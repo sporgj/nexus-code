@@ -1,0 +1,56 @@
+/**
+ * RPC definitions for afsx
+ * @author Judicael Briand
+ */
+package AFSX_
+prefix S
+
+%#include <rx/rx.h>
+%#include <rx/rx_null.h>
+
+%#define AFSX_SERVER_PORT       9462
+%#define AFSX_SERVICE_PORT      0
+%#define AFSX_SERVICE_ID        4
+
+%#define AFSX_STATUS_SUCCESS        0
+%#define AFSX_STATUS_ERROR          1
+%#define AFSX_STATUS_NOOP           2
+
+
+/* maximum number of requests to be handled silmutaneously */
+%#define AFSX_REQ_MAX           2
+/* minimum number of requests to be handled immediately */
+%#define AFSX_REQ_MIN           1
+
+/* index of the null security class */
+%#define AFSX_NULL              0
+
+%#define AFSX_FNAME_MAX         256
+%#define AFSX_PATH_MAX       1024
+
+/* dummy call to get version */
+fversion(
+    IN int dummy,
+    OUT int * result
+) = 1;
+
+fnew(
+    IN string path<AFSX_PATH_MAX>,
+    OUT string crypto_fname<AFSX_FNAME_MAX>
+) = 2;
+
+frealname(
+    IN string fake_name<AFSX_FNAME_MAX>,
+    string path<AFSX_PATH_MAX>,
+    OUT string real_name<AFSX_FNAME_MAX>
+) = 3;
+
+fencodename(
+    IN string fpath<AFSX_PATH_MAX>,
+    OUT string fake_name<AFSX_FNAME_MAX>
+) = 4;
+
+fremove(
+    IN string fpath<AFSX_PATH_MAX>,
+    OUT string code_name<AFSX_FNAME_MAX>
+) = 5;

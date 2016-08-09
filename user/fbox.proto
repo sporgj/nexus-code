@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+message fbox {
+    required uint32 count = 1; // number of elements
+    required bytes ekey = 2; 
+    required bytes mac = 3;
+
+    message fentry {
+        required bytes iv = 1;
+        required bytes encoded_name = 3;
+        required bytes raw_name = 4;
+    }
+
+    // all the entries
+    repeated fentry files = 4;
+}

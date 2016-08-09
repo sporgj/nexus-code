@@ -1,0 +1,5 @@
+{
+    BasedOnStyle: "Webkit",
+    PointerAlignment: "Middle",
+    ColumnLimit: "80"
+}
