@@ -12,4 +12,5 @@ INCFLAGS = -Imbedtls/include -I$(COMMON_DIR)
 OBJS = dirnode.o\
        crypto.o\
        encode.o\
+       dirops.o\
        dnode.pb.o

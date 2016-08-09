@@ -1,4 +1,7 @@
 #include <string>
+#include <glog/logging.h>
+
+#include "uspace.h"
 #include "dirnode.h"
 
 using namespace std;
@@ -8,7 +11,6 @@ class dnode;
 DirNode::DirNode()
 {
     this->proto = new dnode();
-    this->fd = nullptr;
 
     proto->set_count(0);
     proto->clear_ekey();
@@ -19,18 +21,39 @@ DirNode * DirNode::from_file(const char * fpath, bool readonly)
 {
     DirNode * object = nullptr;
     dnode * _dnode = new class ::dnode();
-    fstream * input = new fstream(
-        fpath, ios::binary | (readonly ? ios::in : ios::in | ios::out));
+    fstream input(fpath,
+                  ios::binary | (readonly ? ios::in : ios::in | ios::out));
 
-    if (!_dnode->ParseFromIstream(input)) {
-        cerr << "Could not parse from '" << fpath << "'" << endl;
+    if (!_dnode->ParseFromIstream(&input)) {
+        LOG(ERROR) << "Could not parse from '" << fpath << "'" << endl;
+        delete _dnode;
         goto out;
     }
 
-    input->close();
+    input.close();
 
     object = new DirNode(_dnode);
 
+out:
+    return object;
+}
+
+DirNode * DirNode::from_afs_fpath(const char * fpath)
+{
+    // TODO for now lets assume everything is in one dnode
+    DirNode * object = nullptr;
+    dnode * _dnode = new class ::dnode();
+    fstream input(gbl_temp_dnode_path, ios::binary | ios::in);
+
+    if (!_dnode->ParseFromIstream(&input)) {
+        LOG(ERROR) << "Could not parse: " << gbl_temp_dnode_path;
+        goto out;
+    }
+
+    input.close();
+
+    object = new DirNode(_dnode);
+    object->dnode_fpath = new string(gbl_temp_dnode_path);
 out:
     return object;
 }

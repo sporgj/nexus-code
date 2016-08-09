@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+message snode {
+    required uint32 count = 1;
+    required bytes mac = 2;
+    repeated string dir = 3;
+}

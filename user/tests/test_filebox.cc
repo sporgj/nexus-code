@@ -1,10 +1,4 @@
-#include <iostream>
-
-#include <encode.h>
-#include <crypto.h>
-#include <dirnode.h>
-
-#include <glog/logging.h>
+#include "defs.h"
 
 const char * test_dnode = "./dummy.dnode";
 

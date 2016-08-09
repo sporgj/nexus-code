@@ -1,7 +1,10 @@
 include header.mk
 
-ucafs: main.cc $(OBJS)
-	$(CXX) $(CPPFLAGS) $^ $(LIBS) -o $@
+ucafs: main.cc libucafs.a
+	$(CXX) $(CPPFLAGS) -I../common $^ $(LIBS) -o $@
+
+libucafs.a: $(OBJS)
+	ar cr $@ $^
 
 %.o: %.cc %.h
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
@@ -9,9 +12,9 @@ ucafs: main.cc $(OBJS)
 dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 
-dnode.pb.cc: dnode.proto
+%.pb.cc: %.proto
 	protoc --cpp_out=./ $^
 
 .PHONY: clean
 clean:
-	rm -rf fbox.pb.h fbox.pb.cc $(PROGRAM) $(OBJS)
+	rm -rf *.pb.h *.pb.cc $(PROGRAM) $(OBJS) libucafs.a

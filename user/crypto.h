@@ -32,3 +32,4 @@ char * crypto_get_fname(DirNode * fb, const encoded_fname_t * codename);
  * @return the code object
  */
 encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename);
+encoded_fname_t * crypto_remove_file(DirNode * fb, const char * plain_filename);

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <google/protobuf/repeated_field.h>
 #include <glog/logging.h>
 
 extern "C" {
@@ -14,9 +15,17 @@ extern "C" {
 #include "crypto.h"
 
 class dnode_fentry;
+using namespace google::protobuf;
 
 crypto_ekey_t sealing_key = { 115, 80, 110, 83,  133, 148, 244, 143,
                               217, 92, 188, 135, 118, 99,  130, 243 };
+
+// temporary
+typedef enum {
+    ITER_NOOP,
+    ITER_RM,
+    ITER_PRINT
+} crypto_iterop_t;
 
 // generates a random number using RDRAND
 static int crypto_rand(void * dest, size_t len)
@@ -159,9 +168,10 @@ out:
     return result_malloc;
 }
 
-encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename)
+static encoded_fname_t * __iterate_files(dnode * dn,
+                                         const char * plain_filename,
+                                         bool rm)
 {
-    const dnode_fentry * fentry;
     encoded_fname_t * result = nullptr;
     raw_fname_t * raw_name;
     crypto_iv_t iv;
@@ -173,35 +183,59 @@ encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename)
     uint8_t * encrypted_fname = new uint8_t[slen];
 
     crypto_ekey_t * ekey = new crypto_ekey_t;
-    memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
+    memcpy(ekey, dn->ekey().data(), sizeof(crypto_ekey_t));
     crypto_crypt_ekey(ekey, false);
 
-    for (size_t i = 0; i < fb->proto->file_size(); i++) {
-        fentry = &fb->proto->file(i);
-        
-        memcpy(&iv, fentry->iv().data(), sizeof(crypto_iv_t));
+    RepeatedPtrField<dnode_fentry> * list = dn->mutable_file();
+    if (dn->file_size()) {
+        internal::RepeatedPtrIterator<dnode_fentry> fentry = list->begin();
 
-        /* encrypt filename under current IV and ekey */
-        mbedtls_aes_context aes_ctx;
-        mbedtls_aes_init(&aes_ctx);
-        mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)ekey,
-                               CRYPTO_AES_KEY_SIZE_BITS);
-        mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, slen,
-                              (uint8_t *)&iv, plain_fname, encrypted_fname);
-        mbedtls_aes_free(&aes_ctx);
+        while (fentry != list->end()) {
+            memcpy(&iv, fentry->iv().data(), sizeof(crypto_iv_t));
 
-        raw_name = (raw_fname_t *)fentry->raw_name().data();
-        if (memcmp(encrypted_fname, raw_name->data, slen) == 0) {
-            // we have found the entry
-            result = new encoded_fname_t;
-            memcpy(result, fentry->encoded_name().data(),
-                   sizeof(encoded_fname_t));
-            goto out;
+            /* encrypt filename under current IV and ekey */
+            mbedtls_aes_context aes_ctx;
+            mbedtls_aes_init(&aes_ctx);
+            mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)ekey,
+                                   CRYPTO_AES_KEY_SIZE_BITS);
+            mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, slen,
+                                  (uint8_t *)&iv, plain_fname, encrypted_fname);
+            mbedtls_aes_free(&aes_ctx);
+
+            raw_name = (raw_fname_t *)fentry->raw_name().data();
+            if (memcmp(encrypted_fname, raw_name->data, slen) == 0) {
+                // we have found the entry
+                result = new encoded_fname_t;
+                memcpy(result, fentry->encoded_name().data(),
+                       sizeof(encoded_fname_t));
+
+                /* delete the element */
+                if (rm) {
+                    list->erase(fentry);
+                }
+                break;
+            }
+
+            fentry++;
         }
     }
-
 out:
     delete[] plain_fname;
     delete[] encrypted_fname;
     return result;
+}
+
+encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename)
+{
+    return __iterate_files(fb->proto, plain_filename, ITER_NOOP);
+}
+
+encoded_fname_t * crypto_remove_file(DirNode * fb, const char * plain_filename)
+{
+    return __iterate_files(fb->proto, plain_filename, ITER_RM);
+}
+
+void crypto_list_files(DirNode * fb)
+{
+    return __iterate_files(fb->proto, "", ITER_PRINT);
 }
