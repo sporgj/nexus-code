@@ -1,5 +1,5 @@
 #pragma once
-#include "filebox.h"
+#include "dirnode.h"
 #include "types.h"
 
 /**
@@ -7,7 +7,7 @@
  * @param fb is the filebox object
  * @return 0 on success
  */
-int crypto_init_filebox(FileBox * fb);
+int crypto_init_filebox(DirNode * fb);
 
 /**
  * Adds a new file entry in the filebox
@@ -15,7 +15,7 @@ int crypto_init_filebox(FileBox * fb);
  * @param fname is the plain filename
  * @return the encoded file name
  */
-encoded_fname_t * crypto_add_file(FileBox * fb, const char * fname);
+encoded_fname_t * crypto_add_file(DirNode * fb, const char * fname);
 
 /**
  * Returns the plain file name of a file
@@ -23,7 +23,7 @@ encoded_fname_t * crypto_add_file(FileBox * fb, const char * fname);
  * @param codename is the encoded file name
  * @return the plain file name
  */
-char * crypto_get_fname(FileBox * fb, const encoded_fname_t * codename);
+char * crypto_get_fname(DirNode * fb, const encoded_fname_t * codename);
 
 /**
  * Returns the code object
@@ -31,4 +31,4 @@ char * crypto_get_fname(FileBox * fb, const encoded_fname_t * codename);
  * @param plain_filename
  * @return the code object
  */
-encoded_fname_t * crypto_get_codename(FileBox * fb, const char * plain_filename);
+encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename);

@@ -158,7 +158,7 @@ out:
     return;
 }
 
-char * encode_filename(const encoded_fname_t * code)
+char * encode_bin2str(const encoded_fname_t * code)
 {
     char * result = NULL;
     size_t sz;
@@ -178,7 +178,7 @@ char * encode_filename(const encoded_fname_t * code)
     return result;
 }
 
-encoded_fname_t * decode_filename(const char * encoded_filename)
+encoded_fname_t * encode_str2bin(const char * encoded_filename)
 {
     size_t src_sz = strlen(encoded_filename);
     

@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-message fbox {
+message dnode {
     required uint32 count = 1; // number of elements
     required bytes ekey = 2; 
     required bytes mac = 3;
@@ -12,5 +12,5 @@ message fbox {
     }
 
     // all the entries
-    repeated fentry files = 4;
+    repeated fentry file = 4;
 }

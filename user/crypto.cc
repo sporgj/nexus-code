@@ -10,10 +10,10 @@ extern "C" {
 }
 
 #include "uspace.h"
-#include "filebox.h"
+#include "dirnode.h"
 #include "crypto.h"
 
-class fbox_fentry;
+class dnode_fentry;
 
 crypto_ekey_t sealing_key = { 115, 80, 110, 83,  133, 148, 244, 143,
                               217, 92, 188, 135, 118, 99,  130, 243 };
@@ -30,7 +30,7 @@ static int crypto_rand(void * dest, size_t len)
 }
 
 // TODO
-static int crypto_mac_fb(FileBox * fb, crypto_mac_t * mac) { return 0; }
+static int crypto_mac_fb(DirNode * fb, crypto_mac_t * mac) { return 0; }
 
 static int crypto_crypt_ekey(crypto_ekey_t * ekey, bool encrypt)
 {
@@ -50,7 +50,7 @@ static int crypto_crypt_ekey(crypto_ekey_t * ekey, bool encrypt)
     return 0;
 }
 
-int crypto_init_filebox(FileBox * fb)
+int crypto_init_filebox(DirNode * fb)
 {
     crypto_ekey_t ekey;
     crypto_mac_t mac;
@@ -64,7 +64,7 @@ int crypto_init_filebox(FileBox * fb)
     return 0;
 }
 
-encoded_fname_t * crypto_add_file(FileBox * fb, const char * fname)
+encoded_fname_t * crypto_add_file(DirNode * fb, const char * fname)
 {
     raw_fname_t * fname_malloc;
     size_t slen = CRYPTO_GET_BLK_LEN(strlen(fname));
@@ -87,7 +87,7 @@ encoded_fname_t * crypto_add_file(FileBox * fb, const char * fname)
 
         /* get the encryption key then encrypt the raw filename */
         crypto_ekey_t * ekey = new crypto_ekey_t;
-        memcpy(ekey, fb->fbox_ptr->ekey().data(), sizeof(crypto_ekey_t));
+        memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
         crypto_crypt_ekey(ekey, false);
 
         crypto_iv_t iv, _iv;
@@ -112,13 +112,13 @@ out:
     return encoded_name;
 }
 
-char * crypto_get_fname(FileBox * fb, const encoded_fname_t * codename)
+char * crypto_get_fname(DirNode * fb, const encoded_fname_t * codename)
 {
     char * result_malloc = nullptr;
-    const fbox_fentry * fentry;
+    const dnode_fentry * fentry;
 
-    for (size_t i = 0; i < fb->fbox_ptr->files_size(); i++) {
-        fentry = &fb->fbox_ptr->files(i);
+    for (size_t i = 0; i < fb->proto->file_size(); i++) {
+        fentry = &fb->proto->file(i);
 
         if (memcmp(codename, fentry->encoded_name().data(),
                    sizeof(encoded_fname_t)) == 0) {
@@ -141,7 +141,7 @@ decrypt : {
     result_malloc = (char *)malloc(slen);
 
     crypto_ekey_t * ekey = new crypto_ekey_t;
-    memcpy(ekey, fb->fbox_ptr->ekey().data(), sizeof(crypto_ekey_t));
+    memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
     crypto_crypt_ekey(ekey, false);
 
     mbedtls_aes_context aes_ctx;
@@ -159,9 +159,9 @@ out:
     return result_malloc;
 }
 
-encoded_fname_t * crypto_get_codename(FileBox * fb, const char * plain_filename)
+encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename)
 {
-    const fbox_fentry * fentry;
+    const dnode_fentry * fentry;
     encoded_fname_t * result = nullptr;
     raw_fname_t * raw_name;
     crypto_iv_t iv;
@@ -173,11 +173,11 @@ encoded_fname_t * crypto_get_codename(FileBox * fb, const char * plain_filename)
     uint8_t * encrypted_fname = new uint8_t[slen];
 
     crypto_ekey_t * ekey = new crypto_ekey_t;
-    memcpy(ekey, fb->fbox_ptr->ekey().data(), sizeof(crypto_ekey_t));
+    memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
     crypto_crypt_ekey(ekey, false);
 
-    for (size_t i = 0; i < fb->fbox_ptr->files_size(); i++) {
-        fentry = &fb->fbox_ptr->files(i);
+    for (size_t i = 0; i < fb->proto->file_size(); i++) {
+        fentry = &fb->proto->file(i);
         
         memcpy(&iv, fentry->iv().data(), sizeof(crypto_iv_t));
 

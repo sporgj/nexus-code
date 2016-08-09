@@ -2,11 +2,11 @@
 
 #include <encode.h>
 #include <crypto.h>
-#include <filebox.h>
+#include <dirnode.h>
 
 #include <glog/logging.h>
 
-const char * test_fbox = "./dummy.fbox";
+const char * test_dnode = "./dummy.dnode";
 
 using namespace std;
 
@@ -16,18 +16,18 @@ static void test_filebox()
 {
     LOG(INFO) << ". Initializing filebox file";
     // create our file and truncate it
-    fstream file(test_fbox, ios::in | ios::out | ios::app);
-    FileBox * fb = new FileBox();
+    fstream file(test_dnode, ios::in | ios::out | ios::app);
+    DirNode * fb = new DirNode();
     crypto_init_filebox(fb);
     fb->dump();
-    FileBox::write(fb, &file);
+    DirNode::write(fb, &file);
     file.close();
     delete fb;
 
     LOG(INFO) << "Reading from initialized file";
-    fb = FileBox::from_file(test_fbox, false);
+    fb = DirNode::from_file(test_dnode, false);
     if (fb == nullptr) {
-        LOG(ERROR) << "Error parsing fbox: " << test_fbox;
+        LOG(ERROR) << "Error parsing dnode: " << test_dnode;
         return;
     }
 
@@ -37,16 +37,16 @@ static void test_filebox()
     }
     fb->dump();
 
-    if (!FileBox::write(fb, test_fbox)) {
+    if (!DirNode::write(fb, test_dnode)) {
         LOG(ERROR) << "Flushing filebox failed";
         return;
     }
     delete fb;
 
     LOG(INFO) << "Rereading entries";
-    fb = FileBox::from_file(test_fbox, false);
+    fb = DirNode::from_file(test_dnode, false);
     if (fb == nullptr) {
-        LOG(ERROR) << "Error parsing fbox: " << test_fbox;
+        LOG(ERROR) << "Error parsing dnode: " << test_dnode;
         return;
     }
     fb->dump();

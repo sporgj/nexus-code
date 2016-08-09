@@ -9,7 +9,7 @@ LIBS = -lprotobuf -pthread\
        -luuid
 INCFLAGS = -Imbedtls/include -I$(COMMON_DIR)
 
-OBJS = filebox.o\
+OBJS = dirnode.o\
        crypto.o\
        encode.o\
-       fbox.pb.o
+       dnode.pb.o

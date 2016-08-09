@@ -6,10 +6,10 @@ ucafs: main.cc $(OBJS)
 %.o: %.cc %.h
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 
-filebox.o: filebox.cc filebox.h fbox.pb.cc
+dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 
-fbox.pb.cc: fbox.proto
+dnode.pb.cc: dnode.proto
 	protoc --cpp_out=./ $^
 
 .PHONY: clean
