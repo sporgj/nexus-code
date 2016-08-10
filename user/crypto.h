@@ -33,3 +33,6 @@ char * crypto_get_fname(DirNode * fb, const encoded_fname_t * codename);
  */
 encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename);
 encoded_fname_t * crypto_remove_file(DirNode * fb, const char * plain_filename);
+
+void crypto_list_files(DirNode * fb);
+

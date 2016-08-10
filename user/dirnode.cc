@@ -85,3 +85,6 @@ bool DirNode::write(DirNode * fb, const char * fpath)
 
     return rv;
 }
+
+void DirNode::list_files() {
+}

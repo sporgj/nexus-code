@@ -21,11 +21,7 @@ crypto_ekey_t sealing_key = { 115, 80, 110, 83,  133, 148, 244, 143,
                               217, 92, 188, 135, 118, 99,  130, 243 };
 
 // temporary
-typedef enum {
-    ITER_NOOP,
-    ITER_RM,
-    ITER_PRINT
-} crypto_iterop_t;
+typedef enum { ITER_NOOP, ITER_RM, ITER_PRINT } crypto_iterop_t;
 
 // generates a random number using RDRAND
 static int crypto_rand(void * dest, size_t len)
@@ -41,22 +37,40 @@ static int crypto_rand(void * dest, size_t len)
 // TODO
 static int crypto_mac_fb(DirNode * fb, crypto_mac_t * mac) { return 0; }
 
-static int crypto_crypt_ekey(crypto_ekey_t * ekey, bool encrypt)
+static int crypto_ekey(crypto_ekey_t * ekey, crypto_op_t op)
 {
     mbedtls_aes_context aes_ctx;
     mbedtls_aes_init(&aes_ctx);
-    if (encrypt) {
+    if (op == ENCRYPT) {
         mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)&sealing_key,
                                CRYPTO_AES_KEY_SIZE_BITS);
     } else {
         mbedtls_aes_setkey_dec(&aes_ctx, (uint8_t *)&sealing_key,
                                CRYPTO_AES_KEY_SIZE_BITS);
     }
-    mbedtls_aes_crypt_ecb(&aes_ctx,
-                          encrypt ? MBEDTLS_AES_ENCRYPT : MBEDTLS_AES_DECRYPT,
+    mbedtls_aes_crypt_ecb(&aes_ctx, op == ENCRYPT ? MBEDTLS_AES_ENCRYPT
+                                                  : MBEDTLS_AES_DECRYPT,
                           (uint8_t *)ekey, (uint8_t *)ekey);
     mbedtls_aes_free(&aes_ctx);
     return 0;
+}
+
+static void crypto_rawfname(crypto_ekey_t * ekey, crypto_iv_t * iv, size_t slen,
+                            uint8_t * src, uint8_t * dest, crypto_op_t op)
+{
+    mbedtls_aes_context aes_ctx;
+    mbedtls_aes_init(&aes_ctx);
+    if (op == ENCRYPT) {
+        mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)ekey,
+                               CRYPTO_AES_KEY_SIZE_BITS);
+    } else {
+        mbedtls_aes_setkey_dec(&aes_ctx, (uint8_t *)ekey,
+                               CRYPTO_AES_KEY_SIZE_BITS);
+    }
+    mbedtls_aes_crypt_cbc(
+        &aes_ctx, (op == ENCRYPT ? MBEDTLS_AES_ENCRYPT : MBEDTLS_AES_DECRYPT),
+        slen, (uint8_t *)iv, src, dest);
+    mbedtls_aes_free(&aes_ctx);
 }
 
 int crypto_init_filebox(DirNode * fb)
@@ -65,7 +79,7 @@ int crypto_init_filebox(DirNode * fb)
     crypto_mac_t mac;
 
     crypto_rand(&ekey, sizeof(crypto_ekey_t));
-    crypto_crypt_ekey(&ekey, 1);
+    crypto_ekey(&ekey, ENCRYPT);
 
     fb->set_ekey(&ekey);
     fb->set_mac(&mac);
@@ -97,21 +111,15 @@ encoded_fname_t * crypto_add_file(DirNode * fb, const char * fname)
         /* get the encryption key then encrypt the raw filename */
         crypto_ekey_t * ekey = new crypto_ekey_t;
         memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
-        crypto_crypt_ekey(ekey, false);
+        crypto_ekey(ekey, DECRYPT);
 
         crypto_iv_t iv, _iv;
         crypto_rand(&iv, sizeof(crypto_iv_t));
         memcpy(&_iv, &iv, sizeof(crypto_iv_t));
 
-        mbedtls_aes_context aes_ctx;
-        mbedtls_aes_init(&aes_ctx);
-        mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)ekey,
-                               CRYPTO_AES_KEY_SIZE_BITS);
-        mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, slen,
-                              (uint8_t *)&iv, fname_malloc->data,
-                              (uint8_t *)fname_malloc->data);
-        mbedtls_aes_free(&aes_ctx);
-
+        crypto_rawfname(ekey, &iv, slen, fname_malloc->data, fname_malloc->data,
+                        ENCRYPT);
+        
         fb->add(encoded_name, fname_malloc, &_iv);
 
         free(fname_malloc);
@@ -151,14 +159,9 @@ decrypt : {
 
     crypto_ekey_t * ekey = new crypto_ekey_t;
     memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
-    crypto_crypt_ekey(ekey, false);
+    crypto_ekey(ekey, DECRYPT);
 
-    mbedtls_aes_context aes_ctx;
-    mbedtls_aes_init(&aes_ctx);
-    mbedtls_aes_setkey_dec(&aes_ctx, (uint8_t *)ekey, CRYPTO_AES_KEY_SIZE_BITS);
-    mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, slen, (uint8_t *)iv,
-                          temp_fname->data, (uint8_t *)result_malloc);
-    mbedtls_aes_free(&aes_ctx);
+    crypto_rawfname(ekey, iv, slen, temp_fname->data, (uint8_t *)result_malloc, DECRYPT);
 
     delete iv;
     delete ekey;
@@ -169,56 +172,45 @@ out:
 }
 
 static encoded_fname_t * __iterate_files(dnode * dn,
-                                         const char * plain_filename,
-                                         bool rm)
+                                         const char * plain_filename, bool rm)
 {
     encoded_fname_t * result = nullptr;
     raw_fname_t * raw_name;
     crypto_iv_t iv;
     size_t slen = CRYPTO_GET_BLK_LEN(strlen(plain_filename));
-
-    uint8_t * plain_fname = new uint8_t[slen];
-    memset(plain_fname, 0, slen);
-    memcpy(plain_fname, plain_filename, strlen(plain_filename));
+    uint8_t * plain_fname = new uint8_t[slen]{ 0 };
     uint8_t * encrypted_fname = new uint8_t[slen];
+
+    memcpy(plain_fname, plain_filename, strlen(plain_filename));
 
     crypto_ekey_t * ekey = new crypto_ekey_t;
     memcpy(ekey, dn->ekey().data(), sizeof(crypto_ekey_t));
-    crypto_crypt_ekey(ekey, false);
+    crypto_ekey(ekey, DECRYPT);
 
-    RepeatedPtrField<dnode_fentry> * list = dn->mutable_file();
-    if (dn->file_size()) {
-        internal::RepeatedPtrIterator<dnode_fentry> fentry = list->begin();
+    auto list = dn->mutable_file();
+    auto fentry = list->begin();
+    while (fentry != list->end()) {
+        /* encrypt filename under current IV and ekey */
+        memcpy(&iv, fentry->iv().data(), sizeof(crypto_iv_t));
 
-        while (fentry != list->end()) {
-            memcpy(&iv, fentry->iv().data(), sizeof(crypto_iv_t));
+        crypto_rawfname(ekey, &iv, slen, plain_fname, encrypted_fname, ENCRYPT);
 
-            /* encrypt filename under current IV and ekey */
-            mbedtls_aes_context aes_ctx;
-            mbedtls_aes_init(&aes_ctx);
-            mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)ekey,
-                                   CRYPTO_AES_KEY_SIZE_BITS);
-            mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, slen,
-                                  (uint8_t *)&iv, plain_fname, encrypted_fname);
-            mbedtls_aes_free(&aes_ctx);
+        raw_name = (raw_fname_t *)fentry->raw_name().data();
+        if (memcmp(encrypted_fname, raw_name->data, slen) == 0) {
+            result = new encoded_fname_t;
+            memcpy(result, fentry->encoded_name().data(),
+                   sizeof(encoded_fname_t));
 
-            raw_name = (raw_fname_t *)fentry->raw_name().data();
-            if (memcmp(encrypted_fname, raw_name->data, slen) == 0) {
-                // we have found the entry
-                result = new encoded_fname_t;
-                memcpy(result, fentry->encoded_name().data(),
-                       sizeof(encoded_fname_t));
-
-                /* delete the element */
-                if (rm) {
-                    list->erase(fentry);
-                }
-                break;
+            if (rm) {
+                list->erase(fentry);
             }
 
-            fentry++;
+            break;
         }
+
+        fentry++;
     }
+
 out:
     delete[] plain_fname;
     delete[] encrypted_fname;
@@ -227,15 +219,36 @@ out:
 
 encoded_fname_t * crypto_get_codename(DirNode * fb, const char * plain_filename)
 {
-    return __iterate_files(fb->proto, plain_filename, ITER_NOOP);
+    return __iterate_files(fb->proto, plain_filename, false);
 }
 
 encoded_fname_t * crypto_remove_file(DirNode * fb, const char * plain_filename)
 {
-    return __iterate_files(fb->proto, plain_filename, ITER_RM);
+    return __iterate_files(fb->proto, plain_filename, true);
 }
 
 void crypto_list_files(DirNode * fb)
 {
-    return __iterate_files(fb->proto, "", ITER_PRINT);
+    crypto_ekey_t * ekey = new crypto_ekey_t;
+    memcpy(ekey, fb->proto->ekey().data(), sizeof(crypto_ekey_t));
+    crypto_ekey(ekey, DECRYPT);
+    crypto_iv_t iv;
+    raw_fname_t * raw_name;
+
+    auto list = fb->proto->mutable_file();
+    auto fentry = list->begin();
+
+    while (fentry != list->end()) {
+        /* encrypt filename under current IV and ekey */
+        memcpy(&iv, fentry->iv().data(), sizeof(crypto_iv_t));
+        raw_name = (raw_fname_t *)fentry->raw_name().data();
+
+        uint8_t * decrypted_fname = new uint8_t[raw_name->len];
+
+        crypto_rawfname(ekey, &iv, raw_name->len, raw_name->data,
+                        decrypted_fname, DECRYPT);
+        cout << decrypted_fname << endl;
+
+        fentry++;
+    }
 }

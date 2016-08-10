@@ -12,6 +12,11 @@
 #define CRYPTO_GET_BLK_LEN(x)                                                      \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE);
 
+typedef enum {
+    ENCRYPT = 0,
+    DECRYPT = 1
+} crypto_op_t;
+
 typedef struct { uint8_t iv[CRYPTO_AES_IV_SIZE]; } crypto_iv_t;
 
 typedef struct { uint8_t ekey[CRYPTO_AES_KEY_SIZE]; } crypto_ekey_t;

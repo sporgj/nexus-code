@@ -14,7 +14,7 @@ static void test_dops()
 
     cout << ". Initializing filebox file" << endl;
     // create our file and truncate it
-    fstream file(gbl_temp_dnode_path, ios::in | ios::out | ios::app);
+    fstream file(TEST_FBOX_PATH1, ios::out | ios::trunc);
     DirNode * fb = new DirNode();
     crypto_init_filebox(fb);
     DirNode::write(fb, &file);
@@ -42,7 +42,7 @@ static void test_dops()
         cout << " ======> " << str << endl;
     }
 
-    cout << "\n . Lookup operation (plain -> encoded)" << endl;
+    cout << "\n. Lookup operation (plain -> encoded)" << endl;
     for (size_t i = 0; i < LEN; i++) {
         cout << fnames[i];
         if (fops_plain2code((char *)fnames[i], &str)) {
@@ -52,18 +52,26 @@ static void test_dops()
         cout << " ======> " << str << endl;
     }
 
-    cout << "\n . Deleting entries" << endl;
+    fb = DirNode::from_file(TEST_FBOX_PATH1, true);
+
+    cout << "\n. Listing entries" << endl;
+    crypto_list_files(fb); 
+
+    cout << "\n. Deleting entries" << endl;
     srand(time(0));
     for (size_t i = 0; i < 2; i++) {
         int j = rand() % LEN;
         cout << "Removing '" << fnames[j] << "'... ";
         if (fops_remove((char *)fnames[j], &str)) {
-            cout << "FAILED";
+            cout << "FAILED" << endl;;
+            continue;
         }
         cout << str << endl;
     }
     
-    fb = DirNode::from_path(TEST_FBOX_PATH1, true);
+    
+    cout << "\n. Listing entries" << endl;
+    fb = DirNode::from_file(TEST_FBOX_PATH1, true);
     crypto_list_files(fb);
 }
 

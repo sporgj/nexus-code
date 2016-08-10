@@ -51,6 +51,7 @@ public:
 
     bool add(encoded_fname_t * encoded_fname, raw_fname_t * fname,
              crypto_iv_t * iv);
+    void list_files();
     /**
      * Flushes contents to on-disk dirnode object
      * @return true on success
@@ -69,4 +70,6 @@ public:
                                                  const char * plain_filename);
     friend encoded_fname_t * crypto_remove_file(DirNode * fb,
                                                 const char * plain_filename);
+    friend void crypto_list_files(DirNode * fb);
+
 };
