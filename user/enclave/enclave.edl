@@ -1,7 +1,0 @@
-enclave {
-
-    trusted {
-        public void ecall_test_function(void);
-    };
-
-};

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Creates a new file at the corresponding file path
  * @param fpath is the file path
@@ -40,3 +44,7 @@ int dops_plain2code(char * dpath_raw, char ** encoded_dname_dest);
  */
 int fops_remove(char * fpath_raw, char ** encoded_fname_dest);
 int dops_remove(char * fpath_raw, char ** encoded_fname_dest);
+
+#ifdef __cplusplus
+}
+#endif

@@ -2,6 +2,7 @@ COMMON_DIR = ../common
 
 PROGRAM = ucafs
 CXX = clang++
+CC = clang
 CPPFLAGS = -g -std=c++11
 LIBS = -lprotobuf -pthread\
        -Lmbedtls/library -lmbedcrypto\
