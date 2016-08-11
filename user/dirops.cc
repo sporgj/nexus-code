@@ -1,7 +1,6 @@
 #include <glog/logging.h>
 
 #include "uspace.h"
-#include "crypto.h"
 #include "dirnode.h"
 #include "encode.h"
 #include "dirops.h"
@@ -31,26 +30,26 @@ int fops_new(char * fpath, char ** encoded_name_dest)
         goto out;
     }
 
-    /* 1 - Get the corresponding dirnode */
+    // 1 - Get the corresponding dirnode
     dirnode = DirNode::from_afs_fpath(fpath);
     if (dirnode == nullptr) {
         return error;
     }
 
-    /* 2 - Get filename and add it to DirNode */
-    fname_code = crypto_add_file(dirnode, fname);
+    // 2 - Get filename and add it to DirNode
+    fname_code = dirnode->add_file(fname);
     if (fname_code == nullptr) {
         LOG(ERROR) << "File: " << fpath;
         goto out;
     }
 
-    /* 3 - Flush to disk */
+    // 3 - Flush to disk 
     if (!dirnode->flush()) {
         LOG(ERROR) << "Flushing '" << fpath << "' failed";
         goto out;
     }
 
-    /* 4 - Set the encoded name */
+    // 4 - Set the encoded name
     *encoded_name_dest = encode_bin2str(fname_code);
     error = 0;
 out:
@@ -70,19 +69,19 @@ int fops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest)
     encoded_fname_t * fname_code = NULL;
     char * result_malloced;
 
-    /* 1 - Get the corresponding dirnode */
+    // 1 - Get the corresponding dirnode
     DirNode * dirnode = DirNode::from_afs_fpath(dir_path);
     if (dirnode == nullptr) {
         goto out;
     }
 
-    /* 2 - Get the binary version */
+    // 2 - Get the binary version
     if ((fname_code = encode_str2bin(encoded_name)) == NULL) {
         goto out;
     }
 
-    /* 3 - Get the plain filename */
-    if ((result_malloced = crypto_get_fname(dirnode, fname_code)) == NULL) {
+    // 3 - Get the plain filename
+    if ((result_malloced = dirnode->encoded2raw(fname_code, true)) == NULL) {
         goto out;
     }
 
@@ -100,7 +99,7 @@ int __fops_encode_or_remove(char * fpath, char ** encoded_fname_dest, bool rm)
 {
     int error = -1; // TODO
     char * fname = NULL;
-    encoded_fname_t * fname_code = NULL;
+    const encoded_fname_t * fname_code = NULL;
 
     /* 1 - Get the corresponding dirnode */
     DirNode * dirnode = DirNode::from_afs_fpath(fpath);
@@ -114,8 +113,7 @@ int __fops_encode_or_remove(char * fpath, char ** encoded_fname_dest, bool rm)
     }
 
     /* Perform the operation */
-    fname_code = rm ? crypto_remove_file(dirnode, fname)
-                    : crypto_get_codename(dirnode, fname);
+    fname_code = rm ? dirnode->rm_file(fname) : dirnode->raw2encoded(fname);
     if (!fname_code) {
         goto out;
     }

@@ -1,16 +1,12 @@
 syntax = "proto2";
 
 message dnode {
-    required uint32 count = 1; // number of elements
-    required bytes ekey = 2; 
-    required bytes mac = 3;
 
     message fentry {
-        required bytes iv = 1;
-        required bytes encoded_name = 3;
-        required bytes raw_name = 4;
+        required bytes encoded_name = 1;
+        required bytes raw_name = 2;
     }
 
     // all the entries
-    repeated fentry file = 4;
+    repeated fentry file = 1;
 }

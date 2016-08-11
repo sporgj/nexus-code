@@ -15,11 +15,10 @@ static void test_dops()
     cout << ". Initializing filebox file" << endl;
     // create our file and truncate it
     fstream file(TEST_FBOX_PATH1, ios::out | ios::trunc);
-    DirNode * fb = new DirNode();
-    crypto_init_filebox(fb);
-    DirNode::write(fb, &file);
+    DirNode * dn = new DirNode();
+    DirNode::write(dn, &file);
     file.close();
-    delete fb;
+    delete dn;
 
     cout << "\n. Adding entries to the filebox " << endl;
     for (size_t i = 0; i < LEN; i++) {
@@ -52,10 +51,10 @@ static void test_dops()
         cout << " ======> " << str << endl;
     }
 
-    fb = DirNode::from_file(TEST_FBOX_PATH1, true);
+    dn = DirNode::from_file(TEST_FBOX_PATH1);
 
     cout << "\n. Listing entries" << endl;
-    crypto_list_files(fb); 
+    dn->list_files();
 
     cout << "\n. Deleting entries" << endl;
     srand(time(0));
@@ -71,8 +70,8 @@ static void test_dops()
     
     
     cout << "\n. Listing entries" << endl;
-    fb = DirNode::from_file(TEST_FBOX_PATH1, true);
-    crypto_list_files(fb);
+    dn = DirNode::from_file(TEST_FBOX_PATH1);
+    dn->list_files();
 }
 
 int main()

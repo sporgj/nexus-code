@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include <encode.h>
-#include <crypto.h>
 #include <dirnode.h>
 #include <dirops.h>
 
