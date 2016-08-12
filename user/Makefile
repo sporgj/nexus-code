@@ -11,6 +11,8 @@ RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 RXINC := -I$(OPENAFS_INC)
 RXLIBS := -L$(OPENAFS_LIB) -lrx -llwp
 
+all: common.h ucafs
+
 define make-test-target
 $(1): $(1).cc libucafs.a
 	@$(CXX) $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc libucafs.a $$(LIBS) -o $(1)
@@ -19,6 +21,9 @@ endef
 
 $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
 tests: $(addprefix tests/, $(TESTS))
+
+common.h: $(COMMON_DIR)/common.h
+	cp $^ $@
 
 ucafs: main.cc libucafs.a
 	$(CXX) $(CPPFLAGS) -I../common $^ $(LIBS) $(RXLIBS) -o $@

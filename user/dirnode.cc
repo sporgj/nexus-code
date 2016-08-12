@@ -38,7 +38,7 @@ DirNode * DirNode::from_file(const char * fpath)
     }
 
     _dnode = new class ::dnode;
-    
+
     if (_header.len) {
         dnode_buf = new uint8_t[_header.len];
         file.read((char *)dnode_buf, _header.len);
@@ -58,7 +58,8 @@ DirNode * DirNode::from_file(const char * fpath)
 
 out:
     file.close();
-    if (obj == nullptr) delete _dnode;
+    if (obj == nullptr)
+        delete _dnode;
     delete[] dnode_buf;
     return obj;
 }
@@ -126,6 +127,8 @@ encoded_fname_t * DirNode::add_file(const char * fname)
     fentry->set_encoded_name(encoded_name, sizeof(encoded_fname_t));
     fentry->set_raw_name(_dest_fname, slen);
 
+    header.count++;
+
     delete _dest_fname;
 
     return encoded_name;
@@ -150,6 +153,7 @@ encoded_fname_t * DirNode::rm_file(const char * realname)
 
             // delete from the list
             fentry_list->erase(curr_fentry);
+            header.count--;
             break;
         }
 
@@ -194,7 +198,8 @@ const encoded_fname_t * DirNode::raw2encoded(const char * realname)
 
         if (memcmp(realname, temp, len) == 0) {
             encoded = new encoded_fname_t;
-            memcpy(encoded, temp, sizeof(encoded_fname_t));
+            memcpy(encoded, fentry.encoded_name().data(),
+                   sizeof(encoded_fname_t));
 
             return encoded;
         }

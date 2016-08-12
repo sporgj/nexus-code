@@ -189,6 +189,9 @@ encoded_fname_t * encode_str2bin(const char * encoded_filename)
                 return NULL;
             }
         }
+    } else {
+        // we know it's not a valid filename
+        return NULL;
     }
 
     const char * _encoded_fname = encoded_filename + UCAFS_FNAME_PREFIX_LEN;
