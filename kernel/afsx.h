@@ -128,22 +128,52 @@ extern afs_int32 SAFSX_fencodename(
 
 extern int AFSX_fremove(
 	/*IN */ struct rx_connection *z_conn,
-	/*IN */ char * plain_name,
+	/*IN */ char * fpath,
 	/*OUT*/ char * *code_name);
 
 extern afs_int32 SAFSX_fremove(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ char * plain_name,
+	/*IN */ char * fpath,
 	/*OUT*/ char * *code_name);
+
+extern int StartAFSX_fpush(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint64 chunklength,
+	/*IN */ afs_uint64 filelength);
+
+extern int EndAFSX_fpush(
+	/*IN */ struct rx_call *z_call);
+
+extern afs_int32 SAFSX_fpush(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint64 chunklength,
+	/*IN */ afs_uint64 filelength);
+
+extern int StartAFSX_fpull(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint64 chunklength,
+	/*IN */ afs_uint64 filelength);
+
+extern int EndAFSX_fpull(
+	/*IN */ struct rx_call *z_call);
+
+extern afs_int32 SAFSX_fpull(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint64 chunklength,
+	/*IN */ afs_uint64 filelength);
 
 extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
 #define AFSX_LOWEST_OPCODE   1
-#define AFSX_HIGHEST_OPCODE	5
-#define AFSX_NUMBER_OPCODES	5
+#define AFSX_HIGHEST_OPCODE	7
+#define AFSX_NUMBER_OPCODES	7
 
-#define AFSX_NO_OF_STAT_FUNCS	5
+#define AFSX_NO_OF_STAT_FUNCS	7
 
 AFS_RXGEN_EXPORT
 extern const char *AFSX_function_names[];

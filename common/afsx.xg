@@ -54,3 +54,17 @@ fremove(
     IN string fpath<AFSX_PATH_MAX>,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 5;
+
+fpush(
+    IN string fpath<AFSX_PATH_MAX>,
+    afs_uint64 chunklength,
+    afs_uint64 filelength
+) split = 6;
+
+fpull(
+    IN string fpath<AFSX_PATH_MAX>,
+    afs_uint64 chunklength,
+    afs_uint64 filelength
+) split = 7;
+
+    

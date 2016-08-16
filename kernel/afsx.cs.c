@@ -180,7 +180,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_fremove(struct rx_connection *z_conn,char * plain_name,char * *code_name)
+int AFSX_fremove(struct rx_connection *z_conn,char * fpath,char * *code_name)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 5;
@@ -191,7 +191,7 @@ int AFSX_fremove(struct rx_connection *z_conn,char * plain_name,char * *code_nam
 
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_string(&z_xdrs, &plain_name, AFSX_PATH_MAX))) {
+	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;
 	}
@@ -215,6 +215,88 @@ fail:
 		(((afs_uint32)(ntohs(z_conn->serviceId) << 16)) 
 		| ((afs_uint32)ntohs(z_conn->peer->port))),
 		4, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
+		&z_call->bytesSent, &z_call->bytesRcvd, 1);
+	}
+
+	return z_result;
+}
+
+int StartAFSX_fpush(struct rx_call *z_call,char * fpath,afs_uint64 chunklength,afs_uint64 filelength)
+{
+	static int z_op = 6;
+	int z_result;
+	XDR z_xdrs;
+	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
+
+	/* Marshal the arguments */
+	if ((!xdr_int(&z_xdrs, &z_op))
+	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))
+	     || (!xdr_afs_uint64(&z_xdrs, &chunklength))
+	     || (!xdr_afs_uint64(&z_xdrs, &filelength))) {
+		z_result = RXGEN_CC_MARSHAL;
+		goto fail;
+	}
+
+	z_result = RXGEN_SUCCESS;
+fail:
+	return z_result;
+}
+
+int EndAFSX_fpush(struct rx_call *z_call)
+{
+	int z_result;
+	struct clock __QUEUE, __EXEC;
+	z_result = RXGEN_SUCCESS;
+	if (rx_enable_stats) {
+	    clock_GetTime(&__EXEC);
+	    clock_Sub(&__EXEC, &z_call->startTime);
+	    __QUEUE = z_call->startTime;
+	    clock_Sub(&__QUEUE, &z_call->queueTime);
+	    rx_IncrementTimeAndCount(z_call->conn->peer,
+		(((afs_uint32)(ntohs(z_call->conn->serviceId) << 16)) |
+		((afs_uint32)ntohs(z_call->conn->peer->port))),
+		5, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
+		&z_call->bytesSent, &z_call->bytesRcvd, 1);
+	}
+
+	return z_result;
+}
+
+int StartAFSX_fpull(struct rx_call *z_call,char * fpath,afs_uint64 chunklength,afs_uint64 filelength)
+{
+	static int z_op = 7;
+	int z_result;
+	XDR z_xdrs;
+	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
+
+	/* Marshal the arguments */
+	if ((!xdr_int(&z_xdrs, &z_op))
+	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))
+	     || (!xdr_afs_uint64(&z_xdrs, &chunklength))
+	     || (!xdr_afs_uint64(&z_xdrs, &filelength))) {
+		z_result = RXGEN_CC_MARSHAL;
+		goto fail;
+	}
+
+	z_result = RXGEN_SUCCESS;
+fail:
+	return z_result;
+}
+
+int EndAFSX_fpull(struct rx_call *z_call)
+{
+	int z_result;
+	struct clock __QUEUE, __EXEC;
+	z_result = RXGEN_SUCCESS;
+	if (rx_enable_stats) {
+	    clock_GetTime(&__EXEC);
+	    clock_Sub(&__EXEC, &z_call->startTime);
+	    __QUEUE = z_call->startTime;
+	    clock_Sub(&__QUEUE, &z_call->queueTime);
+	    rx_IncrementTimeAndCount(z_call->conn->peer,
+		(((afs_uint32)(ntohs(z_call->conn->serviceId) << 16)) |
+		((afs_uint32)ntohs(z_call->conn->peer->port))),
+		6, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
 		&z_call->bytesSent, &z_call->bytesRcvd, 1);
 	}
 

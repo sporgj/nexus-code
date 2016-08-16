@@ -4,20 +4,24 @@
 #include <linux/types.h>
 #include <linux/string.h>
 
+#include <afsconfig.h>
+#include "afs/param.h"
+
+#include "afs/sysincludes.h"
+#include "afsincludes.h"
 #include "afs_secure.h"
 #include "afsx.h"
 
-static char * ignore_dirs[] = {
-    "/xyz.vm/user/mirko/.afsx"
-};
+static char * ignore_dirs[] = { "/xyz.vm/user/mirko/.afsx" };
 
-static struct rx_connection *conn = NULL, *ping_conn = NULL;
+static struct rx_connection * conn = NULL, *ping_conn = NULL;
 
 static int AFSX_IS_CONNECTED = 0;
 
-int LINUX_AFSX_connect() {
+int LINUX_AFSX_connect()
+{
     u_long host;
-    struct rx_securityClass* null_securityObject;
+    struct rx_securityClass * null_securityObject;
 
     rx_Init(0);
 
@@ -41,7 +45,8 @@ int LINUX_AFSX_connect() {
     return 0;
 }
 
-int LINUX_AFSX_ping(void) {
+int LINUX_AFSX_ping(void)
+{
     int ret, dummy;
 
     /* lower the timeout, 2 */
@@ -56,14 +61,42 @@ int LINUX_AFSX_ping(void) {
 }
 
 /**
- * return 0 
+ * whether to ignore a vnode or not.
+ * if not ignore, dest will be set to the full path of the directory
+ *
+ * @return bool true if path is to be ignored
  */
-int LINUX_AFSX_ignore_path_bool(char * dir) {
+static int __ignore_vnode(struct vcache * avc, char ** dest)
+{
+    int ret, len;
+    char * path, *result;
+    char buf[512];
+    struct inode * inode = AFSTOV(avc);
+
+    // TODO cache the inode number
+    path = dentry_path_raw(d_find_alias(inode), buf, sizeof(buf));
+
+    if ((ret = (LINUX_AFSX_ignore_path_bool(path))) && dest) {
+        len = strlen(path);
+        result = kmalloc(len + 1);
+        memcpy(result, path, len);
+        result[len + 1] = '\0';
+        *dest = result;
+    }
+
+    return ret;
+}
+
+/**
+ * return 0
+ */
+int LINUX_AFSX_ignore_path_bool(char * dir)
+{
     int i;
     int len;
     char * ignore;
 
-    for (i = 0; i < sizeof(ignore_dirs)/sizeof(char *); i++) {
+    for (i = 0; i < sizeof(ignore_dirs) / sizeof(char *); i++) {
         ignore = ignore_dirs[i];
         len = strlen(ignore);
         if (strnstr(dir, ignore, len + 1)) {
@@ -73,7 +106,8 @@ int LINUX_AFSX_ignore_path_bool(char * dir) {
     return 0;
 }
 
-int LINUX_AFSX_newfile(char** dest, char* fpath) {
+int LINUX_AFSX_newfile(char ** dest, char * fpath)
+{
     int ret;
 
     *dest = NULL;
@@ -92,7 +126,8 @@ int LINUX_AFSX_newfile(char** dest, char* fpath) {
     return ret;
 }
 
-int LINUX_AFSX_realname(char ** dest, char * fname, char * dirpath) {
+int LINUX_AFSX_realname(char ** dest, char * fname, char * dirpath)
+{
     int ret;
 
     *dest = NULL;
@@ -110,7 +145,8 @@ int LINUX_AFSX_realname(char ** dest, char * fname, char * dirpath) {
     return ret;
 }
 
-int LINUX_AFSX_lookup(char ** dest, char * fpath) {
+int LINUX_AFSX_lookup(char ** dest, char * fpath)
+{
     int ret;
 
     *dest = NULL;
@@ -128,7 +164,8 @@ int LINUX_AFSX_lookup(char ** dest, char * fpath) {
     return ret;
 }
 
-int LINUX_AFSX_delfile(char ** dest, char * fpath) {
+int LINUX_AFSX_delfile(char ** dest, char * fpath)
+{
     int ret;
 
     *dest = NULL;
@@ -143,6 +180,80 @@ int LINUX_AFSX_delfile(char ** dest, char * fpath) {
         *dest = NULL;
     }
 
+    return ret;
+}
+
+#define MAX_NUM_OF_CHUNKS 32
+
+/**
+ * Stores all the chunks attached to a vcache
+ *
+ * @return 0 on success
+ */
+int LINUX_AFSX_push_file(struct vcache * avc)
+{
+    struct dcache * tdc, **dclist;
+    int hash, index, ret = -1, count = 0, j;
+    afs_size_t size, tlen;
+    char * path = NULL;
+    afs_size_t total_len;
+    struct rx_call * call;
+    struct osi_file * file;
+    void * buffer = (void *)__get_free_page(GFP_KERNEL);
+
+    if (__ignore_vnode(avc, &path)) {
+        return 0;
+    }
+
+    total_len = avc->f.m.Length;
+
+    // hash value of the vnode's dcache list
+    hash = DVHash(&avc->f.fid);
+
+    // XXX assuming that the prototype used does not employ a memory cache.
+    dclist = (struct dcache **)get_zeroed_page(GFP_KERNEL);
+
+    ObtainWriteLock(&afs_xdcache, 6503);
+    call = rx_newCall(conn);
+    if (StartAFSX_fpush(call, path, 0, total_len))
+        return -1;
+
+    for (index = afs_dvhashTbl[hash], j = 0;
+         j < MAX_NUM_OF_CHUNKS && index != NULLIDX; j++) {
+        // make sure we have a valid entry
+        if (afs_indexUnique[index] == avc->f.fid.Fid.Unique) {
+            tdc = afs_GetValidDSlot(index); // refcount + 1
+            // printk(KERN_ERR "index = %d\n", index);
+
+            if (tdc) {
+                if (!FidCmp(&tdc->f.fid, &avc->f.fid)) {
+                    // add it to the list of dcaches
+                    dclist[tdc->f.chunk] = tdc;
+                    printk(KERN_ERR "Found a tdc: %p\n", tdc);
+                    count++;
+
+                    size = tdc->f.size;
+                    // copy from the file
+                    file = afs_CFileOpen(&tdc->f.inode);
+                    afs_osi_read(file, -1, buffer, tlen);
+
+                }
+
+                ReleaseReadLock(&tdc->tlock);
+                afs_PutDCache(tdc);
+            }
+        }
+        index = afs_dvnextTbl[index];
+    }
+
+    ret = rx_EndCall(call, ret);
+
+    printk(KERN_ERR "Number: %d, Path: %s\n", count, path);
+    if (path) {
+        kfree(path);
+    }
+    __free_page(buffer);
+    ReleaseWriteLock(&afs_xdcache);
     return ret;
 }
 
