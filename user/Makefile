@@ -15,12 +15,19 @@ all: common.h ucafs
 
 define make-test-target
 $(1): $(1).cc libucafs.a
-	@$(CXX) $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc libucafs.a $$(LIBS) -o $(1)
+	@$(CXX) -DTEST_ENV $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc libucafs.a $$(LIBS) -o $(1)
 	@echo "CXX <= $(1)"
 endef
 
 $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
-tests: $(addprefix tests/, $(TESTS))
+tests: $(addprefix tests/, $(TESTS)) tests/test_upload
+
+tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
+	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
+	@echo "CXX <= $@"
+
+afsx.cs.o: $(KERNSRC_PATH)/afsx.cs.c afsx.h
+	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 
 common.h: $(COMMON_DIR)/common.h
 	cp $^ $@
@@ -29,7 +36,7 @@ ucafs: main.cc libucafs.a
 	$(CXX) $(CPPFLAGS) -I../common $^ $(LIBS) $(RXLIBS) -o $@
 
 afsx.ss.o: afsx.ss.c
-	$(CC) $(RXINC) -c $< -o $@
+	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 
 afsx.ss.c: $(COMMON_DIR)/afsx.xg afsx.h
 	$(RXGEN) -A -x -S -o $@ $<
@@ -41,7 +48,7 @@ libucafs.a: $(OBJS)
 	ar cr $@ $^
 
 req.o: req.c afsx.ss.c
-	$(CC) $(RXINC) -c $< -o $@
+	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 
 %.o: %.cc %.h
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@

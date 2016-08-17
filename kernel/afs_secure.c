@@ -194,10 +194,10 @@ int LINUX_AFSX_push_file(struct vcache * avc)
 {
     struct dcache * tdc, **dclist;
     int hash, index, ret = -1, count = 0, j;
-    afs_size_t size, tlen;
+    afs_size_t size, tlen, offset;
     char * path = NULL;
     afs_size_t total_len;
-    struct rx_call * call;
+    struct rx_call * sgx_call, * afs_call;
     struct osi_file * file;
     void * buffer = (void *)__get_free_page(GFP_KERNEL);
 
@@ -214,8 +214,8 @@ int LINUX_AFSX_push_file(struct vcache * avc)
     dclist = (struct dcache **)get_zeroed_page(GFP_KERNEL);
 
     ObtainWriteLock(&afs_xdcache, 6503);
-    call = rx_newCall(conn);
-    if (StartAFSX_fpush(call, path, 0, total_len))
+    sgx_call = rx_newCall(conn);
+    if (StartAFSX_fpush(sgx_call, path, 0, total_len))
         return -1;
 
     for (index = afs_dvhashTbl[hash], j = 0;
@@ -232,11 +232,22 @@ int LINUX_AFSX_push_file(struct vcache * avc)
                     printk(KERN_ERR "Found a tdc: %p\n", tdc);
                     count++;
 
+                    // read from the file
                     size = tdc->f.size;
-                    // copy from the file
+                    tlen = PAGE_SIZE;
                     file = afs_CFileOpen(&tdc->f.inode);
-                    afs_osi_read(file, -1, buffer, tlen);
+                    while (size) {
+                        tlen = afs_osi_read(file, -1, buffer, tlen);
 
+                        // send the data over to userspace
+                        rx_Write(sgx_call, buffer, tlen);
+
+                        // wait for the response
+                        rx_Read(sgx_call, buffer, tlen);
+
+                        size -= tlen;
+                    }
+                    afs_CFileClose(file);
                 }
 
                 ReleaseReadLock(&tdc->tlock);
@@ -246,7 +257,7 @@ int LINUX_AFSX_push_file(struct vcache * avc)
         index = afs_dvnextTbl[index];
     }
 
-    ret = rx_EndCall(call, ret);
+    ret = rx_EndCall(sgx_call, ret);
 
     printk(KERN_ERR "Number: %d, Path: %s\n", count, path);
     if (path) {

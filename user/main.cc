@@ -17,7 +17,7 @@
 
 using namespace std;
 
-extern "C" int setup_rx();
+extern "C" int setup_rx(int);
 
 const char * gbl_temp_dnode_path = UCAFS_TEMP_DNODE_STR;
 
@@ -60,7 +60,7 @@ int main(int argc, char ** argv)
     if (!check_main_dir()) {
         return -1;
     }
-    setup_rx();
+    setup_rx(0);
 
     return 0;
 }

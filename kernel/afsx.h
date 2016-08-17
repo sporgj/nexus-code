@@ -72,7 +72,11 @@ struct ubik_client;
 
 #include <rx/rx.h>
 #include <rx/rx_null.h>
+#ifndef TEST_ENV
 #define AFSX_SERVER_PORT 9462
+#else
+#define AFSX_SERVER_PORT 11987
+#endif
 #define AFSX_SERVICE_PORT 0
 #define AFSX_SERVICE_ID 4
 #define AFSX_STATUS_SUCCESS 0
