@@ -55,16 +55,15 @@ fremove(
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 5;
 
-fpush(
+start_upload(
     IN string fpath<AFSX_PATH_MAX>,
-    afs_uint64 chunklength,
-    afs_uint64 filelength
-) split = 6;
+    afs_uint32 max_chunk_size,
+    afs_uint64 total_size,
+    OUT afs_uint32 * upload_id
+) = 6;
 
-fpull(
-    IN string fpath<AFSX_PATH_MAX>,
-    afs_uint64 chunklength,
-    afs_uint64 filelength
+upload_file(
+    IN afs_uint32 upload_id,
+    afs_uint32 chunk_size
 ) split = 7;
-
     

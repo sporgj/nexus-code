@@ -107,52 +107,66 @@ afs_int32 SAFSX_fremove(
     return ret;
 }
 
-afs_int32 SAFSX_fpush(
+afs_int32 SAFSX_start_upload(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*IN */ afs_uint64 blocklength,
-    /*IN */ afs_uint64 filelength)
+    /*IN */ afs_uint32 max_chunk_size,
+    /*IN */ afs_uint64 total_size,
+    /*OUT*/ afs_uint32 * upload_id)
 {
-    int ret = -1;
-    afs_uint64 remaining_bytes = filelength, nbytes = blocklength;
-    store_ctx_t * ctx = start_upload(fpath, blocklength, filelength);
+    store_ctx_t * ctx = start_upload(fpath, max_chunk_size, total_size);
     if (ctx == NULL) {
-        uerror("Error starting upload");
+        return AFSX_STATUS_NOOP;
+    }
+
+    *upload_id = ctx->id;
+    return AFSX_STATUS_SUCCESS;
+}
+
+afs_int32 SAFSX_upload_file(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ afs_uint32 upload_id,
+    /*IN */ afs_uint32 chunk_size)
+{
+    int ret = AFSX_STATUS_NOOP;
+    afs_uint32 abytes;
+
+    store_ctx_t * ctx = get_upload_buffer(upload_id);
+    if (ctx == NULL) {
+        ret = AFSX_STATUS_ERROR;
+        uerror("Upload id: %d could not be found", upload_id);
         goto out;
     }
 
-    // start receiving data
-    while (remaining_bytes) {
-        nbytes = remaining_bytes > blocklength ? blocklength : remaining_bytes;
-
-        // read
-        nbytes = rx_Read(z_call, ctx->buffer, nbytes);
-
-        if (!nbytes) {
-            uerror("Error during transmission");
-            goto out;
-        }
-
-        // process the data
-        ctx->len = nbytes;
-        process_upload_data(ctx);
-
-        if (rx_Write(z_call, ctx->buffer, ctx->len) != nbytes) {
-            uerror("Error writing response");
-            goto out;
-        }
-
-        remaining_bytes -= nbytes;
+    if (ctx->len < chunk_size) {
+        uerror("Chunk size %d sent is above the max = %d", chunk_size,
+               ctx->len);
+        ret = AFSX_STATUS_ERROR;
+        goto out;
     }
 
-    printf("fpush: Completed %llu bytes\n", filelength);
+    if ((abytes = rx_Read(z_call, ctx->buffer, chunk_size)) != chunk_size) {
+        uerror("Read error. expecting: %u, actual: %u (err = %d)", chunk_size,
+               abytes, rx_Error(z_call));
+        goto out;
+    }
+
+    ctx->len = chunk_size;
+    // process the data
+    process_upload_data(ctx);
+
+    if ((abytes = rx_Write(z_call, ctx->buffer, ctx->len)) != chunk_size) {
+        uerror("Write error. Expecting: %u, Actual: %u (err = %d)",
+               chunk_size, abytes, rx_Error(z_call));
+        goto out;
+    }
 
     ret = 0;
 out:
     return ret;
 }
 
-afs_int32 SAFSX_fpull(
+afs_int32 SAFSX_download_file(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
     /*IN */ afs_uint64 chunklength,

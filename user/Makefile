@@ -23,7 +23,7 @@ $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
 tests: $(addprefix tests/, $(TESTS)) tests/test_upload
 
 tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
-	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
+	$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
 	@echo "CXX <= $@"
 
 afsx.cs.o: $(KERNSRC_PATH)/afsx.cs.c afsx.h

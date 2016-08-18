@@ -18,7 +18,7 @@ using namespace std;
 #define AFSX_CUSTOM_PORT 11987
 
 #define TEST_FILE (char *) "filetext.txt"
-#define PAGE_SIZE 4096
+#define PACKET_SIZE 128
 #define HEXDUMP_LEN(d) (d > 32 ? 32 : d)
 
 extern "C" int setup_rx(int);
@@ -76,10 +76,21 @@ static void hexdump(char * buf, uint32_t len)
     }
 }
 
+static void init_dnode()
+{
+    cout << ". Initializing filebox file" << endl;
+    // create our file and truncate it
+    fstream file(TEST_FBOX_PATH1, ios::out | ios::trunc);
+    DirNode * dn = new DirNode();
+    DirNode::write(dn, &file);
+    file.close();
+}
+
 static int test_upload()
 {
     // start_srv();
 
+    char * encoded_name_str;
     u_long host;
     struct rx_securityClass * null_securityObject;
 
@@ -99,6 +110,13 @@ static int test_upload()
         return -1;
     }
 
+    // lets add it to a fake dnode
+    init_dnode();
+    if (fops_new(TEST_FILE, &encoded_name_str)) {
+        cout << "Adding to dnode failed" << endl;
+        return -1;
+    }
+
     cout << ". Opening file" << endl;
     fstream input(TEST_FILE, ios::in);
     if (!input) {
@@ -106,32 +124,84 @@ static int test_upload()
         return -1;
     }
 
-    struct rx_call * call = rx_NewCall(conn);
-    size_t size = st.st_size, blklen = PAGE_SIZE;
+    size_t size = st.st_size, blklen = PACKET_SIZE;
+    afs_uint32 upload_id;
 
-    cout << ". Calling RPC" << endl;
-    if (StartAFSX_fpush(call, TEST_FILE, blklen, st.st_size)) {
+    /*
+    cout << ". Calling RPC, Packet Size = " << PACKET_SIZE << endl;
+    if (StartAFSX_upload_file(call, encoded_name_str, blklen, st.st_size)) {
         cout << "Start RPC call failed" << endl;
         return -1;
     }
 
     char * buffer = (char *)operator new(blklen);
-    int i = 0;
+    int i = 0, nbytes;
     while (size) {
         blklen = input.readsome(buffer, blklen);
-        printf("Sending %d [%zd bytes]...\n", i, blklen);
+        printf("Sending [%zd bytes]...\n", blklen);
         hexdump(buffer, HEXDUMP_LEN(blklen));
-        rx_Write(call, buffer, blklen);
-        printf("\nReceiving %d [%zd bytes]...\n", i, blklen);
-        // read back from the wire
-        rx_Read(call, buffer, blklen);
+
+        if ((nbytes = rx_Write(call, buffer, blklen)) != blklen) {
+            cout << "send error: expected: " << blklen << ", actual: " << nbytes
+                 << endl;
+            return -1;
+        }
+
+        printf("\nReceiving [%zd bytes]...\n", blklen);
+        if ((nbytes = rx_Read(call, buffer, blklen)) != blklen) {
+            cout << "Receive error: expected: " << blklen
+                 << ", actual: " << nbytes << endl;
+            return -1;
+        }
+
         hexdump(buffer, HEXDUMP_LEN(blklen));
         size -= blklen;
         i++;
     }
 
-    EndAFSX_fpush(call);
+    EndAFSX_upload_file(call);
+    */
 
+    if (AFSX_start_upload(conn, encoded_name_str, PACKET_SIZE, size, &upload_id)) {
+        cout << "Start RPC call failed" << endl;
+        return -1;
+    }
+
+    char * buffer = (char *)operator new(PACKET_SIZE);
+    afs_uint32 nbytes;
+    while (size > 0) {
+        blklen = size > PACKET_SIZE ? PACKET_SIZE : size;
+        blklen = input.readsome(buffer, blklen);
+        
+        struct rx_call * call = rx_NewCall(conn);
+
+        if (StartAFSX_upload_file(call, upload_id, blklen)) {
+            cout << "StartAFSX_upload_file failed" << endl;
+            return -1;
+        }
+        
+        printf("\nSending [%zd bytes]...\n", blklen);
+        hexdump(buffer, HEXDUMP_LEN(blklen));
+
+        if ((nbytes = rx_Write(call, buffer, blklen)) != blklen) {
+            cout << "send error: expected: " << blklen << ", actual: " << nbytes
+                 << endl;
+            return -1;
+        }
+
+        printf("Receiving [%zd bytes]...\n", blklen);
+        if ((nbytes = rx_Read(call, buffer, blklen)) != blklen) {
+            cout << "Receive error: expected: " << blklen
+                 << ", actual: " << nbytes << endl;
+            return -1;
+        }
+
+        hexdump(buffer, HEXDUMP_LEN(blklen));
+        size -= blklen;
+
+        EndAFSX_upload_file(call);
+        rx_EndCall(call, 0);
+    }
     return 0;
 }
 

@@ -5,7 +5,7 @@
 #include "encode.h"
 #include "dirops.h"
 
-char * __get_fname(char * fpath)
+char * dirops_get_fname(char * fpath)
 {
     size_t i;
     char * result = fpath + strlen(fpath);
@@ -21,7 +21,7 @@ char * __get_fname(char * fpath)
 int fops_new(char * fpath, char ** encoded_name_dest)
 {
     int error = -1; // TODO change this
-    char * fname = __get_fname(fpath);
+    char * fname = dirops_get_fname(fpath);
     DirNode * dirnode = nullptr;
     encoded_fname_t * fname_code = nullptr;
 
@@ -107,7 +107,7 @@ int __fops_encode_or_remove(char * fpath, char ** encoded_fname_dest, bool rm)
         goto out;
     }
 
-    if ((fname = __get_fname(fpath)) == NULL) {
+    if ((fname = dirops_get_fname(fpath)) == NULL) {
         LOG(ERROR) << "Could not get fname: " << fpath;
         goto out;
     }
