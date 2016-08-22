@@ -5,6 +5,7 @@
 #include <encode.h>
 #include <dirnode.h>
 #include <dirops.h>
+#include <utils.h>
 
 #include <glog/logging.h>
 

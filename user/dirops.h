@@ -4,8 +4,6 @@
 extern "C" {
 #endif
 
-char * dirops_get_fname(char * fpath);
-
 /**
  * Creates a new file at the corresponding file path
  * @param fpath is the file path

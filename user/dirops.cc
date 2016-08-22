@@ -4,19 +4,7 @@
 #include "dirnode.h"
 #include "encode.h"
 #include "dirops.h"
-
-char * dirops_get_fname(char * fpath)
-{
-    size_t i;
-    char * result = fpath + strlen(fpath);
-
-    while (*result != '/' && result != fpath) {
-        i++;
-        result--;
-    }
-
-    return strndup(result + (result != fpath), i + 1);
-}
+#include "utils.h"
 
 int fops_new(char * fpath, char ** encoded_name_dest)
 {

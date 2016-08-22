@@ -118,9 +118,18 @@ afs_int32 SAFSX_start_upload(
     if (ctx == NULL) {
         return AFSX_STATUS_NOOP;
     }
-
     *upload_id = ctx->id;
+    printf("start_upload: %s (%u, %llu), upload_id=%d\n", fpath, max_chunk_size,
+           total_size, ctx->id);
     return AFSX_STATUS_SUCCESS;
+}
+
+afs_int32 SAFSX_end_upload(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ int upload_id)
+{
+    // TODO
+    return 0;
 }
 
 afs_int32 SAFSX_upload_file(
@@ -138,9 +147,9 @@ afs_int32 SAFSX_upload_file(
         goto out;
     }
 
-    if (ctx->len < chunk_size) {
-        uerror("Chunk size %d sent is above the max = %d", chunk_size,
-               ctx->len);
+    if (ctx->cap < chunk_size) {
+        uerror("Chunk size %d sent is above the cap = %d", chunk_size,
+               ctx->cap);
         ret = AFSX_STATUS_ERROR;
         goto out;
     }
@@ -156,8 +165,8 @@ afs_int32 SAFSX_upload_file(
     process_upload_data(ctx);
 
     if ((abytes = rx_Write(z_call, ctx->buffer, ctx->len)) != chunk_size) {
-        uerror("Write error. Expecting: %u, Actual: %u (err = %d)",
-               chunk_size, abytes, rx_Error(z_call));
+        uerror("Write error. Expecting: %u, Actual: %u (err = %d)", chunk_size,
+               abytes, rx_Error(z_call));
         goto out;
     }
 

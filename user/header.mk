@@ -15,7 +15,8 @@ INCFLAGS = -Imbedtls/include -I$(COMMON_DIR) -I/usr/local/include
 OBJS = dirnode.o\
        encode.o\
        dirops.o\
-	   fileops.o\
+       fileops.o\
+       utils.o\
        dnode.pb.o
 
 TESTS := test_dnode test_dops

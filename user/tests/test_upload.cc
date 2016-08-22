@@ -18,7 +18,7 @@ using namespace std;
 #define AFSX_CUSTOM_PORT 11987
 
 #define TEST_FILE (char *) "filetext.txt"
-#define PACKET_SIZE 128
+#define PACKET_SIZE 4096
 #define HEXDUMP_LEN(d) (d > 32 ? 32 : d)
 
 extern "C" int setup_rx(int);
@@ -34,46 +34,6 @@ static int start_srv()
     }
 
     return 0;
-}
-
-// http://stackoverflow.com/questions/16804251/how-would-i-create-a-hex-dump-utility-in-c
-static void hexdump(char * buf, uint32_t len)
-{
-    unsigned long address = 0;
-    char c;
-
-    cout << hex << setfill('0');
-    while (len) {
-        int nread = len > 16 ? 16 : len;
-
-        // Show the address
-        cout << setw(8) << address;
-
-        // Show the hex codes
-        for (int i = 0; i < 16; i++) {
-            if (i % 8 == 0)
-                cout << ' ';
-            if (i < nread)
-                cout << ' ' << setw(2) << (unsigned)buf[i];
-            else
-                cout << "   ";
-        }
-
-        // Show printable characters
-        cout << "  ";
-        for (int i = 0; i < nread; i++) {
-            if (buf[i] < 32)
-                cout << '.';
-            else
-                cout << buf[i];
-        }
-
-        cout << "\n";
-        address += 16;
-
-        buf += nread;
-        len -= nread;
-    }
 }
 
 static void init_dnode()
@@ -127,41 +87,6 @@ static int test_upload()
     size_t size = st.st_size, blklen = PACKET_SIZE;
     afs_uint32 upload_id;
 
-    /*
-    cout << ". Calling RPC, Packet Size = " << PACKET_SIZE << endl;
-    if (StartAFSX_upload_file(call, encoded_name_str, blklen, st.st_size)) {
-        cout << "Start RPC call failed" << endl;
-        return -1;
-    }
-
-    char * buffer = (char *)operator new(blklen);
-    int i = 0, nbytes;
-    while (size) {
-        blklen = input.readsome(buffer, blklen);
-        printf("Sending [%zd bytes]...\n", blklen);
-        hexdump(buffer, HEXDUMP_LEN(blklen));
-
-        if ((nbytes = rx_Write(call, buffer, blklen)) != blklen) {
-            cout << "send error: expected: " << blklen << ", actual: " << nbytes
-                 << endl;
-            return -1;
-        }
-
-        printf("\nReceiving [%zd bytes]...\n", blklen);
-        if ((nbytes = rx_Read(call, buffer, blklen)) != blklen) {
-            cout << "Receive error: expected: " << blklen
-                 << ", actual: " << nbytes << endl;
-            return -1;
-        }
-
-        hexdump(buffer, HEXDUMP_LEN(blklen));
-        size -= blklen;
-        i++;
-    }
-
-    EndAFSX_upload_file(call);
-    */
-
     if (AFSX_start_upload(conn, encoded_name_str, PACKET_SIZE, size, &upload_id)) {
         cout << "Start RPC call failed" << endl;
         return -1;
@@ -181,7 +106,7 @@ static int test_upload()
         }
         
         printf("\nSending [%zd bytes]...\n", blklen);
-        hexdump(buffer, HEXDUMP_LEN(blklen));
+        hexdump((uint8_t *)buffer, HEXDUMP_LEN(blklen));
 
         if ((nbytes = rx_Write(call, buffer, blklen)) != blklen) {
             cout << "send error: expected: " << blklen << ", actual: " << nbytes
@@ -196,7 +121,7 @@ static int test_upload()
             return -1;
         }
 
-        hexdump(buffer, HEXDUMP_LEN(blklen));
+        hexdump((uint8_t *)buffer, HEXDUMP_LEN(blklen));
         size -= blklen;
 
         EndAFSX_upload_file(call);

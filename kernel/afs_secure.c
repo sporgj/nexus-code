@@ -12,7 +12,7 @@
 #include "afs_secure.h"
 #include "afsx.h"
 
-static char * ignore_dirs[] = { "/xyz.vm/user/mirko/.afsx" };
+static char * ignore_dirs[] = { "/maatta.sgx/user/bruyne/.afsx" };
 
 static struct rx_connection * conn = NULL, *ping_conn = NULL;
 
@@ -66,7 +66,7 @@ int LINUX_AFSX_ping(void)
  *
  * @return bool true if path is to be ignored
  */
-static int __ignore_vnode(struct vcache * avc, char ** dest)
+static int __is_vnode_ignored(struct vcache * avc, char ** dest)
 {
     int ret, len;
     char * path, *result;
@@ -76,11 +76,11 @@ static int __ignore_vnode(struct vcache * avc, char ** dest)
     // TODO cache the inode number
     path = dentry_path_raw(d_find_alias(inode), buf, sizeof(buf));
 
-    if ((ret = (LINUX_AFSX_ignore_path_bool(path))) && dest) {
+    if (!(ret = LINUX_AFSX_ignore_path_bool(path)) && dest) {
         len = strlen(path);
-        result = kmalloc(len + 1);
+        result = kmalloc(len + 1, GFP_KERNEL);
         memcpy(result, path, len);
-        result[len + 1] = '\0';
+        result[len] = '\0';
         *dest = result;
     }
 
@@ -185,87 +185,221 @@ int LINUX_AFSX_delfile(char ** dest, char * fpath)
 
 #define MAX_NUM_OF_CHUNKS 32
 
-/**
- * Stores all the chunks attached to a vcache
- *
- * @return 0 on success
- */
-int LINUX_AFSX_push_file(struct vcache * avc)
+int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
 {
-    struct dcache * tdc, **dclist;
-    int hash, index, ret = -1, count = 0, j;
-    afs_size_t size, tlen, offset;
+    int ret = -1, hash, i = 0, index, code;
+    afs_uint32 size, dcache_size, remaining_bytes, total_len, upload_id, nbytes;
     char * path = NULL;
-    afs_size_t total_len;
-    struct rx_call * sgx_call, * afs_call;
-    struct osi_file * file;
-    void * buffer = (void *)__get_free_page(GFP_KERNEL);
+    void * buffer = NULL;
+    struct dcache * tdc = NULL;
+    struct rx_connection * rx_conn;
+    struct rx_call * uspace_call = NULL, *afs_call = NULL;
+    struct osi_file * file = NULL;
+    struct afs_conn * tc;
+    struct AFSVolSync tsync;
+    struct AFSFetchStatus outstatus;
+    struct AFSStoreStatus instatus;
 
-    if (__ignore_vnode(avc, &path)) {
-        return 0;
+    if (!AFSX_IS_CONNECTED) {
+        printk(KERN_ERR "upload: not connected\n");
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_vnode_ignored(avc, &path)) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    // if it's not dirty, ignore
+    if (!(avc->f.states & CDirty)) {
+        return AFSX_STATUS_SUCCESS;
+    }
+
+    // anything hereon is a fatal error
+    ret = AFSX_STATUS_ERROR;
+
+    buffer = (void *)__get_free_page(GFP_KERNEL);
+    if (!buffer) {
+        printk(KERN_ERR "Could not allocate buffer\n");
+        return ret;
+    }
+
+    total_len = avc->f.m.Length;
+    hash = DVHash(&avc->f.fid);
+
+    // 1 - Get the Lock and start the upload
+    ObtainWriteLock(&afs_xdcache, 6503);
+
+    tc = afs_Conn(&avc->f.fid, areq, 0, &rx_conn);
+    afs_call = rx_NewCall(tc->id);
+
+    //RX_AFS_GLOCK();
+    instatus.Mask = AFS_SETMODTIME;
+    instatus.ClientModTime = avc->f.m.Date;
+    //RX_AFS_GUNLOCK();
+
+#ifdef AFS_64BIT_CLIENT
+    // if the server is rrunning in 64 bits
+    if (!afs_serverHasNo64Bit(tc)) {
+        code = StartRXAFS_StoreData64(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
+                                     &instatus, 0, total_len, total_len);
+    } else {
+        // XXX check for total_len > 2^32 - 1
+        code = StartRXAFS_StoreData(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
+                                   &instatus, (afs_int32)0,
+                                   (afs_int32)total_len, (afs_int32)total_len);
+    }
+#else
+    code = StartRXAFS_StoreData64(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
+                                 &instatus, 0, total_len, total_len);
+#endif
+
+    if (code) {
+        rx_EndCall(afs_call, 0);
+        afs_call = NULL;
+        printk(KERN_ERR "rxafs_store failed\n");
+        goto out;
+    }
+
+    if (AFSX_start_upload(conn, path, AFSX_PACKET_SIZE, total_len,
+                          &upload_id)) {
+        printk(KERN_ERR "start_upload failed: %s\n", path);
+        goto out;
+    }
+
+    remaining_bytes = total_len;
+    index = afs_dvhashTbl[hash];
+
+    // 2 - Send the current dcache
+    while ((index != NULLIDX)
+           && (afs_indexUnique[index] == avc->f.fid.Fid.Unique)) {
+        if ((tdc = afs_GetValidDSlot(index))
+            && !FidCmp(&tdc->f.fid, &avc->f.fid)) {
+            dcache_size = tdc->f.chunkBytes;
+
+            file = (struct osi_file *)osi_UFSOpen(&tdc->f.inode);
+            while (dcache_size) {
+                size = dcache_size > AFSX_PACKET_SIZE ? AFSX_PACKET_SIZE
+                                                      : dcache_size;
+
+                code = afs_osi_Read(file, -1, buffer, AFSX_PACKET_SIZE);
+
+                /* XXX for some reason, I'm getting an error reading from
+                the file
+                 * but the data is read in the buffer. TO BE INVESTIGATED
+                if (code < 0) {
+                    printk(
+                        KERN_ERR
+                        "upload: Error reading chunk #%d, ret=%d, off=%u,
+                size=%u\n",
+                        i, code, file->offset, size);
+                    goto out1;
+                }
+                */
+
+                // 3 - Sending it over to userspace
+                uspace_call = rx_NewCall(conn);
+
+                if (StartAFSX_upload_file(uspace_call, upload_id, size)) {
+                    printk(KERN_ERR "StartAFSX_upload_file failed");
+                    goto out1;
+                }
+
+                if ((nbytes = rx_Write(uspace_call, buffer, size)) != size) {
+                    printk(KERN_ERR "send error: exp=%d, act=%u\n", size,
+                           nbytes);
+                    goto out1;
+                }
+
+                if ((nbytes = rx_Read(uspace_call, buffer, size)) != size) {
+                    printk(KERN_ERR "recv error: exp=%d, act=%u\n", size,
+                           nbytes);
+                    goto out1;
+                }
+
+                // 4 - Send the data over to the server
+                if ((nbytes = rx_Write(afs_call, buffer, size)) != size) {
+                    printk(KERN_ERR "send to server failed: exp=%d, act=%d\n",
+                            size, (int)nbytes);
+                    goto out1;
+                }
+
+                dcache_size -= size;
+                EndAFSX_upload_file(uspace_call);
+                rx_EndCall(uspace_call, 0);
+            }
+            osi_UFSClose(file);
+
+            uspace_call = NULL;
+            // release the tdc resources
+            ReleaseReadLock(&tdc->tlock);
+            afs_PutDCache(tdc);
+            tdc = NULL;
+        } else {
+            printk(KERN_ERR "hash chain failed us :( index=%d, i=%d)\n", index, i);
+            goto out1;
+        }
+
+        i++;
+        index = afs_dvnextTbl[index];
+    }
+
+    ret = 0;
+out1:
+    if (ret == AFSX_STATUS_ERROR) {
+        if (uspace_call) {
+            EndAFSX_upload_file(uspace_call);
+            rx_EndCall(uspace_call, 0);
+        }
+
+        if (tdc) {
+            afs_CFileClose(file);
+            ReleaseReadLock(&tdc->tlock);
+            afs_PutDCache(tdc);
+        }
+    }
+out:
+    ReleaseWriteLock(&afs_xdcache);
+    if (afs_call) {
+#ifdef AFS_64BIT_CLIENT
+        EndRXAFS_StoreData64(afs_call, &outstatus, &tsync);
+#else
+        EndRXAFS_StoreData(afs_call, &outstatus, &tsync);
+#endif
+        rx_EndCall(afs_call, 0);
+    }
+    AFSX_end_upload(conn, upload_id);
+    if (buffer)
+        __free_page(buffer);
+    if (path)
+        kfree(path);
+
+    return ret;
+}
+
+/*
+int LINUX_AFSX_get_file(struct vcache * avc)
+{
+    int ret = AFSX_STATUS_ERROR;
+    afs_uint32 total_len, get_id;
+
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_vnode_ignore(avc, &path)) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    buffer = (void *)__get_free_page(GFP_KERNEL);
+    if (!buffer) {
+        printk(KERN_ERR "download_file: Could not allocate free page\n");
+        goto out;
     }
 
     total_len = avc->f.m.Length;
 
-    // hash value of the vnode's dcache list
-    hash = DVHash(&avc->f.fid);
-
-    // XXX assuming that the prototype used does not employ a memory cache.
-    dclist = (struct dcache **)get_zeroed_page(GFP_KERNEL);
-
-    ObtainWriteLock(&afs_xdcache, 6503);
-    sgx_call = rx_newCall(conn);
-    if (StartAFSX_fpush(sgx_call, path, 0, total_len))
-        return -1;
-
-    for (index = afs_dvhashTbl[hash], j = 0;
-         j < MAX_NUM_OF_CHUNKS && index != NULLIDX; j++) {
-        // make sure we have a valid entry
-        if (afs_indexUnique[index] == avc->f.fid.Fid.Unique) {
-            tdc = afs_GetValidDSlot(index); // refcount + 1
-            // printk(KERN_ERR "index = %d\n", index);
-
-            if (tdc) {
-                if (!FidCmp(&tdc->f.fid, &avc->f.fid)) {
-                    // add it to the list of dcaches
-                    dclist[tdc->f.chunk] = tdc;
-                    printk(KERN_ERR "Found a tdc: %p\n", tdc);
-                    count++;
-
-                    // read from the file
-                    size = tdc->f.size;
-                    tlen = PAGE_SIZE;
-                    file = afs_CFileOpen(&tdc->f.inode);
-                    while (size) {
-                        tlen = afs_osi_read(file, -1, buffer, tlen);
-
-                        // send the data over to userspace
-                        rx_Write(sgx_call, buffer, tlen);
-
-                        // wait for the response
-                        rx_Read(sgx_call, buffer, tlen);
-
-                        size -= tlen;
-                    }
-                    afs_CFileClose(file);
-                }
-
-                ReleaseReadLock(&tdc->tlock);
-                afs_PutDCache(tdc);
-            }
-        }
-        index = afs_dvnextTbl[index];
-    }
-
-    ret = rx_EndCall(sgx_call, ret);
-
-    printk(KERN_ERR "Number: %d, Path: %s\n", count, path);
-    if (path) {
-        kfree(path);
-    }
-    __free_page(buffer);
-    ReleaseWriteLock(&afs_xdcache);
+out:
     return ret;
 }
-
+*/
 #endif

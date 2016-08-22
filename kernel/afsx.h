@@ -72,16 +72,13 @@ struct ubik_client;
 
 #include <rx/rx.h>
 #include <rx/rx_null.h>
-#ifndef TEST_ENV
 #define AFSX_SERVER_PORT 9462
-#else
-#define AFSX_SERVER_PORT 11987
-#endif
 #define AFSX_SERVICE_PORT 0
 #define AFSX_SERVICE_ID 4
 #define AFSX_STATUS_SUCCESS 0
 #define AFSX_STATUS_ERROR 1
 #define AFSX_STATUS_NOOP 2
+#define AFSX_PACKET_SIZE 4096
 #define AFSX_REQ_MAX 2
 #define AFSX_REQ_MIN 1
 #define AFSX_NULL 0
@@ -140,44 +137,49 @@ extern afs_int32 SAFSX_fremove(
 	/*IN */ char * fpath,
 	/*OUT*/ char * *code_name);
 
-extern int StartAFSX_fpush(
+extern int AFSX_start_upload(
+	/*IN */ struct rx_connection *z_conn,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint32 max_chunk_size,
+	/*IN */ afs_uint64 total_size,
+	/*OUT*/ afs_uint32 * upload_id);
+
+extern afs_int32 SAFSX_start_upload(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * fpath,
-	/*IN */ afs_uint64 chunklength,
-	/*IN */ afs_uint64 filelength);
+	/*IN */ afs_uint32 max_chunk_size,
+	/*IN */ afs_uint64 total_size,
+	/*OUT*/ afs_uint32 * upload_id);
 
-extern int EndAFSX_fpush(
+extern int AFSX_end_upload(
+	/*IN */ struct rx_connection *z_conn,
+	/*IN */ int upload_id);
+
+extern afs_int32 SAFSX_end_upload(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ int upload_id);
+
+extern int StartAFSX_upload_file(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ afs_uint32 upload_id,
+	/*IN */ afs_uint32 chunk_size);
+
+extern int EndAFSX_upload_file(
 	/*IN */ struct rx_call *z_call);
 
-extern afs_int32 SAFSX_fpush(
+extern afs_int32 SAFSX_upload_file(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ char * fpath,
-	/*IN */ afs_uint64 chunklength,
-	/*IN */ afs_uint64 filelength);
-
-extern int StartAFSX_fpull(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * fpath,
-	/*IN */ afs_uint64 chunklength,
-	/*IN */ afs_uint64 filelength);
-
-extern int EndAFSX_fpull(
-	/*IN */ struct rx_call *z_call);
-
-extern afs_int32 SAFSX_fpull(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * fpath,
-	/*IN */ afs_uint64 chunklength,
-	/*IN */ afs_uint64 filelength);
+	/*IN */ afs_uint32 upload_id,
+	/*IN */ afs_uint32 chunk_size);
 
 extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
 #define AFSX_LOWEST_OPCODE   1
-#define AFSX_HIGHEST_OPCODE	7
-#define AFSX_NUMBER_OPCODES	7
+#define AFSX_HIGHEST_OPCODE	8
+#define AFSX_NUMBER_OPCODES	8
 
-#define AFSX_NO_OF_STAT_FUNCS	7
+#define AFSX_NO_OF_STAT_FUNCS	8
 
 AFS_RXGEN_EXPORT
 extern const char *AFSX_function_names[];

@@ -19,6 +19,6 @@ extern int LINUX_AFSX_newfile(char** dest, char* path);
 extern int LINUX_AFSX_realname(char** dest, char *fname, char* path);
 extern int LINUX_AFSX_lookup(char ** dest, char * fpath);
 extern int LINUX_AFSX_delfile(char ** dest, char * fpath);
-extern int LINUX_AFSX_push_file(struct vcache * avc);
+extern int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq);
 
 #endif
