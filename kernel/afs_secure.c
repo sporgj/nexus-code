@@ -185,7 +185,7 @@ int LINUX_AFSX_delfile(char ** dest, char * fpath)
 
 #define MAX_NUM_OF_CHUNKS 32
 
-int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
+int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq)
 {
     int ret = -1, hash, i = 0, index, code;
     afs_uint32 size, dcache_size, remaining_bytes, total_len, upload_id, nbytes;
@@ -232,25 +232,26 @@ int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
     tc = afs_Conn(&avc->f.fid, areq, 0, &rx_conn);
     afs_call = rx_NewCall(tc->id);
 
-    //RX_AFS_GLOCK();
+    // RX_AFS_GLOCK();
     instatus.Mask = AFS_SETMODTIME;
     instatus.ClientModTime = avc->f.m.Date;
-    //RX_AFS_GUNLOCK();
+// RX_AFS_GUNLOCK();
 
 #ifdef AFS_64BIT_CLIENT
     // if the server is rrunning in 64 bits
     if (!afs_serverHasNo64Bit(tc)) {
-        code = StartRXAFS_StoreData64(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
+        code
+            = StartRXAFS_StoreData64(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
                                      &instatus, 0, total_len, total_len);
     } else {
         // XXX check for total_len > 2^32 - 1
         code = StartRXAFS_StoreData(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
-                                   &instatus, (afs_int32)0,
-                                   (afs_int32)total_len, (afs_int32)total_len);
+                                    &instatus, (afs_int32)0,
+                                    (afs_int32)total_len, (afs_int32)total_len);
     }
 #else
     code = StartRXAFS_StoreData64(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
-                                 &instatus, 0, total_len, total_len);
+                                  &instatus, 0, total_len, total_len);
 #endif
 
     if (code) {
@@ -260,7 +261,7 @@ int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
         goto out;
     }
 
-    if (AFSX_start_upload(conn, path, AFSX_PACKET_SIZE, total_len,
+    if (AFSX_begin_upload(conn, path, AFSX_PACKET_SIZE, total_len,
                           &upload_id)) {
         printk(KERN_ERR "start_upload failed: %s\n", path);
         goto out;
@@ -299,7 +300,7 @@ int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
                 // 3 - Sending it over to userspace
                 uspace_call = rx_NewCall(conn);
 
-                if (StartAFSX_upload_file(uspace_call, upload_id, size)) {
+                if (StartAFSX_upload_data(uspace_call, upload_id, size)) {
                     printk(KERN_ERR "StartAFSX_upload_file failed");
                     goto out1;
                 }
@@ -319,23 +320,24 @@ int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
                 // 4 - Send the data over to the server
                 if ((nbytes = rx_Write(afs_call, buffer, size)) != size) {
                     printk(KERN_ERR "send to server failed: exp=%d, act=%d\n",
-                            size, (int)nbytes);
+                           size, (int)nbytes);
                     goto out1;
                 }
 
                 dcache_size -= size;
-                EndAFSX_upload_file(uspace_call);
+                EndAFSX_upload_data(uspace_call);
                 rx_EndCall(uspace_call, 0);
+                uspace_call = NULL;
             }
             osi_UFSClose(file);
 
-            uspace_call = NULL;
             // release the tdc resources
             ReleaseReadLock(&tdc->tlock);
             afs_PutDCache(tdc);
             tdc = NULL;
         } else {
-            printk(KERN_ERR "hash chain failed us :( index=%d, i=%d)\n", index, i);
+            printk(KERN_ERR "hash chain failed us :( index=%d, i=%d)\n", index,
+                   i);
             goto out1;
         }
 
@@ -347,7 +349,7 @@ int LINUX_AFSX_upload_file(struct vcache * avc, struct vrequest * areq)
 out1:
     if (ret == AFSX_STATUS_ERROR) {
         if (uspace_call) {
-            EndAFSX_upload_file(uspace_call);
+            EndAFSX_upload_data(uspace_call);
             rx_EndCall(uspace_call, 0);
         }
 
@@ -373,6 +375,179 @@ out:
     if (path)
         kfree(path);
 
+    return ret;
+}
+
+int LINUX_AFSX_fetch(struct vcache * avc, struct vrequest * areq)
+{
+    int ret, hash, index, length_hi;
+    afs_int32 code, filepos, tdc_len, size, nbytes, download_id,
+        remaining_bytes, total_len;
+    void * buffer;
+    char * path = NULL;
+    struct dcache * tdc = NULL;
+    struct rx_connection * rx_conn;
+    struct rx_call * uspace_call = NULL, *afs_call = NULL;
+    struct afs_conn * tc;
+    struct osi_file * tfile = NULL;
+    struct AFSVolSync tsync;
+    struct AFSFetchStatus outstatus;
+    struct AFSCallBack cb;
+
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_vnode_ignored(avc, &path)) {
+        printk(KERN_ERR "path: %s IGNORED\n", path);
+        return AFSX_STATUS_NOOP;
+    }
+    printk(KERN_ERR "path: %s NOT-IGNORED\n", path);
+
+
+    // anything hereon is a fatal error
+    ret = AFSX_STATUS_ERROR;
+
+    buffer = (void *)__get_free_page(GFP_KERNEL);
+    if (!buffer) {
+        printk(KERN_ERR "Could not allocate buffer\n");
+        return ret;
+    }
+
+    total_len = avc->f.m.Length;
+
+    // 1 - Initialize the rx_connection with the server
+    tc = afs_Conn(&avc->f.fid, areq, 0, &rx_conn);
+    afs_call = rx_NewCall(tc->id);
+
+#ifdef AFS_64BIT_CLIENT
+    if (!afs_serverHasNo64Bit(tc)) {
+        code = StartRXAFS_FetchData64(
+            afs_call, (struct AFSFid *)&avc->f.fid.Fid, 0, total_len);
+    } else {
+        code = StartRXAFS_FetchData(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
+                                    0, total_len);
+    }
+#else
+    code = StartRXAFS_FetchData(afs_call, (struct AFSFid *)&avc->f.fid.Fid, 0,
+                                total_length);
+#endif
+
+    if (code) {
+        printk(KERN_ERR "rxafs_fetch failed\n");
+        goto out;
+    }
+
+    nbytes = rx_Read(afs_call, (char *)&length_hi, sizeof(afs_int32));
+    if (nbytes != sizeof(afs_int32)) {
+        printk(KERN_ERR "Server error, exiting fetch\n");
+        goto out;
+    }
+
+    printk(KERN_ERR "server returned %d\n", length_hi);
+
+    if (AFSX_begin_download(conn, path, AFSX_PACKET_SIZE, total_len,
+                            &download_id)) {
+        printk(KERN_ERR "start_upload failed: %s\n", path);
+        goto out;
+    }
+
+    hash = DVHash(&avc->f.fid);
+    index = afs_dvhashTbl[hash];
+    filepos = 0;
+    remaining_bytes = total_len;
+
+    // TODO handle fileserver errors here
+    while (remaining_bytes) {
+        // get a tdc at that area
+        tdc = afs_ObtainDCacheForWriting(avc, filepos, remaining_bytes, areq,
+                                         0);
+
+        if (!tdc) {
+            printk(KERN_ERR "tdc could not be found\n");
+            break;
+        }
+
+        tdc_len = min(AFS_CHUNKTOSIZE(tdc->f.chunk), remaining_bytes);
+        tfile = (struct osi_file *)osi_UFSOpen(&tdc->f.inode);
+        while (tdc_len) {
+            size = tdc_len > AFSX_PACKET_SIZE ? AFSX_PACKET_SIZE : tdc_len;
+
+            // Read Data from the server
+            if ((nbytes = rx_Read(afs_call, buffer, size)) != size) {
+                printk(KERN_ERR "send to server failed: exp=%d, act=%d\n", size,
+                       (int)nbytes);
+                goto out1;
+            }
+
+            // send it to uspace
+            if (StartAFSX_download_data(uspace_call, download_id, size)) {
+                printk(KERN_ERR "StartAFSX_upload_file failed");
+                goto out1;
+            }
+
+            // copy the bytes over
+            if ((nbytes = rx_Write(uspace_call, buffer, size)) != size) {
+                printk(KERN_ERR "send error: exp=%d, act=%u\n", size, nbytes);
+                goto out1;
+            }
+
+            // read back the decrypted stream
+            if ((nbytes = rx_Read(uspace_call, buffer, size)) != size) {
+                printk(KERN_ERR "recv error: exp=%d, act=%u\n", size, nbytes);
+                goto out1;
+            }
+
+            // write into the dcache file
+            // XXX still have issues with IO
+            afs_osi_Write(tfile, -1, buffer, size);
+
+            tdc_len -= size;
+            EndAFSX_download_data(uspace_call);
+            rx_EndCall(uspace_call, 0);
+            uspace_call = NULL;
+        }
+        remaining_bytes -= tdc_len;
+        filepos += tdc_len;
+
+        osi_UFSClose(tfile);
+        ReleaseWriteLock(&tdc->lock);
+        afs_PutDCache(tdc);
+
+        tdc = NULL;
+    }
+
+    ret = 0;
+out1:
+    if (ret == AFSX_STATUS_ERROR) {
+        if (uspace_call) {
+            EndAFSX_download_data(uspace_call);
+            rx_EndCall(uspace_call, 0);
+        }
+
+        if (tdc) {
+            afs_CFileClose(tfile);
+            ReleaseWriteLock(&tdc->tlock);
+            afs_PutDCache(tdc);
+        }
+    }
+
+out:
+#ifdef AFS_64BIT_CLIENT
+    if (!afs_serverHasNo64Bit(tc))
+        code = EndRXAFS_FetchData64(afs_call, &outstatus, &cb, &tsync);
+    else
+        code = EndRXAFS_FetchData(afs_call, &outstatus, &cb, &tsync);
+#else
+    code = EndRXAFS_FetchData(afs_call, &outstatus, &cb, &tsync);
+#endif
+
+    AFSX_end_download(conn, download_id);
+    rx_EndCall(afs_call, 0);
+
+    __free_page(buffer);
+    if (path)
+        kfree(path);
     return ret;
 }
 

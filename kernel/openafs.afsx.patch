@@ -142,18 +142,29 @@ index 1b99c94..103ec15 100644
      AFS_GLOCK();
      code = afs_rename(VTOAFS(oldip), (char *)oldname, VTOAFS(newip), (char *)newname, credp);
      AFS_GUNLOCK();
-diff --git a/src/afs/VNOPS/afs_vnop_write.c b/src/afs/VNOPS/afs_vnop_write.c
-index d11cdbc..d2e0d7d 100644
---- a/src/afs/VNOPS/afs_vnop_write.c
-+++ b/src/afs/VNOPS/afs_vnop_write.c
-@@ -64,6 +64,7 @@ afs_StoreOnLastReference(struct vcache *avc,
- 
-     if (!AFS_IS_DISCONNECTED) {
- 	/* Connected. */
-+	LINUX_AFSX_push_file(avc);
- 
- 	/* Now, send the file back.  Used to require 0 writers left, but now do
- 	 * it on every close for write, since two closes in a row are harmless
+diff --git a/src/afs/VNOPS/afs_vnop_open.c b/src/afs/VNOPS/afs_vnop_open.c
+index 0c90bf16..f1b1fe8 100644
+--- a/src/afs/VNOPS/afs_vnop_open.c
++++ b/src/afs/VNOPS/afs_vnop_open.c
+@@ -164,6 +164,18 @@ afs_open(struct vcache **avcp, afs_int32 aflags, afs_ucred_t *acred)
+     }
+ #endif
+     ReleaseReadLock(&tvc->lock);
++
++#ifdef AFS_SECURE
++    #include "afsx_defs.h"
++    if ((writing == 0) && (vType(tvc) != VDIR)) {
++	code = LINUX_AFSX_fetch(tvc, treq);
++	printk(KERN_ERR "afsx_fetch returned %d\n", code);
++	if (code != AFSX_STATUS_NOOP) {
++	    goto done;
++	}
++    }
++#endif
++
+     if ((afs_preCache != 0) && (writing == 0) && (vType(tvc) != VDIR) && 
+ 	(!afs_BBusy())) {
+ 	struct dcache *tdc;
 diff --git a/src/afs/afs_daemons.c b/src/afs/afs_daemons.c
 index e8b8f9d..7e15a39 100644
 --- a/src/afs/afs_daemons.c
@@ -195,17 +206,26 @@ index 9e9f65b..fe8d680 100644
 +
  #endif /* _AFS_PROTOTYPES_H_ */
 diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
-index 2dd89cf..4d2303d 100644
+index 2dd89cf..982f39c 100644
 --- a/src/afs/afs_segments.c
 +++ b/src/afs/afs_segments.c
-@@ -174,6 +174,7 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
+@@ -173,6 +173,16 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
+     afs_size_t maxStoredLength;	/* highest offset we've written to server. */
      int safety, marineronce = 0;
  
++#ifdef AFS_SECURE
++#include "afsx_defs.h"
++    code = LINUX_AFSX_store(avc, areq);
++    if (code == AFSX_STATUS_SUCCESS || code == AFSX_STATUS_ERROR) {
++	printk(KERN_ERR "upload_file returned %d\n", code);
++	return code;
++    }
++    code = 0;
++#endif 
++
      AFS_STATCNT(afs_StoreAllSegments);
-+    LINUX_AFSX_push_file(avc);
  
      hash = DVHash(&avc->f.fid);
-     foreign = (avc->f.states & CForeign);
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
 index 46b9c9d..9d7c4e6 100644
 --- a/src/libafs/Makefile.common.in

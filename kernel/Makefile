@@ -5,6 +5,7 @@ OPENAFS_SRC_AFS = $(OPENAFS_SRC)/afs
 CC := clang
 SRC = afsx.h \
       afsx.cs.c \
+      afsx_defs.h \
       afs_secure.h \
       afs_secure.c
 
@@ -21,11 +22,14 @@ all: afsx.cs.c afsx.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
 	$(RXGEN) -A -x -C -o $@ $^
 
-afsx.h: $(COMMONPATH)/afsx.xg
-	$(RXGEN) -A -x -h -o $@ $^
+afsx.h: $(COMMONPATH)/afsx.xg afsx_defs.h
+	$(RXGEN) -A -x -h -o $@ $<
+
+afsx_defs.h: $(COMMONPATH)/afsx_defs.h
+	cp -u $^ $@
 
 .PHONY: copy
-copy:
+copy: all
 	cp -u $(SRC) $(OPENAFS_SRC_AFS)/
 
 .PHONY: clean

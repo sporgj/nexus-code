@@ -87,7 +87,7 @@ static int test_upload()
     size_t size = st.st_size, blklen = PACKET_SIZE;
     afs_uint32 upload_id;
 
-    if (AFSX_start_upload(conn, encoded_name_str, PACKET_SIZE, size, &upload_id)) {
+    if (AFSX_begin_upload(conn, TEST_FILE, PACKET_SIZE, size, &upload_id)) {
         cout << "Start RPC call failed" << endl;
         return -1;
     }
@@ -100,7 +100,7 @@ static int test_upload()
         
         struct rx_call * call = rx_NewCall(conn);
 
-        if (StartAFSX_upload_file(call, upload_id, blklen)) {
+        if (StartAFSX_upload_data(call, upload_id, blklen)) {
             cout << "StartAFSX_upload_file failed" << endl;
             return -1;
         }
@@ -124,7 +124,7 @@ static int test_upload()
         hexdump((uint8_t *)buffer, HEXDUMP_LEN(blklen));
         size -= blklen;
 
-        EndAFSX_upload_file(call);
+        EndAFSX_upload_data(call);
         rx_EndCall(call, 0);
     }
     return 0;

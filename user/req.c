@@ -31,7 +31,7 @@ int setup_rx(int port)
         goto out;
     }
 
-    uinfo("Waiting for connections...");
+    uinfo("Waiting for connections [0:%d]...", port);
     rx_StartServer(1);
     /* Note that the above call forks into another process */
 
@@ -107,14 +107,82 @@ afs_int32 SAFSX_fremove(
     return ret;
 }
 
-afs_int32 SAFSX_start_upload(
+afs_int32 SAFSX_begin_download(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ char * fpath,
+    /*IN */ afs_uint32 max_chunk_size,
+    /*IN */ afs_uint64 total_size,
+    /*OUT*/ afs_uint32 * download_id)
+{
+    fop_ctx_t * ctx = start_download(fpath, max_chunk_size, total_size);
+    if (ctx == NULL) {
+        return AFSX_STATUS_NOOP;
+    }
+    *download_id = ctx->id;
+    printf("start_download: %s (%u, %llu), upload_id=%d\n", fpath, max_chunk_size,
+           total_size, ctx->id);
+    return AFSX_STATUS_SUCCESS;
+}
+
+afs_int32 SAFSX_end_download(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ int upload_id)
+{
+    // TODO
+    return 0;
+}
+
+afs_int32 SAFSX_download_data(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ afs_uint32 download_id,
+    /*IN */ afs_uint32 chunk_size)
+{
+    int ret = AFSX_STATUS_NOOP;
+    afs_uint32 abytes;
+
+    fop_ctx_t * ctx = get_download_buffer(download_id);
+    if (ctx == NULL) {
+        ret = AFSX_STATUS_ERROR;
+        uerror("Download id: %d could not be found", download_id);
+        goto out;
+    }
+
+    if (ctx->cap < chunk_size) {
+        uerror("Chunk size %d sent is above the cap = %d", chunk_size,
+               ctx->cap);
+        ret = AFSX_STATUS_ERROR;
+        goto out;
+    }
+
+    if ((abytes = rx_Read(z_call, ctx->buffer, chunk_size)) != chunk_size) {
+        uerror("Read error. expecting: %u, actual: %u (err = %d)", chunk_size,
+               abytes, rx_Error(z_call));
+        goto out;
+    }
+
+    ctx->len = chunk_size;
+    // process the data
+    process_download_data(ctx);
+
+    if ((abytes = rx_Write(z_call, ctx->buffer, ctx->len)) != chunk_size) {
+        uerror("Write error. Expecting: %u, Actual: %u (err = %d)", chunk_size,
+               abytes, rx_Error(z_call));
+        goto out;
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+afs_int32 SAFSX_begin_upload(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
     /*IN */ afs_uint32 max_chunk_size,
     /*IN */ afs_uint64 total_size,
     /*OUT*/ afs_uint32 * upload_id)
 {
-    store_ctx_t * ctx = start_upload(fpath, max_chunk_size, total_size);
+    fop_ctx_t * ctx = start_upload(fpath, max_chunk_size, total_size);
     if (ctx == NULL) {
         return AFSX_STATUS_NOOP;
     }
@@ -132,7 +200,7 @@ afs_int32 SAFSX_end_upload(
     return 0;
 }
 
-afs_int32 SAFSX_upload_file(
+afs_int32 SAFSX_upload_data(
     /*IN */ struct rx_call * z_call,
     /*IN */ afs_uint32 upload_id,
     /*IN */ afs_uint32 chunk_size)
@@ -140,7 +208,7 @@ afs_int32 SAFSX_upload_file(
     int ret = AFSX_STATUS_NOOP;
     afs_uint32 abytes;
 
-    store_ctx_t * ctx = get_upload_buffer(upload_id);
+    fop_ctx_t * ctx = get_upload_buffer(upload_id);
     if (ctx == NULL) {
         ret = AFSX_STATUS_ERROR;
         uerror("Upload id: %d could not be found", upload_id);

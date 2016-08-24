@@ -8,16 +8,7 @@ prefix S
 %#include <rx/rx.h>
 %#include <rx/rx_null.h>
 
-%#define AFSX_SERVER_PORT       9462
-%#define AFSX_SERVICE_PORT      0
-%#define AFSX_SERVICE_ID        4
-
-%#define AFSX_STATUS_SUCCESS        0
-%#define AFSX_STATUS_ERROR          1
-%#define AFSX_STATUS_NOOP           2
-
-%#define AFSX_PACKET_SIZE   4096
-
+%#include "afsx_defs.h"
 
 /* maximum number of requests to be handled silmutaneously */
 %#define AFSX_REQ_MAX           2
@@ -26,9 +17,6 @@ prefix S
 
 /* index of the null security class */
 %#define AFSX_NULL              0
-
-%#define AFSX_FNAME_MAX         256
-%#define AFSX_PATH_MAX       1024
 
 /* dummy call to get version */
 fversion(
@@ -57,7 +45,7 @@ fremove(
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 5;
 
-start_upload(
+begin_upload(
     IN string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_chunk_size,
     afs_uint64 total_size,
@@ -68,7 +56,23 @@ end_upload(
     IN int upload_id
 ) = 7;
 
-upload_file(
+upload_data(
     IN afs_uint32 upload_id,
     afs_uint32 chunk_size
 ) split = 8;
+
+begin_download(
+    IN string fpath<AFSX_PATH_MAX>,
+    afs_uint32 max_chunk_size,
+    afs_uint64 total_size,
+    OUT afs_uint32 * download_id
+) = 9;
+    
+end_download(
+    IN int download_id
+) = 10;
+
+download_data(
+    IN afs_uint32 download_id,
+    afs_uint32 chunk_size
+) split = 11;

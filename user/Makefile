@@ -41,8 +41,11 @@ afsx.ss.o: afsx.ss.c
 afsx.ss.c: $(COMMON_DIR)/afsx.xg afsx.h
 	$(RXGEN) -A -x -S -o $@ $<
 
-afsx.h: $(COMMON_DIR)/afsx.xg
-	$(RXGEN) -A -x -h -o $@ $^
+afsx.h: $(COMMON_DIR)/afsx.xg afsx_defs.h
+	$(RXGEN) -A -x -h -o $@ $<
+
+afsx_defs.h: $(COMMON_DIR)/afsx_defs.h
+	cp -u $^ $@
 
 libucafs.a: $(OBJS)
 	ar cr $@ $^
@@ -61,4 +64,4 @@ dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
 
 .PHONY: clean
 clean:
-	rm -rf *.pb.h *.pb.cc afsx.h afsx.ss.c $(PROGRAM) $(OBJS) libucafs.a
+	rm -rf afsx_defs.h *.pb.h *.pb.cc afsx.h afsx.ss.c $(PROGRAM) $(OBJS) libucafs.a
