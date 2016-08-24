@@ -72,7 +72,7 @@ struct ubik_client;
 
 #include <rx/rx.h>
 #include <rx/rx_null.h>
-#include "afsx_defs.h"
+#include "afsx_hdr.h"
 #define AFSX_REQ_MAX 2
 #define AFSX_REQ_MIN 1
 #define AFSX_NULL 0

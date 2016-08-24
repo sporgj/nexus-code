@@ -12,7 +12,7 @@
 #include "afs_secure.h"
 #include "afsx.h"
 
-static char * ignore_dirs[] = { "/maatta.sgx/user/bruyne/.afsx" };
+static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx/" };
 
 static struct rx_connection * conn = NULL, *ping_conn = NULL;
 
@@ -41,7 +41,6 @@ int LINUX_AFSX_connect()
         printk(KERN_ERR "Connection to AFSX server failed\n");
         return -1;
     }
-    LINUX_AFSX_ping();
     return 0;
 }
 
@@ -66,53 +65,58 @@ int LINUX_AFSX_ping(void)
  *
  * @return bool true if path is to be ignored
  */
-static int __is_vnode_ignored(struct vcache * avc, char ** dest)
+static int __is_vnode_ignored(struct dentry * dentry, char ** dest)
 {
     int ret, len;
     char * path, *result;
     char buf[512];
-    struct inode * inode = AFSTOV(avc);
 
     // TODO cache the inode number
-    path = dentry_path_raw(d_find_alias(inode), buf, sizeof(buf));
+    path = dentry_path_raw(dentry, buf, sizeof(buf));
 
-    if (!(ret = LINUX_AFSX_ignore_path_bool(path)) && dest) {
-        len = strlen(path);
-        result = kmalloc(len + 1, GFP_KERNEL);
-        memcpy(result, path, len);
-        result[len] = '\0';
-        *dest = result;
-    }
+    for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
+        curr_dir = watch_dirs[i];
 
-    return ret;
-}
-
-/**
- * return 0
- */
-int LINUX_AFSX_ignore_path_bool(char * dir)
-{
-    int i;
-    int len;
-    char * ignore;
-
-    for (i = 0; i < sizeof(ignore_dirs) / sizeof(char *); i++) {
-        ignore = ignore_dirs[i];
-        len = strlen(ignore);
-        if (strnstr(dir, ignore, len + 1)) {
-            return 1;
+        if (strnstr(path, curr_dir, strlen(curr_dir))) {
+            // TODO maybe check the prefix on the name
+            
+            // we're good
+            if (dest) {
+                len = strlen(path);
+                result = kmalloc(len + 1, GFP_KERNEL);
+                memcpy(result, path, len);
+                result[len] = '\0';
+                *dest = result;
+            }
+            return 0;
         }
     }
-    return 0;
+
+    return 1;
 }
 
-int LINUX_AFSX_newfile(char ** dest, char * fpath)
+int LINUX_AFSX_is_dentry_watched(struct dentry * dentry)
+{
+    return __is_vnode_ignored(dentry, NULL);
+}
+
+int LINUX_AFSX_is_vnode_watched(struct vcache * avc)
+{
+    return __is_vnode_ignored(d_find_alias(AFSTOV(avc)), NULL);
+}
+
+int LINUX_AFSX_newfile(char ** dest, struct dentry * dp)
 {
     int ret;
+    char * fpath;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
-        return -1;
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_vnode_ignored(dp, &fpath)) {
+        return AFSX_STATUS_NOOP;
     }
 
     ret = AFSX_fnew(conn, fpath, dest);
@@ -126,13 +130,18 @@ int LINUX_AFSX_newfile(char ** dest, char * fpath)
     return ret;
 }
 
-int LINUX_AFSX_realname(char ** dest, char * fname, char * dirpath)
+int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp)
 {
     int ret;
+    char * dirpath;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
-        return -1;
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_vnode_ignored(dentry, &dirpath)) {
+        return AFSX_STATUS_NOOP;
     }
 
     if ((ret = AFSX_frealname(conn, fname, dirpath, dest))) {
@@ -145,13 +154,18 @@ int LINUX_AFSX_realname(char ** dest, char * fname, char * dirpath)
     return ret;
 }
 
-int LINUX_AFSX_lookup(char ** dest, char * fpath)
+int LINUX_AFSX_lookup(char ** dest, struct dentry * dp)
 {
     int ret;
+    char * fpath;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
         return -1;
+    }
+
+    if (__is_vnode_ignored(dp, &fpath)) {
+        return AFSX_STATUS_NOOP;
     }
 
     if ((ret = AFSX_fencodename(conn, fpath, dest))) {
@@ -164,13 +178,18 @@ int LINUX_AFSX_lookup(char ** dest, char * fpath)
     return ret;
 }
 
-int LINUX_AFSX_delfile(char ** dest, char * fpath)
+int LINUX_AFSX_delfile(char ** dest, struct dentry * dp)
 {
     int ret;
+    char * fpath;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
         return -1;
+    }
+
+    if (__is_vnode_ignored(dp, &fpath)) {
+        return AFSX_STATUS_NOOP;
     }
 
     if ((ret = AFSX_fremove(conn, fpath, dest))) {
@@ -403,7 +422,6 @@ int LINUX_AFSX_fetch(struct vcache * avc, struct vrequest * areq)
         return AFSX_STATUS_NOOP;
     }
     printk(KERN_ERR "path: %s NOT-IGNORED\n", path);
-
 
     // anything hereon is a fatal error
     ret = AFSX_STATUS_ERROR;

@@ -1,4 +1,3 @@
-COMMON_DIR = ../common
 KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs
@@ -10,7 +9,7 @@ LIBS = -L/usr/local/lib -lprotobuf -pthread\
        -Lmbedtls/library -lmbedcrypto\
        -lglog\
        -luuid
-INCFLAGS = -Imbedtls/include -I$(COMMON_DIR) -I/usr/local/include
+INCFLAGS = -Imbedtls/include -I/usr/local/include
 
 OBJS = dirnode.o\
        encode.o\
@@ -20,3 +19,4 @@ OBJS = dirnode.o\
        dnode.pb.o
 
 TESTS := test_dnode test_dops
+GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a 

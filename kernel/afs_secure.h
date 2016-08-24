@@ -14,11 +14,10 @@
 
 extern int LINUX_AFSX_connect(void);
 extern int LINUX_AFSX_ping(void);
-extern int LINUX_AFSX_ignore_path_bool(char * dir);
-extern int LINUX_AFSX_newfile(char** dest, char* path);
-extern int LINUX_AFSX_realname(char** dest, char *fname, char* path);
-extern int LINUX_AFSX_lookup(char ** dest, char * fpath);
-extern int LINUX_AFSX_delfile(char ** dest, char * fpath);
+extern int LINUX_AFSX_newfile(char ** dest, struct dentry * dp);
+extern int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp);
+extern int LINUX_AFSX_lookup(char ** dest, struct dentry * dp);
+extern int LINUX_AFSX_delfile(char ** dest, struct dentry * dp);
 extern int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq);
 extern int LINUX_AFSX_fetch(struct vcache * avc, struct vrequest * areq);
 

@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..103ec15 100644
+index 1b99c94..3889d95 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -406,6 +406,8 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -11,7 +11,7 @@ index 1b99c94..103ec15 100644
  	    afid.Cell = avc->f.fid.Cell;
  	    afid.Fid.Volume = avc->f.fid.Fid.Volume;
  	    afid.Fid.Vnode = ntohl(de->fid.vnode);
-@@ -437,12 +439,29 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+@@ -437,12 +439,25 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
  	     * holding the GLOCK.
  	     */
  	    AFS_GUNLOCK();
@@ -19,15 +19,11 @@ index 1b99c94..103ec15 100644
 +	    dentry_name = de->name;
 +#ifdef AFS_SECURE
 +	    {
-+	        char buf[500];
-+	        char * path, * res;
-+		path = dentry_path_raw(fp->f_dentry, buf, sizeof(buf));
++		char * path, * res;
 +
-+		if (!LINUX_AFSX_ignore_path_bool(path)) {
-+		     if (!LINUX_AFSX_realname(&res, de->name, path)) {
-+		         printk(KERN_DEBUG "afs_filldir: %s -> %s\n", de->name, res);
-+			 dentry_name = res;
-+		     }
++                if (!LINUX_AFSX_realname(&res, de->name, fp->d_dentry)) {
++                    printk(KERN_DEBUG "afs_filldir: %s -> %s\n", de->name, res);
++                    dentry_name = res;
 +		}
 +	    }
 +#endif
@@ -43,35 +39,27 @@ index 1b99c94..103ec15 100644
  #endif
  	    AFS_GLOCK();
  	}
-@@ -1468,6 +1487,35 @@ afs_linux_create(struct inode *dip, struct dentry *dp, int mode)
+@@ -1468,6 +1483,27 @@ afs_linux_create(struct inode *dip, struct dentry *dp, int mode)
      vattr->va_mode = mode;
      vattr->va_type = mode & S_IFMT;
  
 +#ifdef AFS_SECURE
-+    {
-+        char fname[500];
-+        char * path, * crypto_name = NULL, * crypto_name_cpy = NULL;
-+        int ret = 0, len = 0;
++    char * crypto_name = NULL, * crypto_name_cpy = NULL;
++    int ret = 0, len = 0;
 +
-+        path = dentry_path_raw(dp, fname, sizeof(fname));
-+        // if we are not touching a .fbox file
-+        if (!LINUX_AFSX_ignore_path_bool(path)) {
-+            if (!LINUX_AFSX_newfile(&crypto_name, path)) {
-+		printk(KERN_ERR "ret is here (%d)\n", ret);
-+
-+		len = strlen(crypto_name);
-+		/* we make a copy because the buffer returned is from rx. I'm not
-+		 * sure if they use it later. Just playing it safe here. FOR NOW */
-+		crypto_name_cpy = kmalloc(len + 1, GFP_KERNEL);
-+		if (crypto_name_cpy) {
-+		    crypto_name_cpy[len] = '\0';
-+		    memcpy(crypto_name_cpy, crypto_name, len);
-+		    name = crypto_name_cpy;
-+		    printk(KERN_ERR "dir: %s\n", path);
-+		} else {
-+		    printk(KERN_ERR "could not allocate memory for crypto name\n");
-+		}
-+            }
++    // if we are not touching a .fbox file
++    if (!LINUX_AFSX_newfile(&crypto_name, dp)) {
++        len = strlen(crypto_name);
++        /* we make a copy because the buffer returned is from rx. I'm not
++         * sure if they use it later. Just playing it safe here. FOR NOW */
++        crypto_name_cpy = kmalloc(len + 1, GFP_KERNEL);
++        if (crypto_name_cpy) {
++            crypto_name_cpy[len] = '\0';
++            memcpy(crypto_name_cpy, crypto_name, len);
++            name = crypto_name_cpy;
++            printk(KERN_ERR "dir: %s\n", path);
++        } else {
++            printk(KERN_ERR "could not allocate memory for crypto name\n");
 +        }
 +    }
 +#endif
@@ -79,61 +67,41 @@ index 1b99c94..103ec15 100644
      code = afs_create(VTOAFS(dip), (char *)name, vattr, NONEXCL, mode,
  		      &vcp, credp);
  
-@@ -1487,6 +1535,7 @@ afs_linux_create(struct inode *dip, struct dentry *dp, int mode)
-     afs_DestroyAttr(vattr);
- 
- out:
-+    printk(KERN_ERR "file created: %s\n", name);
-     AFS_GUNLOCK();
- 
-     crfree(credp);
-@@ -1513,6 +1562,23 @@ afs_linux_lookup(struct inode *dip, struct dentry *dp)
+@@ -1513,6 +1549,17 @@ afs_linux_lookup(struct inode *dip, struct dentry *dp)
      int code;
  
      AFS_GLOCK();
 +
 +#ifdef AFS_SECURE
-+    {
-+        char fname[500];
-+	char * path, * dest;
-+	
-+	path = dentry_path_raw(dp, fname, sizeof(fname));
-+	if (!LINUX_AFSX_ignore_path_bool(path)) {
-+	    if (!LINUX_AFSX_lookup(&dest, path)) {
-+		comp = dest;
-+	        printk(KERN_ERR "afs_lookup: %s -> %s\n", comp,
-+		    newdp ? newdp->d_name.name : NULL);
-+	    }
-+	}
++    char * dest;
++    
++    if (!LINUX_AFSX_lookup(&dest, dp)) {
++        comp = dest;
++        printk(KERN_ERR "afs_lookup: %s -> %s\n", comp,
++                newdp ? newdp->d_name.name : NULL);
 +    }
 +#endif
 +
      code = afs_lookup(VTOAFS(dip), (char *)comp, &vcp, credp);
  
      if (!code) {
-@@ -1698,6 +1764,21 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
+@@ -1698,6 +1745,15 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
      const char *name = dp->d_name.name;
      struct vcache *tvc = VTOAFS(dp->d_inode);
  
 +#ifdef AFS_SECURE
 +    {
-+        char fname[500];
-+	char * path, * dest;
-+	
-+	path = dentry_path_raw(dp, fname, sizeof(fname));
-+	if (!LINUX_AFSX_ignore_path_bool(path)) {
-+	    if (!LINUX_AFSX_delfile(&dest, path)) {
-+	        printk(KERN_ERR "afs_unlink: %s -> %s\n", name, dest);
-+		name = dest;
-+	    }
-+	} 
++        if (!LINUX_AFSX_delfile(&dest, dp)) {
++            printk(KERN_ERR "afs_unlink: %s -> %s\n", name, dest);
++            name = dest;
++        }
 +    }
 +#endif
 +
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
-@@ -1838,6 +1919,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
+@@ -1838,6 +1894,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
  
      afs_maybe_shrink_dcache(olddp);
  

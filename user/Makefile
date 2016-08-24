@@ -11,7 +11,7 @@ RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 RXINC := -I$(OPENAFS_INC)
 RXLIBS := -L$(OPENAFS_LIB) -lrx -llwp
 
-all: common.h ucafs
+all: ucafs
 
 define make-test-target
 $(1): $(1).cc libucafs.a
@@ -23,38 +23,41 @@ $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
 tests: $(addprefix tests/, $(TESTS)) tests/test_upload
 
 tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
-	$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
+	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
 	@echo "CXX <= $@"
 
-afsx.cs.o: $(KERNSRC_PATH)/afsx.cs.c afsx.h
+afsx.cs.o: afsx.cs.c afsx.h
 	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@echo "CC <= $@"
 
-common.h: $(COMMON_DIR)/common.h
-	cp $^ $@
+afsx.cs.c: afsx.xg
+	$(RXGEN) -A -x -C -o $@ $<
 
 ucafs: main.cc libucafs.a
-	$(CXX) $(CPPFLAGS) -I../common $^ $(LIBS) $(RXLIBS) -o $@
+	@$(CXX) $(CPPFLAGS) -I../common $^ $(LIBS) $(RXLIBS) -o $@
+	@echo "CXX <= $@"
 
 afsx.ss.o: afsx.ss.c
 	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@echo "CC <= $@"
 
-afsx.ss.c: $(COMMON_DIR)/afsx.xg afsx.h
+afsx.ss.c: afsx.xg afsx.h
 	$(RXGEN) -A -x -S -o $@ $<
 
-afsx.h: $(COMMON_DIR)/afsx.xg afsx_defs.h
+afsx.h: afsx.xg afsx_hdr.h
 	$(RXGEN) -A -x -h -o $@ $<
 
-afsx_defs.h: $(COMMON_DIR)/afsx_defs.h
-	cp -u $^ $@
-
 libucafs.a: $(OBJS)
-	ar cr $@ $^
+	@ar cr $@ $^
+	@echo "ar => $@"
 
 req.o: req.c afsx.ss.c
 	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@echo "CC <= $@"
 
 %.o: %.cc %.h
-	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@echo "CXX <= $@"
 
 dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
@@ -64,4 +67,4 @@ dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
 
 .PHONY: clean
 clean:
-	rm -rf afsx_defs.h *.pb.h *.pb.cc afsx.h afsx.ss.c $(PROGRAM) $(OBJS) libucafs.a
+	rm -rf $(GENS) $(PROGRAM) *.o

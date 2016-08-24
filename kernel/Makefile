@@ -1,11 +1,11 @@
-COMMONPATH = ../common
+COMMONPATH = ../user
 OPENAFS_PATH = ~/openafs
 OPENAFS_SRC = ~/openafs/src
 OPENAFS_SRC_AFS = $(OPENAFS_SRC)/afs
 CC := clang
 SRC = afsx.h \
       afsx.cs.c \
-      afsx_defs.h \
+      afsx_hdr.h \
       afs_secure.h \
       afs_secure.c
 
@@ -22,10 +22,10 @@ all: afsx.cs.c afsx.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
 	$(RXGEN) -A -x -C -o $@ $^
 
-afsx.h: $(COMMONPATH)/afsx.xg afsx_defs.h
+afsx.h: $(COMMONPATH)/afsx.xg afsx_hdr.h
 	$(RXGEN) -A -x -h -o $@ $<
 
-afsx_defs.h: $(COMMONPATH)/afsx_defs.h
+afsx_hdr.h: $(COMMONPATH)/afsx_hdr.h
 	cp -u $^ $@
 
 .PHONY: copy

@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <uuid/uuid.h>
-#include <common.h>
+#include "afsx_hdr.h"
 
 #define GLOBAL_MAGIC 0x20160811
 

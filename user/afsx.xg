@@ -8,7 +8,7 @@ prefix S
 %#include <rx/rx.h>
 %#include <rx/rx_null.h>
 
-%#include "afsx_defs.h"
+%#include "afsx_hdr.h"
 
 /* maximum number of requests to be handled silmutaneously */
 %#define AFSX_REQ_MAX           2
