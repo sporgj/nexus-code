@@ -11,8 +11,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "uspace.h"
 #include "dirnode.h"
 
 using namespace std;

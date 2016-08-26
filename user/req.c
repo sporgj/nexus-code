@@ -11,7 +11,9 @@ int setup_rx(int port)
     struct rx_service * service;
     int ret = 1;
 
-    if (rx_Init(port == 0 ? AFSX_SERVER_PORT : port) < 0) {
+    port = (port == 0) ? AFSX_SERVER_PORT : port;
+
+    if (rx_Init(port) < 0) {
         uerror("rx_init");
         goto out;
     }
@@ -119,14 +121,14 @@ afs_int32 SAFSX_begin_download(
         return AFSX_STATUS_NOOP;
     }
     *download_id = ctx->id;
-    printf("start_download: %s (%u, %llu), upload_id=%d\n", fpath, max_chunk_size,
-           total_size, ctx->id);
+    printf("start_download: %s (%u, %llu), upload_id=%d\n", fpath,
+           max_chunk_size, total_size, ctx->id);
     return AFSX_STATUS_SUCCESS;
 }
 
 afs_int32 SAFSX_end_download(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ int upload_id)
+    /*IN */ struct rx_call * z_call,
+    /*IN */ int upload_id)
 {
     // TODO
     return 0;
@@ -193,10 +195,16 @@ afs_int32 SAFSX_begin_upload(
 }
 
 afs_int32 SAFSX_end_upload(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ int upload_id)
+    /*IN */ struct rx_call * z_call,
+    /*IN */ int upload_id)
 {
-    // TODO
+    fop_ctx_t * ctx = get_upload_buffer(upload_id);
+    if (ctx == NULL) {
+        printf("! end_upload: id %d could not be found", upload_id);
+        return -1;
+    }
+    // TODO call delete upload context
+    printf("end_upload: upload_id=%d completed=%u\n", upload_id, ctx->done);
     return 0;
 }
 
@@ -238,16 +246,9 @@ afs_int32 SAFSX_upload_data(
         goto out;
     }
 
+    printf("upload_data: upload_id=%u, len=%u\n", upload_id, ctx->len);
+
     ret = 0;
 out:
     return ret;
-}
-
-afs_int32 SAFSX_download_file(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * fpath,
-    /*IN */ afs_uint64 chunklength,
-    /*IN */ afs_uint64 filelength)
-{
-    return 0;
 }

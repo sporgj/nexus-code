@@ -12,7 +12,7 @@
 #include "afs_secure.h"
 #include "afsx.h"
 
-static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx/" };
+static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx" };
 
 static struct rx_connection * conn = NULL, *ping_conn = NULL;
 
@@ -67,8 +67,8 @@ int LINUX_AFSX_ping(void)
  */
 static int __is_vnode_ignored(struct dentry * dentry, char ** dest)
 {
-    int ret, len;
-    char * path, *result;
+    int len, i;
+    char * path, *curr_dir, *result;
     char buf[512];
 
     // TODO cache the inode number
@@ -79,7 +79,6 @@ static int __is_vnode_ignored(struct dentry * dentry, char ** dest)
 
         if (strnstr(path, curr_dir, strlen(curr_dir))) {
             // TODO maybe check the prefix on the name
-            
             // we're good
             if (dest) {
                 len = strlen(path);
@@ -91,7 +90,6 @@ static int __is_vnode_ignored(struct dentry * dentry, char ** dest)
             return 0;
         }
     }
-
     return 1;
 }
 
@@ -140,7 +138,7 @@ int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    if (__is_vnode_ignored(dentry, &dirpath)) {
+    if (__is_vnode_ignored(dp, &dirpath)) {
         return AFSX_STATUS_NOOP;
     }
 
@@ -224,7 +222,7 @@ int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq)
         return AFSX_STATUS_NOOP;
     }
 
-    if (__is_vnode_ignored(avc, &path)) {
+    if (__is_vnode_ignored(d_find_alias(AFSTOV(avc)), &path)) {
         return AFSX_STATUS_NOOP;
     }
 
@@ -242,6 +240,20 @@ int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq)
         return ret;
     }
 
+
+    // to avoid pageout when reading files, make sure all the vcache dirty
+    // pages are flushed to disk. This also obtains the GLOCK()
+    osi_VM_StoreAllSegments(avc);
+
+    /*
+    // store the data version
+    hset(olddv, avc->f.m.DataVersion);
+    hset(newdv, avc->f.m.DataVersion);
+    */
+
+    // osi_VM_StoreAllSegments sets avc->lock to a writelock
+    ConvertWToSLock(&avc->lock);
+
     total_len = avc->f.m.Length;
     hash = DVHash(&avc->f.fid);
 
@@ -254,7 +266,7 @@ int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq)
     // RX_AFS_GLOCK();
     instatus.Mask = AFS_SETMODTIME;
     instatus.ClientModTime = avc->f.m.Date;
-// RX_AFS_GUNLOCK();
+    // RX_AFS_GUNLOCK();
 
 #ifdef AFS_64BIT_CLIENT
     // if the server is rrunning in 64 bits
@@ -351,6 +363,13 @@ int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq)
             osi_UFSClose(file);
 
             // release the tdc resources
+            ObtainWriteLock(&tdc->lock, 6504);
+            hset(tdc->f.versionNo, avc->f.m.DataVersion);
+            // set flag to ensure tdc is flushed to disk
+            tdc->dflags |= DFEntryMod;
+            tdc->f.states &= ~DWriting;
+            ReleaseWriteLock(&tdc->lock);
+
             ReleaseReadLock(&tdc->tlock);
             afs_PutDCache(tdc);
             tdc = NULL;
@@ -364,6 +383,7 @@ int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq)
         index = afs_dvnextTbl[index];
     }
 
+    avc->f.states &= ~CDirty;
     ret = 0;
 out1:
     if (ret == AFSX_STATUS_ERROR) {
@@ -417,11 +437,9 @@ int LINUX_AFSX_fetch(struct vcache * avc, struct vrequest * areq)
         return AFSX_STATUS_NOOP;
     }
 
-    if (__is_vnode_ignored(avc, &path)) {
-        printk(KERN_ERR "path: %s IGNORED\n", path);
+    if (__is_vnode_ignored(d_find_alias(AFSTOV(avc)), &path)) {
         return AFSX_STATUS_NOOP;
     }
-    printk(KERN_ERR "path: %s NOT-IGNORED\n", path);
 
     // anything hereon is a fatal error
     ret = AFSX_STATUS_ERROR;
@@ -486,7 +504,11 @@ int LINUX_AFSX_fetch(struct vcache * avc, struct vrequest * areq)
             break;
         }
 
-        tdc_len = min(AFS_CHUNKTOSIZE(tdc->f.chunk), remaining_bytes);
+        // let's mention we're fetching
+        tdc->dflags |= DFFetching;
+        tdc->f.states |= DWriting;
+
+        tdc_len = MIN(AFS_CHUNKTOSIZE(tdc->f.chunkBytes), remaining_bytes);
         tfile = (struct osi_file *)osi_UFSOpen(&tdc->f.inode);
         while (tdc_len) {
             size = tdc_len > AFSX_PACKET_SIZE ? AFSX_PACKET_SIZE : tdc_len;
@@ -529,6 +551,8 @@ int LINUX_AFSX_fetch(struct vcache * avc, struct vrequest * areq)
         filepos += tdc_len;
 
         osi_UFSClose(tfile);
+        tdc->f.states &= ~DWriting;
+        tdc->dflags &= ~DFFetching;
         ReleaseWriteLock(&tdc->lock);
         afs_PutDCache(tdc);
 

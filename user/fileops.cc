@@ -34,6 +34,7 @@ inline static fop_ctx_t * __new_ctx(vector<fop_ctx_t *> * ctx_array,
 
     fop_ctx_t * ctx = new fop_ctx_t;
     ctx->buffer = (char *)operator new(max_chunk_size);
+    ctx->done = 0;
     ctx->cap = max_chunk_size;
     ctx->total = filelength;
     ctx->id = *counter;
@@ -98,6 +99,8 @@ int process_upload_data(fop_ctx_t * ctx)
         *ptr = *ptr + 1;
         ptr++;
     }
+
+    ctx->done += ctx->len;
 
     return 0;
 }

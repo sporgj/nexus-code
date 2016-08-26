@@ -3,6 +3,7 @@
 typedef struct {
     uint32_t id;
     char * buffer;
+    uint32_t done;
     uint32_t len;
     uint32_t cap;
     uint64_t total;
