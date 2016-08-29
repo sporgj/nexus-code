@@ -121,7 +121,7 @@ afs_int32 SAFSX_begin_download(
         return AFSX_STATUS_NOOP;
     }
     *download_id = ctx->id;
-    printf("start_download: %s (%u, %llu), upload_id=%d\n", fpath,
+    printf("start_download: %s (%u, %llu), download_id=%d\n", fpath,
            max_chunk_size, total_size, ctx->id);
     return AFSX_STATUS_SUCCESS;
 }
@@ -130,7 +130,13 @@ afs_int32 SAFSX_end_download(
     /*IN */ struct rx_call * z_call,
     /*IN */ int upload_id)
 {
-    // TODO
+    fop_ctx_t * ctx = get_upload_buffer(upload_id);
+    if (ctx == NULL) {
+        printf("! end_download: id %d could not be found", upload_id);
+        return -1;
+    }
+    // TODO call delete upload context
+    printf("end_download: upload_id=%d completed=%u\n", upload_id, ctx->done);
     return 0;
 }
 

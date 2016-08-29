@@ -6,6 +6,8 @@ CC := clang
 SRC = afsx.h \
       afsx.cs.c \
       afsx_hdr.h \
+      ucafs_fetch.c \
+      ucafs_kern.h \
       afs_secure.h \
       afs_secure.c
 
