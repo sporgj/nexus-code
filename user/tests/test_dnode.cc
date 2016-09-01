@@ -40,6 +40,9 @@ static void test_dnode()
         return;
     }
 
+    LOG(INFO) << "Renaming '" << fnames[2] << "' -> epl.txt";
+    dn->rename_file(fnames[2], "epl.txt");
+
     LOG(INFO) << "Listing entries";
     dn->list_files();
 

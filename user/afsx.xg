@@ -35,6 +35,12 @@ frealname(
     OUT string real_name<AFSX_FNAME_MAX>
 ) = 3;
 
+frename(
+    IN string old_fpath<AFSX_PATH_MAX>,
+    string new_path<AFSX_PATH_MAX>,
+    OUT string code_name<AFSX_FNAME_MAX>
+) = 9;
+
 fencodename(
     IN string fpath<AFSX_PATH_MAX>,
     OUT string fake_name<AFSX_FNAME_MAX>
@@ -45,34 +51,20 @@ fremove(
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 5;
 
-begin_upload(
-    IN string fpath<AFSX_PATH_MAX>,
+readwrite_start(
+    IN int op,
+    string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_chunk_size,
     afs_uint64 total_size,
-    OUT afs_uint32 * upload_id
+    OUT afs_uint32 * id
 ) = 6;
     
-end_upload(
-    IN int upload_id
+readwrite_finish(
+    IN int id
 ) = 7;
 
-upload_data(
-    IN afs_uint32 upload_id,
-    afs_uint32 chunk_size
+readwrite_data(
+    IN afs_uint32 id,
+    afs_uint32 size,
+    OUT int * moredata
 ) split = 8;
-
-begin_download(
-    IN string fpath<AFSX_PATH_MAX>,
-    afs_uint32 max_chunk_size,
-    afs_uint64 total_size,
-    OUT afs_uint32 * download_id
-) = 9;
-    
-end_download(
-    IN int download_id
-) = 10;
-
-download_data(
-    IN afs_uint32 download_id,
-    afs_uint32 chunk_size
-) split = 11;

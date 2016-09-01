@@ -7,9 +7,10 @@ SRC = afsx.h \
       afsx.cs.c \
       afsx_hdr.h \
       ucafs_fetch.c \
+      ucafs_store.c \
       ucafs_kern.h \
       afs_secure.h \
-      afs_secure.c
+      ucafs_main.c
 
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
@@ -19,6 +20,8 @@ LIB_FLAGS= -L$(OPENAFS_LIB_PATH)
 # libraries for the RX compilation
 RXLIBS = -lrx\
 	 -llwp
+
+GEN = afsx.cs.c afsx.h afsx_hdr.h
 
 all: afsx.cs.c afsx.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
@@ -30,12 +33,16 @@ afsx.h: $(COMMONPATH)/afsx.xg afsx_hdr.h
 afsx_hdr.h: $(COMMONPATH)/afsx_hdr.h
 	cp -u $^ $@
 
-.PHONY: copy
-copy: all
+.PHONY: install
+install: all
 	cp -u $(SRC) $(OPENAFS_SRC_AFS)/
 
+.PHONY: rm
+rm:
+	rm $(GEN)
+
 .PHONY: clean
-clean:
+clean: rm
 	cd $(OPENAFS_SRC_AFS) && rm -f $(SRC)
 
 

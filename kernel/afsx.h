@@ -129,84 +129,51 @@ extern afs_int32 SAFSX_fremove(
 	/*IN */ char * fpath,
 	/*OUT*/ char * *code_name);
 
-extern int AFSX_begin_upload(
+extern int AFSX_readwrite_start(
 	/*IN */ struct rx_connection *z_conn,
+	/*IN */ int op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
 	/*IN */ afs_uint64 total_size,
-	/*OUT*/ afs_uint32 * upload_id);
+	/*OUT*/ afs_uint32 * id);
 
-extern afs_int32 SAFSX_begin_upload(
+extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ struct rx_call *z_call,
+	/*IN */ int op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
 	/*IN */ afs_uint64 total_size,
-	/*OUT*/ afs_uint32 * upload_id);
+	/*OUT*/ afs_uint32 * id);
 
-extern int AFSX_end_upload(
+extern int AFSX_readwrite_finish(
 	/*IN */ struct rx_connection *z_conn,
-	/*IN */ int upload_id);
+	/*IN */ int id);
 
-extern afs_int32 SAFSX_end_upload(
+extern afs_int32 SAFSX_readwrite_finish(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ int upload_id);
+	/*IN */ int id);
 
-extern int StartAFSX_upload_data(
+extern int StartAFSX_readwrite_data(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ afs_uint32 upload_id,
-	/*IN */ afs_uint32 chunk_size);
+	/*IN */ afs_uint32 id,
+	/*IN */ afs_uint32 size);
 
-extern int EndAFSX_upload_data(
+extern int EndAFSX_readwrite_data(
 	/*IN */ struct rx_call *z_call);
 
-extern afs_int32 SAFSX_upload_data(
+extern afs_int32 SAFSX_readwrite_data(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ afs_uint32 upload_id,
-	/*IN */ afs_uint32 chunk_size);
-
-extern int AFSX_begin_download(
-	/*IN */ struct rx_connection *z_conn,
-	/*IN */ char * fpath,
-	/*IN */ afs_uint32 max_chunk_size,
-	/*IN */ afs_uint64 total_size,
-	/*OUT*/ afs_uint32 * download_id);
-
-extern afs_int32 SAFSX_begin_download(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * fpath,
-	/*IN */ afs_uint32 max_chunk_size,
-	/*IN */ afs_uint64 total_size,
-	/*OUT*/ afs_uint32 * download_id);
-
-extern int AFSX_end_download(
-	/*IN */ struct rx_connection *z_conn,
-	/*IN */ int download_id);
-
-extern afs_int32 SAFSX_end_download(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ int download_id);
-
-extern int StartAFSX_download_data(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ afs_uint32 download_id,
-	/*IN */ afs_uint32 chunk_size);
-
-extern int EndAFSX_download_data(
-	/*IN */ struct rx_call *z_call);
-
-extern afs_int32 SAFSX_download_data(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ afs_uint32 download_id,
-	/*IN */ afs_uint32 chunk_size);
+	/*IN */ afs_uint32 id,
+	/*IN */ afs_uint32 size);
 
 extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
 #define AFSX_LOWEST_OPCODE   1
-#define AFSX_HIGHEST_OPCODE	11
-#define AFSX_NUMBER_OPCODES	11
+#define AFSX_HIGHEST_OPCODE	8
+#define AFSX_NUMBER_OPCODES	8
 
-#define AFSX_NO_OF_STAT_FUNCS	11
+#define AFSX_NO_OF_STAT_FUNCS	8
 
 AFS_RXGEN_EXPORT
 extern const char *AFSX_function_names[];

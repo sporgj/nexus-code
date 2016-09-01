@@ -18,6 +18,6 @@ extern int LINUX_AFSX_newfile(char ** dest, struct dentry * dp);
 extern int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp);
 extern int LINUX_AFSX_lookup(char ** dest, struct dentry * dp);
 extern int LINUX_AFSX_delfile(char ** dest, struct dentry * dp);
-extern int LINUX_AFSX_store(struct vcache * avc, struct vrequest * areq);
+extern int UCAFS_store(struct vcache * avc, struct vrequest * areq);
 extern int UCAFS_fetch(struct vcache * avc, struct vrequest * areq);
 #endif

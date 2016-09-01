@@ -17,7 +17,8 @@ extern int AFSX_IS_CONNECTED;
 
 typedef struct {
     char srv_64bit;
-    int dw_id;
+    afs_uint32 moredata;
+    int id;
     int buflen;
     void * buffer;
     afs_int32 len;

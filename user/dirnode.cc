@@ -163,6 +163,57 @@ encoded_fname_t * DirNode::rm_file(const char * realname)
     return result;
 }
 
+encoded_fname_t * DirNode::rename_file(const char * oldname,
+                                       const char * newname)
+{
+#if 0
+    encoded_fname_t * new_encoded_name;
+    raw_fname_t * dest_fname;
+    if (!rm_file(oldname)) {
+        return nullptr;
+    }
+
+    size_t slen = strlen(newname) + 1;
+
+    dest_fname = static_cast<raw_fname_t *>(operator new(slen));
+    memset(dest_fname, 0, slen);
+
+    memcpy(dest_fname->raw, newname, strlen(newname));
+
+    new_encoded_name = new encoded_fname_t;
+    uuid_generate_time_safe(new_encoded_name->bin);
+
+    dnode_fentry * fentry = this->proto->add_file();
+    fentry->set_encoded_name(new_encoded_name, sizeof(encoded_fname_t));
+    fentry->set_raw_name(dest_fname, slen);
+
+    delete dest_fname;
+    return new_encoded_name;
+#else
+    encoded_fname_t * encoded_name;
+    auto fentry_list = this->proto->mutable_file();
+    auto curr_fentry = fentry_list->begin();
+    string name_str(oldname);
+
+    while (curr_fentry != fentry_list->end()) {
+        if (!name_str.compare(curr_fentry->raw_name().data())) {
+            encoded_name = new encoded_fname_t;
+            uuid_generate_time_safe(encoded_name->bin);
+
+            curr_fentry->set_raw_name(newname);
+            curr_fentry->set_encoded_name(encoded_name->bin,
+                                          sizeof(encoded_fname_t));
+
+            return encoded_name;
+        }
+
+        curr_fentry++;
+    }
+
+    return nullptr;
+#endif
+}
+
 /**
  * Converts the encoded to the real one
  * @param encoded_name

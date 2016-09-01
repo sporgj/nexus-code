@@ -5,7 +5,7 @@ OPENAFS_INC := $(OPENAFS_PATH)/include
 OPENAFS_SRC := $(OPENAFS_PATH)/src
 OPENAFS_LIB := $(OPENAFS_PATH)/lib
 
-OBJS := req.o afsx.ss.o $(OBJS)
+OBJS := rpc.o afsx.ss.o $(OBJS)
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
 RXINC := -I$(OPENAFS_INC)
@@ -51,7 +51,7 @@ libucafs.a: $(OBJS)
 	@ar cr $@ $^
 	@echo "ar => $@"
 
-req.o: req.c afsx.ss.c
+rpc.o: rpc.c afsx.ss.c
 	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 

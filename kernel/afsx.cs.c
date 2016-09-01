@@ -214,7 +214,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_begin_upload(struct rx_connection *z_conn,char * fpath,afs_uint32 max_chunk_size,afs_uint64 total_size,afs_uint32 * upload_id)
+int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint64 total_size,afs_uint32 * id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 6;
@@ -225,6 +225,7 @@ int AFSX_begin_upload(struct rx_connection *z_conn,char * fpath,afs_uint32 max_c
 
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
+	     || (!xdr_int(&z_xdrs, &op))
 	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))
 	     || (!xdr_afs_uint32(&z_xdrs, &max_chunk_size))
 	     || (!xdr_afs_uint64(&z_xdrs, &total_size))) {
@@ -234,7 +235,7 @@ int AFSX_begin_upload(struct rx_connection *z_conn,char * fpath,afs_uint32 max_c
 
 	/* Un-marshal the reply arguments */
 	z_xdrs.x_op = XDR_DECODE;
-	if ((!xdr_afs_uint32(&z_xdrs, upload_id))) {
+	if ((!xdr_afs_uint32(&z_xdrs, id))) {
 		z_result = RXGEN_CC_UNMARSHAL;
 		goto fail;
 	}
@@ -257,7 +258,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_end_upload(struct rx_connection *z_conn,int upload_id)
+int AFSX_readwrite_finish(struct rx_connection *z_conn,int id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 7;
@@ -268,7 +269,7 @@ int AFSX_end_upload(struct rx_connection *z_conn,int upload_id)
 
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_int(&z_xdrs, &upload_id))) {
+	     || (!xdr_int(&z_xdrs, &id))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;
 	}
@@ -291,7 +292,7 @@ fail:
 	return z_result;
 }
 
-int StartAFSX_upload_data(struct rx_call *z_call,afs_uint32 upload_id,afs_uint32 chunk_size)
+int StartAFSX_readwrite_data(struct rx_call *z_call,afs_uint32 id,afs_uint32 size)
 {
 	static int z_op = 8;
 	int z_result;
@@ -300,8 +301,8 @@ int StartAFSX_upload_data(struct rx_call *z_call,afs_uint32 upload_id,afs_uint32
 
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_afs_uint32(&z_xdrs, &upload_id))
-	     || (!xdr_afs_uint32(&z_xdrs, &chunk_size))) {
+	     || (!xdr_afs_uint32(&z_xdrs, &id))
+	     || (!xdr_afs_uint32(&z_xdrs, &size))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;
 	}
@@ -311,7 +312,7 @@ fail:
 	return z_result;
 }
 
-int EndAFSX_upload_data(struct rx_call *z_call)
+int EndAFSX_readwrite_data(struct rx_call *z_call)
 {
 	int z_result;
 	struct clock __QUEUE, __EXEC;
@@ -325,123 +326,6 @@ int EndAFSX_upload_data(struct rx_call *z_call)
 		(((afs_uint32)(ntohs(z_call->conn->serviceId) << 16)) |
 		((afs_uint32)ntohs(z_call->conn->peer->port))),
 		7, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
-		&z_call->bytesSent, &z_call->bytesRcvd, 1);
-	}
-
-	return z_result;
-}
-
-int AFSX_begin_download(struct rx_connection *z_conn,char * fpath,afs_uint32 max_chunk_size,afs_uint64 total_size,afs_uint32 * download_id)
-{
-	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 9;
-	int z_result;
-	XDR z_xdrs;
-	struct clock __QUEUE, __EXEC;
-	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
-
-	/* Marshal the arguments */
-	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))
-	     || (!xdr_afs_uint32(&z_xdrs, &max_chunk_size))
-	     || (!xdr_afs_uint64(&z_xdrs, &total_size))) {
-		z_result = RXGEN_CC_MARSHAL;
-		goto fail;
-	}
-
-	/* Un-marshal the reply arguments */
-	z_xdrs.x_op = XDR_DECODE;
-	if ((!xdr_afs_uint32(&z_xdrs, download_id))) {
-		z_result = RXGEN_CC_UNMARSHAL;
-		goto fail;
-	}
-
-	z_result = RXGEN_SUCCESS;
-fail:
-	z_result = rx_EndCall(z_call, z_result);
-	if (rx_enable_stats) {
-	    clock_GetTime(&__EXEC);
-	    clock_Sub(&__EXEC, &z_call->startTime);
-	    __QUEUE = z_call->startTime;
-	    clock_Sub(&__QUEUE, &z_call->queueTime);
-	    rx_IncrementTimeAndCount(z_conn->peer,
-		(((afs_uint32)(ntohs(z_conn->serviceId) << 16)) 
-		| ((afs_uint32)ntohs(z_conn->peer->port))),
-		8, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
-		&z_call->bytesSent, &z_call->bytesRcvd, 1);
-	}
-
-	return z_result;
-}
-
-int AFSX_end_download(struct rx_connection *z_conn,int download_id)
-{
-	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 10;
-	int z_result;
-	XDR z_xdrs;
-	struct clock __QUEUE, __EXEC;
-	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
-
-	/* Marshal the arguments */
-	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_int(&z_xdrs, &download_id))) {
-		z_result = RXGEN_CC_MARSHAL;
-		goto fail;
-	}
-
-	z_result = RXGEN_SUCCESS;
-fail:
-	z_result = rx_EndCall(z_call, z_result);
-	if (rx_enable_stats) {
-	    clock_GetTime(&__EXEC);
-	    clock_Sub(&__EXEC, &z_call->startTime);
-	    __QUEUE = z_call->startTime;
-	    clock_Sub(&__QUEUE, &z_call->queueTime);
-	    rx_IncrementTimeAndCount(z_conn->peer,
-		(((afs_uint32)(ntohs(z_conn->serviceId) << 16)) 
-		| ((afs_uint32)ntohs(z_conn->peer->port))),
-		9, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
-		&z_call->bytesSent, &z_call->bytesRcvd, 1);
-	}
-
-	return z_result;
-}
-
-int StartAFSX_download_data(struct rx_call *z_call,afs_uint32 download_id,afs_uint32 chunk_size)
-{
-	static int z_op = 11;
-	int z_result;
-	XDR z_xdrs;
-	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
-
-	/* Marshal the arguments */
-	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_afs_uint32(&z_xdrs, &download_id))
-	     || (!xdr_afs_uint32(&z_xdrs, &chunk_size))) {
-		z_result = RXGEN_CC_MARSHAL;
-		goto fail;
-	}
-
-	z_result = RXGEN_SUCCESS;
-fail:
-	return z_result;
-}
-
-int EndAFSX_download_data(struct rx_call *z_call)
-{
-	int z_result;
-	struct clock __QUEUE, __EXEC;
-	z_result = RXGEN_SUCCESS;
-	if (rx_enable_stats) {
-	    clock_GetTime(&__EXEC);
-	    clock_Sub(&__EXEC, &z_call->startTime);
-	    __QUEUE = z_call->startTime;
-	    clock_Sub(&__QUEUE, &z_call->queueTime);
-	    rx_IncrementTimeAndCount(z_call->conn->peer,
-		(((afs_uint32)(ntohs(z_call->conn->serviceId) << 16)) |
-		((afs_uint32)ntohs(z_call->conn->peer->port))),
-		10, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
 		&z_call->bytesSent, &z_call->bytesRcvd, 1);
 	}
 

@@ -39,7 +39,9 @@ public:
 
     encoded_fname_t * add_file(const char * filename);
     encoded_fname_t * rm_file(const char * encoded_name);
-    char * encoded2raw(const encoded_fname_t * encoded_name, bool use_malloc = false);
+    encoded_fname_t * rename_file(const char * oldname, const char * newname);
+    char * encoded2raw(const encoded_fname_t * encoded_name,
+                       bool use_malloc = false);
     const encoded_fname_t * raw2encoded(const char * realname);
     void list_files();
     /**

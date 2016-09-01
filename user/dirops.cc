@@ -31,7 +31,7 @@ int fops_new(char * fpath, char ** encoded_name_dest)
         goto out;
     }
 
-    // 3 - Flush to disk 
+    // 3 - Flush to disk
     if (!dirnode->flush()) {
         LOG(ERROR) << "Flushing '" << fpath << "' failed";
         goto out;
@@ -80,6 +80,47 @@ out:
         delete fname_code;
     if (dirnode)
         delete dirnode;
+    return error;
+}
+
+int fops_rename(char * old_plain_path, char * new_plain_path,
+                char ** raw_name_dest)
+{
+    // TODO check if both files are in the same folder
+    int error = -1;
+    char * old_fname, *new_fname;
+    const encoded_fname_t * fname_code = nullptr;
+
+    DirNode * dirnode = DirNode::from_afs_fpath(old_plain_path);
+    if (dirnode == nullptr) {
+        goto out;
+    }
+
+    if ((old_fname = dirops_get_fname(old_plain_path)) == NULL
+        || (new_fname = dirops_get_fname(new_plain_path)) == NULL) {
+        goto out;
+    }
+
+    fname_code = dirnode->rename_file(old_fname, new_fname);
+    if (!fname_code) {
+        goto out;
+    }
+
+    if (!dirnode->flush()) {
+        LOG(ERROR) << "rename, error flushing: " << old_plain_path << " -> "
+                   << new_plain_path;
+        goto out;
+    }
+
+    *raw_name_dest = encode_bin2str(fname_code);
+    error = 0;
+out:
+    if (old_fname)
+        free(old_fname);
+    if (new_fname)
+        free(new_fname);
+    if (fname_code)
+        delete fname_code;
     return error;
 }
 

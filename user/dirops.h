@@ -45,6 +45,9 @@ int dops_plain2code(char * dpath_raw, char ** encoded_dname_dest);
 int fops_remove(char * fpath_raw, char ** encoded_fname_dest);
 int dops_remove(char * fpath_raw, char ** encoded_fname_dest);
 
+int fops_rename(char * old_plain_path, char * new_plain_path,
+                char ** raw_name_dest);
+
 #ifdef __cplusplus
 }
 #endif
