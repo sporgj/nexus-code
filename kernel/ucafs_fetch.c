@@ -1,5 +1,165 @@
 #include "ucafs_kern.h"
+#undef ERROR
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_fetch: " fmt, ##args)
 
+void fetch_cleanup(ucafs_ctx_t * ctx, struct afs_FetchOutput * o, int error)
+{
+    struct rx_call * afs_call;
+    int code;
+    if (ctx == NULL) {
+        return;
+    }
+
+    // 1 - End our connection to the fileserver
+    afs_call = ctx->afs_call;
+
+#ifdef AFS_64BIT_CLIENT
+    if (ctx->srv_64bit)
+        code = EndRXAFS_FetchData64(afs_call, &o->OutStatus, &o->CallBack,
+                                    &o->tsync);
+    else
+        code = EndRXAFS_FetchData(afs_call, &o->OutStatus, &o->CallBack,
+                                  &o->tsync);
+#else
+    code = EndRXAFS_FetchData(afs_call, &o->OutStatus, &o->CallBack, &o->tsync);
+#endif
+    rx_EndCall(afs_call, code | error);
+
+    // 2 - Clean up the connection to ucafs
+    if (ctx->id) {
+        AFSX_readwrite_finish(conn, ctx->id);
+    }
+
+    // 3 - Clear up the rest
+    if (ctx->buffer) {
+        __free_page(ctx->buffer);
+    }
+    kfree(ctx);
+}
+
+int init_sgx_socket(ucafs_ctx_t * ctx, char * path)
+{
+    int ret;
+    /* 1 -  Connect to the userspace daemon */
+    if ((ret = AFSX_readwrite_start(conn, UCAFS_READOP, path, AFSX_PACKET_SIZE,
+                                    ctx->len, &ctx->id))) {
+        if (ret == AFSX_STATUS_ERROR) {
+            ERROR("fetchstore start failed: %s\n", path);
+            return -1;
+        }
+    }
+
+    /* 2 - Setup the data structures in the context */
+    if ((ctx->buffer = (void *)__get_free_page(GFP_KERNEL)) == NULL) {
+        ERROR("could not allocate ctx->buffer\n");
+        return -1;
+    }
+
+    ctx->buflen = AFSX_PACKET_SIZE;
+    return 0;
+}
+
+int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
+               struct vrequest * areq)
+{
+    int ret = -1, code, temp;
+    uint32_t nbytes, tlen = avc->f.m.Length;
+    struct afs_conn * tc;
+    struct rx_connection * rx_conn;
+    struct rx_call * afs_call;
+    ucafs_ctx_t * ctx = NULL;
+
+    ctx = (ucafs_ctx_t *)kmalloc(sizeof(ucafs_ctx_t), GFP_KERNEL);
+    if (ctx == NULL) {
+        ERROR("Could not allocate context\n");
+        goto out;
+    }
+    memset(ctx, 0, sizeof(ucafs_ctx_t));
+
+    /* 1 - Connect to the AFS fileserver */
+    tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rx_conn);
+    if (!tc) {
+        ERROR("Could not allocate afs_conn\n");
+        goto out;
+    }
+    afs_call = rx_NewCall(rx_conn);
+
+#ifdef AFS_64BIT_CLIENT
+    if (!afs_serverHasNo64Bit(tc)) {
+        RX_AFS_GUNLOCK();
+        ctx->srv_64bit = 1;
+        code = StartRXAFS_FetchData64(afs_call, &avc->f.fid.Fid, 0, tlen);
+        RX_AFS_GLOCK();
+    } else {
+        code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, 0, tlen);
+    }
+#else
+    RX_AFS_GUNLOCK();
+    code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, 0, tlen);
+    RX_AFS_GLOCK();
+#endif
+
+    if (code) {
+        ERROR("FetchData call failed %d\n", code);
+        goto out;
+    }
+
+    // read the length from the the server
+    temp = rx_Read32(afs_call, &nbytes);
+    if (temp != sizeof(afs_int32)) {
+        ERROR("FileServer is sending BS. amt=%d, nbytes=%u\n", temp,
+              ntohl(nbytes));
+        goto out;
+    }
+
+    ctx->afs_call = afs_call;
+    ctx->len = tlen;
+
+    ret = 0;
+out:
+    return ret;
+}
+
+int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
+{
+    int ret;
+    char * path;
+    struct afs_FetchOutput output;
+    ucafs_ctx_t * ctx = NULL;
+
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (!(avc->f.states & CStatd) || avc->f.states & CDecrypted) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_vnode_ignored(avc, &path)) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (avc->f.fid.Fid.Vnode & 1 || vType(avc) == VDIR) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    ret = AFSX_STATUS_ERROR;
+
+    if (init_fserv(avc, &ctx, areq)) {
+        goto out;
+    }
+
+    if (init_sgx_socket(ctx, path)) {
+        goto out;
+    }
+
+    ret = 0;
+out:
+    fetch_cleanup(ctx, &output, ret);
+    return ret;
+}
+
+#if 0
 /**
  * TODO
  * Checks if we need to download from network or read from disk
@@ -241,7 +401,6 @@ out:
     return ret;
 }
 
-#if 0
 /** called to acquire data from the server if tdc if not on disk */
 static int fetch_more(void * rock, afs_int32 * len, afs_uint32 * moredata)
 {
