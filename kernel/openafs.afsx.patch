@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..5efddc3 100644
+index 1b99c94..600562d 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -406,6 +406,8 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -80,7 +80,7 @@ index 1b99c94..5efddc3 100644
 +	if (!LINUX_AFSX_lookup(&dest, dp)) {
 +	    comp = dest;
 +	    printk(KERN_ERR "afs_lookup: %s -> %s\n", comp,
-+		    newdp ? newdp->d_name.name : NULL);
++		    dp ? dp->d_name.name : NULL);
 +	}
 +    }
 +#endif
@@ -114,29 +114,31 @@ index 1b99c94..5efddc3 100644
      AFS_GLOCK();
      code = afs_rename(VTOAFS(oldip), (char *)oldname, VTOAFS(newip), (char *)newname, credp);
      AFS_GUNLOCK();
-diff --git a/src/afs/VNOPS/afs_vnop_open.c b/src/afs/VNOPS/afs_vnop_open.c
-index 0c90bf16..d17cc0b 100644
---- a/src/afs/VNOPS/afs_vnop_open.c
-+++ b/src/afs/VNOPS/afs_vnop_open.c
-@@ -164,6 +164,18 @@ afs_open(struct vcache **avcp, afs_int32 aflags, afs_ucred_t *acred)
-     }
+diff --git a/src/afs/VNOPS/afs_vnop_read.c b/src/afs/VNOPS/afs_vnop_read.c
+index 9ca2929..8b984e3 100644
+--- a/src/afs/VNOPS/afs_vnop_read.c
++++ b/src/afs/VNOPS/afs_vnop_read.c
+@@ -606,7 +606,19 @@ afs_UFSRead(struct vcache *avc, struct uio *auio,
  #endif
-     ReleaseReadLock(&tvc->lock);
-+
+ 	AFS_UIOMOVE(afs_zeros, trimlen, UIO_READ, tuiop, code);
+     }
+-
++/*
 +#ifdef AFS_SECURE
++    // DO a synchronous fetch of the file if in a secure folder
 +    #include "afsx_hdr.h"
-+    if ((vType(tvc) != VDIR) && (writing == 0)) {
-+	code = UCAFS_fetch(tvc, treq);
-+	if (code != AFSX_STATUS_NOOP) {
-+	    goto done;
++    if (vType(avc) != VDIR) {
++	code = UCAFS_fetch(avc, treq);
++	if (code == AFSX_STATUS_ERROR) {
++	    return EIO;
 +	}
 +	code = 0;
 +    }
 +#endif
-+
-     if ((afs_preCache != 0) && (writing == 0) && (vType(tvc) != VDIR) && 
- 	(!afs_BBusy())) {
- 	struct dcache *tdc;
++*/
+     while (avc->f.m.Length > 0 && totalLength > 0) {
+ 	/* read all of the cached info */
+ 	if (filePos >= avc->f.m.Length)
 diff --git a/src/afs/afs.h b/src/afs/afs.h
 index f03609c..176f33a 100644
 --- a/src/afs/afs.h
@@ -190,7 +192,7 @@ index 9e9f65b..fe8d680 100644
 +
  #endif /* _AFS_PROTOTYPES_H_ */
 diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
-index 2dd89cf..1aec53f 100644
+index 2dd89cf..1cb8fa1 100644
 --- a/src/afs/afs_segments.c
 +++ b/src/afs/afs_segments.c
 @@ -173,6 +173,16 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
@@ -199,8 +201,8 @@ index 2dd89cf..1aec53f 100644
  
 +#ifdef AFS_SECURE
 +#include "afsx_hdr.h"
-+    code = LINUX_AFSX_store(avc, areq);
-+    if (code == AFSX_STATUS_SUCCESS || code == AFSX_STATUS_ERROR) {
++    code = UCAFS_store(avc, areq);
++    if (code != AFSX_STATUS_NOOP) {
 +	printk(KERN_ERR "upload_file returned %d\n", code);
 +	return code;
 +    }
@@ -211,26 +213,29 @@ index 2dd89cf..1aec53f 100644
  
      hash = DVHash(&avc->f.fid);
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..7a598be 100644
+index 46b9c9d..210320a 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
-@@ -104,6 +104,9 @@ AFSAOBJS = \
+@@ -104,6 +104,10 @@ AFSAOBJS = \
  	afs_osi_vm.o \
  	afs_segments.o \
  	afs_server.o \
-+	afs_secure.o \
++	ucafs_main.o \
 +	ucafs_fetch.o \
++	ucafs_store.o \
 +	afsx.cs.o \
  	afs_stat.o \
  	afs_syscall.o \
  	afs_user.o \
-@@ -283,6 +286,12 @@ afs_segments.o: $(TOP_SRC_AFS)/afs_segments.c
+@@ -283,6 +287,14 @@ afs_segments.o: $(TOP_SRC_AFS)/afs_segments.c
  	$(CRULE_OPT)
  afs_server.o: $(TOP_SRC_AFS)/afs_server.c
  	$(CRULE_OPT)
++ucafs_main.o: $(TOP_SRC_AFS)/ucafs_main.c
++	$(CRULE_OPT)
 +ucafs_fetch.o: $(TOP_SRC_AFS)/ucafs_fetch.c
 +	$(CRULE_OPT)
-+afs_secure.o: $(TOP_SRC_AFS)/afs_secure.c
++ucafs_store.o: $(TOP_SRC_AFS)/ucafs_store.c
 +	$(CRULE_OPT)
 +afsx.cs.o: $(TOP_SRC_AFS)/afsx.cs.c
 +	$(CRULE_OPT)

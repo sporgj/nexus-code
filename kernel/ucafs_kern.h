@@ -16,18 +16,14 @@ extern struct rx_connection * conn;
 extern int AFSX_IS_CONNECTED;
 
 typedef struct {
-    char srv_64bit;
-    afs_uint32 moredata;
     int id;
+    uint8_t srv_64bit;
     int buflen;
     void * buffer;
-    afs_int32 len;
-    afs_int32 off;
-    struct vcache * avc;
-    struct osi_file * fp;
-    struct rx_connection * rx_conn;
+    int32_t len;
+    int32_t off;
     struct rx_call * afs_call;
-    struct dcache * tdc;
+    struct rx_connection * rx_conn;
     struct vrequest * areq;
 } ucafs_ctx_t;
 

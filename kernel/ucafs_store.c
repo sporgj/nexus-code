@@ -13,7 +13,7 @@ static int store_read(void * rock, struct osi_file * tfile, afs_uint32 offset,
 {
     struct rx_call * uspace_call;
     afs_int32 nbytes;
-    int ret = -1;
+    int ret = -1, moredata;
     ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
 
     // XXX check for the read return
@@ -40,7 +40,7 @@ static int store_read(void * rock, struct osi_file * tfile, afs_uint32 offset,
 
     ret = 0;
 out:
-    EndAFSX_readwrite_data(uspace_call);
+    EndAFSX_readwrite_data(uspace_call, &moredata);
     rx_EndCall(uspace_call, 0);
     return ret;
 }
