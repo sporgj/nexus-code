@@ -101,7 +101,7 @@ int fops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest)
     char * result_malloced;
 
     // 1 - Get the corresponding dirnode
-    DirNode * dirnode = DirNode::from_afs_fpath(dir_path);
+    DirNode * dirnode = DirNode::from_afs_fpath(dir_path, false);
     if (dirnode == nullptr) {
         goto out;
     }
@@ -226,4 +226,5 @@ int dops_lookup_path(char * fpath_raw, char ** encoded_dnode_dest)
     int error =  -1;
 
 
+    return error;
 }

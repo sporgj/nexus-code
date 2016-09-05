@@ -4,6 +4,7 @@
 
 #include "uspace.h"
 #include "dirnode.h"
+#include "encode.h"
 
 using namespace std;
 
@@ -33,21 +34,47 @@ inline DirNode * DirNode::load_default_dnode()
  * @param home_folder is the folder in which the cell resides
  * @return NULL if the path is invalid
  */
-DirNode * DirNode::lookup_path(const char * path)
+DirNode * DirNode::lookup_path(const char * path, bool omit_last)
 {
-    /*
-    char * p_path = strdup((char *)(path + DNODE_HOME_DIR.size())), *pch;
-    DirNode * temp = DirNode::load_default_dnode();
+    char * p_path = strdup((char *)path), *pch, *nch;
+    uintptr_t ptr_val = (uintptr_t)p_path + strlen(path);
+    DirNode * dirnode = DirNode::load_default_dnode();
+    const encoded_fname_t * encoded_fname = nullptr;
+    const char * encoded_str = nullptr;
+    string * dnode_path = nullptr;
 
-    pch = strtok(p_path, "/");
-    while (pch) {
-        printf("%s\n", pch);
+    nch = strtok_r(p_path, "/", &pch);
+    while (nch) {
+        if (omit_last && ptr_val == (uintptr_t)pch) {
+            break;
+        }
 
-        pch = strtok(NULL, "/");
+        // let's lookup into the value passed
+        if ((encoded_fname = dirnode->find_dir_by_raw_name(nch)) == NULL) {
+            dirnode = nullptr;
+            break;
+        }
+
+        encoded_str = encode_bin2str(encoded_fname);
+        delete encoded_fname;
+
+        dnode_path = make_dnode_fpath(encoded_str);
+        free((void *) encoded_str);
+
+        if ((dirnode = DirNode::from_file(dnode_path->c_str())) == nullptr) {
+            break;
+        }
+        delete dnode_path;
+        dnode_path = nullptr;
+
+        nch = strtok_r(NULL, "/", &pch);
     }
-    */
 
-    return nullptr;
+    if (dnode_path)
+        delete dnode_path;
+
+    free(p_path);
+    return dirnode;
 }
 
 DirNode * DirNode::from_file(const char * fpath)
@@ -101,10 +128,7 @@ out:
 DirNode * DirNode::from_afs_fpath(const char * fpath)
 {
     // TODO for now lets assume everything is in one dnode
-    string * path = get_default_dnode_fpath();
-    DirNode * dnode = DirNode::from_file(path->c_str());
-    delete path;
-    return dnode;
+    return DirNode::lookup_path(fpath);
 }
 
 bool DirNode::write(DirNode * dn, fstream * file)

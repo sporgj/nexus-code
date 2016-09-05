@@ -43,10 +43,15 @@ public:
 
     inline void dump() { std::cout << proto->DebugString() << std::endl; }
 
+    const encoded_fname_t * find_dir_by_raw_name(const char * rawname)
+    {
+        return this->__raw2enc(rawname, false);
+    }
+
     static DirNode * from_file(const char * fpath);
     static DirNode * from_afs_fpath(const char * fpath);
     static DirNode * load_default_dnode();
-    static DirNode * lookup_path(const char * path);
+    static DirNode * lookup_path(const char * path, bool omit_last=true);
 
     static bool write(DirNode * fb, fstream * fd);
     static bool write(DirNode * fb, const char * fpath);

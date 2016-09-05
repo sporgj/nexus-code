@@ -1,9 +1,6 @@
 #ifndef AFS_SGX_H
 #define AFS_SGX_H
 
-#define AFSX_FBOX_EXT ".fbox"
-#define AFSX_LBOX_EXT ".lbox"
-
 #ifndef AFSX_FNAME_MAX
 #define AFSX_FNAME_MAX 256
 #endif
@@ -12,9 +9,20 @@
 #define AFSX_PATH_MAX 1024
 #endif
 
+#define AFSX_IS_DIR     0
+#define AFSX_IS_FILE    1
+
 extern int LINUX_AFSX_connect(void);
 extern int LINUX_AFSX_ping(void);
-extern int LINUX_AFSX_newfile(char ** dest, struct dentry * dp);
+/**
+ * Creates a new file/dir in the dentry dp
+ * @param dest is the encoded filename destination ptr
+ * @param is_file is (AFSX_IS_DIR/AFSX_IS_FILE)
+ * @param dp is the containing dentry
+ * @return 0 on success
+ */
+extern int UCAFS_create(char ** dest, int is_file, struct dentry * dp);
+
 extern int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp);
 extern int LINUX_AFSX_lookup(char ** dest, struct dentry * dp);
 extern int LINUX_AFSX_delfile(char ** dest, struct dentry * dp);

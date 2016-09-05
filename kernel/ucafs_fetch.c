@@ -120,12 +120,18 @@ out:
     return ret;
 }
 
+static int fetch_proc(struct dcache * tdc, uint32_t pos) {
+
+}
+
 int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
 {
     int ret;
+    uint32_t tlen, bytes_left;
     char * path;
     struct afs_FetchOutput output;
     ucafs_ctx_t * ctx = NULL;
+    struct dcache * tdc;
 
     if (!AFSX_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
@@ -140,6 +146,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     if (avc->f.fid.Fid.Vnode & 1 || vType(avc) == VDIR) {
+        kfree(path);
         return AFSX_STATUS_NOOP;
     }
 
@@ -153,9 +160,19 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
         goto out;
     }
 
+    bytes_left = avc->f.m.Length;
+    while (bytes_left) {
+        tdc = ObtainDCacheForWriting();
+
+        if (fetch_proc(tdc, pos)) {
+
+        }
+    }
+
     ret = 0;
 out:
     fetch_cleanup(ctx, &output, ret);
+    kfree(path);
     return ret;
 }
 
