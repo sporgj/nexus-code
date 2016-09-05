@@ -12,17 +12,16 @@
 #include <unistd.h>
 
 #include "dirnode.h"
+#include "uspace.h"
 
 using namespace std;
 
 extern "C" int setup_rx(int);
 
-const char * gbl_temp_dnode_path = UCAFS_TEMP_DNODE_STR;
-
 const char afs_path[] = "/afs/maatta.sgx/user/bruyne";
 static bool check_main_dir()
 {
-    string afsx_repo(UCAFS_TEMP_REPO);
+    string afsx_repo(afs_path);
     fstream f1(afsx_repo, ios::in);
     struct stat stat_buf;
 
@@ -35,11 +34,10 @@ static bool check_main_dir()
     }
     f1.close();
 
-    string afsx_dnode(UCAFS_TEMP_DNODE_STR);
-
-    if (stat(afsx_dnode.c_str(), &stat_buf)) {
+    string * afsx_dnode = get_default_dnode_fpath();
+    if (stat(afsx_dnode->c_str(), &stat_buf)) {
         cout << ". Initializing a new filebox" << endl;
-        fstream f2(afsx_dnode, ios::out | ios::binary);
+        fstream f2(afsx_dnode->c_str(), ios::out | ios::binary);
         DirNode * dirnode = new DirNode;
         if (!DirNode::write(dirnode, &f2)) {
             cout << ". Writing main dirnode failed" << endl;
@@ -48,12 +46,15 @@ static bool check_main_dir()
         f2.close();
     }
 
+    delete afsx_dnode;
+
     cout << ". Everything looks ok" << endl;
     return true;
 }
 
 int main(int argc, char ** argv)
 {
+    set_global_afs_home_path(afs_path);
     google::InitGoogleLogging("--logtostderr=1");
     if (!check_main_dir()) {
         return -1;

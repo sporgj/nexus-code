@@ -9,4 +9,5 @@ message dnode {
 
     // all the entries
     repeated fentry file = 1;
+    repeated fentry dir = 2;
 }

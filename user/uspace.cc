@@ -1,28 +1,47 @@
-#include <iostream>
-#include <fstream>
+#include <string>
+#include <cstring>
 
 #include "uspace.h"
+#include "types.h"
 
-map<string, SuperNode *> Supernode::objs = new map<string, SuperNode *>();
+using std::string;
 
-SuperNode * add_cell(char * cell, char * fpath)
+const char * global_afs_home_path = nullptr;
+
+/** path to the default repo director.  home_path/.afsx */
+const char * global_afs_repo_path = nullptr;
+
+void set_global_afs_home_path(const char * path)
 {
-    SuperNode * _obj;
-
-    if (objs->size() > UCAFS_MAX_CELLS) {
-        return nullptr;
+    if (global_afs_home_path) {
+        free((void *)global_afs_home_path);
+        free((void *)global_afs_repo_path);
     }
 
-    _obj = new SuperNode();
-    _obj->proto = new class::snode;
+    string temp_str(path);
 
-    // parse the file
-    fstream input(fpath, ios::in | ios::bin);
-    if (input && _obj->proto->ParseFromIStream(&input)) {;
-        // add it to our map and go
-        map[cell] = _obj;
-    }
-    input.close();
+    global_afs_home_path = strdup(temp_str.c_str());
 
-    return _obj;
+    temp_str += "/";
+    temp_str += DEFAULT_REPO_DIRNAME;
+
+    global_afs_repo_path = strdup(temp_str.c_str());
+}
+
+inline string * get_default_repo_path()
+{
+    return new string(global_afs_repo_path);
+}
+
+/**
+ * returns a new[] path for the default directory.
+ * Please free with delete[]
+ */
+string * get_default_dnode_fpath()
+{
+    string * rv_str = get_default_repo_path();
+    rv_str->operator+=('/');
+    rv_str->operator+=(DEFAULT_DNODE_FNAME);
+
+    return rv_str;
 }

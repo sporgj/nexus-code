@@ -9,11 +9,45 @@ using namespace std;
 
 class dnode;
 
+string DirNode::DNODE_HOME_DIR = "";
+
 DirNode::DirNode()
 {
     this->proto = new dnode();
     memset(&header, 0, sizeof(file_header_t));
     header.magic = GLOBAL_MAGIC;
+}
+
+inline DirNode * DirNode::load_default_dnode()
+{
+    string * path = get_default_dnode_fpath();
+    DirNode * dnode = DirNode::from_file(path->c_str());
+    delete path;
+
+    return dnode;
+}
+
+/**
+ * Returns the DirNode object containing the following object
+ * @param path is the path to the object
+ * @param home_folder is the folder in which the cell resides
+ * @return NULL if the path is invalid
+ */
+DirNode * DirNode::lookup_path(const char * path)
+{
+    /*
+    char * p_path = strdup((char *)(path + DNODE_HOME_DIR.size())), *pch;
+    DirNode * temp = DirNode::load_default_dnode();
+
+    pch = strtok(p_path, "/");
+    while (pch) {
+        printf("%s\n", pch);
+
+        pch = strtok(NULL, "/");
+    }
+    */
+
+    return nullptr;
 }
 
 DirNode * DirNode::from_file(const char * fpath)
@@ -67,7 +101,10 @@ out:
 DirNode * DirNode::from_afs_fpath(const char * fpath)
 {
     // TODO for now lets assume everything is in one dnode
-    return DirNode::from_file(gbl_temp_dnode_path);
+    string * path = get_default_dnode_fpath();
+    DirNode * dnode = DirNode::from_file(path->c_str());
+    delete path;
+    return dnode;
 }
 
 bool DirNode::write(DirNode * dn, fstream * file)
@@ -105,10 +142,7 @@ bool DirNode::write(DirNode * dn, const char * fpath)
     return ret;
 }
 
-/**
- * Adds a new file to the dirnode. Returns an encoded filename
- */
-encoded_fname_t * DirNode::add_file(const char * fname)
+encoded_fname_t * DirNode::__add_entry(const char * fname, bool is_file)
 {
     encoded_fname_t * encoded_name;
     raw_fname_t * _dest_fname;
@@ -123,7 +157,8 @@ encoded_fname_t * DirNode::add_file(const char * fname)
     memcpy(_dest_fname->raw, fname, strlen(fname));
 
     // add the mapping to our dnode
-    dnode_fentry * fentry = this->proto->add_file();
+    dnode_fentry * fentry = is_file ? this->proto->add_file()
+                                    : this->proto->add_dir();
     fentry->set_encoded_name(encoded_name, sizeof(encoded_fname_t));
     fentry->set_raw_name(_dest_fname, slen);
 
@@ -134,13 +169,27 @@ encoded_fname_t * DirNode::add_file(const char * fname)
     return encoded_name;
 }
 
-encoded_fname_t * DirNode::rm_file(const char * realname)
+/**
+ * Adds a new file to the dirnode. Returns an encoded filename
+ */
+encoded_fname_t * DirNode::add_file(const char * fname)
+{
+    return this->__add_entry(fname, true);
+}
+
+encoded_fname_t * DirNode::add_dir(const char * fname)
+{
+    return this->__add_entry(fname, false);
+}
+
+encoded_fname_t * DirNode::__rm_entry(const char * realname, bool is_file)
 {
     const char * temp;
     size_t len = strlen(realname);
     encoded_fname_t * result = nullptr;
 
-    auto fentry_list = this->proto->mutable_file();
+    auto fentry_list = is_file ? this->proto->mutable_file()
+                               : this->proto->mutable_dir();
     auto curr_fentry = fentry_list->begin();
 
     while (curr_fentry != fentry_list->end()) {
@@ -161,6 +210,16 @@ encoded_fname_t * DirNode::rm_file(const char * realname)
     }
 
     return result;
+}
+
+encoded_fname_t * DirNode::rm_file(const char * realname)
+{
+    return this->__rm_entry(realname, true);
+}
+
+encoded_fname_t * DirNode::rm_dir(const char * realname)
+{
+    return this->__rm_entry(realname, false);
 }
 
 encoded_fname_t * DirNode::rename_file(const char * oldname,
@@ -220,48 +279,70 @@ encoded_fname_t * DirNode::rename_file(const char * oldname,
  * @param use_malloc on if to allocate with malloc
  * @return nullptr if entry not found
  */
-char * DirNode::encoded2raw(const encoded_fname_t * encoded_name,
-                            bool use_malloc)
+char * DirNode::__enc2raw(const encoded_fname_t * encoded_name, bool use_malloc,
+                          bool is_file)
 {
     char * realname = nullptr;
-    for (size_t i = 0; i < this->proto->file_size(); i++) {
-        auto fentry = this->proto->file(i);
-        if (memcmp(encoded_name, fentry.encoded_name().data(),
+
+    auto fentry_list = is_file ? this->proto->file() : this->proto->dir();
+    auto curr_fentry = fentry_list.begin();
+    while (curr_fentry != fentry_list.end()) {
+        if (memcmp(encoded_name, curr_fentry->encoded_name().data(),
                    sizeof(encoded_fname_t)) == 0) {
-            size_t len = fentry.raw_name().size();
-            realname = use_malloc ? (char *)calloc(1, len) : new char[len];
-            memcpy(realname, fentry.raw_name().c_str(), len);
+            size_t len = curr_fentry->raw_name().size();
+            realname = use_malloc ? (char *)calloc(1, len + 1)
+                                  : new char[len + 1];
+            memcpy(realname, curr_fentry->raw_name().c_str(), len);
             break;
         }
+
+        curr_fentry++;
     }
 
     return realname;
 }
 
-const encoded_fname_t * DirNode::raw2encoded(const char * realname)
+const encoded_fname_t * DirNode::__raw2enc(const char * realname, bool is_file)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
 
-    for (size_t i = 0; i < this->proto->file_size(); i++) {
-        auto fentry = this->proto->file(i);
-        auto temp = fentry.raw_name().data();
-
-        if (memcmp(realname, temp, len) == 0) {
+    auto fentry_list = is_file ? this->proto->file() : this->proto->dir();
+    auto curr_fentry = fentry_list.begin();
+    while (curr_fentry != fentry_list.end()) {
+        if (strncmp(realname, curr_fentry->raw_name().data(), len) == 0) {
             encoded = new encoded_fname_t;
-            memcpy(encoded, fentry.encoded_name().data(),
+            memcpy(encoded, curr_fentry->encoded_name().data(),
                    sizeof(encoded_fname_t));
 
             return encoded;
         }
+        curr_fentry++;
     }
 
     return nullptr;
+}
+
+char * DirNode::encoded2raw(const encoded_fname_t * encoded_name,
+                            bool use_malloc)
+{
+    char * value = this->__enc2raw(encoded_name, use_malloc, true);
+    return value ? value : this->__enc2raw(encoded_name, use_malloc, false);
+}
+
+const encoded_fname_t * DirNode::raw2encoded(const char * realname)
+{
+    const encoded_fname_t * value = this->__raw2enc(realname, true);
+    return value ? value : this->__raw2enc(realname, false);
 }
 
 void DirNode::list_files()
 {
     for (size_t i = 0; i < this->proto->file_size(); i++) {
         cout << this->proto->file(i).raw_name() << endl;
+    }
+
+    for (size_t i = 0; i < this->proto->dir_size(); i++) {
+        cout << this->proto->dir(i).raw_name() << "/" << endl;
     }
 }

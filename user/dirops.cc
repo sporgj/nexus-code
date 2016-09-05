@@ -21,7 +21,7 @@ int fops_new(char * fpath, char ** encoded_name_dest)
     // 1 - Get the corresponding dirnode
     dirnode = DirNode::from_afs_fpath(fpath);
     if (dirnode == nullptr) {
-        return error;
+        goto out;
     }
 
     // 2 - Get filename and add it to DirNode
@@ -38,6 +38,49 @@ int fops_new(char * fpath, char ** encoded_name_dest)
     }
 
     // 4 - Set the encoded name
+    *encoded_name_dest = encode_bin2str(fname_code);
+    error = 0;
+out:
+    if (fname_code)
+        delete fname_code;
+    if (dirnode)
+        delete dirnode;
+    if (fname)
+        delete fname;
+
+    return error;
+}
+
+int dops_new(char * fpath, char ** encoded_name_dest)
+{
+    int error = -1; // TODO
+    encoded_fname_t * fname_code = nullptr;
+    DirNode * dirnode = nullptr;
+    char * fname = dirops_get_fname(fpath);
+
+    if (fname == nullptr) {
+        LOG(ERROR) << "Error getting filename: " << fpath;
+        goto out;
+    }
+
+    /* get the dirnode */
+    dirnode = DirNode::from_afs_fpath(fpath);
+    if (dirnode == nullptr) {
+        goto out;
+    }
+
+    /* add it to the dirnode */
+    fname_code = dirnode->add_dir(fname);
+    if (fname_code == nullptr) {
+        LOG(ERROR) << "Could not add: " << fpath;
+        goto out;
+    }
+
+    if (!dirnode->flush()) {
+        LOG(ERROR) << "Flushing: " << fpath << " failed";
+        goto out;
+    }
+
     *encoded_name_dest = encode_bin2str(fname_code);
     error = 0;
 out:
@@ -172,4 +215,15 @@ int fops_plain2code(char * fpath_raw, char ** encoded_fname_dest)
 int fops_remove(char * fpath_raw, char ** encoded_fname_dest)
 {
     return __fops_encode_or_remove(fpath_raw, encoded_fname_dest, true);
+}
+
+/**
+ * Looks up a plain path and derives the destination encoded filename
+ *
+ */
+int dops_lookup_path(char * fpath_raw, char ** encoded_dnode_dest)
+{
+    int error =  -1;
+
+
 }

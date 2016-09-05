@@ -18,10 +18,6 @@
 
 #define UCAFS_MAX_CELLS 5
 
-#define UCAFS_TEMP_DNODE_STR "/afs/maatta.sgx/user/bruyne/.afsx/main.dnode"
-
-#define UCAFS_TEMP_REPO "/afs/maatta.sgx/user/bruyne/.afsx"
-
 #define UCAFS_WRITEOP 1
 #define UCAFS_READOP 0
 

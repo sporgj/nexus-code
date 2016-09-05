@@ -14,6 +14,9 @@
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                                      \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE);
 
+#define DEFAULT_REPO_DIRNAME ".afsx"
+#define DEFAULT_DNODE_FNAME "main.dnode"
+
 typedef enum {
     ENCRYPT = 0,
     DECRYPT = 1

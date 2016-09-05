@@ -49,7 +49,7 @@ static void init_dnode()
 static int test_upload()
 {
     // start_srv();
-
+    int moredata;
     char * encoded_name_str;
     u_long host;
     struct rx_securityClass * null_securityObject;
@@ -125,7 +125,7 @@ static int test_upload()
         hexdump((uint8_t *)buffer, HEXDUMP_LEN(blklen));
         size -= blklen;
 
-        EndAFSX_readwrite_data(call);
+        EndAFSX_readwrite_data(call, &moredata);
         rx_EndCall(call, 0);
     }
     return 0;

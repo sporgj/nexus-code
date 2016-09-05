@@ -20,6 +20,8 @@ private:
     dnode * proto = nullptr;
     string * dnode_fpath = nullptr;
 
+    static string DNODE_HOME_DIR;
+
     /**
      * Private constructor static constructor
      * @param fb is the dnode object
@@ -27,18 +29,34 @@ private:
      */
     DirNode(dnode * fb) { this->proto = fb; };
 
+    encoded_fname_t * __add_entry(const char * fname, bool is_file);
+    encoded_fname_t * __rm_entry(const char * realname, bool is_file);
+    char * __enc2raw(const encoded_fname_t * encoded_name, bool use_malloc,
+                     bool is_file);
+    const encoded_fname_t * __raw2enc(const char * realname, bool is_file);
+
 public:
     DirNode();
+
+    static void set_home_dir(const char * home) { DNODE_HOME_DIR = home; }
+    static string & get_repo_dir_str();
 
     inline void dump() { std::cout << proto->DebugString() << std::endl; }
 
     static DirNode * from_file(const char * fpath);
     static DirNode * from_afs_fpath(const char * fpath);
+    static DirNode * load_default_dnode();
+    static DirNode * lookup_path(const char * path);
+
     static bool write(DirNode * fb, fstream * fd);
     static bool write(DirNode * fb, const char * fpath);
 
     encoded_fname_t * add_file(const char * filename);
-    encoded_fname_t * rm_file(const char * encoded_name);
+    encoded_fname_t * add_dir(const char * filename);
+
+    encoded_fname_t * rm_file(const char * realname);
+    encoded_fname_t * rm_dir(const char * realname);
+
     encoded_fname_t * rename_file(const char * oldname, const char * newname);
     char * encoded2raw(const encoded_fname_t * encoded_name,
                        bool use_malloc = false);

@@ -166,7 +166,8 @@ afs_int32 SAFSX_readwrite_finish(
 afs_int32 SAFSX_readwrite_data(
     /*IN */ struct rx_call * z_call,
     /*IN */ afs_uint32 id,
-    /*IN */ afs_uint32 size)
+    /*IN */ afs_uint32 size,
+    /*OUT */ int * moredata)
 {
     int ret = AFSX_STATUS_ERROR;
     afs_uint32 abytes;

@@ -12,11 +12,12 @@ LIBS = -L/usr/local/lib -lprotobuf -pthread\
 INCFLAGS = -Imbedtls/include -I/usr/local/include
 
 OBJS = dirnode.o\
+       uspace.o\
        encode.o\
        dirops.o\
        fileops.o\
        utils.o\
        dnode.pb.o
 
-TESTS := test_dnode test_dops
+TESTS := test_dnode test_dops test_lookup
 GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a 
