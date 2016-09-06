@@ -62,6 +62,9 @@ rpc.o: rpc.c afsx.ss.c
 dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
 	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 
+filebox.o: filebox.cc filebox.h fbox.pb.cc
+	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+
 %.pb.cc: %.proto
 	protoc --cpp_out=./ $^
 

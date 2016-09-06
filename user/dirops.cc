@@ -101,7 +101,7 @@ int fops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest)
     char * result_malloced;
 
     // 1 - Get the corresponding dirnode
-    DirNode * dirnode = DirNode::from_afs_fpath(dir_path, false);
+    DirNode * dirnode = DirNode::lookup_path(dir_path, false);
     if (dirnode == nullptr) {
         goto out;
     }

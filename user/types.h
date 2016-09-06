@@ -36,10 +36,23 @@ typedef struct {
 typedef struct { uuid_t bin; } encoded_fname_t;
 
 typedef struct {
+    crypto_ekey_t ekey;
+    crypto_mac_t mac;
+    crypto_iv_t iv;
+} __attribute__((packed)) file_crypto_t;
+
+typedef struct {
     uint32_t magic;
     uint32_t count;
     uint32_t len;
     crypto_iv_t iv;
     crypto_ekey_t ekey;
     crypto_mac_t mac;
-} __attribute__((packed)) file_header_t;
+} __attribute__((packed)) dnode_header_t;
+
+typedef struct {
+    uint32_t seg_count; // number of segments in the file
+    uint32_t flen;
+    uint32_t plen; // length of the protocol buffer
+    file_crypto_t crypto; // crypto protecting the whole protocol buffer file
+} __attribute__((packed)) fbox_header_t;

@@ -15,7 +15,7 @@ string DirNode::DNODE_HOME_DIR = "";
 DirNode::DirNode()
 {
     this->proto = new dnode();
-    memset(&header, 0, sizeof(file_header_t));
+    memset(&header, 0, sizeof(dnode_header_t));
     header.magic = GLOBAL_MAGIC;
 }
 
@@ -82,7 +82,7 @@ DirNode * DirNode::from_file(const char * fpath)
     DirNode * obj = nullptr;
     dnode * _dnode = nullptr;
     uint8_t * dnode_buf = nullptr;
-    file_header_t _header;
+    dnode_header_t _header;
 
     fstream file(fpath, ios::in | ios::binary);
 
@@ -91,7 +91,7 @@ DirNode * DirNode::from_file(const char * fpath)
         goto out;
     }
 
-    file.read((char *)&_header, sizeof(file_header_t));
+    file.read((char *)&_header, sizeof(dnode_header_t));
 
     if (_header.magic != GLOBAL_MAGIC) {
         cout << "\n ! Error with file format" << endl;
@@ -115,7 +115,7 @@ DirNode * DirNode::from_file(const char * fpath)
     obj = new DirNode();
     obj->proto = _dnode;
     obj->dnode_fpath = new string(fpath);
-    memcpy(&obj->header, &_header, sizeof(file_header_t));
+    memcpy(&obj->header, &_header, sizeof(dnode_header_t));
 
 out:
     file.close();
@@ -148,7 +148,7 @@ bool DirNode::write(DirNode * dn, fstream * file)
 
     // TODO call enclave
 
-    file->write((char *)&dn->header, sizeof(file_header_t));
+    file->write((char *)&dn->header, sizeof(dnode_header_t));
     file->write((char *)dnode_buf, dn->header.len);
     ret = true;
 out:

@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+message fbox {
+    message segment {
+        // stores crypto information related to the segment
+        required bytes crypto = 1;
+        required uint32 segid = 2;
+        required uint32 size = 3;
+        required bytes name = 4;
+    }
+
+    repeated segment seg = 1;   
+}

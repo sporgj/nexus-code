@@ -16,7 +16,7 @@ class dnode;
 
 class DirNode {
 private:
-    file_header_t header;
+    dnode_header_t header;
     dnode * proto = nullptr;
     string * dnode_fpath = nullptr;
 

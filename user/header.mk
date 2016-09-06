@@ -12,6 +12,7 @@ LIBS = -L/usr/local/lib -lprotobuf -pthread\
 INCFLAGS = -Imbedtls/include -I/usr/local/include
 
 OBJS = dirnode.o\
+       filebox.o\
        uspace.o\
        encode.o\
        dirops.o\
