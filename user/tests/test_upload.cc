@@ -40,7 +40,7 @@ static void init_dnode()
 {
     cout << ". Initializing filebox file" << endl;
     // create our file and truncate it
-    fstream file(TEST_FBOX_PATH1, ios::out | ios::trunc);
+    fstream file(uspace_get_dnode_fpath()->c_str(), ios::out | ios::trunc);
     DirNode * dn = new DirNode();
     DirNode::write(dn, &file);
     file.close();
@@ -133,6 +133,7 @@ static int test_upload()
 
 int main(int argc, char ** argv)
 {
+    uspace_set_afs_home("repo", false);
     if (argc > 1) {
         start_srv();
         return 0;

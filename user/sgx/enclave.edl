@@ -1,7 +1,16 @@
 enclave {
+    include "types.h"
 
     trusted {
-        public void ecall_test_function(void);
+        public int ecall_init_enclave();
+
+        public int ecall_init_crypto([in, out] fop_ctx_t * f_ctx,
+                [in] file_crypto_t * fcrypto);
+
+        public int ecall_crypt_data([in] fop_ctx_t * f_ctx);
+
+        public int ecall_finish_crypto([in] fop_ctx_t * f_ctx, 
+                [in, out] file_crypto_t * fcrypto);
     };
 
 };

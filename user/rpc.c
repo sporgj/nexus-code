@@ -59,6 +59,7 @@ afs_int32 SAFSX_fversion(
 
 afs_int32 SAFSX_fnew(struct rx_call * z_call, char * path, char ** crypto_fname)
 {
+    printf("fnew is here\n");
     int ret = fops_new(path, crypto_fname);
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
@@ -141,7 +142,7 @@ afs_int32 SAFSX_readwrite_start(
     fop_ctx_t * ctx
         = fileops_start(op, fpath, max_chunk_size, total_size, &ret);
     if (ctx == NULL) {
-        return ret;
+        return -2;
     }
 
     *pull_id = ctx->id;

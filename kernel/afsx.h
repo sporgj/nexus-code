@@ -109,18 +109,6 @@ extern afs_int32 SAFSX_frealname(
 	/*IN */ char * path,
 	/*OUT*/ char * *real_name);
 
-extern int AFSX_frename(
-	/*IN */ struct rx_connection *z_conn,
-	/*IN */ char * old_fpath,
-	/*IN */ char * new_path,
-	/*OUT*/ char * *code_name);
-
-extern afs_int32 SAFSX_frename(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * old_fpath,
-	/*IN */ char * new_path,
-	/*OUT*/ char * *code_name);
-
 extern int AFSX_fencodename(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * fpath,
@@ -184,10 +172,10 @@ extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
 #define AFSX_LOWEST_OPCODE   1
-#define AFSX_HIGHEST_OPCODE	9
-#define AFSX_NUMBER_OPCODES	9
+#define AFSX_HIGHEST_OPCODE	8
+#define AFSX_NUMBER_OPCODES	8
 
-#define AFSX_NO_OF_STAT_FUNCS	9
+#define AFSX_NO_OF_STAT_FUNCS	8
 
 AFS_RXGEN_EXPORT
 extern const char *AFSX_function_names[];

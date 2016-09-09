@@ -6,10 +6,9 @@ CC = clang
 CPPFLAGS = -g -std=c++11
 CFLAGS = -g
 LIBS = -L/usr/local/lib -lprotobuf -pthread\
-       -Lmbedtls/library -lmbedcrypto\
        -lglog\
        -luuid
-INCFLAGS = -Imbedtls/include -I/usr/local/include
+INCFLAGS = -I/usr/local/include
 
 OBJS = dirnode.o\
        filebox.o\

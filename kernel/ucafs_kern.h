@@ -30,5 +30,8 @@ typedef struct {
 int __is_vnode_ignored(struct vcache * vcache, char ** dest);
 int __is_dentry_ignored(struct dentry * dentry, char ** dest);
 
+struct rx_connection * __get_conn(void);
+void __put_conn(struct rx_connection * c);
+
 
 #endif

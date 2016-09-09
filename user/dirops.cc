@@ -100,14 +100,14 @@ int fops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest)
     encoded_fname_t * fname_code = NULL;
     char * result_malloced;
 
-    // 1 - Get the corresponding dirnode
-    DirNode * dirnode = DirNode::lookup_path(dir_path, false);
-    if (dirnode == nullptr) {
-        goto out;
+    // 1 - Get the binary version
+    if ((fname_code = encode_str2bin(encoded_name)) == NULL) {
+        return -1;
     }
 
-    // 2 - Get the binary version
-    if ((fname_code = encode_str2bin(encoded_name)) == NULL) {
+    // 2 - Get the corresponding dirnode
+    DirNode * dirnode = DirNode::from_afs_fpath(dir_path, false);
+    if (dirnode == nullptr) {
         goto out;
     }
 

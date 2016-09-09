@@ -11,13 +11,14 @@ extern const char * global_afs_home_path;
 /** path to the default repo director.  home_path/.afsx */
 extern const char * global_afs_repo_path;
 
-void set_global_afs_home_path(const char * path);
-string * get_default_repo_path();
-string * get_default_dnode_fpath();
+extern bool global_env_is_afs;
 
-inline string * make_dnode_fpath(const char * fname) {
-    string * rv = get_default_repo_path();
-    rv->operator+=("/");
-    rv->operator+=(fname);
-    return rv;
-}
+void uspace_set_afs_home(const char * path, bool is_afs);
+
+string * uspace_get_repo_path(); 
+
+string * uspace_get_dnode_fpath();
+
+string * uspace_make_dnode_fpath(const char * fname);
+
+void uspace_get_relpath(const char * path, char ** rv);

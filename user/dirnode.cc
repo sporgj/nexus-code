@@ -21,7 +21,7 @@ DirNode::DirNode()
 
 inline DirNode * DirNode::load_default_dnode()
 {
-    string * path = get_default_dnode_fpath();
+    string * path = uspace_get_dnode_fpath();
     DirNode * dnode = DirNode::from_file(path->c_str());
     delete path;
 
@@ -58,7 +58,7 @@ DirNode * DirNode::lookup_path(const char * path, bool omit_last)
         encoded_str = encode_bin2str(encoded_fname);
         delete encoded_fname;
 
-        dnode_path = make_dnode_fpath(encoded_str);
+        dnode_path = uspace_make_dnode_fpath(encoded_str);
         free((void *) encoded_str);
 
         if ((dirnode = DirNode::from_file(dnode_path->c_str())) == nullptr) {
@@ -87,7 +87,7 @@ DirNode * DirNode::from_file(const char * fpath)
     fstream file(fpath, ios::in | ios::binary);
 
     if (!file) {
-        cout << "Could not read file: " << fpath;
+        cout << "Could not read file: " << fpath << endl;
         goto out;
     }
 
@@ -125,10 +125,12 @@ out:
     return obj;
 }
 
-DirNode * DirNode::from_afs_fpath(const char * fpath)
+DirNode * DirNode::from_afs_fpath(const char * fpath, bool omit_last)
 {
     // TODO for now lets assume everything is in one dnode
-    return DirNode::lookup_path(fpath);
+    char * relpath;
+    uspace_get_relpath(fpath, &relpath);
+    return DirNode::lookup_path(relpath, omit_last);
 }
 
 bool DirNode::write(DirNode * dn, fstream * file)
@@ -208,18 +210,15 @@ encoded_fname_t * DirNode::add_dir(const char * fname)
 
 encoded_fname_t * DirNode::__rm_entry(const char * realname, bool is_file)
 {
-    const char * temp;
-    size_t len = strlen(realname);
     encoded_fname_t * result = nullptr;
 
+    string name_str(realname);
     auto fentry_list = is_file ? this->proto->mutable_file()
                                : this->proto->mutable_dir();
     auto curr_fentry = fentry_list->begin();
 
     while (curr_fentry != fentry_list->end()) {
-        temp = curr_fentry->raw_name().data();
-        // just compare
-        if (memcmp(realname, temp, len) == 0) {
+        if (!name_str.compare(curr_fentry->raw_name().data())) {
             result = new encoded_fname_t;
             memcpy(result, curr_fentry->encoded_name().data(),
                    sizeof(encoded_fname_t));

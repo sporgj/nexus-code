@@ -1,4 +1,6 @@
 #include "ucafs_kern.h"
+#undef ERROR
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_store: " fmt, ##args)
 
 int store_prepare(void * rock, afs_uint32 size, afs_uint32 * bytestoxfer)
 {
@@ -22,17 +24,17 @@ static int store_read(void * rock, struct osi_file * tfile, afs_uint32 offset,
     uspace_call = rx_NewCall(conn);
 
     if (StartAFSX_readwrite_data(uspace_call, ctx->id, size)) {
-        printk(KERN_ERR "StartAFSX_upload_file failed");
+        ERROR("StartAFSX_upload_file failed");
         goto out;
     }
 
     if ((nbytes = rx_Write(uspace_call, ctx->buffer, size)) != size) {
-        printk(KERN_ERR "send error: exp=%d, act=%u\n", size, nbytes);
+        ERROR("send error: exp=%d, act=%u\n", size, nbytes);
         goto out;
     }
 
     if ((nbytes = rx_Read(uspace_call, ctx->buffer, size)) != size) {
-        printk(KERN_ERR "recv error: exp=%d, act=%u\n", size, nbytes);
+        ERROR("recv error: exp=%d, act=%u\n", size, nbytes);
         goto out;
     }
 
@@ -53,7 +55,7 @@ int store_write(void * rock, afs_uint32 tlen, afs_uint32 * byteswritten)
     *byteswritten = tlen;
 
     if ((nbytes = rx_Write(ctx->afs_call, ctx->buffer, tlen)) != tlen) {
-        printk(KERN_ERR "ucafs_store: afs_server send exp=%d, act=%d\n", tlen,
+        ERROR("afs_server send exp=%d, act=%d\n", tlen,
                (int)nbytes);
         *byteswritten = nbytes;
         return -1;
@@ -93,7 +95,7 @@ static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
     tfile = afs_CFileOpen(&tdc->f.inode);
 
     *transferred = 0;
-    printk(KERN_ERR "tdc size=%d\n", size);
+    ERROR("tdc size=%d\n", size);
 
     while (size > 0) {
         ops->prepare(rock, size, &tlen);
@@ -159,14 +161,14 @@ int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
                                   &instatus, 0, real_len, real_len);
 #endif
     if (code) {
-        printk(KERN_ERR "ucafs_store: issues with call\n");
+        ERROR("issues with call\n");
         goto out;
     }
 
     // allocate the context buffer
     ctx->buffer = (void *)__get_free_page(GFP_KERNEL);
     if (ctx->buffer == NULL) {
-        printk(KERN_ERR "ucafs_store: could not allocate buffer\n");
+        ERROR("could not allocate buffer\n");
         goto out;
     }
 
@@ -185,13 +187,15 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
 {
     int ret, hash, index;
     ucafs_ctx_t ctx;
+    uint64_t tlen;
     afs_uint32 bytes_left, dcache_size, nbytes;
     char * path;
     struct dcache * tdc = NULL;
     struct AFSFetchStatus outstatus;
+    struct rx_connection * conn = NULL;
 
     if (!AFSX_IS_CONNECTED) {
-        printk(KERN_ERR "upload: not connected\n");
+        ERROR("upload: not connected\n");
         return AFSX_STATUS_NOOP;
     }
 
@@ -206,17 +210,19 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
     }
 
     memset(&ctx, 0, sizeof(ucafs_ctx_t));
+
+    tlen = avc->f.m.Length;
+
+    conn = __get_conn();
     if ((ret = AFSX_readwrite_start(conn, UCAFS_WRITEOP, path, AFSX_PACKET_SIZE,
-                                   avc->f.m.Length, &ctx.id))) {
-        if (ret == AFSX_STATUS_ERROR) {
-            printk(KERN_ERR "ucafs_store: error %s\n", path);
-        }
+                                   tlen, &ctx.id))) {
+        ERROR("yello ret=%d\n", ret);
         goto out;
     }
 
     ret = AFSX_STATUS_ERROR;
     if (store_init(avc, &ctx, areq)) {
-        printk(KERN_ERR "ucafs_store: error initializing store\n");
+        ERROR("error initializing store\n");
         goto out;
     }
 
@@ -242,7 +248,7 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
                 goto out;
             }
         } else {
-            printk(KERN_ERR "ucafs_store: tdc failed us :(\n");
+            ERROR("tdc failed us :(\n");
             goto out;
         }
 
@@ -255,7 +261,7 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
     }
 
     if (bytes_left) {
-        printk(KERN_ERR "ucafs_store: some bytes left=%d\n", bytes_left);
+        ERROR("some bytes left=%d\n", bytes_left);
         goto out;
     }
 
@@ -281,5 +287,6 @@ out:
     if (path)
         kfree(path);
 
+    __put_conn(conn);
     return ret;
 }

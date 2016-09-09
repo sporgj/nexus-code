@@ -24,7 +24,7 @@ int LINUX_AFSX_connect()
                                  null_securityObject, AFSX_NULL);
 
     rx_SetConnDeadTime(conn, 5);
-    rx_SetConnDeadTime(ping_conn, 2);
+    rx_SetConnHardDeadTime(ping_conn, 2);
 
     if (conn == NULL || ping_conn == NULL) {
         /* maybe have a retry */
@@ -48,6 +48,22 @@ int LINUX_AFSX_ping(void)
     }
     return 0;
 }
+
+struct rx_connection * __get_conn(void)
+{
+    u_long host;
+    struct rx_securityClass * null_securityObject;
+
+    host = htonl(INADDR_LOOPBACK);
+    null_securityObject = rxnull_NewClientSecurityObject();
+    conn = rx_NewConnection(host, AFSX_SERVER_PORT, AFSX_SERVICE_ID,
+                            null_securityObject, AFSX_NULL);
+
+    rx_GetConnection(conn);
+    return conn;
+}
+
+void __put_conn(struct rx_connection * c) { rx_PutConnection(c); }
 
 /**
  * whether to ignore a vnode or not.
@@ -88,7 +104,7 @@ inline int __is_vnode_ignored(struct vcache * avc, char ** dest)
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
 }
 
-int LINUX_AFSX_newfile(char ** dest, struct dentry * dp)
+int UCAFS_create(char ** dest, int is_file, struct dentry * dp)
 {
     int ret;
     char * fpath;

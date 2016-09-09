@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <vector>
 #include <glog/logging.h>
+#include <iostream>
 
 #include "fileops.h"
 #include "dirops.h"
@@ -20,6 +21,7 @@ fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
 {
     // check if the dirnode knows about this file
     char * temp;
+    std::cout << fpath << std::endl;
     int ret = fops_plain2code(fpath, &temp);
     if (ret) {
         *retptr = -1;

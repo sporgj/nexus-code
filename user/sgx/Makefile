@@ -1,25 +1,26 @@
 include header.mk
 
-APP_PATH = ../
-OBJS = ecall_sgx.o
+APP_PATH = ..
+OBJS = ecall_sgx.o\
+	   elasticarray.o\
+	   elasticqueue.o\
+	   seqptrmap.o
 
 .PHONY: all
 all: enclave.signed.so
 
-# untrusted objects
-$(APP_PATH)/enclave_u.c: enclave.edl
-	@$(SGX_EDGER8R) --untrusted --untrusted-dir $(APP_PATH) $^
-	@echo "GEN =>  $@"
+Enclave_C_Flags += -DUCPRIV_ENCLAVE -I../mbedtls/include -I../
 
-$(APP_PATH)/enclave_u.o: $(APP_PATH)/enclave_u.c
-	@$(CC) -c $< -o $@
-	@echo "CC <= $^"
+libmbedcrypto.a: ../mbedtls/library/libmbedcrypto.a
+	cp $^ $@
 
-
-#trusted
 %.o: %.cc
 	@$(CXX) $(Enclave_Cpp_Flags) -c $< -o $@
 	@echo "CXX => $@"
+
+%.o: %.c
+	@$(CC) $(Enclave_C_Flags) -c $< -o $@
+	@echo "CC => $@"
 
 private_key.pem:
 	openssl genrsa -out $@ -3 3072
@@ -32,8 +33,8 @@ enclave_t.o: enclave_t.c
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC => $@"
 
-enclave.so: enclave_t.o $(OBJS)
-	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+enclave.so: enclave_t.o $(OBJS) libmbedcrypto.a
+	$(CXX) $^ -o $@ $(Enclave_Link_Flags)
 	@echo "LINK => $@"
 
 enclave.signed.so: enclave.so private_key.pem

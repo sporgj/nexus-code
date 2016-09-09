@@ -49,7 +49,7 @@ public:
     }
 
     static DirNode * from_file(const char * fpath);
-    static DirNode * from_afs_fpath(const char * fpath);
+    static DirNode * from_afs_fpath(const char * fpath, bool omit_last=true);
     static DirNode * load_default_dnode();
     static DirNode * lookup_path(const char * path, bool omit_last=true);
 

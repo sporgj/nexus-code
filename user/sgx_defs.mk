@@ -64,31 +64,36 @@ ifeq ($(SGX_DEBUG), 1)
 else
         SGX_COMMON_CFLAGS += -O2
 endif
+
+######## App Settings ########
+
 ifneq ($(SGX_MODE), HW)
-	Trts_Library_Name := sgx_trts_sim
-	Service_Library_Name := sgx_tservice_sim
+	Urts_Library_Name := sgx_urts_sim
 else
-	Trts_Library_Name := sgx_trts
-	Service_Library_Name := sgx_tservice
+	Urts_Library_Name := sgx_urts
 endif
-Crypto_Library_Name := sgx_tcrypto
 
-Enclave_Include_Paths := -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport
+App_Include_Paths := -IInclude -IApp -I$(SGX_SDK)/include
 
-Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector $(Enclave_Include_Paths)
-Enclave_Cpp_Flags := $(Enclave_C_Flags) -std=c++03 -nostdinc++
-Enclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
-	-Wl,--whole-archive -l$(Trts_Library_Name) -Wl,--no-whole-archive \
-	-Wl,--start-group -lsgx_tstdc -lsgx_tstdcxx -l$(Crypto_Library_Name) -l$(Service_Library_Name) -Wl,--end-group \
-	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
-	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
-	-Wl,--defsym,__ImageBase=0 \
-	-Wl,--version-script=enclave.lds
+App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(App_Include_Paths)
 
-ifeq ($(SGX_MODE), HW)
-ifneq ($(SGX_DEBUG), 1)
-ifneq ($(SGX_PRERELEASE), 1)
-Build_Mode = HW_RELEASE
+# Three configuration modes - Debug, prerelease, release
+#   Debug - Macro DEBUG enabled.
+#   Prerelease - Macro NDEBUG and EDEBUG enabled.
+#   Release - Macro NDEBUG enabled.
+ifeq ($(SGX_DEBUG), 1)
+        App_C_Flags += -DDEBUG -UNDEBUG -UEDEBUG
+else ifeq ($(SGX_PRERELEASE), 1)
+        App_C_Flags += -DNDEBUG -DEDEBUG -UDEBUG
+else
+        App_C_Flags += -DNDEBUG -UEDEBUG -UDEBUG
 endif
-endif
+
+App_Cpp_Flags := $(App_C_Flags) -std=c++11
+App_Link_Flags := $(SGX_COMMON_CFLAGS) -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name) -lpthread 
+
+ifneq ($(SGX_MODE), HW)
+	App_Link_Flags += -lsgx_uae_service_sim
+else
+	App_Link_Flags += -lsgx_uae_service
 endif

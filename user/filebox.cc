@@ -16,7 +16,7 @@ FileBox * FileBox::from_file(const char * fname)
     fbox * _fbox = nullptr;
     fbox_header_t _header;
     uint8_t * buffer;
-    string * fpath = make_dnode_fpath(fname);
+    string * fpath = uspace_make_dnode_fpath(fname);
 
     fstream file(fpath->c_str(), ios::in | ios::binary);
     if (!file) {
@@ -63,7 +63,7 @@ encoded_fname_t * FileBox::create_segment()
     seg->set_crypto((char *)&file_crypto, sizeof(file_crypto_t));
 
     this->header.seg_count++;
-    seg->set_segid(this->header.seg_count);
+    seg->set_num(this->header.seg_count);
 
     uuid_generate_time_safe(rv->bin);
     seg->set_name((char *)rv, sizeof(encoded_fname_t));

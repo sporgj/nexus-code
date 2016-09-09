@@ -1,11 +1,12 @@
 include header.mk
+include sgx_defs.mk
 
 OPENAFS_PATH := /home/vagrant/openafs
 OPENAFS_INC := $(OPENAFS_PATH)/include
 OPENAFS_SRC := $(OPENAFS_PATH)/src
 OPENAFS_LIB := $(OPENAFS_PATH)/lib
 
-OBJS := rpc.o afsx.ss.o $(OBJS)
+OBJS := rpc.o afsx.ss.o enclave_u.o $(OBJS)
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
 RXINC := -I$(OPENAFS_INC)
@@ -26,15 +27,23 @@ tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
 	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
 	@echo "CXX <= $@"
 
+enclave_u.c: sgx/enclave.edl
+	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
+	@echo "GEN =>  $@"
+
+enclave_u.o: enclave_u.c
+	@$(CC) $(App_C_Flags) -c $< -o $@
+	@echo "CC <= $^"
+
 afsx.cs.o: afsx.cs.c afsx.h
-	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 
 afsx.cs.c: afsx.xg
 	$(RXGEN) -A -x -C -o $@ $<
 
 ucafs: main.cc libucafs.a
-	@$(CXX) $(CPPFLAGS) -I../common $^ $(LIBS) $(RXLIBS) -o $@
+	@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) $^ $(LIBS) $(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
 afsx.ss.o: afsx.ss.c
@@ -52,7 +61,7 @@ libucafs.a: $(OBJS)
 	@echo "ar => $@"
 
 rpc.o: rpc.c afsx.ss.c
-	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 
 %.o: %.cc %.h
