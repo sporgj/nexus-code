@@ -177,7 +177,8 @@ int ecall_finish_crypto(fop_ctx_t * f_ctx, file_crypto_t * fcrypto)
 
     /* close the crypto context and verify the mac */
     mbedtls_md_hmac_finish(&__ctx->hmac_ctx, (uint8_t *)&mac);
-    if (memcmp(&mac, &__ctx->crypto_data.mac, sizeof(crypto_mac_t))) {
+    if (f_ctx->op == UCPRIV_DECRYPT
+        && memcmp(&mac, &__ctx->crypto_data.mac, sizeof(crypto_mac_t))) {
         goto out;
     }
 
@@ -185,8 +186,8 @@ int ecall_finish_crypto(fop_ctx_t * f_ctx, file_crypto_t * fcrypto)
 
     // TODO seal the keys before sending
 
-    memset(__ctx, 0, sizeof(file_crypto_t));
     memcpy(fcrypto, &__ctx->crypto_data, sizeof(file_crypto_t));
+    memset(__ctx, 0, sizeof(file_crypto_t));
     error = E_SUCCESS;
 out:
     free(__ctx);

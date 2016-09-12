@@ -40,12 +40,14 @@ typedef enum {
 typedef struct {
     int op;
     int crypto_id;
+    uint32_t seg_id;
     uint32_t id;
     char * buffer;
     uint32_t done;
     uint32_t len;
     uint32_t cap;
     uint64_t total;
+    char * path;
 } fop_ctx_t;
 
 typedef struct { uint8_t iv[CRYPTO_AES_IV_SIZE]; } crypto_iv_t;

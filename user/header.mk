@@ -17,6 +17,7 @@ OBJS = dirnode.o\
        dirops.o\
        fileops.o\
        utils.o\
+       fbox.pb.o\
        dnode.pb.o
 
 TESTS := test_dnode test_dops test_lookup

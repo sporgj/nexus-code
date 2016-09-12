@@ -8,6 +8,14 @@ using namespace std;
 FileBox::FileBox() {
     memset(&this->header, 0, sizeof(fbox_header_t));
     this->proto = new class::fbox;
+
+    // every filebox has a default segmentt
+    this->create_segment();
+}
+
+FileBox * FileBox::from_afs_file(const char * fname)
+{
+    return nullptr;
 }
 
 FileBox * FileBox::from_file(const char * fname)
@@ -71,6 +79,16 @@ encoded_fname_t * FileBox::create_segment()
     seg->set_size(0);
 
     return rv;
+}
+
+file_crypto_t * FileBox::segment_crypto(uint32_t seg_id)
+{
+    return nullptr;
+}
+
+encoded_fname_t * FileBox::segment_name(uint32_t seg_id)
+{
+    return nullptr;
 }
 
 bool FileBox::write(FileBox * fb, fstream * file)

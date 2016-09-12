@@ -10,12 +10,11 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
-
 #include <sgx_urts.h>
-#include "enclave_u.h"
 
 #include "dirnode.h"
 #include "uspace.h"
+#include "enclave_common.h"
 
 #define ENCLAVE_FILENAME "sgx/enclave.so"
 

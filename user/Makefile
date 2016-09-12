@@ -12,6 +12,8 @@ RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 RXINC := -I$(OPENAFS_INC)
 RXLIBS := -L$(OPENAFS_LIB) -lrx -llwp
 
+CPPFLAGS += $(App_Cpp_Flags)
+
 all: ucafs
 
 define make-test-target
@@ -43,7 +45,7 @@ afsx.cs.c: afsx.xg
 	$(RXGEN) -A -x -C -o $@ $<
 
 ucafs: main.cc libucafs.a
-	@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) $^ $(LIBS) $(RXLIBS) $(App_Link_Flags) -o $@
+	@$(CXX) $(CPPFLAGS) $^ $(LIBS) $(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
 afsx.ss.o: afsx.ss.c
@@ -58,7 +60,7 @@ afsx.h: afsx.xg afsx_hdr.h
 
 libucafs.a: $(OBJS)
 	@ar cr $@ $^
-	@echo "ar => $@"
+	@echo "ar $(OBJS) => $@"
 
 rpc.o: rpc.c afsx.ss.c
 	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@

@@ -7,7 +7,8 @@ extern "C" {
 #include "types.h"
 
 fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
-                          uint64_t filelength, int * retptr);
+                          uint64_t filelength, uint32_t * padded_len,
+                          int * retptr);
 
 fop_ctx_t * fileops_get_context(uint32_t id);
 
