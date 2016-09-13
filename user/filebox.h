@@ -21,6 +21,6 @@ public:
     static bool write(FileBox * fb, std::fstream * file);
 
     encoded_fname_t * create_segment();
-    file_crypto_t * segment_crypto(uint32_t seg_id);
+    crypto_context_t * segment_crypto(uint32_t seg_id);
     encoded_fname_t * segment_name(uint32_t seg_id);
 };

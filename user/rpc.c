@@ -139,7 +139,7 @@ afs_int32 SAFSX_readwrite_start(
     /*OUT*/ afs_uint32 * padded_len)
 {
     int ret;
-    fop_ctx_t * ctx = fileops_start(op, fpath, max_chunk_size, total_size,
+    xfer_context_t * ctx = fileops_start(op, fpath, max_chunk_size, total_size,
                                     padded_len, &ret);
     if (ctx == NULL) {
         if (ret == -2) {
@@ -177,19 +177,19 @@ afs_int32 SAFSX_readwrite_data(
     int ret = AFSX_STATUS_ERROR;
     afs_uint32 abytes;
 
-    fop_ctx_t * ctx = fileops_get_context(id);
+    xfer_context_t * ctx = fileops_get_context(id);
     if (ctx == NULL) {
         uerror("rw failed: id %d could not be found", id);
         goto out;
     }
 
-    if (ctx->cap < size) {
-        uerror("size %d sent is above the cap = %d", size, ctx->cap);
+    if (ctx->buflen < size) {
+        uerror("size %d sent is above the cap = %d", size, ctx->buflen);
         goto out;
     }
 
-    if (ctx->done >= ctx->padded_len) {
-        uerror("sending us more data. done=%u, max=%u", ctx->done,
+    if (ctx->completed >= ctx->padded_len) {
+        uerror("sending us more data. done=%u, max=%u", ctx->completed,
                ctx->padded_len);
         goto out;
     }
@@ -200,18 +200,18 @@ afs_int32 SAFSX_readwrite_data(
         goto out;
     }
 
-    ctx->len = size;
+    ctx->valid_buflen = size;
     // process the data
     fileops_process_data(ctx);
 
-    if ((abytes = rx_Write(z_call, ctx->buffer, ctx->len)) != size) {
+    if ((abytes = rx_Write(z_call, ctx->buffer, ctx->valid_buflen)) != size) {
         uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
                abytes, rx_Error(z_call));
         goto out;
     }
 
     uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
-          ctx->done);
+          ctx->completed);
 
     ret = 0;
 out:

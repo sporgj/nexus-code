@@ -29,13 +29,13 @@ static size_t generate(size_t len, size_t plen, uint8_t ** buf1,
     return len;
 }
 
-static fop_ctx_t * get_fop(size_t len)
+static xfer_context_t * get_fop(size_t len)
 {
-    fop_ctx_t * ctx = new fop_ctx_t;
-    ctx->done = 0;
-    ctx->cap = CHUNK_SIZE;
-    ctx->total = len;
-    ctx->len = len; // TODO
+    xfer_context_t * ctx = new xfer_context_t;
+    ctx->completed = 0;
+    ctx->buflen = CHUNK_SIZE;
+    ctx->raw_len = len;
+    ctx->valid_buflen = len; // TODO
     ctx->id = 1;
 
     return ctx;
@@ -47,10 +47,10 @@ int test_crypto()
     uint8_t * buf1, *buf2;
     size_t len = std::rand() % MAX_BUFLEN;
 
-    file_crypto_t * fcrypto = new file_crypto_t;
-    memset(fcrypto, 0, sizeof(file_crypto_t));
+    crypto_context_t * fcrypto = new crypto_context_t;
+    memset(fcrypto, 0, sizeof(crypto_context_t));
 
-    fop_ctx_t * fop_ctx = get_fop(len);
+    xfer_context_t * fop_ctx = get_fop(len);
     fop_ctx->op = UCPRIV_ENCRYPT;
     ecall_init_crypto(global_eid, &ret, fop_ctx, fcrypto);
     if (ret) {
@@ -82,8 +82,8 @@ int test_crypto()
 
     /* 3 - Decrypt the stream */
     fop_ctx->op = UCPRIV_DECRYPT;
-    fop_ctx->len = fop_ctx->padded_len;
-    fop_ctx->done = 0;
+    fop_ctx->valid_buflen = fop_ctx->padded_len;
+    fop_ctx->completed = 0;
     cout << "Decrypting..." << endl;
     ecall_init_crypto(global_eid, &ret, fop_ctx, fcrypto);
     if (ret) {

@@ -16,7 +16,7 @@ using std::vector;
 
 static int counter = 0;
 // TODO switch to different structure
-static vector<fop_ctx_t *> ctx_array(0, nullptr);
+static vector<xfer_context_t *> ctx_array(0, nullptr);
 
 /**
  * Starts a file upload/download operation
@@ -26,7 +26,7 @@ static vector<fop_ctx_t *> ctx_array(0, nullptr);
  *
  * returns nullptr on failure, retptr set.
  */
-fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
+xfer_context_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
                           uint32_t filelength, uint32_t * padded_len,
                           int * retptr)
 {
@@ -41,14 +41,14 @@ fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
 
     // get file encryption info
     // only one cryptographic information for now
-    file_crypto_t * f_seal = fbox->segment_crypto(seg_id);
+    crypto_context_t * f_seal = fbox->segment_crypto(seg_id);
 
-    fop_ctx_t * ctx = new fop_ctx_t;
+    xfer_context_t * ctx = new xfer_context_t;
     ctx->op = op;
     ctx->buffer = (char *)operator new(max_chunk_size);
-    ctx->done = 0;
-    ctx->cap = max_chunk_size;
-    ctx->total = filelength;
+    ctx->completed = 0;
+    ctx->buflen = max_chunk_size;
+    ctx->raw_len = filelength;
     ctx->id = counter++;
     ctx->seg_id = seg_id;
     ctx->path = strdup(fpath);
@@ -70,7 +70,7 @@ fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
     return ctx;
 }
 
-fop_ctx_t * fileops_get_context(uint32_t id)
+xfer_context_t * fileops_get_context(uint32_t id)
 {
     for (uint32_t i = 0; i < ctx_array.size(); i++) {
         if (ctx_array[i] && ctx_array[i]->id == id) {
@@ -80,20 +80,20 @@ fop_ctx_t * fileops_get_context(uint32_t id)
     return nullptr;
 }
 
-int fileops_process_data(fop_ctx_t * ctx)
+int fileops_process_data(xfer_context_t * ctx)
 {
     int ret;
     uint8_t * ptr = (uint8_t *)ctx->buffer;
-    hexdump(ptr, ctx->len > 32 ? 32 : ctx->len);
+    // hexdump(ptr, ctx->len > 32 ? 32 : ctx->len);
 
     ecall_crypt_data(global_eid, &ret, ctx);
     if (ret) {
         goto out;
     }
 
-    hexdump((uint8_t *)ctx->buffer, ctx->len > 32 ? 32 : ctx->len);
+    // hexdump((uint8_t *)ctx->buffer, ctx->len > 32 ? 32 : ctx->len);
 
-    ctx->done += ctx->len;
+    ctx->completed += ctx->valid_buflen;
 out:
     return ret;
 }
@@ -105,14 +105,14 @@ out:
 int fileops_finish(uint32_t id, int * op, uint32_t * done)
 {
     FileBox * fbox;
-    file_crypto_t * fseal;
+    crypto_context_t * fseal;
     int ret = -2;
 
     auto ctx_iter = ctx_array.begin();
     while (ctx_iter != ctx_array.end()) {
         auto & ctx = *ctx_iter;
         if (ctx->id == id) {
-            *done = ctx->done;
+            *done = ctx->completed;
             *op = ctx->op;
 
             fbox = FileBox::from_afs_file(ctx->path);

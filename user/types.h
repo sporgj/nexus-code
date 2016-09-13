@@ -3,7 +3,7 @@
 #ifndef UCPRIV_ENCLAVE
 #include <uuid/uuid.h>
 #else
-typedef struct { uint8_t bin[128]; } uuid_t;
+typedef struct { uint8_t bin[16]; } uuid_t;
 #endif
 #include "afsx_hdr.h"
 
@@ -18,7 +18,7 @@ typedef struct { uint8_t bin[128]; } uuid_t;
 #define CRYPTO_HMAC_SIZE 32
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                                      \
-    x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE);
+    x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
 
 #define DEFAULT_REPO_DIRNAME ".afsx"
 #define DEFAULT_DNODE_FNAME "main.dnode"
@@ -43,13 +43,13 @@ typedef struct {
     uint32_t seg_id;
     uint32_t id;
     char * buffer;
-    uint32_t done;
-    uint32_t len;
-    uint32_t cap;
-    uint32_t total;
+    uint32_t buflen;
+    uint32_t valid_buflen; // how much "good" data can be read from the buffer
+    uint32_t completed;
+    uint32_t raw_len;
     uint32_t padded_len;
     char * path;
-} fop_ctx_t;
+} xfer_context_t;
 
 typedef struct { uint8_t iv[CRYPTO_AES_IV_SIZE]; } crypto_iv_t;
 
@@ -71,7 +71,7 @@ typedef struct {
     crypto_ekey_t skey;
     crypto_mac_t mac;
     crypto_iv_t iv;
-} __attribute__((packed)) file_crypto_t;
+} __attribute__((packed)) crypto_context_t;
 
 typedef struct {
     uint32_t magic;
@@ -86,5 +86,5 @@ typedef struct {
     uint32_t seg_count; // number of segments in the file
     uint32_t flen;
     uint32_t plen; // length of the protocol buffer
-    file_crypto_t crypto; // crypto protecting the whole protocol buffer file
+    crypto_context_t crypto; // crypto protecting the whole protocol buffer file
 } __attribute__((packed)) fbox_header_t;

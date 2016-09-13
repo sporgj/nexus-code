@@ -65,11 +65,11 @@ encoded_fname_t * FileBox::create_segment()
 {
     encoded_fname_t * rv = new encoded_fname_t;
     fbox_segment * seg = this->proto->add_seg();
-    file_crypto_t file_crypto;
+    crypto_context_t file_crypto;
 
-    memset(&file_crypto, 0, sizeof(file_crypto_t));
+    memset(&file_crypto, 0, sizeof(crypto_context_t));
     // TODO call enclave here to setup
-    seg->set_crypto((char *)&file_crypto, sizeof(file_crypto_t));
+    seg->set_crypto((char *)&file_crypto, sizeof(crypto_context_t));
 
     this->header.seg_count++;
     seg->set_num(this->header.seg_count);
@@ -82,13 +82,13 @@ encoded_fname_t * FileBox::create_segment()
     return rv;
 }
 
-file_crypto_t * FileBox::segment_crypto(uint32_t seg_id)
+crypto_context_t * FileBox::segment_crypto(uint32_t seg_id)
 {
-    file_crypto_t * fcrypto;
+    crypto_context_t * fcrypto;
     if (this->proto->seg_size()) {
-        fcrypto = new file_crypto_t;
+        fcrypto = new crypto_context_t;
         memcpy(fcrypto, this->proto->seg(seg_id).crypto().data(),
-               sizeof(file_crypto_t));
+               sizeof(crypto_context_t));
         return fcrypto;
     }
     return nullptr;
