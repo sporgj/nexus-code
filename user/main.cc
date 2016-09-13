@@ -16,7 +16,7 @@
 #include "uspace.h"
 #include "enclave_common.h"
 
-#define ENCLAVE_FILENAME "sgx/enclave.so"
+#define ENCLAVE_FILENAME "sgx/enclave.signed.so"
 
 using namespace std;
 
@@ -66,9 +66,10 @@ int main(int argc, char ** argv)
 
     /* initialize the enclave */
     sgx_launch_token_t token;
-    sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated, &global_eid, NULL);
+    ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
+                             &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
-        cout <<  "Could not open enclave" << endl;
+        cout << "Could not open enclave: ret=" << ret << endl;
         return -1;
     }
 

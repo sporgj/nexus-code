@@ -134,16 +134,18 @@ extern int AFSX_readwrite_start(
 	/*IN */ int op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
-	/*IN */ afs_uint64 total_size,
-	/*OUT*/ afs_uint32 * id);
+	/*IN */ afs_uint32 total_size,
+	/*OUT*/ afs_uint32 * id,
+	/*OUT*/ afs_uint32 * padded_len);
 
 extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ int op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
-	/*IN */ afs_uint64 total_size,
-	/*OUT*/ afs_uint32 * id);
+	/*IN */ afs_uint32 total_size,
+	/*OUT*/ afs_uint32 * id,
+	/*OUT*/ afs_uint32 * padded_len);
 
 extern int AFSX_readwrite_finish(
 	/*IN */ struct rx_connection *z_conn,

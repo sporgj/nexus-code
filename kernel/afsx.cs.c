@@ -214,7 +214,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint64 total_size,afs_uint32 * id)
+int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_uint32 * id,afs_uint32 * padded_len)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 6;
@@ -228,14 +228,15 @@ int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_ui
 	     || (!xdr_int(&z_xdrs, &op))
 	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))
 	     || (!xdr_afs_uint32(&z_xdrs, &max_chunk_size))
-	     || (!xdr_afs_uint64(&z_xdrs, &total_size))) {
+	     || (!xdr_afs_uint32(&z_xdrs, &total_size))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;
 	}
 
 	/* Un-marshal the reply arguments */
 	z_xdrs.x_op = XDR_DECODE;
-	if ((!xdr_afs_uint32(&z_xdrs, id))) {
+	if ((!xdr_afs_uint32(&z_xdrs, id))
+	     || (!xdr_afs_uint32(&z_xdrs, padded_len))) {
 		z_result = RXGEN_CC_UNMARSHAL;
 		goto fail;
 	}

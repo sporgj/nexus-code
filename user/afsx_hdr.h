@@ -21,4 +21,5 @@
 #define UCAFS_WRITEOP 1
 #define UCAFS_READOP 0
 
+#define AFSX_CRYPTO_BLK_SIZE 16
 #define TOBLKSIZE(x) 16 - (x % 16)

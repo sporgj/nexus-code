@@ -94,7 +94,7 @@ static int init_sgx_socket(ucafs_ctx_t * ctx, char * path)
     int ret;
     /* 1 -  Connect to the userspace daemon */
     if ((ret = AFSX_readwrite_start(conn, UCAFS_READOP, path, AFSX_PACKET_SIZE,
-                                    ctx->len, &ctx->id))) {
+                                    ctx->len, &ctx->id, &ctx->padded_len))) {
         if (ret == AFSX_STATUS_ERROR) {
             ERROR("fetchstore start failed: %s\n", path);
             return -1;

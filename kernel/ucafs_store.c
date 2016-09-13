@@ -18,9 +18,6 @@ static int store_read(void * rock, struct osi_file * tfile, afs_uint32 offset,
     int ret = -1, moredata;
     ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
 
-    // XXX check for the read return
-    afs_osi_Read(tfile, -1, ctx->buffer, size);
-
     uspace_call = rx_NewCall(conn);
 
     if (StartAFSX_readwrite_data(uspace_call, ctx->id, size)) {
@@ -55,8 +52,7 @@ int store_write(void * rock, afs_uint32 tlen, afs_uint32 * byteswritten)
     *byteswritten = tlen;
 
     if ((nbytes = rx_Write(ctx->afs_call, ctx->buffer, tlen)) != tlen) {
-        ERROR("afs_server send exp=%d, act=%d\n", tlen,
-               (int)nbytes);
+        ERROR("afs_server send exp=%d, act=%d\n", tlen, (int)nbytes);
         *byteswritten = nbytes;
         return -1;
     }
@@ -85,9 +81,9 @@ static int store_close(void * rock, struct AFSFetchStatus * OutStatus,
 static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
                      int * more, afs_int32 * transferred)
 {
-    int ret = AFSX_STATUS_ERROR;
+    int ret = AFSX_STATUS_ERROR, is_last_tdc, size, sent_pad = 0;
     struct osi_file * tfile;
-    afs_uint32 tlen, nbytes, size, pos = 0;
+    afs_uint32 tlen, nbytes, pos = 0;
     ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
 
     size = tdc->f.chunkBytes;
@@ -95,10 +91,21 @@ static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
     tfile = afs_CFileOpen(&tdc->f.inode);
 
     *transferred = 0;
-    ERROR("tdc size=%d\n", size);
 
+    is_last_tdc = (ctx->off + size) >= ctx->len;
+
+    ERROR("tdc size=%d, chunk=%d, is_last=%d\n", size, tdc->f.chunk, is_last_tdc);
     while (size > 0) {
-        ops->prepare(rock, size, &tlen);
+        ops->prepare(rock, size, &tlen);    
+        
+        // XXX check for the read return
+        afs_osi_Read(tfile, -1, ctx->buffer, tlen);
+
+        // adds the appended info
+        if (size < ctx->buflen && is_last_tdc) {
+            tlen = ctx->padded_len - ctx->off;
+            sent_pad = 1;
+        }
 
         if (ops->read(rock, tfile, pos, tlen, &nbytes)) {
             goto out;
@@ -113,6 +120,23 @@ static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
         ctx->off += tlen;
         pos += tlen;
         size -= tlen;
+    }
+
+    /**
+     * corner case for tdc sizes who are multiple of 16.
+     */
+    if (sent_pad == 0 && is_last_tdc) {
+        tlen = AFSX_CRYPTO_BLK_SIZE;
+        if (ops->read(rock, tfile, pos, tlen, &nbytes)) {
+            goto out;
+        }
+
+        if (ops->write(rock, nbytes, &nbytes)) {
+            goto out;
+        }
+
+        pos += tlen;
+        ctx->off += tlen;
     }
 
     *transferred = pos;
@@ -132,7 +156,8 @@ struct storeOps ops = { .read = store_read,
 int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
 {
     int ret = -1;
-    afs_int32 code, real_len = avc->f.m.Length;
+    afs_int32 code;
+    afs_uint32 real_len = ctx->padded_len;
     struct rx_call * afs_call;
     struct rx_connection * rx_conn;
     struct afs_conn * tc;
@@ -158,7 +183,7 @@ int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
     }
 #else
     code = StartRXAFS_StoreData(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
-                                  &instatus, 0, real_len, real_len);
+                                &instatus, 0, real_len, real_len);
 #endif
     if (code) {
         ERROR("issues with call\n");
@@ -173,7 +198,8 @@ int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
     }
 
     ctx->buflen = AFSX_PACKET_SIZE;
-    ctx->len = real_len;
+    ctx->len = avc->f.m.Length;
+    ctx->off = 0;
     ctx->afs_call = afs_call;
     ctx->rx_conn = rx_conn;
 
@@ -188,7 +214,8 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
     int ret, hash, index;
     ucafs_ctx_t ctx;
     uint64_t tlen;
-    afs_uint32 bytes_left, dcache_size, nbytes;
+    afs_int32 bytes_left;
+    afs_uint32 dcache_size, nbytes;
     char * path;
     struct dcache * tdc = NULL;
     struct AFSFetchStatus outstatus;
@@ -215,7 +242,7 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
 
     conn = __get_conn();
     if ((ret = AFSX_readwrite_start(conn, UCAFS_WRITEOP, path, AFSX_PACKET_SIZE,
-                                   tlen, &ctx.id))) {
+                                    tlen, &ctx.id, &ctx.padded_len))) {
         ERROR("yello ret=%d\n", ret);
         goto out;
     }
@@ -226,33 +253,31 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
         goto out;
     }
 
+    ERROR("storing file. padded=%u, id=%u\n", ctx.padded_len, ctx.id);
+
     // to avoid pageout when reading files, make sure all the vcache dirty
     // pages are flushed to disk. This also obtains the GLOCK()
     osi_VM_StoreAllSegments(avc);
     ConvertWToSLock(&avc->lock);
-    ObtainWriteLock(&afs_xdcache, 6503);
+    // ObtainWriteLock(&afs_xdcache, 6503);
 
     hash = DVHash(&avc->f.fid);
     index = afs_dvhashTbl[hash];
 
     // process every dcache entry in order
     bytes_left = ctx.len;
-    while ((index != NULLIDX)
-           && (afs_indexUnique[index] == avc->f.fid.Fid.Unique)) {
-
-        if ((tdc = afs_GetValidDSlot(index))
-            && !FidCmp(&tdc->f.fid, &avc->f.fid)) {
-            dcache_size = tdc->f.chunkBytes;
-
-            if (storeproc(&ops, &ctx, tdc, NULL, &nbytes)) {
-                goto out;
-            }
-        } else {
-            ERROR("tdc failed us :(\n");
+    while (bytes_left > 0) {
+        tdc = afs_FindDCache(avc, ctx.off);
+        if (!tdc) {
+            ERROR("we failed to failed tdc. byte=%d", ctx.off);
             goto out;
         }
 
-        ReleaseReadLock(&tdc->tlock);
+        if (storeproc(&ops, &ctx, tdc, NULL, &nbytes)) {
+            goto out;
+        }
+        
+        //ReleaseReadLock(&tdc->tlock);
         afs_PutDCache(tdc);
         tdc = NULL;
         bytes_left -= nbytes;
@@ -260,7 +285,7 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
         index = afs_dvnextTbl[index];
     }
 
-    if (bytes_left) {
+    if (bytes_left > 0) {
         ERROR("some bytes left=%d\n", bytes_left);
         goto out;
     }
@@ -269,9 +294,9 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
     avc->f.states &= ~CDirty;
     ret = 0;
 out:
-    ReleaseWriteLock(&afs_xdcache);
+    // ReleaseWriteLock(&afs_xdcache);
     if (tdc) {
-        ReleaseReadLock(&tdc->tlock);
+        //ReleaseReadLock(&tdc->tlock);
         afs_PutDCache(tdc);
     }
 
