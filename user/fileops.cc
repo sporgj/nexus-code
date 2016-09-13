@@ -27,8 +27,8 @@ static vector<xfer_context_t *> ctx_array(0, nullptr);
  * returns nullptr on failure, retptr set.
  */
 xfer_context_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
-                          uint32_t filelength, uint32_t * padded_len,
-                          int * retptr)
+                               uint32_t filelength, uint32_t * padded_len,
+                               int * retptr)
 {
     uint32_t seg_id = 0;
     int ret;
@@ -83,14 +83,12 @@ xfer_context_t * fileops_get_context(uint32_t id)
 int fileops_process_data(xfer_context_t * ctx)
 {
     int ret;
-    uint8_t * ptr = (uint8_t *)ctx->buffer;
+    
     // hexdump(ptr, ctx->len > 32 ? 32 : ctx->len);
-
     ecall_crypt_data(global_eid, &ret, ctx);
     if (ret) {
         goto out;
     }
-
     // hexdump((uint8_t *)ctx->buffer, ctx->len > 32 ? 32 : ctx->len);
 
     ctx->completed += ctx->valid_buflen;
@@ -116,9 +114,7 @@ int fileops_finish(uint32_t id, int * op, uint32_t * done)
             *op = ctx->op;
 
             fbox = FileBox::from_afs_file(ctx->path);
-            if (fbox
-                && (fseal = fbox->segment_crypto(ctx->seg_id)) != nullptr) {
-
+            if (fbox && (fseal = fbox->segment_crypto(ctx->seg_id))) {
                 // complete the cryptographic operation
                 ecall_finish_crypto(global_eid, &ret, ctx, fseal);
                 if (ret) {

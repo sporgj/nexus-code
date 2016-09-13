@@ -72,6 +72,12 @@ int main(int argc, char ** argv)
         return -1;
     }
 
+    ecall_init_enclave(global_eid, &ret);
+    if (ret) {
+        cout << "Enclave could not be initialized" << endl;
+        return -1;
+    }
+
     cout << ". Loaded enclave" << endl;
 
     google::InitGoogleLogging("--logtostderr=1");

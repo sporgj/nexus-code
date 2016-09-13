@@ -23,7 +23,7 @@ using namespace std;
 #define AFSX_CUSTOM_PORT 11987
 
 #define TEST_FILE (char *) "filetext.txt"
-#define PACKET_SIZE 4096
+#define PACKET_SIZE 16
 #define HEXDUMP_LEN(d) (d > 32 ? 32 : d)
 
 extern "C" int setup_rx(int);
@@ -98,7 +98,7 @@ static int test_upload()
 
     afs_uint32 size = st.st_size, blklen = PACKET_SIZE, upload_id;
 
-    if ((result = AFSX_readwrite_start(conn, UCAFS_READOP, TEST_FILE, blklen,
+    if ((result = AFSX_readwrite_start(conn, UCAFS_WRITEOP, TEST_FILE, blklen,
                                        size, &upload_id, &padded_len))) {
         cout << "Start RPC call failed: " << result << endl;
         return -1;
@@ -149,6 +149,7 @@ static int test_upload()
         EndAFSX_readwrite_data(call, &moredata);
         rx_EndCall(call, 0);
     }
+    AFSX_readwrite_finish(conn, upload_id);
     return 0;
 }
 

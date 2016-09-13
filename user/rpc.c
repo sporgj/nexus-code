@@ -139,8 +139,22 @@ afs_int32 SAFSX_readwrite_start(
     /*OUT*/ afs_uint32 * padded_len)
 {
     int ret;
-    xfer_context_t * ctx = fileops_start(op, fpath, max_chunk_size, total_size,
-                                    padded_len, &ret);
+    xfer_context_t * ctx;
+
+    if (max_chunk_size % CRYPTO_CRYPTO_BLK_SIZE) {
+        uerror("rw: max chunk size(%d) should be a multiple of %d",
+               max_chunk_size, CRYPTO_CRYPTO_BLK_SIZE);
+        return AFSX_STATUS_ERROR;
+    }
+
+    if (op == UCAFS_READOP && total_size % CRYPTO_CRYPTO_BLK_SIZE) {
+        uerror("rw: total size (%d) should be a multiple of %d", total_size,
+               CRYPTO_CRYPTO_BLK_SIZE);
+        return AFSX_STATUS_ERROR;
+    }
+
+    ctx = fileops_start(op, fpath, max_chunk_size, total_size, padded_len,
+                        &ret);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);
@@ -188,6 +202,11 @@ afs_int32 SAFSX_readwrite_data(
         goto out;
     }
 
+    if (size % CRYPTO_CRYPTO_BLK_SIZE) {
+        uerror("size %d is not a multiple of the block size", size);
+        goto out;
+    }
+
     if (ctx->completed >= ctx->padded_len) {
         uerror("sending us more data. done=%u, max=%u", ctx->completed,
                ctx->padded_len);
@@ -204,7 +223,7 @@ afs_int32 SAFSX_readwrite_data(
     // process the data
     fileops_process_data(ctx);
 
-    if ((abytes = rx_Write(z_call, ctx->buffer, ctx->valid_buflen)) != size) {
+    if ((abytes = rx_Write(z_call, ctx->buffer, size)) != size) {
         uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
                abytes, rx_Error(z_call));
         goto out;

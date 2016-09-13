@@ -133,7 +133,7 @@ int ecall_crypt_data(xfer_context_t * xfer_ctx)
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
     uint8_t * p_input, *p_output, *iv;
-    int pad, pkcs, len, bytes_left;
+    int pad, pkcs, bytes_left;
     crypto_ctx_t __SECRET * __ctx;
 
     if ((__ctx = seqptrmap_get(crypto_hashmap, xfer_ctx->crypto_id)) == NULL) {
@@ -147,14 +147,14 @@ int ecall_crypt_data(xfer_context_t * xfer_ctx)
     p_input = __ctx->p_input;
     iv = (uint8_t *)&__ctx->iv;
 
-    len = xfer_ctx->valid_buflen;
-    padded_len = bytes_left = xfer_ctx->padded_len;
+    bytes_left = xfer_ctx->valid_buflen;
+    padded_len = xfer_ctx->padded_len;
     total_len = xfer_ctx->raw_len;
 
     aes_ctx = &__ctx->aes_ctx;
     hmac_ctx = &__ctx->hmac_ctx;
 
-    pad = (xfer_ctx->valid_buflen + xfer_ctx->completed >= xfer_ctx->raw_len);
+    pad = (bytes_left + xfer_ctx->completed >= xfer_ctx->raw_len);
     p_output = xfer_ctx->buffer;
 
     while (bytes_left > 0) {
@@ -164,7 +164,7 @@ int ecall_crypt_data(xfer_context_t * xfer_ctx)
 
         if (xfer_ctx->op == UCPRIV_ENCRYPT) {
             if (bytes_left <= E_CRYPTO_BUFFER_LEN && pad) {
-                pkcs = padded_len - len;
+                pkcs = padded_len - xfer_ctx->raw_len;
                 // set the padding
                 memset(p_input + nbytes - pkcs, pkcs, pkcs);
             }
