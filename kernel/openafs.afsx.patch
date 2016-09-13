@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..506ffcf 100644
+index 1b99c94..63c0ef4 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -406,6 +406,8 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -48,7 +48,7 @@ index 1b99c94..506ffcf 100644
 +	char * crypto_name = NULL;
 +
 +	// if we are not touching a .fbox file
-+	if (!UCAFS_create(&crypto_name, AFSX_IS_DIR, dp)) {
++	if (!UCAFS_create(&crypto_name, AFSX_IS_FILE, dp)) {
 +	    name = crypto_name;
 +	}
 +    }
@@ -103,31 +103,25 @@ index 1b99c94..506ffcf 100644
      AFS_GLOCK();
      code = afs_rename(VTOAFS(oldip), (char *)oldname, VTOAFS(newip), (char *)newname, credp);
      AFS_GUNLOCK();
-diff --git a/src/afs/VNOPS/afs_vnop_read.c b/src/afs/VNOPS/afs_vnop_read.c
-index 9ca2929..8b984e3 100644
---- a/src/afs/VNOPS/afs_vnop_read.c
-+++ b/src/afs/VNOPS/afs_vnop_read.c
-@@ -606,7 +606,19 @@ afs_UFSRead(struct vcache *avc, struct uio *auio,
- #endif
- 	AFS_UIOMOVE(afs_zeros, trimlen, UIO_READ, tuiop, code);
-     }
--
-+/*
+@@ -2201,6 +2252,18 @@ afs_linux_fillpage(struct file *fp, struct page *pp)
+     cred_t *credp;
+ 
+     AFS_GLOCK();
 +#ifdef AFS_SECURE
-+    // DO a synchronous fetch of the file if in a secure folder
-+    #include "afsx_hdr.h"
-+    if (vType(avc) != VDIR) {
++#include "afsx_hdr.h"
++    {
++	credp = crref();
++        struct vrequest * treq;
++	afs_CreateReq(&treq, credp);
 +	code = UCAFS_fetch(avc, treq);
-+	if (code == AFSX_STATUS_ERROR) {
-+	    return EIO;
-+	}
-+	code = 0;
++	afs_DestroyReq(treq);
++	crfree(credp);
 +    }
 +#endif
-+*/
-     while (avc->f.m.Length > 0 && totalLength > 0) {
- 	/* read all of the cached info */
- 	if (filePos >= avc->f.m.Length)
++
+     if (afs_linux_readpage_fastpath(fp, pp, &code)) {
+ 	AFS_GUNLOCK();
+ 	return code;
 diff --git a/src/afs/afs.h b/src/afs/afs.h
 index f03609c..176f33a 100644
 --- a/src/afs/afs.h
