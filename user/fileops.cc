@@ -22,13 +22,12 @@ static vector<fop_ctx_t *> ctx_array(0, nullptr);
  * Starts a file upload/download operation
  *
  * retptr is set depending on cause of the failulre. -1 = file not found which
- *might
- * not be a failure. -2 implies cryptographic operations may have failed
+ * might not be a failure. -2 implies cryptographic operations may have failed
  *
  * returns nullptr on failure, retptr set.
  */
 fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
-                          uint64_t filelength, uint32_t * padded_len,
+                          uint32_t filelength, uint32_t * padded_len,
                           int * retptr)
 {
     uint32_t seg_id = 0;
@@ -55,7 +54,8 @@ fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
     ctx->path = strdup(fpath);
 
     // call the enclave setup
-    if (ecall_init_crypto(global_eid, &ret, ctx, f_seal)) {
+    ecall_init_crypto(global_eid, &ret, ctx, f_seal);
+    if (ret) {
         free(ctx->path);
         delete ctx->buffer;
         delete ctx;
@@ -63,7 +63,7 @@ fop_ctx_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
         return nullptr;
     }
 
-    *padded_len = CRYPTO_CEIL_TO_BLKSIZE(ctx->total);
+    *padded_len = ctx->padded_len;
 
     ctx_array.push_back(ctx);
     *retptr = 0;

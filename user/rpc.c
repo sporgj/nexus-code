@@ -129,25 +129,29 @@ afs_int32 SAFSX_fremove(
 }
 
 #define RWOP_TO_STR(op) (op == UCAFS_WRITEOP ? "write" : "read")
-
 afs_int32 SAFSX_readwrite_start(
     /*IN */ struct rx_call * z_call,
     /*IN */ int op,
     /*IN */ char * fpath,
     /*IN */ afs_uint32 max_chunk_size,
-    /*IN */ afs_uint64 total_size,
-    /*OUT*/ afs_uint32 * pull_id)
+    /*IN */ afs_uint32 total_size,
+    /*OUT*/ afs_uint32 * id,
+    /*OUT*/ afs_uint32 * padded_len)
 {
     int ret;
-    fop_ctx_t * ctx
-        = fileops_start(op, fpath, max_chunk_size, total_size, &ret);
+    fop_ctx_t * ctx = fileops_start(op, fpath, max_chunk_size, total_size,
+                                    padded_len, &ret);
     if (ctx == NULL) {
-        return -2;
+        if (ret == -2) {
+            uerror("rw: %s, enclave failed", fpath);
+            return AFSX_STATUS_ERROR;
+        }
+        return AFSX_STATUS_NOOP;
     }
 
-    *pull_id = ctx->id;
-    uinfo("begin %s: %s (%u, %llu) id=%d", RWOP_TO_STR(op), fpath,
-          max_chunk_size, total_size, ctx->id);
+    *id = ctx->id;
+    uinfo("begin %s: %s (%u, %u) id=%d", RWOP_TO_STR(op), fpath, max_chunk_size,
+          total_size, ctx->id);
 
     return AFSX_STATUS_SUCCESS;
 }
@@ -175,12 +179,18 @@ afs_int32 SAFSX_readwrite_data(
 
     fop_ctx_t * ctx = fileops_get_context(id);
     if (ctx == NULL) {
-        uerror("%s id: %d could not be found", RWOP_TO_STR(ctx->op), id);
+        uerror("rw failed: id %d could not be found", id);
         goto out;
     }
 
     if (ctx->cap < size) {
         uerror("size %d sent is above the cap = %d", size, ctx->cap);
+        goto out;
+    }
+
+    if (ctx->done >= ctx->padded_len) {
+        uerror("sending us more data. done=%u, max=%u", ctx->done,
+               ctx->padded_len);
         goto out;
     }
 

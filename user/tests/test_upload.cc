@@ -7,11 +7,16 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include <sgx_urts.h>
+
 #include "defs.h"
+#define ENCLAVE_FILENAME "../sgx/enclave.signed.so"
 
 extern "C" {
 #include <afsx.h>
 }
+
+sgx_enclave_id_t global_eid = 0;
 
 using namespace std;
 
@@ -50,6 +55,7 @@ static int test_upload()
 {
     // start_srv();
     int moredata;
+    uint32_t padded_len;
     char * encoded_name_str;
     u_long host;
     struct rx_securityClass * null_securityObject;
@@ -70,6 +76,12 @@ static int test_upload()
         return -1;
     }
 
+    int result;
+    if (AFSX_fversion(conn, 4, &result)) {
+        cout << "Can't computer " << endl;
+        return -1;
+    }
+
     // lets add it to a fake dnode
     init_dnode();
     if (fops_new(TEST_FILE, &encoded_name_str)) {
@@ -84,20 +96,28 @@ static int test_upload()
         return -1;
     }
 
-    size_t size = st.st_size, blklen = PACKET_SIZE;
-    afs_uint32 upload_id;
+    afs_uint32 size = st.st_size, blklen = PACKET_SIZE, upload_id;
 
-    if (AFSX_readwrite_start(conn, UCAFS_READOP, TEST_FILE, PACKET_SIZE, size,
-                             &upload_id)) {
-        cout << "Start RPC call failed" << endl;
+    if ((result = AFSX_readwrite_start(conn, UCAFS_READOP, TEST_FILE, blklen,
+                                       size, &upload_id, &padded_len))) {
+        cout << "Start RPC call failed: " << result << endl;
         return -1;
     }
 
+    cout << "Starting upload. id=" << upload_id << " flen=" << size
+         << " padlen=" << padded_len << endl;
+
     char * buffer = (char *)operator new(PACKET_SIZE);
-    afs_uint32 nbytes;
-    while (size > 0) {
+    afs_uint32 nbytes, buflen;
+    while (padded_len > 0) {
         blklen = size > PACKET_SIZE ? PACKET_SIZE : size;
-        blklen = input.readsome(buffer, blklen);
+        // read from the file
+        buflen = input.readsome(buffer, blklen);
+
+        // recompute to include the padding
+        if (blklen < PACKET_SIZE) {
+            blklen = padded_len;
+        }
 
         struct rx_call * call = rx_NewCall(conn);
 
@@ -124,6 +144,7 @@ static int test_upload()
 
         hexdump((uint8_t *)buffer, HEXDUMP_LEN(blklen));
         size -= blklen;
+        padded_len -= blklen;
 
         EndAFSX_readwrite_data(call, &moredata);
         rx_EndCall(call, 0);
@@ -133,11 +154,32 @@ static int test_upload()
 
 int main(int argc, char ** argv)
 {
+    int ret, updated;
     uspace_set_afs_home("repo", false);
+    /* initialize the enclave */
+    sgx_launch_token_t token;
+    ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
+                             &global_eid, NULL);
+    if (ret != SGX_SUCCESS) {
+        cout << "Could not open enclave: " << ENCLAVE_FILENAME
+             << ", ret=" << ret << endl;
+        return -1;
+    }
+
+    // initialize
+    ecall_init_enclave(global_eid, &ret);
+    if (ret) {
+        cout << "Initializing enclave failed" << endl;
+        return -1;
+    }
+
+    cout << "Initialized enclave" << endl;
+
     if (argc > 1) {
         start_srv();
         return 0;
     }
-    int ret = test_upload();
-    return ret;
+
+    cout << ". Loaded enclave" << endl;
+    return test_upload();
 }

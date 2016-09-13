@@ -46,7 +46,8 @@ typedef struct {
     uint32_t done;
     uint32_t len;
     uint32_t cap;
-    uint64_t total;
+    uint32_t total;
+    uint32_t padded_len;
     char * path;
 } fop_ctx_t;
 

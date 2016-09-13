@@ -49,8 +49,9 @@ readwrite_start(
     IN int op,
     string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_chunk_size,
-    afs_uint64 total_size,
-    OUT afs_uint32 * id
+    afs_uint32 total_size,
+    OUT afs_uint32 * id,
+    afs_uint32 * padded_len
 ) = 6;
     
 readwrite_finish(

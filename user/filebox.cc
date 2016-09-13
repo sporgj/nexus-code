@@ -5,17 +5,17 @@
 
 using namespace std;
 
-FileBox::FileBox() {
+FileBox::FileBox()
+{
     memset(&this->header, 0, sizeof(fbox_header_t));
-    this->proto = new class::fbox;
+    this->proto = new class ::fbox;
 
     // every filebox has a default segmentt
     this->create_segment();
 }
 
-FileBox * FileBox::from_afs_file(const char * fname)
-{
-    return nullptr;
+FileBox * FileBox::from_afs_file(const char * fname) {
+    return new FileBox();
 }
 
 FileBox * FileBox::from_file(const char * fname)
@@ -34,12 +34,13 @@ FileBox * FileBox::from_file(const char * fname)
 
     file.read((char *)&_header, sizeof(fbox_header_t));
 
-    _fbox = new class::fbox;
+    _fbox = new class ::fbox;
     if (_header.plen) {
         buffer = new uint8_t[_header.plen];
 
         if (!_fbox->ParseFromArray(buffer, _header.plen)) {
-            cout << "! Parsing protocol buffer failed: " << fpath->c_str() << endl;
+            cout << "! Parsing protocol buffer failed: " << fpath->c_str()
+                 << endl;
             goto out;
         }
     }
@@ -53,7 +54,7 @@ out:
     }
 
     if (buffer) {
-        delete [] buffer;
+        delete[] buffer;
     }
 
     file.close();
@@ -83,11 +84,25 @@ encoded_fname_t * FileBox::create_segment()
 
 file_crypto_t * FileBox::segment_crypto(uint32_t seg_id)
 {
+    file_crypto_t * fcrypto;
+    if (this->proto->seg_size()) {
+        fcrypto = new file_crypto_t;
+        memcpy(fcrypto, this->proto->seg(seg_id).crypto().data(),
+               sizeof(file_crypto_t));
+        return fcrypto;
+    }
     return nullptr;
 }
 
 encoded_fname_t * FileBox::segment_name(uint32_t seg_id)
 {
+    encoded_fname_t * fname;
+    if (this->proto->seg_size()) {
+        fname = new encoded_fname_t;
+        memcpy(fname, this->proto->seg(seg_id).name().data(),
+               sizeof(encoded_fname_t));
+        return fname;
+    }
     return nullptr;
 }
 
@@ -104,7 +119,7 @@ bool FileBox::write(FileBox * fb, fstream * file)
 
     fb->header.plen = fb->proto->GetCachedSize();
     // TODO call enclave here
-    
+
     file->write((char *)&fb->header.plen, sizeof(fbox_header_t));
     file->write((char *)buffer, fb->header.plen);
 

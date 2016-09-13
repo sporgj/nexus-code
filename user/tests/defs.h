@@ -7,6 +7,7 @@
 #include <dirops.h>
 #include <utils.h>
 #include <uspace.h>
+#include <enclave_common.h>
 
 #include <glog/logging.h>
 

@@ -18,7 +18,8 @@ all: ucafs
 
 define make-test-target
 $(1): $(1).cc libucafs.a
-	@$(CXX) -DTEST_ENV $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc libucafs.a $$(LIBS) -o $(1)
+	@$(CXX) -DTEST_ENV $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc\
+		libucafs.a $$(LIBS) $$(App_Link_Flags) -o $(1)
 	@echo "CXX <= $(1)"
 endef
 
@@ -26,7 +27,8 @@ $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
 tests: $(addprefix tests/, $(TESTS)) tests/test_upload
 
 tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
-	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS) $(RXLIBS) -o $@
+	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS)\
+		$(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
 enclave_u.c: sgx/enclave.edl
@@ -49,7 +51,7 @@ ucafs: main.cc libucafs.a
 	@echo "CXX <= $@"
 
 afsx.ss.o: afsx.ss.c
-	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 
 afsx.ss.c: afsx.xg afsx.h
@@ -71,10 +73,12 @@ rpc.o: rpc.c afsx.ss.c
 	@echo "CXX <= $@"
 
 dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
-	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@echo "CXX <= $@"
 
 filebox.o: filebox.cc filebox.h fbox.pb.cc
-	$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@echo "CXX <= $@"
 
 %.pb.cc: %.proto
 	protoc --cpp_out=./ $^

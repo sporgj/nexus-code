@@ -20,5 +20,5 @@ OBJS = dirnode.o\
        fbox.pb.o\
        dnode.pb.o
 
-TESTS := test_dnode test_dops test_lookup
+TESTS := test_dnode test_dops test_lookup test_crypto
 GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a 
