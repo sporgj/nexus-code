@@ -1,8 +1,41 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..9d0dbba 100644
+index 1b99c94..9ebefba 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
-@@ -406,6 +406,8 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+@@ -123,17 +123,30 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
+     unsigned long bufsize = iter->nr_segs;
+ # endif
+ 
+-
+     AFS_GLOCK();
+     afs_Trace4(afs_iclSetp, CM_TRACE_AIOREADOP, ICL_TYPE_POINTER, vcp,
+ 	       ICL_TYPE_OFFSET, ICL_HANDLE_OFFSET(pos), ICL_TYPE_INT32,
+                (afs_int32)bufsize, ICL_TYPE_INT32, 99999);
+     code = afs_linux_VerifyVCache(vcp, NULL);
+-
++#ifdef AFS_SECURE
++#include "afsx_hdr.h"
++    {
++        struct vrequest * treq;
++	cred_t * credp = crref();
++	afs_CreateReq(&treq, credp);
++	code = UCAFS_fetch(vcp, treq);
++	if (code == AFSX_STATUS_NOOP) {
++	    code = 0;
++	}
++	afs_DestroyReq(treq);
++	crfree(credp);
++    }
++#endif
+     if (code == 0) {
+ 	/* Linux's FlushPages implementation doesn't ever use credp,
+ 	 * so we optimise by not using it */
+ 	osi_FlushPages(vcp, NULL);	/* ensure stale pages are gone */
++
+ 	AFS_GUNLOCK();
+ # if defined(STRUCT_FILE_OPERATIONS_HAS_READ_ITER)
+ 	code = generic_file_read_iter(iocb, iter);
+@@ -406,6 +419,8 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
  	    struct VenusFid afid;
  	    struct vcache *tvc;
  	    int vtype;
@@ -11,7 +44,7 @@ index 1b99c94..9d0dbba 100644
  	    afid.Cell = avc->f.fid.Cell;
  	    afid.Fid.Volume = avc->f.fid.Fid.Volume;
  	    afid.Fid.Vnode = ntohl(de->fid.vnode);
-@@ -437,12 +439,25 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+@@ -437,12 +452,25 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
  	     * holding the GLOCK.
  	     */
  	    AFS_GUNLOCK();
@@ -39,7 +72,7 @@ index 1b99c94..9d0dbba 100644
  #endif
  	    AFS_GLOCK();
  	}
-@@ -1468,6 +1483,17 @@ afs_linux_create(struct inode *dip, struct dentry *dp, int mode)
+@@ -1468,6 +1496,17 @@ afs_linux_create(struct inode *dip, struct dentry *dp, int mode)
      vattr->va_mode = mode;
      vattr->va_type = mode & S_IFMT;
  
@@ -57,7 +90,7 @@ index 1b99c94..9d0dbba 100644
      code = afs_create(VTOAFS(dip), (char *)name, vattr, NONEXCL, mode,
  		      &vcp, credp);
  
-@@ -1513,6 +1539,19 @@ afs_linux_lookup(struct inode *dip, struct dentry *dp)
+@@ -1513,6 +1552,19 @@ afs_linux_lookup(struct inode *dip, struct dentry *dp)
      int code;
  
      AFS_GLOCK();
@@ -77,7 +110,7 @@ index 1b99c94..9d0dbba 100644
      code = afs_lookup(VTOAFS(dip), (char *)comp, &vcp, credp);
  
      if (!code) {
-@@ -1698,6 +1737,16 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
+@@ -1698,6 +1750,16 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
      const char *name = dp->d_name.name;
      struct vcache *tvc = VTOAFS(dp->d_inode);
  
@@ -94,7 +127,7 @@ index 1b99c94..9d0dbba 100644
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
-@@ -1838,6 +1887,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
+@@ -1838,6 +1900,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
  
      afs_maybe_shrink_dcache(olddp);
  
@@ -103,25 +136,6 @@ index 1b99c94..9d0dbba 100644
      AFS_GLOCK();
      code = afs_rename(VTOAFS(oldip), (char *)oldname, VTOAFS(newip), (char *)newname, credp);
      AFS_GUNLOCK();
-@@ -2201,6 +2252,18 @@ afs_linux_fillpage(struct file *fp, struct page *pp)
-     cred_t *credp;
- 
-     AFS_GLOCK();
-+#ifdef AFS_SECURE
-+#include "afsx_hdr.h"
-+    {
-+        struct vrequest * treq;
-+	credp = crref();
-+	afs_CreateReq(&treq, credp);
-+	code = UCAFS_fetch(avc, treq);
-+	afs_DestroyReq(treq);
-+	crfree(credp);
-+    }
-+#endif
-+
-     if (afs_linux_readpage_fastpath(fp, pp, &code)) {
- 	AFS_GUNLOCK();
- 	return code;
 diff --git a/src/afs/afs.h b/src/afs/afs.h
 index f03609c..176f33a 100644
 --- a/src/afs/afs.h
