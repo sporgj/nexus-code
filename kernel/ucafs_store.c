@@ -215,7 +215,7 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
     ucafs_ctx_t ctx;
     uint64_t tlen;
     afs_int32 bytes_left;
-    afs_uint32 dcache_size, nbytes;
+    afs_uint32 nbytes;
     char * path;
     struct dcache * tdc = NULL;
     struct AFSFetchStatus outstatus;

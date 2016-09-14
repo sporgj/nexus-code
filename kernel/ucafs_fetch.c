@@ -78,9 +78,7 @@ static void fetch_cleanup(ucafs_ctx_t * ctx, struct afs_FetchOutput * o,
     rx_EndCall(afs_call, code | error);
 
     // 2 - Clean up the connection to ucafs
-    if (ctx->id) {
-        AFSX_readwrite_finish(conn, ctx->id);
-    }
+    AFSX_readwrite_finish(conn, ctx->id);
 
     // 3 - Clear up the rest
     if (ctx->buffer) {
@@ -89,7 +87,8 @@ static void fetch_cleanup(ucafs_ctx_t * ctx, struct afs_FetchOutput * o,
     kfree(ctx);
 }
 
-static int init_sgx_socket(ucafs_ctx_t * ctx, char * path)
+static int init_sgx_socket(struct rx_connection * conn, ucafs_ctx_t * ctx,
+                           char * path)
 {
     int ret;
     /* 1 -  Connect to the userspace daemon */
@@ -193,7 +192,6 @@ static int fetch_proc(ucafs_ctx_t * ctx, struct dcache * tdc,
 
         // let's write this to our tdc
         nbytes = afs_osi_Write(tfile, pos, ctx->buffer, len);
-        ERROR("wrote: %u, len=%u\n", nbytes, len);
         pos += len;
         max_write -= len;
     }
@@ -216,6 +214,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     struct afs_FetchOutput output;
     ucafs_ctx_t * ctx = NULL;
     struct dcache * tdc = NULL;
+    struct rx_connection * conn = NULL;
 
     if (!AFSX_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
@@ -228,7 +227,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     if (__is_vnode_ignored(avc, &path)) {
         return AFSX_STATUS_NOOP;
     }
-    
+
     if (avc->f.fid.Fid.Vnode & 1 || vType(avc) == VDIR) {
         kfree(path);
         return AFSX_STATUS_NOOP;
@@ -240,20 +239,16 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
         goto out;
     }
 
-    if (init_sgx_socket(ctx, path)) {
+    conn = __get_conn();
+    if (init_sgx_socket(conn, ctx, path)) {
         goto out;
     }
 
     bytes_left = avc->f.m.Length;
-    ObtainWriteLock(&afs_xdcache, 6505);
-    //ObtainWriteLock(&avc->lock, 6507);
+    //ObtainWriteLock(&afs_xdcache, 6505);
+    ObtainWriteLock(&avc->lock, 6507);
     while (bytes_left) {
-        ERROR("before lock\n");
-        //AFS_GLOCK();
-        ERROR("after lock\n");
         tdc = afs_GetDCache(avc, pos, areq, &offset, &len, 2);
-        //AFS_GUNLOCK();
-        ERROR("after unlock\n");
         if (tdc == NULL) {
             ERROR("tdc is null. pos=%u, bytes_left=%u\n", pos, bytes_left);
             goto out1;
@@ -280,9 +275,12 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     ret = 0;
 
 out1:
-    //ReleaseWriteLock(&avc->lock);
-    ReleaseWriteLock(&afs_xdcache);
+    ReleaseWriteLock(&avc->lock);
+    //ReleaseWriteLock(&afs_xdcache);
 out:
+    if (conn) {
+        __put_conn(conn);
+    }
     if (tdc) {
         ReleaseWriteLock(&tdc->lock);
         afs_PutDCache(tdc);

@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..63c0ef4 100644
+index 1b99c94..9d0dbba 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -406,6 +406,8 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -110,8 +110,8 @@ index 1b99c94..63c0ef4 100644
 +#ifdef AFS_SECURE
 +#include "afsx_hdr.h"
 +    {
-+	credp = crref();
 +        struct vrequest * treq;
++	credp = crref();
 +	afs_CreateReq(&treq, credp);
 +	code = UCAFS_fetch(avc, treq);
 +	afs_DestroyReq(treq);
