@@ -84,12 +84,12 @@ int fileops_process_data(xfer_context_t * ctx)
 {
     int ret;
     
-    // hexdump(ptr, ctx->len > 32 ? 32 : ctx->len);
+    hexdump((uint8_t *)ctx->buffer, ctx->valid_buflen > 32 ? 32 : ctx->valid_buflen);
     ecall_crypt_data(global_eid, &ret, ctx);
     if (ret) {
         goto out;
     }
-    // hexdump((uint8_t *)ctx->buffer, ctx->len > 32 ? 32 : ctx->len);
+    hexdump((uint8_t *)ctx->buffer, ctx->valid_buflen > 32 ? 32 : ctx->valid_buflen);
 
     ctx->completed += ctx->valid_buflen;
 out:

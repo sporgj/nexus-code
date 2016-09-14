@@ -133,38 +133,72 @@ int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
         ERROR("Could not allocate afs_conn\n");
         goto out;
     }
+
+    RX_AFS_GUNLOCK();
     afs_call = rx_NewCall(rx_conn);
+    RX_AFS_GLOCK();
 
 #ifdef AFS_64BIT_CLIENT
     if (!afs_serverHasNo64Bit(tc)) {
         ctx->srv_64bit = 1;
+        RX_AFS_GUNLOCK();
         code = StartRXAFS_FetchData64(afs_call, &avc->f.fid.Fid, 0, tlen);
-    } else {
+
+        if (code == 0) {
+            // read the length from the the server
+            temp = rx_Read(afs_call, (char *)&nbytes, sizeof(afs_int32));
+            RX_AFS_GLOCK();
+            ERROR("read from server. nbytes=%u, %u\n", nbytes, ntohl(nbytes));
+            if (temp != sizeof(afs_int32)) {
+                ERROR("FileServer is sending BS. amt=%d, nbytes=%u\n", temp,
+                        ntohl(nbytes));
+                code = rx_Error(afs_call);
+                RX_AFS_GUNLOCK();
+                rx_EndCall(afs_call, code);
+                RX_AFS_GLOCK();
+                afs_call = NULL;
+            }
+        } else {
+            RX_AFS_GLOCK();
+        }
+    } 
+    
+    if (code == RXGEN_OPCODE || afs_serverHasNo64Bit(tc)) {
+        RX_AFS_GUNLOCK();
+        if (afs_call == NULL) {
+            afs_call = rx_NewCall(rx_conn);
+        }
         code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, 0, tlen);
+        RX_AFS_GLOCK();
+
+        ctx->srv_64bit = 0;
+        afs_serverSetNo64Bit(tc);
     }
 #else
+    RX_AFS_GUNLOCK();
     code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, 0, tlen);
+    RX_AFS_GLOCK();
 #endif
-
+    
     if (code) {
         ERROR("FetchData call failed %d\n", code);
         goto out;
     }
 
-    // read the length from the the server
-    temp = rx_Read32(afs_call, &nbytes);
+    RX_AFS_GUNLOCK();
+    temp = rx_Read(afs_call, (char *)&nbytes, sizeof(afs_int32));
+    RX_AFS_GLOCK();
     if (temp != sizeof(afs_int32)) {
-        ERROR("FileServer is sending BS. amt=%d, nbytes=%u\n", temp,
-              ntohl(nbytes));
+        ERROR("BS. amt=%d, nbytes=%u\n", temp, ntohl(nbytes));
         goto out;
     }
 
-    ctx->afs_call = afs_call;
     ctx->len = tlen;
     *pp_ctx = ctx;
 
     ret = 0;
 out:
+    ctx->afs_call = afs_call;
     return ret;
 }
 
@@ -234,6 +268,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     ret = AFSX_STATUS_ERROR;
+    ERROR("fetching %s\n", path);
 
     if (init_fserv(avc, &ctx, areq)) {
         goto out;

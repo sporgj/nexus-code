@@ -218,7 +218,6 @@ afs_int32 SAFSX_readwrite_data(
                rx_Error(z_call));
         goto out;
     }
-    printf("** got %d bytes, ", abytes);
 
     ctx->valid_buflen = size;
     // process the data
@@ -229,7 +228,6 @@ afs_int32 SAFSX_readwrite_data(
                abytes, rx_Error(z_call));
         goto out;
     }
-    printf("** sent %d bytes\n", abytes);
 
     uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
           ctx->completed);
