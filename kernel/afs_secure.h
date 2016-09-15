@@ -9,9 +9,6 @@
 #define AFSX_PATH_MAX 1024
 #endif
 
-#define AFSX_IS_DIR     0
-#define AFSX_IS_FILE    1
-
 extern int LINUX_AFSX_connect(void);
 extern int LINUX_AFSX_ping(void);
 /**

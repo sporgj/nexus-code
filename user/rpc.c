@@ -57,10 +57,14 @@ afs_int32 SAFSX_fversion(
     return 0;
 }
 
-afs_int32 SAFSX_fnew(struct rx_call * z_call, char * path, char ** crypto_fname)
+afs_int32 SAFSX_create(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ char * path,
+    /*IN */ afs_int32 file_or_dir,
+    /*OUT*/ char ** crypto_fname)
 {
-    printf("fnew is here\n");
-    int ret = fops_new(path, crypto_fname);
+    int ret = (file_or_dir == AFSX_IS_FILE) ? fops_new(path, crypto_fname)
+                                            : dops_new(path, crypto_fname);
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
     } else {

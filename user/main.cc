@@ -41,7 +41,7 @@ static bool check_main_dir()
     f1.close();
     delete afsx_repo;
 
-    string * afsx_dnode = uspace_get_dnode_fpath();
+    string * afsx_dnode = uspace_main_dnode_fpath();
     if (stat(afsx_dnode->c_str(), &stat_buf)) {
         cout << ". Initializing a new filebox" << endl;
         fstream f2(afsx_dnode->c_str(), ios::out | ios::binary);

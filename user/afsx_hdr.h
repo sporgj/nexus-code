@@ -23,3 +23,6 @@
 
 #define AFSX_CRYPTO_BLK_SIZE 16
 #define TOBLKSIZE(x) 16 - (x % 16)
+
+#define AFSX_IS_DIR     0
+#define AFSX_IS_FILE    1

@@ -128,3 +128,12 @@ out:
     delete[] buffer;
     return error;
 }
+
+bool FileBox::write(FileBox * fb, const char * path)
+{
+    fstream file(path, ios::trunc | ios::out | ios::binary);
+    bool ret = file ? FileBox::write(fb, &file) : false;
+
+    file.close();
+    return ret;
+}

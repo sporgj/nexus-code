@@ -24,8 +24,9 @@ fversion(
     OUT int * result
 ) = 1;
 
-fnew(
+create(
     IN string path<AFSX_PATH_MAX>,
+    afs_int32 file_or_dir,
     OUT string crypto_fname<AFSX_FNAME_MAX>
 ) = 2;
 

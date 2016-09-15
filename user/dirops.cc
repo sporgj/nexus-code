@@ -2,16 +2,19 @@
 
 #include "uspace.h"
 #include "dirnode.h"
+#include "filebox.h"
 #include "encode.h"
 #include "dirops.h"
 #include "utils.h"
 
-int fops_new(char * fpath, char ** encoded_name_dest)
+int fops_new(const char * fpath, char ** encoded_name_dest)
 {
     int error = -1; // TODO change this
-    char * fname = dirops_get_fname(fpath);
+    char * fname = dirops_get_fname(fpath), * temp;
     DirNode * dirnode = nullptr;
+    FileBox * fbox = nullptr;
     encoded_fname_t * fname_code = nullptr;
+    string * path1 = nullptr;
 
     if (fname == NULL) {
         LOG(ERROR) << "Error getting file name: " << fpath;
@@ -37,8 +40,17 @@ int fops_new(char * fpath, char ** encoded_name_dest)
         goto out;
     }
 
+    temp = encode_bin2str(fname_code);
+
+    fbox = new FileBox();
+    path1 = uspace_make_fbox_fpath(temp);
+    if (!FileBox::write(fbox, path1->c_str())) {
+        LOG(ERROR) << "Creating: " << fpath << " filebox failed";
+        goto out;
+    }
+
     // 4 - Set the encoded name
-    *encoded_name_dest = encode_bin2str(fname_code);
+    *encoded_name_dest = temp;
     error = 0;
 out:
     if (fname_code)
@@ -47,16 +59,21 @@ out:
         delete dirnode;
     if (fname)
         delete fname;
+    if (fbox)
+        delete fbox;
+    if (path1)
+        delete path1;
 
     return error;
 }
 
-int dops_new(char * fpath, char ** encoded_name_dest)
+int dops_new(const char * fpath, char ** encoded_name_dest)
 {
     int error = -1; // TODO
     encoded_fname_t * fname_code = nullptr;
-    DirNode * dirnode = nullptr;
-    char * fname = dirops_get_fname(fpath);
+    DirNode * dirnode = nullptr, * dirnode1;
+    string * path1 = nullptr;
+    char * fname = dirops_get_fname(fpath), * temp;
 
     if (fname == nullptr) {
         LOG(ERROR) << "Error getting filename: " << fpath;
@@ -81,15 +98,29 @@ int dops_new(char * fpath, char ** encoded_name_dest)
         goto out;
     }
 
-    *encoded_name_dest = encode_bin2str(fname_code);
+    temp = encode_bin2str(fname_code);
+
+    /* create the new dirnode */
+    dirnode1 = new DirNode();
+    path1 = uspace_make_dnode_fpath(temp);
+    if (!DirNode::write(dirnode1, path1->c_str())) {
+        LOG(ERROR) << "Creating: " << fpath << " dirnode failed";
+        goto out;
+    }
+
+    *encoded_name_dest = temp;
     error = 0;
 out:
     if (fname_code)
         delete fname_code;
     if (dirnode)
         delete dirnode;
+    if (dirnode1)
+        delete dirnode1;
     if (fname)
         delete fname;
+    if (path1)
+        delete path1;
 
     return error;
 }

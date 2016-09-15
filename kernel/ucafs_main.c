@@ -104,7 +104,7 @@ inline int __is_vnode_ignored(struct vcache * avc, char ** dest)
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
 }
 
-int UCAFS_create(char ** dest, int is_file, struct dentry * dp)
+int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -118,7 +118,12 @@ int UCAFS_create(char ** dest, int is_file, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    ret = AFSX_fnew(conn, fpath, dest);
+    printk(KERN_ERR "creating dir: %s\n", fpath);
+    if (file_or_dir == AFSX_IS_DIR) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    ret = AFSX_create(conn, fpath, file_or_dir, dest);
     if (ret) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "error on file %s\n", fpath);
@@ -126,6 +131,7 @@ int UCAFS_create(char ** dest, int is_file, struct dentry * dp)
         *dest = NULL;
     }
 
+    kfree(fpath);
     return ret;
 }
 

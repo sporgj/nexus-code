@@ -87,14 +87,16 @@ extern afs_int32 SAFSX_fversion(
 	/*IN */ int dummy,
 	/*OUT*/ int * result);
 
-extern int AFSX_fnew(
+extern int AFSX_create(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * path,
+	/*IN */ afs_int32 file_or_dir,
 	/*OUT*/ char * *crypto_fname);
 
-extern afs_int32 SAFSX_fnew(
+extern afs_int32 SAFSX_create(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * path,
+	/*IN */ afs_int32 file_or_dir,
 	/*OUT*/ char * *crypto_fname);
 
 extern int AFSX_frealname(

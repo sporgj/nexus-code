@@ -46,10 +46,10 @@ void hexdump(uint8_t * buf, uint32_t len)
     }
 }
 
-char * dirops_get_fname(char * fpath)
+char * dirops_get_fname(const char * fpath)
 {
     size_t i;
-    char * result = fpath + strlen(fpath);
+    const char * result = fpath + strlen(fpath);
 
     while (*result != '/' && result != fpath) {
         i++;

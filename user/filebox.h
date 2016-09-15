@@ -19,6 +19,7 @@ public:
     static FileBox * from_file(const char * fpath);
     static FileBox * from_afs_file(const char * fpath);
     static bool write(FileBox * fb, std::fstream * file);
+    static bool write(FileBox * fb, const char * path);
 
     encoded_fname_t * create_segment();
     crypto_context_t * segment_crypto(uint32_t seg_id);

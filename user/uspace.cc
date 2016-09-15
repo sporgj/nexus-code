@@ -39,7 +39,7 @@ string * uspace_get_repo_path() {
  * returns a new[] path for the default directory.
  * Please free with delete[]
  */
-string * uspace_get_dnode_fpath()
+string * uspace_main_dnode_fpath()
 {
     string * rv_str = uspace_get_repo_path();
     rv_str->operator+=('/');
@@ -68,4 +68,6 @@ string * uspace_make_dnode_fpath(const char * fname) {
     return rv;
 }
 
-
+string * uspace_make_fbox_fpath(const char * fname) {
+    return uspace_make_dnode_fpath(fname);
+}

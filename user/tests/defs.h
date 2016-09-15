@@ -11,5 +11,7 @@
 
 #include <glog/logging.h>
 
+#define TEST_AFS_HOME "repo"
+
 #define TEST_FBOX_PATH "./dummy.dnode"
 #define TEST_FBOX_PATH1 "./dirops.dnode"

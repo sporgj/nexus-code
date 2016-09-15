@@ -117,7 +117,7 @@ int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
     uint32_t nbytes, tlen = avc->f.m.Length;
     struct afs_conn * tc;
     struct rx_connection * rx_conn;
-    struct rx_call * afs_call;
+    struct rx_call * afs_call = NULL;
     ucafs_ctx_t * ctx = NULL;
 
     ctx = (ucafs_ctx_t *)kmalloc(sizeof(ucafs_ctx_t), GFP_KERNEL);

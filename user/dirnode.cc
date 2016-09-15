@@ -21,7 +21,7 @@ DirNode::DirNode()
 
 inline DirNode * DirNode::load_default_dnode()
 {
-    string * path = uspace_get_dnode_fpath();
+    string * path = uspace_main_dnode_fpath();
     DirNode * dnode = DirNode::from_file(path->c_str());
     delete path;
 

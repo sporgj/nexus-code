@@ -45,7 +45,7 @@ static void init_dnode()
 {
     cout << ". Initializing filebox file" << endl;
     // create our file and truncate it
-    fstream file(uspace_get_dnode_fpath()->c_str(), ios::out | ios::trunc);
+    fstream file(uspace_main_dnode_fpath()->c_str(), ios::out | ios::trunc);
     DirNode * dn = new DirNode();
     DirNode::write(dn, &file);
     file.close();

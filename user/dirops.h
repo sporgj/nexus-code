@@ -11,8 +11,8 @@ extern "C" {
  * the encoded file name (malloc), set to NULL if error
  * @return 0 on success
  */
-int fops_new(char * fpath, char ** encoded_name_dest);
-int dops_new(char * dpath, char ** encoded_name_dest);
+int fops_new(const char * fpath, char ** encoded_name_dest);
+int dops_new(const char * dpath, char ** encoded_name_dest);
 
 /**
  * Returns the raw file name of an encoded path
