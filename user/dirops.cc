@@ -221,7 +221,7 @@ out:
     return error;
 }
 #endif
-int __fops_encode_or_remove(char * fpath, char ** encoded_fname_dest, bool rm)
+int __fops_encode_or_remove(const char * fpath, char ** encoded_fname_dest, bool rm)
 {
     int error = -1; // TODO
     char * fname = NULL;
@@ -266,9 +266,61 @@ int fops_plain2code(char * fpath_raw, char ** encoded_fname_dest)
     return __fops_encode_or_remove(fpath_raw, encoded_fname_dest, false);
 }
 
-int fops_remove(char * fpath_raw, char ** encoded_fname_dest)
+int fops_remove(const char * fpath_raw, char ** encoded_fname_dest)
 {
     return __fops_encode_or_remove(fpath_raw, encoded_fname_dest, true);
+}
+
+int dops_remove(const char * dpath_raw, char ** encoded_dname_dest)
+{
+    int error = AFSX_STATUS_ERROR;
+    char * c_dname = NULL, * c_temp = NULL;
+    string * dnode_path = nullptr;
+    const encoded_fname_t * dname_code = NULL;
+
+    /* 1 - Get the corresponding dirnode */
+    DirNode * dirnode = DirNode::from_afs_fpath(dpath_raw);
+    if (dirnode == nullptr) {
+        goto out;
+    }
+
+    if ((c_dname = dirops_get_fname(dpath_raw)) == nullptr) {
+        LOG(ERROR) << "Could not get fname: " << dpath_raw;
+        goto out;
+    }
+
+    /* Perform the operation */
+    if ((dname_code = dirnode->rm_dir(c_dname)) == nullptr) {
+        goto out;
+    }
+
+    /* writeout the dirnode */
+    if (!dirnode->flush()) {
+        LOG(ERROR) << "Error flushing: " << dirnode->get_fpath();
+        goto out;
+    }
+
+    /* now delete the file from the filesystem */
+    c_temp = encode_bin2str(dname_code);
+    dnode_path = uspace_make_dnode_fpath(c_temp);
+    if (unlink(dnode_path->c_str())) {
+        LOG(ERROR) << "Could not remove: " << dnode_path->c_str();
+    }
+
+    *encoded_dname_dest = c_temp;
+    error = 0;
+out:
+    if (dirnode)
+        delete dirnode;
+    if (c_dname)
+        free(c_dname);
+    if (dname_code)
+        delete dname_code;
+    if (dnode_path)
+        delete dnode_path;
+    if (error && c_temp)
+        free(c_temp);
+    return error;
 }
 
 /**

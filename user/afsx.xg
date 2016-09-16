@@ -41,8 +41,9 @@ fencodename(
     OUT string fake_name<AFSX_FNAME_MAX>
 ) = 4;
 
-fremove(
+remove(
     IN string fpath<AFSX_PATH_MAX>,
+    afs_int32 file_or_dir,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 5;
 

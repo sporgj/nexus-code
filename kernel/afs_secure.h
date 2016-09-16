@@ -18,11 +18,10 @@ extern int LINUX_AFSX_ping(void);
  * @param dp is the containing dentry
  * @return 0 on success
  */
-extern int UCAFS_create(char ** dest, int is_file, struct dentry * dp);
-
+extern int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp);
+extern int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp);
 extern int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp);
 extern int LINUX_AFSX_lookup(char ** dest, struct dentry * dp);
-extern int LINUX_AFSX_delfile(char ** dest, struct dentry * dp);
 extern int UCAFS_store(struct vcache * avc, struct vrequest * areq);
 extern int UCAFS_fetch(struct vcache * avc, struct vrequest * areq);
 #endif

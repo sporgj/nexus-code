@@ -178,7 +178,7 @@ int LINUX_AFSX_lookup(char ** dest, struct dentry * dp)
     return ret;
 }
 
-int LINUX_AFSX_delfile(char ** dest, struct dentry * dp)
+int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -192,13 +192,14 @@ int LINUX_AFSX_delfile(char ** dest, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    if ((ret = AFSX_fremove(conn, fpath, dest))) {
+    if ((ret = AFSX_remove(conn, fpath, file_or_dir, dest))) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "delete error: %s\n", fpath);
         }
         *dest = NULL;
     }
 
+    kfree(fpath);
     return ret;
 }
 

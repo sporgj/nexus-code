@@ -118,16 +118,20 @@ afs_int32 SAFSX_fencodename(
     return ret;
 }
 
-afs_int32 SAFSX_fremove(
+afs_int32 SAFSX_remove(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*OUT */ char ** code_name_str)
+    /*IN */ afs_int32 file_or_dir,
+    /*OUT*/ char ** code_name)
 {
-    int ret = fops_remove(fpath, code_name_str);
+    const char * str = file_or_dir == AFSX_IS_FILE ? "rm" : "rmdir";
+    int ret = file_or_dir == AFSX_IS_FILE ? fops_remove(fpath, code_name)
+                                          : dops_remove(fpath, code_name);
     if (ret) {
-        *code_name_str = EMPTY_STR_HEAP;
+        *code_name = EMPTY_STR_HEAP;
+        uerror("%s FAILED", str);
     } else {
-        printf("fremove: %s ~> %s\n", fpath, *code_name_str);
+        uinfo("%s: %s ~> %s", str, fpath, *code_name);
     }
     return ret;
 }
@@ -144,8 +148,7 @@ afs_int32 SAFSX_readwrite_start(
     int ret;
     xfer_context_t * ctx;
 
-    ctx = fileops_start(op, fpath, max_chunk_size, total_size,
-                        &ret);
+    ctx = fileops_start(op, fpath, max_chunk_size, total_size, &ret);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);

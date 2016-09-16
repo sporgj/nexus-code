@@ -121,14 +121,16 @@ extern afs_int32 SAFSX_fencodename(
 	/*IN */ char * fpath,
 	/*OUT*/ char * *fake_name);
 
-extern int AFSX_fremove(
+extern int AFSX_remove(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * fpath,
+	/*IN */ afs_int32 file_or_dir,
 	/*OUT*/ char * *code_name);
 
-extern afs_int32 SAFSX_fremove(
+extern afs_int32 SAFSX_remove(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * fpath,
+	/*IN */ afs_int32 file_or_dir,
 	/*OUT*/ char * *code_name);
 
 extern int AFSX_readwrite_start(

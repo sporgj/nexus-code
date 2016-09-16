@@ -42,8 +42,8 @@ int dops_plain2code(char * dpath_raw, char ** encoded_dname_dest);
  * @param fpath_raw is the raw file name
  * @return 0 on success
  */
-int fops_remove(char * fpath_raw, char ** encoded_fname_dest);
-int dops_remove(char * fpath_raw, char ** encoded_fname_dest);
+int fops_remove(const char * fpath_raw, char ** encoded_fname_dest);
+int dops_remove(const char * fpath_raw, char ** encoded_fname_dest);
 
 int fops_rename(char * old_plain_path, char * new_plain_path,
                 char ** raw_name_dest);

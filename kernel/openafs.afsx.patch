@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..28b97e7 100644
+index 1b99c94..87dce38 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -123,17 +123,30 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
@@ -116,7 +116,7 @@ index 1b99c94..28b97e7 100644
 +#ifdef AFS_SECURE
 +    {
 +	char * dest;
-+        if (!LINUX_AFSX_delfile(&dest, dp)) {
++        if (!UCAFS_remove(&dest, AFSX_IS_DIR, dp)) {
 +            printk(KERN_ERR "afs_unlink: %s -> %s\n", name, dest);
 +            name = dest;
 +        }
@@ -145,7 +145,24 @@ index 1b99c94..28b97e7 100644
      code = afs_mkdir(VTOAFS(dip), (char *)name, vattr, &tvcp, credp);
  
      if (tvcp) {
-@@ -1838,6 +1911,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
+@@ -1798,6 +1871,16 @@ afs_linux_rmdir(struct inode *dip, struct dentry *dp)
+ 
+     /* locking kernel conflicts with glock? */
+ 
++#ifdef AFS_SECURE
++    {
++	char * dest;
++        if (!UCAFS_remove(&dest, AFSX_IS_DIR, dp)) {
++            printk(KERN_ERR "afs_unlink: %s -> %s\n", name, dest);
++            name = dest;
++        }
++    }
++#endif
++
+     AFS_GLOCK();
+     code = afs_rmdir(VTOAFS(dip), (char *)name, credp);
+     AFS_GUNLOCK();
+@@ -1838,6 +1921,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
  
      afs_maybe_shrink_dcache(olddp);
  
