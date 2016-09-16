@@ -41,14 +41,14 @@ int fops_new(const char * fpath, char ** encoded_name_dest)
     }
 
     temp = encode_bin2str(fname_code);
-
+    /*
     fbox = new FileBox();
     path1 = uspace_make_fbox_fpath(temp);
     if (!FileBox::write(fbox, path1->c_str())) {
         LOG(ERROR) << "Creating: " << fpath << " filebox failed";
         goto out;
     }
-
+    */
     // 4 - Set the encoded name
     *encoded_name_dest = temp;
     error = 0;
@@ -160,18 +160,37 @@ out:
 int fops_rename(char * old_plain_path, char * new_plain_path,
                 char ** raw_name_dest)
 {
+    return 0;
+}
+
+#if 0
+int fops_rename(char * old_plain_path, char * new_plain_path, int file_or_dir,
+                char ** raw_name_dest)
+{
     // TODO check if both files are in the same folder
     int error = -1;
     char * old_fname, *new_fname;
-    const encoded_fname_t * fname_code = nullptr;
+    DirNode * dirnode1 = nullptr, dirnode2 = nullptr;
+    const encoded_fname_t * fname_code1 = nullptr, * fname_code1 = nullptr;
 
-    DirNode * dirnode = DirNode::from_afs_fpath(old_plain_path);
-    if (dirnode == nullptr) {
+    dirnode1 = DirNode::from_afs_fpath(old_plain_path);
+    if (dirnode1 == nullptr) {
+        goto out;
+    }
+
+    dirnode2 = DirNode::from_afs_fpath(new_plain_path);
+    if (dirnode2 == nullptr) {
         goto out;
     }
 
     if ((old_fname = dirops_get_fname(old_plain_path)) == NULL
         || (new_fname = dirops_get_fname(new_plain_path)) == NULL) {
+        goto out;
+    }
+
+    fname_code1 = dirnode1->rm_file(old_fname);
+    if (fname_code1) {
+        LOG(ERROR) << "deleting " << old_fname << "from dirnode";
         goto out;
     }
 
@@ -189,6 +208,10 @@ int fops_rename(char * old_plain_path, char * new_plain_path,
     *raw_name_dest = encode_bin2str(fname_code);
     error = 0;
 out:
+    if (dirnode1)
+        delete dirnode1;
+    if (dirnode2)
+        delete dirnode2;
     if (old_fname)
         free(old_fname);
     if (new_fname)
@@ -197,7 +220,7 @@ out:
         delete fname_code;
     return error;
 }
-
+#endif
 int __fops_encode_or_remove(char * fpath, char ** encoded_fname_dest, bool rm)
 {
     int error = -1; // TODO

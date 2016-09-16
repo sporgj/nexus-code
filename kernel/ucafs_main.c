@@ -118,11 +118,6 @@ int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    printk(KERN_ERR "creating dir: %s\n", fpath);
-    if (file_or_dir == AFSX_IS_DIR) {
-        return AFSX_STATUS_NOOP;
-    }
-
     ret = AFSX_create(conn, fpath, file_or_dir, dest);
     if (ret) {
         if (ret == AFSX_STATUS_ERROR) {
@@ -208,6 +203,35 @@ int LINUX_AFSX_delfile(char ** dest, struct dentry * dp)
 }
 
 #if 0
+int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
+{
+    int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
+    char * from_path = NULL, * to_path = NULL;
+
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    ignore_from = __is_dentry_ignored(from_dp, &from_path);
+    ignore_to = __is_dentry_ignore(to_dp, &to_path);
+
+    if (ignore_from && ignore_to) {
+        goto out;
+    }
+
+    if ((ret = AFSX_rename(from_path, to_path, dest))) {
+        goto out;
+    }
+
+out:
+    if (ignore_from)
+        kfree(ignore_from);
+    if (ignore_to)
+        kfree(ignore_to);
+    
+    return ret;
+}
+
 // TODO test function
 int LINUX_AFSX_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {

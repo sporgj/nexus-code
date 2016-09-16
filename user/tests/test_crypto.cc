@@ -5,7 +5,7 @@
 #include <sgx_urts.h>
 
 #define NUMBER_OF_TESTS 5
-#define MAX_BUFLEN  2137
+#define MAX_BUFLEN  37
 #define CHUNK_SIZE 250
 #define ENCLAVE_FILENAME "../sgx/enclave.signed.so"
 
@@ -59,10 +59,10 @@ int test_crypto()
     }
 
     /* 1 - Generate the stream */
-    len = generate(len, fop_ctx->padded_len, &buf1, &buf2);
-    cout << "Generated buffer (len=" << len << ", plen=" << fop_ctx->padded_len
+    len = generate(len, fop_ctx->raw_len, &buf1, &buf2);
+    cout << "Generated buffer (len=" << len << ", plen=" << fop_ctx->raw_len
          << ")" << endl;
-    hexdump(buf1, (fop_ctx->padded_len > 32 ? 32 : fop_ctx->padded_len));
+    hexdump(buf1, (fop_ctx->raw_len > 32 ? 32 : fop_ctx->raw_len));
 
     fop_ctx->buffer = (char *)buf1;
 
@@ -72,7 +72,7 @@ int test_crypto()
     if (ret) {
         cout << "Encryption of data failed" << endl;
     }
-    hexdump(buf1, (fop_ctx->padded_len > 32 ? 32 : fop_ctx->padded_len));
+    hexdump(buf1, (fop_ctx->raw_len > 32 ? 32 : fop_ctx->raw_len));
 
     ecall_finish_crypto(global_eid, &ret, fop_ctx, fcrypto);
     if (ret) {
@@ -82,7 +82,7 @@ int test_crypto()
 
     /* 3 - Decrypt the stream */
     fop_ctx->op = UCPRIV_DECRYPT;
-    fop_ctx->valid_buflen = fop_ctx->padded_len;
+    fop_ctx->valid_buflen = fop_ctx->raw_len;
     fop_ctx->completed = 0;
     cout << "Decrypting..." << endl;
     ecall_init_crypto(global_eid, &ret, fop_ctx, fcrypto);
@@ -95,7 +95,7 @@ int test_crypto()
     if (ret) {
         cout << "Encryption of data failed" << endl;
     }
-    hexdump(buf1, (fop_ctx->padded_len > 32 ? 32 : fop_ctx->padded_len));
+    hexdump(buf1, (fop_ctx->raw_len > 32 ? 32 : fop_ctx->raw_len));
 
     ecall_finish_crypto(global_eid, &ret, fop_ctx, fcrypto);
     if (ret) {

@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..bd0397d 100644
+index 1b99c94..28b97e7 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -123,17 +123,30 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
@@ -126,10 +126,12 @@ index 1b99c94..bd0397d 100644
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
-@@ -1766,6 +1827,16 @@ afs_linux_mkdir(struct inode *dip, struct dentry *dp, int mode)
+@@ -1766,6 +1827,18 @@ afs_linux_mkdir(struct inode *dip, struct dentry *dp, int mode)
      vattr->va_mask = ATTR_MODE;
      vattr->va_mode = mode;
  
++    printk(KERN_ERR"mkdir_name: %s\n", name);
++
 +#ifdef AFS_SECURE
 +    {
 +        char * crypto_name = NULL;
@@ -143,7 +145,7 @@ index 1b99c94..bd0397d 100644
      code = afs_mkdir(VTOAFS(dip), (char *)name, vattr, &tvcp, credp);
  
      if (tvcp) {
-@@ -1838,6 +1909,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
+@@ -1838,6 +1911,8 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
  
      afs_maybe_shrink_dcache(olddp);
  

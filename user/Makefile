@@ -16,6 +16,12 @@ CPPFLAGS += $(App_Cpp_Flags)
 
 all: ucafs
 
+copyconfig:
+	cp mbedtls-config.h mbedtls/include/mbedtls/config.h
+
+cryptolib: copyconfig
+	cd mbedtls/library && make clean && make SHARED=t
+
 define make-test-target
 $(1): $(1).cc libucafs.a
 	@$(CXX) -DTEST_ENV $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc\

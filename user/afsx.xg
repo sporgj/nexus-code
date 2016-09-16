@@ -51,8 +51,7 @@ readwrite_start(
     string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_chunk_size,
     afs_uint32 total_size,
-    OUT afs_uint32 * id,
-    afs_uint32 * padded_len
+    OUT afs_uint32 * id
 ) = 6;
     
 readwrite_finish(
@@ -65,10 +64,8 @@ readwrite_data(
     OUT int * moredata
 ) split = 8;
 
-/*
 frename(
     IN string old_fpath<AFSX_PATH_MAX>,
     string new_path<AFSX_PATH_MAX>,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 9;
-*/

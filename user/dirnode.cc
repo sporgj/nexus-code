@@ -329,11 +329,12 @@ const encoded_fname_t * DirNode::__raw2enc(const char * realname, bool is_file)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
+    string name_str(realname);
 
     auto fentry_list = is_file ? this->proto->file() : this->proto->dir();
     auto curr_fentry = fentry_list.begin();
     while (curr_fentry != fentry_list.end()) {
-        if (strncmp(realname, curr_fentry->raw_name().data(), len) == 0) {
+        if (!name_str.compare(curr_fentry->raw_name().data())) {
             encoded = new encoded_fname_t;
             memcpy(encoded, curr_fentry->encoded_name().data(),
                    sizeof(encoded_fname_t));

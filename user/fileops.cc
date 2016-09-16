@@ -27,7 +27,7 @@ static vector<xfer_context_t *> ctx_array(0, nullptr);
  * returns nullptr on failure, retptr set.
  */
 xfer_context_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
-                               uint32_t filelength, uint32_t * padded_len,
+                               uint32_t filelength,
                                int * retptr)
 {
     uint32_t seg_id = 0;
@@ -62,8 +62,6 @@ xfer_context_t * fileops_start(int op, char * fpath, uint32_t max_chunk_size,
         *retptr = -2;
         return nullptr;
     }
-
-    *padded_len = ctx->padded_len;
 
     ctx_array.push_back(ctx);
     *retptr = 0;

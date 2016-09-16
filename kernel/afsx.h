@@ -137,8 +137,7 @@ extern int AFSX_readwrite_start(
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
 	/*IN */ afs_uint32 total_size,
-	/*OUT*/ afs_uint32 * id,
-	/*OUT*/ afs_uint32 * padded_len);
+	/*OUT*/ afs_uint32 * id);
 
 extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ struct rx_call *z_call,
@@ -146,8 +145,7 @@ extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
 	/*IN */ afs_uint32 total_size,
-	/*OUT*/ afs_uint32 * id,
-	/*OUT*/ afs_uint32 * padded_len);
+	/*OUT*/ afs_uint32 * id);
 
 extern int AFSX_readwrite_finish(
 	/*IN */ struct rx_connection *z_conn,
@@ -172,14 +170,26 @@ extern afs_int32 SAFSX_readwrite_data(
 	/*IN */ afs_uint32 size,
 	/*OUT*/ int * moredata);
 
+extern int AFSX_frename(
+	/*IN */ struct rx_connection *z_conn,
+	/*IN */ char * old_fpath,
+	/*IN */ char * new_path,
+	/*OUT*/ char * *code_name);
+
+extern afs_int32 SAFSX_frename(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * old_fpath,
+	/*IN */ char * new_path,
+	/*OUT*/ char * *code_name);
+
 extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
 #define AFSX_LOWEST_OPCODE   1
-#define AFSX_HIGHEST_OPCODE	8
-#define AFSX_NUMBER_OPCODES	8
+#define AFSX_HIGHEST_OPCODE	9
+#define AFSX_NUMBER_OPCODES	9
 
-#define AFSX_NO_OF_STAT_FUNCS	8
+#define AFSX_NO_OF_STAT_FUNCS	9
 
 AFS_RXGEN_EXPORT
 extern const char *AFSX_function_names[];

@@ -99,7 +99,7 @@ static int test_upload()
     afs_uint32 size = st.st_size, blklen = PACKET_SIZE, upload_id;
 
     if ((result = AFSX_readwrite_start(conn, UCAFS_WRITEOP, TEST_FILE, blklen,
-                                       size, &upload_id, &padded_len))) {
+                                       size, &upload_id))) {
         cout << "Start RPC call failed: " << result << endl;
         return -1;
     }

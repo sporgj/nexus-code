@@ -215,7 +215,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_uint32 * id,afs_uint32 * padded_len)
+int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_uint32 * id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 6;
@@ -236,8 +236,7 @@ int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_ui
 
 	/* Un-marshal the reply arguments */
 	z_xdrs.x_op = XDR_DECODE;
-	if ((!xdr_afs_uint32(&z_xdrs, id))
-	     || (!xdr_afs_uint32(&z_xdrs, padded_len))) {
+	if ((!xdr_afs_uint32(&z_xdrs, id))) {
 		z_result = RXGEN_CC_UNMARSHAL;
 		goto fail;
 	}
@@ -337,6 +336,48 @@ fail:
 		(((afs_uint32)(ntohs(z_call->conn->serviceId) << 16)) |
 		((afs_uint32)ntohs(z_call->conn->peer->port))),
 		7, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
+		&z_call->bytesSent, &z_call->bytesRcvd, 1);
+	}
+
+	return z_result;
+}
+
+int AFSX_frename(struct rx_connection *z_conn,char * old_fpath,char * new_path,char * *code_name)
+{
+	struct rx_call *z_call = rx_NewCall(z_conn);
+	static int z_op = 9;
+	int z_result;
+	XDR z_xdrs;
+	struct clock __QUEUE, __EXEC;
+	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
+
+	/* Marshal the arguments */
+	if ((!xdr_int(&z_xdrs, &z_op))
+	     || (!xdr_string(&z_xdrs, &old_fpath, AFSX_PATH_MAX))
+	     || (!xdr_string(&z_xdrs, &new_path, AFSX_PATH_MAX))) {
+		z_result = RXGEN_CC_MARSHAL;
+		goto fail;
+	}
+
+	/* Un-marshal the reply arguments */
+	z_xdrs.x_op = XDR_DECODE;
+	if ((!xdr_string(&z_xdrs, code_name, AFSX_FNAME_MAX))) {
+		z_result = RXGEN_CC_UNMARSHAL;
+		goto fail;
+	}
+
+	z_result = RXGEN_SUCCESS;
+fail:
+	z_result = rx_EndCall(z_call, z_result);
+	if (rx_enable_stats) {
+	    clock_GetTime(&__EXEC);
+	    clock_Sub(&__EXEC, &z_call->startTime);
+	    __QUEUE = z_call->startTime;
+	    clock_Sub(&__QUEUE, &z_call->queueTime);
+	    rx_IncrementTimeAndCount(z_conn->peer,
+		(((afs_uint32)(ntohs(z_conn->serviceId) << 16)) 
+		| ((afs_uint32)ntohs(z_conn->peer->port))),
+		8, AFSX_NO_OF_STAT_FUNCS, &__QUEUE, &__EXEC,
 		&z_call->bytesSent, &z_call->bytesRcvd, 1);
 	}
 

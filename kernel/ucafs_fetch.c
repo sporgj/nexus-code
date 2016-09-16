@@ -93,7 +93,7 @@ static int init_sgx_socket(struct rx_connection * conn, ucafs_ctx_t * ctx,
     int ret;
     /* 1 -  Connect to the userspace daemon */
     if ((ret = AFSX_readwrite_start(conn, UCAFS_READOP, path, AFSX_PACKET_SIZE,
-                                    ctx->len, &ctx->id, &ctx->padded_len))) {
+                                    ctx->len, &ctx->id))) {
         if (ret == AFSX_STATUS_ERROR) {
             ERROR("fetchstore start failed: %s\n", path);
             return -1;
@@ -148,7 +148,6 @@ int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
             // read the length from the the server
             temp = rx_Read(afs_call, (char *)&nbytes, sizeof(afs_int32));
             RX_AFS_GLOCK();
-            ERROR("read from server. nbytes=%u, %u\n", nbytes, ntohl(nbytes));
             if (temp != sizeof(afs_int32)) {
                 ERROR("FileServer is sending BS. amt=%d, nbytes=%u\n", temp,
                         ntohl(nbytes));
@@ -225,7 +224,8 @@ static int fetch_proc(ucafs_ctx_t * ctx, struct dcache * tdc,
         }
 
         // let's write this to our tdc
-        nbytes = afs_osi_Write(tfile, pos, ctx->buffer, len);
+        nbytes = afs_osi_Write(tfile, pos, ctx->buffer, nbytes);
+        ERROR("tdc written: nbytes=%u, len=%u\n", nbytes, len);
         pos += len;
         max_write -= len;
     }
@@ -297,8 +297,10 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
         }
 
         ReleaseWriteLock(&tdc->lock);
+        hset(tdc->f.versionNo, avc->f.m.DataVersion);
         tdc->f.states &= ~DWriting;
         tdc->dflags |= DFEntryMod;
+        tdc->validPos = nbytes;
         afs_AdjustSize(tdc, nbytes);
         afs_PutDCache(tdc);
         tdc = NULL;

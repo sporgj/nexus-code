@@ -81,7 +81,7 @@ static int store_close(void * rock, struct AFSFetchStatus * OutStatus,
 static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
                      int * more, afs_int32 * transferred)
 {
-    int ret = AFSX_STATUS_ERROR, is_last_tdc, size, sent_pad = 0;
+    int ret = AFSX_STATUS_ERROR, size;
     struct osi_file * tfile;
     afs_uint32 tlen, nbytes, pos = 0;
     ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
@@ -92,20 +92,12 @@ static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
 
     *transferred = 0;
 
-    is_last_tdc = (ctx->off + size) >= ctx->len;
-
-    ERROR("tdc size=%d, chunk=%d, is_last=%d\n", size, tdc->f.chunk, is_last_tdc);
+    //ERROR("tdc size=%d, chunk=%d, is_last=%d\n", size, tdc->f.chunk, is_last_tdc);
     while (size > 0) {
         ops->prepare(rock, size, &tlen);    
         
         // XXX check for the read return
         afs_osi_Read(tfile, -1, ctx->buffer, tlen);
-
-        // adds the appended info
-        if (size < ctx->buflen && is_last_tdc) {
-            tlen = ctx->padded_len - ctx->off;
-            sent_pad = 1;
-        }
 
         if (ops->read(rock, tfile, pos, tlen, &nbytes)) {
             goto out;
@@ -120,23 +112,6 @@ static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
         ctx->off += tlen;
         pos += tlen;
         size -= tlen;
-    }
-
-    /**
-     * corner case for tdc sizes who are multiple of 16.
-     */
-    if (sent_pad == 0 && is_last_tdc) {
-        tlen = AFSX_CRYPTO_BLK_SIZE;
-        if (ops->read(rock, tfile, pos, tlen, &nbytes)) {
-            goto out;
-        }
-
-        if (ops->write(rock, nbytes, &nbytes)) {
-            goto out;
-        }
-
-        pos += tlen;
-        ctx->off += tlen;
     }
 
     *transferred = pos;
@@ -157,7 +132,7 @@ int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
 {
     int ret = -1;
     afs_int32 code;
-    afs_uint32 real_len = ctx->padded_len;
+    afs_uint32 real_len = ctx->len;
     struct rx_call * afs_call;
     struct rx_connection * rx_conn;
     struct afs_conn * tc;
@@ -198,7 +173,6 @@ int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
     }
 
     ctx->buflen = AFSX_PACKET_SIZE;
-    ctx->len = avc->f.m.Length;
     ctx->off = 0;
     ctx->afs_call = afs_call;
     ctx->rx_conn = rx_conn;
@@ -238,12 +212,11 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
 
     memset(&ctx, 0, sizeof(ucafs_ctx_t));
 
-    tlen = avc->f.m.Length;
+    ctx.len = tlen = avc->f.m.Length;
 
     conn = __get_conn();
     if ((ret = AFSX_readwrite_start(conn, UCAFS_WRITEOP, path, AFSX_PACKET_SIZE,
-                                    tlen, &ctx.id, &ctx.padded_len))) {
-        ERROR("yello ret=%d\n", ret);
+                                    tlen, &ctx.id))) {
         goto out;
     }
 
@@ -252,8 +225,6 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
         ERROR("error initializing store\n");
         goto out;
     }
-
-    ERROR("storing file. padded=%u, id=%u\n", ctx.padded_len, ctx.id);
 
     // to avoid pageout when reading files, make sure all the vcache dirty
     // pages are flushed to disk. This also obtains the GLOCK()

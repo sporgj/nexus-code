@@ -139,25 +139,12 @@ afs_int32 SAFSX_readwrite_start(
     /*IN */ char * fpath,
     /*IN */ afs_uint32 max_chunk_size,
     /*IN */ afs_uint32 total_size,
-    /*OUT*/ afs_uint32 * id,
-    /*OUT*/ afs_uint32 * padded_len)
+    /*OUT*/ afs_uint32 * id)
 {
     int ret;
     xfer_context_t * ctx;
 
-    if (max_chunk_size % CRYPTO_CRYPTO_BLK_SIZE) {
-        uerror("rw: max chunk size(%d) should be a multiple of %d",
-               max_chunk_size, CRYPTO_CRYPTO_BLK_SIZE);
-        return AFSX_STATUS_ERROR;
-    }
-
-    if (op == UCAFS_READOP && total_size % CRYPTO_CRYPTO_BLK_SIZE) {
-        uerror("rw: total size (%d) should be a multiple of %d", total_size,
-               CRYPTO_CRYPTO_BLK_SIZE);
-        return AFSX_STATUS_ERROR;
-    }
-
-    ctx = fileops_start(op, fpath, max_chunk_size, total_size, padded_len,
+    ctx = fileops_start(op, fpath, max_chunk_size, total_size,
                         &ret);
     if (ctx == NULL) {
         if (ret == -2) {
@@ -203,17 +190,6 @@ afs_int32 SAFSX_readwrite_data(
 
     if (ctx->buflen < size) {
         uerror("size %d sent is above the cap = %d", size, ctx->buflen);
-        goto out;
-    }
-
-    if (size % CRYPTO_CRYPTO_BLK_SIZE) {
-        uerror("size %d is not a multiple of the block size", size);
-        goto out;
-    }
-
-    if (ctx->completed >= ctx->padded_len) {
-        uerror("sending us more data. done=%u, max=%u", ctx->completed,
-               ctx->padded_len);
         goto out;
     }
 
