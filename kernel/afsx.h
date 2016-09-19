@@ -189,8 +189,8 @@ extern afs_int32 SAFSX_rename(
 extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
-#define AFSX_LOWEST_OPCODE   1
-#define AFSX_HIGHEST_OPCODE	9
+#define AFSX_LOWEST_OPCODE   130
+#define AFSX_HIGHEST_OPCODE	138
 #define AFSX_NUMBER_OPCODES	9
 
 #define AFSX_NO_OF_STAT_FUNCS	9

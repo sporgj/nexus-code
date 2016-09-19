@@ -31,9 +31,7 @@ void uspace_set_afs_home(const char * path, bool is_afs)
     global_env_is_afs = is_afs;
 }
 
-string * uspace_get_repo_path() {
-    return new string(global_afs_repo_path);
-}
+string * uspace_get_repo_path() { return new string(global_afs_repo_path); }
 
 /**
  * returns a new[] path for the default directory.
@@ -50,24 +48,35 @@ string * uspace_main_dnode_fpath()
 
 void uspace_get_relpath(const char * path, char ** rv)
 {
+    // XXX next time, add watched folders to make sure we load the necessary
+    // dnode object
     const char * ptr = path + strlen(global_afs_home_path)
                        - (global_env_is_afs ? strlen("/afs") : 0);
+
+    if (global_env_is_afs) {
+        ptr++;
+    }
 
     while (*ptr != '/' && *ptr != '\0') {
         ptr++;
     }
-    ptr++;
+
+    if (*ptr != '\0') {
+        ptr++;
+    }
 
     *rv = strdup(ptr);
 }
 
-string * uspace_make_dnode_fpath(const char * fname) {
+string * uspace_make_dnode_fpath(const char * fname)
+{
     string * rv = uspace_get_repo_path();
     rv->operator+=("/");
     rv->operator+=(fname);
     return rv;
 }
 
-string * uspace_make_fbox_fpath(const char * fname) {
+string * uspace_make_fbox_fpath(const char * fname)
+{
     return uspace_make_dnode_fpath(fname);
 }

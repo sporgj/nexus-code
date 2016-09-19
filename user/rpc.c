@@ -67,8 +67,9 @@ afs_int32 SAFSX_create(
                                             : dops_new(path, crypto_fname);
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
+        uerror("create FAILED (ret=%d): %s", ret, path);
     } else {
-        printf("> fnew: %s ~> %s\n", path, *crypto_fname);
+        uinfo("create: %s ~> %s", path, *crypto_fname);
     }
     return ret;
 }
@@ -83,7 +84,7 @@ afs_int32 SAFSX_frealname(
     if (ret) {
         *plain_name = EMPTY_STR_HEAP;
     } else {
-        printf("> freal: %s ~> %s\n", fake_name, *plain_name);
+        uinfo("> decode: %s ~> %s", fake_name, *plain_name);
     }
     return ret;
 }

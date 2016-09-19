@@ -11,7 +11,7 @@
 int AFSX_fversion(struct rx_connection *z_conn,int dummy,int * result)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 1;
+	static int z_op = 130;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -52,7 +52,7 @@ fail:
 int AFSX_create(struct rx_connection *z_conn,char * path,afs_int32 file_or_dir,char * *crypto_fname)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 2;
+	static int z_op = 131;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -94,7 +94,7 @@ fail:
 int AFSX_frealname(struct rx_connection *z_conn,char * fake_name,char * path,char * *real_name)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 3;
+	static int z_op = 132;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -136,7 +136,7 @@ fail:
 int AFSX_fencodename(struct rx_connection *z_conn,char * fpath,char * *fake_name)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 4;
+	static int z_op = 133;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -177,7 +177,7 @@ fail:
 int AFSX_remove(struct rx_connection *z_conn,char * fpath,afs_int32 file_or_dir,char * *code_name)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 5;
+	static int z_op = 134;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -219,7 +219,7 @@ fail:
 int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_uint32 * id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 6;
+	static int z_op = 135;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -263,7 +263,7 @@ fail:
 int AFSX_readwrite_finish(struct rx_connection *z_conn,int id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 7;
+	static int z_op = 136;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;
@@ -296,7 +296,7 @@ fail:
 
 int StartAFSX_readwrite_data(struct rx_call *z_call,afs_uint32 id,afs_uint32 size)
 {
-	static int z_op = 8;
+	static int z_op = 137;
 	int z_result;
 	XDR z_xdrs;
 	xdrrx_create(&z_xdrs, z_call, XDR_ENCODE);
@@ -346,7 +346,7 @@ fail:
 int AFSX_rename(struct rx_connection *z_conn,char * old_fpath,char * new_path,afs_int32 file_or_dir,char * *code_name)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
-	static int z_op = 9;
+	static int z_op = 138;
 	int z_result;
 	XDR z_xdrs;
 	struct clock __QUEUE, __EXEC;

@@ -24,13 +24,14 @@ int fops_new(const char * fpath, char ** encoded_name_dest)
     // 1 - Get the corresponding dirnode
     dirnode = DirNode::from_afs_fpath(fpath);
     if (dirnode == nullptr) {
+        LOG(ERROR) << "Error loading dirnode: " << fpath;
         goto out;
     }
 
     // 2 - Get filename and add it to DirNode
     fname_code = dirnode->add_file(fname);
     if (fname_code == nullptr) {
-        LOG(ERROR) << "File: " << fpath;
+        LOG(ERROR) << "Add file operation failed: " << fpath;
         goto out;
     }
 

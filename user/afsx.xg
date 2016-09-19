@@ -45,7 +45,7 @@ remove(
     IN string fpath<AFSX_PATH_MAX>,
     afs_int32 file_or_dir,
     OUT string code_name<AFSX_FNAME_MAX>
-) = 5;
+) = 134;
 
 readwrite_start(
     IN int op,
@@ -53,21 +53,21 @@ readwrite_start(
     afs_uint32 max_chunk_size,
     afs_uint32 total_size,
     OUT afs_uint32 * id
-) = 6;
+) = 135;
     
 readwrite_finish(
     IN int id
-) = 7;
+) = 136;
 
 readwrite_data(
     IN afs_uint32 id,
     afs_uint32 size,
     OUT int * moredata
-) split = 8;
+) split = 137;
 
 rename(
     IN string old_fpath<AFSX_PATH_MAX>,
     string new_path<AFSX_PATH_MAX>,
     afs_int32 file_or_dir,
     OUT string code_name<AFSX_FNAME_MAX>
-) = 9;
+) = 138;
