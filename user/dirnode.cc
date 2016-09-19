@@ -38,9 +38,9 @@ DirNode * DirNode::lookup_path(const char * path, bool omit_last)
 {
     char * p_path = strdup((char *)path), *pch, *nch;
     uintptr_t ptr_val = (uintptr_t)p_path + strlen(path);
-    DirNode * dirnode = DirNode::load_default_dnode();
+    DirNode * dirnode = DirNode::load_default_dnode(), dirnode1 = nullptr;
     const encoded_fname_t * encoded_fname = nullptr;
-    const char * encoded_str = nullptr;
+    const char * c_encoded_str = nullptr;
     string * dnode_path = nullptr;
 
     nch = strtok_r(p_path, "/", &pch);
@@ -55,12 +55,16 @@ DirNode * DirNode::lookup_path(const char * path, bool omit_last)
             break;
         }
 
-        encoded_str = encode_bin2str(encoded_fname);
+        /* get the encoded file name in string format */
+        c_encoded_str = encode_bin2str(encoded_fname);
         delete encoded_fname;
 
-        dnode_path = uspace_make_dnode_fpath(encoded_str);
-        free((void *) encoded_str);
+        /* create the path to open */
+        dnode_path = uspace_make_dnode_fpath(c_encoded_str);
+        free((void *)c_encoded_str);
 
+        /* open the dirnode file */
+        delete dirnode;
         if ((dirnode = DirNode::from_file(dnode_path->c_str())) == nullptr) {
             break;
         }
@@ -168,17 +172,23 @@ bool DirNode::write(DirNode * dn, const char * fpath)
     return ret;
 }
 
-encoded_fname_t * DirNode::__add_entry(const char * fname, bool is_file)
+const encoded_fname_t *
+DirNode::__add_entry(const char * fname, const encoded_fname_t * p_encoded_name,
+                     bool is_file)
 {
     encoded_fname_t * encoded_name;
     raw_fname_t * _dest_fname;
     size_t slen = strlen(fname) + 1;
 
-    encoded_name = new encoded_fname_t;
-    _dest_fname = static_cast<raw_fname_t *>(operator new(slen));
-    memset(_dest_fname, 0, slen);
+    if (p_encoded_name) {
+        encoded_name = (encoded_fname_t *)p_encoded_name;
+    } else {
+        encoded_name = new encoded_fname_t;
+        _dest_fname = static_cast<raw_fname_t *>(operator new(slen));
+        memset(_dest_fname, 0, slen);
 
-    uuid_generate_time_safe(encoded_name->bin);
+        uuid_generate_time_safe(encoded_name->bin);
+    }
 
     memcpy(_dest_fname->raw, fname, strlen(fname));
 
@@ -198,14 +208,16 @@ encoded_fname_t * DirNode::__add_entry(const char * fname, bool is_file)
 /**
  * Adds a new file to the dirnode. Returns an encoded filename
  */
-encoded_fname_t * DirNode::add_file(const char * fname)
+const encoded_fname_t *
+DirNode::add_file(const char * fname, const encoded_fname_t * p_encoded_name)
 {
-    return this->__add_entry(fname, true);
+    return this->__add_entry(fname, p_encoded_name, true);
 }
 
-encoded_fname_t * DirNode::add_dir(const char * fname)
+const encoded_fname_t * DirNode::add_dir(const char * fname,
+                                         const encoded_fname_t * p_encoded_name)
 {
-    return this->__add_entry(fname, false);
+    return this->__add_entry(fname, p_encoded_name, false);
 }
 
 encoded_fname_t * DirNode::__rm_entry(const char * realname, bool is_file)

@@ -10,10 +10,10 @@
 int fops_new(const char * fpath, char ** encoded_name_dest)
 {
     int error = -1; // TODO change this
-    char * fname = dirops_get_fname(fpath), * temp;
+    char * fname = dirops_get_fname(fpath), *temp;
     DirNode * dirnode = nullptr;
     FileBox * fbox = nullptr;
-    encoded_fname_t * fname_code = nullptr;
+    const encoded_fname_t * fname_code = nullptr;
     string * path1 = nullptr;
 
     if (fname == NULL) {
@@ -70,10 +70,10 @@ out:
 int dops_new(const char * fpath, char ** encoded_name_dest)
 {
     int error = -1; // TODO
-    encoded_fname_t * fname_code = nullptr;
-    DirNode * dirnode = nullptr, * dirnode1;
+    const encoded_fname_t * fname_code = nullptr;
+    DirNode * dirnode = nullptr, *dirnode1;
     string * path1 = nullptr;
-    char * fname = dirops_get_fname(fpath), * temp;
+    char * fname = dirops_get_fname(fpath), *temp;
 
     if (fname == nullptr) {
         LOG(ERROR) << "Error getting filename: " << fpath;
@@ -157,10 +157,81 @@ out:
     return error;
 }
 
-int fops_rename(char * old_plain_path, char * new_plain_path,
+static int dirops_rename(const char * from_path, const char * to_path,
+                         int file_or_dir, char ** raw_name_dest)
+{
+    int error = AFSX_STATUS_NOOP;
+    char * c_old_name = NULL, *c_new_name = NULL;
+    DirNode * dirnode1 = nullptr, *dirnode2 = nullptr;
+    const encoded_fname_t * fname_code = nullptr;
+
+    if ((c_old_name = dirops_get_fname(from_path)) == nullptr) {
+        goto out;
+    }
+
+    /* Get the parent directory dirnode */
+    if ((dirnode1 = DirNode::from_afs_fpath(from_path))) {
+        // that means, we delete the entry from the dirnode
+        fname_code = (file_or_dir == AFSX_IS_FILE)
+                         ? dirnode1->rm_file(c_old_name)
+                         : dirnode1->rm_dir(c_old_name);
+        if (fname_code == nullptr) {
+            std::cout << "fname '" << c_old_name << "' does not exist"
+                      << std::endl;
+            goto out;
+        }
+
+        // save the file to disk
+        if (!dirnode1->flush()) {
+            std::cout << "flushing: " << from_path << " dnode failed";
+            goto out;
+        }
+    }
+
+    // save it in the destination
+    if ((c_new_name = dirops_get_fname(to_path)) == nullptr) {
+        goto out;
+    }
+
+    if ((dirnode2 = DirNode::from_afs_fpath(to_path))) {
+        // then we can add the entry
+        if (file_or_dir == AFSX_IS_FILE) {
+            dirnode2->add_file(c_new_name, fname_code);
+        } else {
+            dirnode2->add_dir(c_new_name, fname_code);
+        }
+
+        // save the file to disk
+        if (!dirnode2->flush()) {
+            std::cout << "flushing: " << to_path << " dnode failed";
+            goto out;
+        }
+    }
+
+    error = AFSX_STATUS_SUCCESS;
+out:
+    if (c_old_name)
+        free(c_old_name);
+    if (c_new_name)
+        free(c_new_name);
+    if (dirnode2)
+        delete dirnode2;
+    if (dirnode1)
+        delete dirnode1;
+
+    return error;
+}
+
+int fops_rename(const char * from_path, const char * to_path,
                 char ** raw_name_dest)
 {
-    return 0;
+    return dirops_rename(from_path, to_path, AFSX_IS_FILE, raw_name_dest);
+}
+
+int dops_rename(const char * from_path, const char * to_path,
+                char ** raw_name_dest)
+{
+    return dirops_rename(from_path, to_path, AFSX_IS_DIR, raw_name_dest);
 }
 
 #if 0
@@ -221,7 +292,8 @@ out:
     return error;
 }
 #endif
-int __fops_encode_or_remove(const char * fpath, char ** encoded_fname_dest, bool rm)
+int __fops_encode_or_remove(const char * fpath, char ** encoded_fname_dest,
+                            bool rm)
 {
     int error = -1; // TODO
     char * fname = NULL;
@@ -274,7 +346,7 @@ int fops_remove(const char * fpath_raw, char ** encoded_fname_dest)
 int dops_remove(const char * dpath_raw, char ** encoded_dname_dest)
 {
     int error = AFSX_STATUS_ERROR;
-    char * c_dname = NULL, * c_temp = NULL;
+    char * c_dname = NULL, *c_temp = NULL;
     string * dnode_path = nullptr;
     const encoded_fname_t * dname_code = NULL;
 
@@ -329,8 +401,7 @@ out:
  */
 int dops_lookup_path(char * fpath_raw, char ** encoded_dnode_dest)
 {
-    int error =  -1;
-
+    int error = -1;
 
     return error;
 }

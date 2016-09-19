@@ -343,7 +343,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_frename(struct rx_connection *z_conn,char * old_fpath,char * new_path,char * *code_name)
+int AFSX_rename(struct rx_connection *z_conn,char * old_fpath,char * new_path,afs_int32 file_or_dir,char * *code_name)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 9;
@@ -355,7 +355,8 @@ int AFSX_frename(struct rx_connection *z_conn,char * old_fpath,char * new_path,c
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
 	     || (!xdr_string(&z_xdrs, &old_fpath, AFSX_PATH_MAX))
-	     || (!xdr_string(&z_xdrs, &new_path, AFSX_PATH_MAX))) {
+	     || (!xdr_string(&z_xdrs, &new_path, AFSX_PATH_MAX))
+	     || (!xdr_afs_int32(&z_xdrs, &file_or_dir))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;
 	}

@@ -88,22 +88,6 @@ afs_int32 SAFSX_frealname(
     return ret;
 }
 
-afs_int32 SAFSX_frename(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * old_path,
-    /*IN */ char * new_path,
-    /*OUT*/ char ** code_name_str)
-{
-    int ret = fops_rename(old_path, new_path, code_name_str);
-    if (ret) {
-        *code_name_str = EMPTY_STR_HEAP;
-    } else {
-        printf("> frename: %s ~> %s (%s)\n", old_path, new_path,
-               *code_name_str);
-    }
-    return ret;
-}
-
 afs_int32 SAFSX_fencodename(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
@@ -115,6 +99,26 @@ afs_int32 SAFSX_fencodename(
     } else {
         printf("fencode: %s ~> %s\n", fpath, *code_name_str);
     }
+    return ret;
+}
+
+afs_int32 SAFSX_rename(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ char * old_fpath,
+    /*IN */ char * new_path,
+    /*IN */ afs_int32 file_or_dir,
+    /*OUT*/ char ** code_name)
+{
+    int ret = (file_or_dir == AFSX_IS_FILE)
+                  ? fops_rename(old_fpath, new_path, code_name)
+                  : dops_rename(old_fpath, new_path, code_name);
+    if (ret) {
+        *code_name = EMPTY_STR_HEAP;
+        uerror("Renaming '%s' -> '%s' FAILED", old_fpath, new_path);
+    } else {
+        uinfo("Renamed '%s' -> '%s'", old_fpath, new_path);
+    }
+
     return ret;
 }
 

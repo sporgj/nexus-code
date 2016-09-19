@@ -24,7 +24,7 @@ int LINUX_AFSX_connect()
                                  null_securityObject, AFSX_NULL);
 
     rx_SetConnDeadTime(conn, 5);
-    rx_SetConnHardDeadTime(ping_conn, 2);
+    rx_SetConnDeadTime(ping_conn, 2);
 
     if (conn == NULL || ping_conn == NULL) {
         /* maybe have a retry */

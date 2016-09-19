@@ -53,10 +53,10 @@ void uspace_get_relpath(const char * path, char ** rv)
     const char * ptr = path + strlen(global_afs_home_path)
                        - (global_env_is_afs ? strlen("/afs") : 0);
 
-    ptr++;
     while (*ptr != '/' && *ptr != '\0') {
         ptr++;
     }
+    ptr++;
 
     *rv = strdup(ptr);
 }

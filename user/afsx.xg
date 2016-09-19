@@ -22,24 +22,24 @@ prefix S
 fversion(
     IN int dummy,
     OUT int * result
-) = 1;
+) = 130;
 
 create(
     IN string path<AFSX_PATH_MAX>,
     afs_int32 file_or_dir,
     OUT string crypto_fname<AFSX_FNAME_MAX>
-) = 2;
+) = 131;
 
 frealname(
     IN string fake_name<AFSX_FNAME_MAX>,
     string path<AFSX_PATH_MAX>,
     OUT string real_name<AFSX_FNAME_MAX>
-) = 3;
+) = 132;
 
 fencodename(
     IN string fpath<AFSX_PATH_MAX>,
     OUT string fake_name<AFSX_FNAME_MAX>
-) = 4;
+) = 133;
 
 remove(
     IN string fpath<AFSX_PATH_MAX>,
@@ -65,8 +65,9 @@ readwrite_data(
     OUT int * moredata
 ) split = 8;
 
-frename(
+rename(
     IN string old_fpath<AFSX_PATH_MAX>,
     string new_path<AFSX_PATH_MAX>,
+    afs_int32 file_or_dir,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 9;

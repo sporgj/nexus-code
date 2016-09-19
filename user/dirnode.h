@@ -29,7 +29,9 @@ private:
      */
     DirNode(dnode * fb) { this->proto = fb; };
 
-    encoded_fname_t * __add_entry(const char * fname, bool is_file);
+    const encoded_fname_t * __add_entry(const char * fname,
+                                        const encoded_fname_t * p_encoded_name,
+                                        bool is_file);
     encoded_fname_t * __rm_entry(const char * realname, bool is_file);
     char * __enc2raw(const encoded_fname_t * encoded_name, bool use_malloc,
                      bool is_file);
@@ -49,15 +51,19 @@ public:
     }
 
     static DirNode * from_file(const char * fpath);
-    static DirNode * from_afs_fpath(const char * fpath, bool omit_last=true);
+    static DirNode * from_afs_fpath(const char * fpath, bool omit_last = true);
     static DirNode * load_default_dnode();
-    static DirNode * lookup_path(const char * path, bool omit_last=true);
+    static DirNode * lookup_path(const char * path, bool omit_last = true);
 
     static bool write(DirNode * fb, fstream * fd);
     static bool write(DirNode * fb, const char * fpath);
 
-    encoded_fname_t * add_file(const char * filename);
-    encoded_fname_t * add_dir(const char * filename);
+    const encoded_fname_t * add_file(const char * filename,
+                                     const encoded_fname_t * p_encoded_name
+                                     = nullptr);
+    const encoded_fname_t * add_dir(const char * filename,
+                                    const encoded_fname_t * p_encoded_name
+                                    = nullptr);
 
     encoded_fname_t * rm_file(const char * realname);
     encoded_fname_t * rm_dir(const char * realname);

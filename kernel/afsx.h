@@ -172,16 +172,18 @@ extern afs_int32 SAFSX_readwrite_data(
 	/*IN */ afs_uint32 size,
 	/*OUT*/ int * moredata);
 
-extern int AFSX_frename(
+extern int AFSX_rename(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * old_fpath,
 	/*IN */ char * new_path,
+	/*IN */ afs_int32 file_or_dir,
 	/*OUT*/ char * *code_name);
 
-extern afs_int32 SAFSX_frename(
+extern afs_int32 SAFSX_rename(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * old_fpath,
 	/*IN */ char * new_path,
+	/*IN */ afs_int32 file_or_dir,
 	/*OUT*/ char * *code_name);
 
 extern int AFSX_ExecuteRequest(struct rx_call *);

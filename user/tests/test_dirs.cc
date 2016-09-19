@@ -88,12 +88,27 @@ int test_dirs()
     dir += "/";
     dir += lvl[0][0];
 
+    /*
     cout << endl;
     cout << "Removing: " << dir << endl;
     if (dops_remove(dir.c_str(), &temp)) {
         cout << "Failed" << endl;
     } else {
         cout << "PASSED. Removed: " << temp << endl;
+    }
+    */
+
+    string dir1("repo/alice/bob"), dir2("repo/alice/kilda");
+    /*dir1 += "/";
+    dir1 += lvl[0][2];
+    dir2 += "/";
+    dir2 += "pro";*/
+
+    cout << endl;
+    cout << "Renaming '" << dir1 << "' to '" << dir2 << "'" << endl;
+    if ((ret = dops_rename(dir1.c_str(), dir2.c_str(), &temp))) {
+        cout << "FAILED. ret = " << ret << endl;
+        return -1;
     }
 
     return 0;
