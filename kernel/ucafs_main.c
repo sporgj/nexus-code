@@ -203,8 +203,7 @@ int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp)
     return ret;
 }
 
-#if 0
-int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
+int UCAFS_rename(char ** dest, int file_or_dir, struct dentry * from_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
     char * from_path = NULL, * to_path = NULL;
@@ -214,25 +213,26 @@ int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
     }
 
     ignore_from = __is_dentry_ignored(from_dp, &from_path);
-    ignore_to = __is_dentry_ignore(to_dp, &to_path);
+    ignore_to = __is_dentry_ignored(to_dp, &to_path);
 
     if (ignore_from && ignore_to) {
         goto out;
     }
 
-    if ((ret = AFSX_rename(from_path, to_path, dest))) {
+    if ((ret = AFSX_rename(conn, from_path, to_path, file_or_dir, dest))) {
         goto out;
     }
 
 out:
-    if (ignore_from)
-        kfree(ignore_from);
-    if (ignore_to)
-        kfree(ignore_to);
+    if (from_path)
+        kfree(from_path);
+    if (to_path)
+        kfree(to_path);
     
     return ret;
 }
 
+#if 0
 // TODO test function
 int LINUX_AFSX_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {

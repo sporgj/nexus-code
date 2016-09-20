@@ -66,7 +66,7 @@ int build_tree(string & curr_dir, int i, int j)
 int test_dirs()
 {
     int ret;
-    char * temp;
+    char * temp, * temp2;
     /* 1 - building the directory tree */
     for (size_t k = 0; k < Y; k++) {
         string v = string(TEST_AFS_HOME);
@@ -106,10 +106,66 @@ int test_dirs()
 
     cout << endl;
     cout << "Renaming '" << dir1 << "' to '" << dir2 << "'" << endl;
-    if ((ret = dops_rename(dir1.c_str(), dir2.c_str(), &temp))) {
+    if ((ret = dirops_rename(dir1.c_str(), dir2.c_str(), AFSX_IS_DIR, &temp))) {
         cout << "FAILED. ret = " << ret << endl;
         return -1;
     }
+    cout << "PASSED" << endl;
+
+    string f1("repo/foo"), f2("repo/foo");
+    f1 += "/";
+    f2 += "/";
+    f1 += "config.lock";
+    f2 += "config";
+
+    cout << "Creating: " << f1 << "\t";
+    if (fops_new(f1.c_str(), &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    cout << "Finding: " << f1 << "\t";
+    if (fops_plain2code(f1.c_str(), &temp)) {
+        cout << "not found" << endl;
+    } else {
+        cout << temp << endl;
+    }
+
+    cout << "Renaming '" << f1 << "' -> '" << f2 << "'" << endl;
+    if (dirops_rename(f1.c_str(), f2.c_str(), AFSX_IS_FILE, &temp)) {
+        cout << "Error" << endl;
+        return -1;
+    }
+
+    cout << "Finding: " << f1 << "\t";
+    if (fops_plain2code(f1.c_str(), &temp)) {
+        cout << "Success" << endl;
+    } else {
+        cout << "Error" << endl;
+        return -1;
+    }
+
+    cout << "Recreaing: " << f1 << "\t";
+    if (fops_new(f1.c_str(), &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    cout << "Finding: " << f1 << "\t";
+    if (fops_plain2code(f1.c_str(), &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    cout << "Finding: " << f2 << "\t";
+    if (fops_plain2code(f2.c_str(), &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
 
     return 0;
 }

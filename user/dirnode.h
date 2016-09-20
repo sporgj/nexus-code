@@ -20,8 +20,6 @@ private:
     dnode * proto = nullptr;
     string * dnode_fpath = nullptr;
 
-    static string DNODE_HOME_DIR;
-
     /**
      * Private constructor static constructor
      * @param fb is the dnode object
@@ -40,10 +38,13 @@ private:
 public:
     DirNode();
 
-    static void set_home_dir(const char * home) { DNODE_HOME_DIR = home; }
-    static string & get_repo_dir_str();
-
-    inline void dump() { std::cout << proto->DebugString() << std::endl; }
+    inline void dump()
+    {
+        if (dnode_fpath) {
+            std::cout << dnode_fpath->c_str() << std::endl;
+        }
+        std::cout << proto->DebugString() << std::endl;
+    }
 
     const encoded_fname_t * find_dir_by_raw_name(const char * rawname)
     {

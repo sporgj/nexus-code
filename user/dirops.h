@@ -22,8 +22,10 @@ int dops_new(const char * dpath, char ** encoded_name_dest);
  * set to NULL if error (ex. file not be found)
  * @return 0 on success
  */
-int fops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest);
-int dops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest);
+int fops_code2plain(char * encoded_name, char * dir_path,
+                    char ** raw_name_dest);
+int dops_code2plain(char * encoded_name, char * dir_path,
+                    char ** raw_name_dest);
 
 /**
  * Returns the encoded name from a file path. This is used by the LINUX
@@ -34,8 +36,7 @@ int dops_code2plain(char * encoded_name, char * dir_path, char ** raw_name_dest)
  * @param encoded_fname_dest is the encoded file name destination
  * @return 0 on success
  */
-int fops_plain2code(char * fpath_raw, char ** encoded_fname_dest);
-int dops_plain2code(char * dpath_raw, char ** encoded_dname_dest);
+int fops_plain2code(const char * fpath_raw, char ** encoded_fname_dest);
 
 /**
  * Removes a file from the respective file path
@@ -45,11 +46,8 @@ int dops_plain2code(char * dpath_raw, char ** encoded_dname_dest);
 int fops_remove(const char * fpath_raw, char ** encoded_fname_dest);
 int dops_remove(const char * fpath_raw, char ** encoded_fname_dest);
 
-int fops_rename(const char * from_path, const char * to_path,
-                char ** raw_name_dest);
-
-int dops_rename(const char * from_path, const char * to_path,
-                char ** raw_name_dest);
+int dirops_rename(const char * from_path, const char * to_path, int file_or_dir,
+                  char ** raw_name_dest);
 #ifdef __cplusplus
 }
 #endif

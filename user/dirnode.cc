@@ -10,13 +10,12 @@ using namespace std;
 
 class dnode;
 
-string DirNode::DNODE_HOME_DIR = "";
-
 DirNode::DirNode()
 {
     this->proto = new dnode();
     memset(&header, 0, sizeof(dnode_header_t));
     header.magic = GLOBAL_MAGIC;
+    uuid_generate_time_safe(header.uuid);
 }
 
 inline DirNode * DirNode::load_default_dnode()
@@ -184,12 +183,11 @@ DirNode::__add_entry(const char * fname, const encoded_fname_t * p_encoded_name,
         encoded_name = (encoded_fname_t *)p_encoded_name;
     } else {
         encoded_name = new encoded_fname_t;
-        _dest_fname = static_cast<raw_fname_t *>(operator new(slen));
-        memset(_dest_fname, 0, slen);
-
         uuid_generate_time_safe(encoded_name->bin);
     }
 
+    _dest_fname = static_cast<raw_fname_t *>(operator new(slen));
+    memset(_dest_fname, 0, slen);
     memcpy(_dest_fname->raw, fname, strlen(fname));
 
     // add the mapping to our dnode
@@ -260,30 +258,6 @@ encoded_fname_t * DirNode::rm_dir(const char * realname)
 encoded_fname_t * DirNode::rename_file(const char * oldname,
                                        const char * newname)
 {
-#if 0
-    encoded_fname_t * new_encoded_name;
-    raw_fname_t * dest_fname;
-    if (!rm_file(oldname)) {
-        return nullptr;
-    }
-
-    size_t slen = strlen(newname) + 1;
-
-    dest_fname = static_cast<raw_fname_t *>(operator new(slen));
-    memset(dest_fname, 0, slen);
-
-    memcpy(dest_fname->raw, newname, strlen(newname));
-
-    new_encoded_name = new encoded_fname_t;
-    uuid_generate_time_safe(new_encoded_name->bin);
-
-    dnode_fentry * fentry = this->proto->add_file();
-    fentry->set_encoded_name(new_encoded_name, sizeof(encoded_fname_t));
-    fentry->set_raw_name(dest_fname, slen);
-
-    delete dest_fname;
-    return new_encoded_name;
-#else
     encoded_fname_t * encoded_name;
     auto fentry_list = this->proto->mutable_file();
     auto curr_fentry = fentry_list->begin();
@@ -305,7 +279,6 @@ encoded_fname_t * DirNode::rename_file(const char * oldname,
     }
 
     return nullptr;
-#endif
 }
 
 /**

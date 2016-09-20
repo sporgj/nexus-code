@@ -158,8 +158,8 @@ out:
     return error;
 }
 
-static int dirops_rename(const char * from_path, const char * to_path,
-                         int file_or_dir, char ** raw_name_dest)
+int dirops_rename(const char * from_path, const char * to_path, int file_or_dir,
+                  char ** raw_name_dest)
 {
     int error = AFSX_STATUS_NOOP;
     char * c_old_name = NULL, *c_new_name = NULL;
@@ -171,7 +171,7 @@ static int dirops_rename(const char * from_path, const char * to_path,
     }
 
     /* Get the parent directory dirnode */
-    if ((dirnode1 = DirNode::from_afs_fpath(from_path))) {
+    if ((dirnode1 = DirNode::from_afs_fpath(from_path)) != nullptr) {
         // that means, we delete the entry from the dirnode
         fname_code = (file_or_dir == AFSX_IS_FILE)
                          ? dirnode1->rm_file(c_old_name)
@@ -194,11 +194,13 @@ static int dirops_rename(const char * from_path, const char * to_path,
         goto out;
     }
 
-    if ((dirnode2 = DirNode::from_afs_fpath(to_path))) {
+    if ((dirnode2 = DirNode::from_afs_fpath(to_path)) != nullptr) {
         // then we can add the entry
         if (file_or_dir == AFSX_IS_FILE) {
+            dirnode2->rm_file(c_new_name);
             dirnode2->add_file(c_new_name, fname_code);
         } else {
+            dirnode2->rm_dir(c_new_name);
             dirnode2->add_dir(c_new_name, fname_code);
         }
 
@@ -209,6 +211,7 @@ static int dirops_rename(const char * from_path, const char * to_path,
         }
     }
 
+    *raw_name_dest = encode_bin2str(fname_code);
     error = AFSX_STATUS_SUCCESS;
 out:
     if (c_old_name)
@@ -223,76 +226,6 @@ out:
     return error;
 }
 
-int fops_rename(const char * from_path, const char * to_path,
-                char ** raw_name_dest)
-{
-    return dirops_rename(from_path, to_path, AFSX_IS_FILE, raw_name_dest);
-}
-
-int dops_rename(const char * from_path, const char * to_path,
-                char ** raw_name_dest)
-{
-    return dirops_rename(from_path, to_path, AFSX_IS_DIR, raw_name_dest);
-}
-
-#if 0
-int fops_rename(char * old_plain_path, char * new_plain_path, int file_or_dir,
-                char ** raw_name_dest)
-{
-    // TODO check if both files are in the same folder
-    int error = -1;
-    char * old_fname, *new_fname;
-    DirNode * dirnode1 = nullptr, dirnode2 = nullptr;
-    const encoded_fname_t * fname_code1 = nullptr, * fname_code1 = nullptr;
-
-    dirnode1 = DirNode::from_afs_fpath(old_plain_path);
-    if (dirnode1 == nullptr) {
-        goto out;
-    }
-
-    dirnode2 = DirNode::from_afs_fpath(new_plain_path);
-    if (dirnode2 == nullptr) {
-        goto out;
-    }
-
-    if ((old_fname = dirops_get_fname(old_plain_path)) == NULL
-        || (new_fname = dirops_get_fname(new_plain_path)) == NULL) {
-        goto out;
-    }
-
-    fname_code1 = dirnode1->rm_file(old_fname);
-    if (fname_code1) {
-        LOG(ERROR) << "deleting " << old_fname << "from dirnode";
-        goto out;
-    }
-
-    fname_code = dirnode->rename_file(old_fname, new_fname);
-    if (!fname_code) {
-        goto out;
-    }
-
-    if (!dirnode->flush()) {
-        LOG(ERROR) << "rename, error flushing: " << old_plain_path << " -> "
-                   << new_plain_path;
-        goto out;
-    }
-
-    *raw_name_dest = encode_bin2str(fname_code);
-    error = 0;
-out:
-    if (dirnode1)
-        delete dirnode1;
-    if (dirnode2)
-        delete dirnode2;
-    if (old_fname)
-        free(old_fname);
-    if (new_fname)
-        free(new_fname);
-    if (fname_code)
-        delete fname_code;
-    return error;
-}
-#endif
 int __fops_encode_or_remove(const char * fpath, char ** encoded_fname_dest,
                             bool rm)
 {
@@ -334,7 +267,7 @@ out:
     return error;
 }
 
-int fops_plain2code(char * fpath_raw, char ** encoded_fname_dest)
+int fops_plain2code(const char * fpath_raw, char ** encoded_fname_dest)
 {
     return __fops_encode_or_remove(fpath_raw, encoded_fname_dest, false);
 }
@@ -393,16 +326,5 @@ out:
         delete dnode_path;
     if (error && c_temp)
         free(c_temp);
-    return error;
-}
-
-/**
- * Looks up a plain path and derives the destination encoded filename
- *
- */
-int dops_lookup_path(char * fpath_raw, char ** encoded_dnode_dest)
-{
-    int error = -1;
-
     return error;
 }

@@ -69,7 +69,8 @@ afs_int32 SAFSX_create(
         *crypto_fname = EMPTY_STR_HEAP;
         uerror("create FAILED (ret=%d): %s", ret, path);
     } else {
-        uinfo("create: %s ~> %s", path, *crypto_fname);
+        uinfo("%s: %s ~> %s", (file_or_dir == AFSX_IS_FILE ? "touch" : "mkdir"),
+              path, *crypto_fname);
     }
     return ret;
 }
@@ -110,9 +111,7 @@ afs_int32 SAFSX_rename(
     /*IN */ afs_int32 file_or_dir,
     /*OUT*/ char ** code_name)
 {
-    int ret = (file_or_dir == AFSX_IS_FILE)
-                  ? fops_rename(old_fpath, new_path, code_name)
-                  : dops_rename(old_fpath, new_path, code_name);
+    int ret = dirops_rename(old_fpath, new_path, file_or_dir, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
         uerror("Renaming '%s' -> '%s' FAILED", old_fpath, new_path);
@@ -134,7 +133,7 @@ afs_int32 SAFSX_remove(
                                           : dops_remove(fpath, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
-        uerror("%s FAILED", str);
+        uerror("%s FAILED: %s", str, fpath);
     } else {
         uinfo("%s: %s ~> %s", str, fpath, *code_name);
     }
@@ -217,8 +216,8 @@ afs_int32 SAFSX_readwrite_data(
         goto out;
     }
 
-    uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
-          ctx->completed);
+    //uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
+    //      ctx->completed);
 
     ret = 0;
 out:

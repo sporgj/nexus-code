@@ -74,9 +74,8 @@ typedef struct {
     uint32_t magic;
     uint32_t count;
     uint32_t len;
-    crypto_iv_t iv;
-    crypto_ekey_t ekey;
-    crypto_tag_t mac;
+    uuid_t uuid;
+    crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 
 typedef struct {

@@ -20,6 +20,8 @@ extern int LINUX_AFSX_ping(void);
  */
 extern int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp);
 extern int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp);
+extern int UCAFS_rename(char ** dest, int file_or_dir, struct dentry * from_dp,
+                        struct dentry * to_dp);
 extern int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp);
 extern int LINUX_AFSX_lookup(char ** dest, struct dentry * dp);
 extern int UCAFS_store(struct vcache * avc, struct vrequest * areq);

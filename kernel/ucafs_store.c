@@ -2,16 +2,9 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_store: " fmt, ##args)
 
-int store_prepare(void * rock, afs_uint32 size, afs_uint32 * bytestoxfer)
-{
-    ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
-
-    *bytestoxfer = (size > ctx->buflen) ? ctx->buflen : size;
-    return 0;
-}
-
-static int store_read(void * rock, struct osi_file * tfile, afs_uint32 offset,
-                      afs_uint32 size, afs_uint32 * bytesread)
+static int store_read(ucafs_ctx_t * ctx, struct osi_file * tfile,
+                      afs_uint32 offset, afs_uint32 size,
+                      afs_uint32 * bytesread)
 {
     struct rx_call * uspace_call;
     afs_int32 nbytes;
@@ -44,7 +37,7 @@ out:
     return ret;
 }
 
-int store_write(void * rock, afs_uint32 tlen, afs_uint32 * byteswritten)
+int store_write(ucafs_ctx_t * ctx, afs_uint32 tlen, afs_uint32 * byteswritten)
 {
     ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
     afs_int32 nbytes;
@@ -59,27 +52,27 @@ int store_write(void * rock, afs_uint32 tlen, afs_uint32 * byteswritten)
     return 0;
 }
 
-static int store_close(void * rock, struct AFSFetchStatus * OutStatus,
+static int store_close(ucafs_ctx_t * ctx, struct AFSFetchStatus * OutStatus,
                        afs_int32 * doProcessFS)
 {
-    ucafs_ctx_t * ctx = (ucafs_ctx_t *)rock;
     struct AFSVolSync tsync;
 
     if (ctx->afs_call) {
+        RX_AFS_GUNLOCK();
 #ifdef AFS_64BIT_CLIENT
-        EndRXAFS_StoreData64(ctx->afs_call, OutStatus, &tsync);
-#else
-        EndRXAFS_StoreData(ctx->afs_call, OutStatus, &tsync);
+        if (ctx->srv_64bit) {
+            EndRXAFS_StoreData64(ctx->afs_call, OutStatus, &tsync);
+        } else
 #endif
-        rx_EndCall(ctx->afs_call, 0);
-        ctx->afs_call = NULL;
+            EndRXAFS_StoreData(ctx->afs_call, OutStatus, &tsync);
+        RX_AFS_GLOCK();
     }
 
     return 0;
 }
 
-static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
-                     int * more, afs_int32 * transferred)
+static int storeproc(ucafs_ctx_t * ctx, struct dcache * tdc, int * more,
+                     afs_int32 * transferred)
 {
     int ret = AFSX_STATUS_ERROR, size;
     struct osi_file * tfile;
@@ -92,18 +85,17 @@ static int storeproc(struct storeOps * ops, void * rock, struct dcache * tdc,
 
     *transferred = 0;
 
-    //ERROR("tdc size=%d, chunk=%d, is_last=%d\n", size, tdc->f.chunk, is_last_tdc);
     while (size > 0) {
-        ops->prepare(rock, size, &tlen);    
-        
+        tlen = (size > ctx->buflen) ? ctx->buflen : size;
+
         // XXX check for the read return
         afs_osi_Read(tfile, -1, ctx->buffer, tlen);
 
-        if (ops->read(rock, tfile, pos, tlen, &nbytes)) {
+        if (store_read(rock, tfile, pos, tlen, &nbytes)) {
             goto out;
         }
 
-        if (ops->write(rock, nbytes, &nbytes)) {
+        if (store_write(rock, nbytes, &nbytes)) {
             goto out;
         }
 
@@ -123,11 +115,6 @@ out:
     return ret;
 }
 
-struct storeOps ops = { .read = store_read,
-                        .write = store_write,
-                        .close = store_close,
-                        .prepare = store_prepare };
-
 int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
 {
     int ret = -1;
@@ -142,24 +129,34 @@ int store_init(struct vcache * avc, ucafs_ctx_t * ctx, struct vrequest * areq)
     instatus.ClientModTime = avc->f.m.Date;
 
     tc = afs_Conn(&avc->f.fid, areq, 0, &rx_conn);
+
+    RX_AFS_GUNLOCK();
     afs_call = rx_NewCall(tc->id);
 
+    if (afs_call) {
 #ifdef AFS_64BIT_CLIENT
-    // if the server is rrunning in 64 bits
-    if (!afs_serverHasNo64Bit(tc)) {
-        ctx->srv_64bit = 1;
-        code
-            = StartRXAFS_StoreData64(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
-                                     &instatus, 0, real_len, real_len);
-    } else {
-        // XXX check for total_len > 2^32 - 1
+        // if the server is rrunning in 64 bits
+        if (!afs_serverHasNo64Bit(tc)) {
+            ctx->srv_64bit = 1;
+            code = StartRXAFS_StoreData64(afs_call,
+                                          (struct AFSFid *)&avc->f.fid.Fid,
+                                          &instatus, 0, real_len, real_len);
+        } else {
+            // XXX check for total_len > 2^32 - 1
+            code = StartRXAFS_StoreData(afs_call,
+                                        (struct AFSFid *)&avc->f.fid.Fid,
+                                        &instatus, 0, real_len, real_len);
+        }
+#else
         code = StartRXAFS_StoreData(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
                                     &instatus, 0, real_len, real_len);
-    }
-#else
-    code = StartRXAFS_StoreData(afs_call, (struct AFSFid *)&avc->f.fid.Fid,
-                                &instatus, 0, real_len, real_len);
 #endif
+    } else {
+        code = -1;
+    }
+
+    RX_AFS_GLOCK();
+
     if (code) {
         ERROR("issues with call\n");
         goto out;
@@ -247,8 +244,8 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
         if (storeproc(&ops, &ctx, tdc, NULL, &nbytes)) {
             goto out;
         }
-        
-        //ReleaseReadLock(&tdc->tlock);
+
+        // ReleaseReadLock(&tdc->tlock);
         afs_PutDCache(tdc);
         tdc = NULL;
         bytes_left -= nbytes;
@@ -267,7 +264,7 @@ int UCAFS_store(struct vcache * avc, struct vrequest * areq)
 out:
     // ReleaseWriteLock(&afs_xdcache);
     if (tdc) {
-        //ReleaseReadLock(&tdc->tlock);
+        // ReleaseReadLock(&tdc->tlock);
         afs_PutDCache(tdc);
     }
 
