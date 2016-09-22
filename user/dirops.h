@@ -11,8 +11,8 @@ extern "C" {
  * the encoded file name (malloc), set to NULL if error
  * @return 0 on success
  */
-int fops_new(const char * fpath, char ** encoded_name_dest);
-int dops_new(const char * dpath, char ** encoded_name_dest);
+int dirops_new(const char * fpath, ucafs_entry_type type,
+               char ** encoded_name_dest);
 
 /**
  * Returns the raw file name of an encoded path
@@ -22,10 +22,8 @@ int dops_new(const char * dpath, char ** encoded_name_dest);
  * set to NULL if error (ex. file not be found)
  * @return 0 on success
  */
-int fops_code2plain(char * encoded_name, char * dir_path,
-                    char ** raw_name_dest);
-int dops_code2plain(char * encoded_name, char * dir_path,
-                    char ** raw_name_dest);
+int dirops_code2plain(char * encoded_name, char * dir_path,
+                      ucafs_entry_type type, char ** raw_name_dest);
 
 /**
  * Returns the encoded name from a file path. This is used by the LINUX
@@ -33,21 +31,23 @@ int dops_code2plain(char * encoded_name, char * dir_path,
  * decode operation
  *
  * @param fpath_raw is the raw file path
+ * @param type dir/file
  * @param encoded_fname_dest is the encoded file name destination
  * @return 0 on success
  */
-int fops_plain2code(const char * fpath_raw, char ** encoded_fname_dest);
+int dirops_plain2code(const char * fpath_raw, ucafs_entry_type type,
+                    char ** encoded_fname_dest);
 
 /**
  * Removes a file from the respective file path
  * @param fpath_raw is the raw file name
  * @return 0 on success
  */
-int fops_remove(const char * fpath_raw, char ** encoded_fname_dest);
-int dops_remove(const char * fpath_raw, char ** encoded_fname_dest);
+int dirops_remove(const char * fpath_raw, ucafs_entry_type type,
+                  char ** encoded_fname_dest);
 
-int dirops_rename(const char * from_path, const char * to_path, int file_or_dir,
-                  char ** raw_name_dest);
+int dirops_rename(const char * from_path, const char * to_path,
+                  ucafs_entry_type type, char ** raw_name_dest);
 #ifdef __cplusplus
 }
 #endif

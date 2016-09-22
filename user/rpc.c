@@ -60,46 +60,47 @@ afs_int32 SAFSX_fversion(
 afs_int32 SAFSX_create(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * path,
-    /*IN */ afs_int32 file_or_dir,
+    /*IN */ ucafs_entry_type type,
     /*OUT*/ char ** crypto_fname)
 {
-    int ret = (file_or_dir == AFSX_IS_FILE) ? fops_new(path, crypto_fname)
-                                            : dops_new(path, crypto_fname);
+    int ret = dirops_new(path, type, crypto_fname);
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
         uerror("create FAILED (ret=%d): %s", ret, path);
     } else {
-        uinfo("%s: %s ~> %s", (file_or_dir == AFSX_IS_FILE ? "touch" : "mkdir"),
+        uinfo("%s: %s ~> %s", (type == UCAFS_TYPE_FILE ? "touch" : "mkdir"),
               path, *crypto_fname);
     }
     return ret;
 }
 
-afs_int32 SAFSX_frealname(
+afs_int32 SAFSX_lookup(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fake_name,
     /*IN */ char * path,
-    /*OUT*/ char ** plain_name)
+    /*IN */ ucafs_entry_type type,
+    /*OUT*/ char ** real_name)
 {
-    int ret = fops_code2plain(fake_name, path, plain_name);
+    int ret = dirops_code2plain(fake_name, path, type, real_name);
     if (ret) {
-        *plain_name = EMPTY_STR_HEAP;
+        *real_name = EMPTY_STR_HEAP;
     } else {
-        uinfo("> decode: %s ~> %s", fake_name, *plain_name);
+        uinfo("> decode: %s ~> %s", fake_name, *real_name);
     }
     return ret;
 }
 
-afs_int32 SAFSX_fencodename(
+afs_int32 SAFSX_find(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*OUT*/ char ** code_name_str)
+    /*IN */ ucafs_entry_type type,
+    /*OUT*/ char ** fake_name)
 {
-    int ret = fops_plain2code(fpath, code_name_str);
+    int ret = dirops_plain2code(fpath, type, fake_name);
     if (ret) {
-        *code_name_str = EMPTY_STR_HEAP;
+        *fake_name = EMPTY_STR_HEAP;
     } else {
-        printf("fencode: %s ~> %s\n", fpath, *code_name_str);
+        printf("fencode: %s ~> %s\n", fpath, *fake_name);
     }
     return ret;
 }
@@ -108,10 +109,10 @@ afs_int32 SAFSX_rename(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * old_fpath,
     /*IN */ char * new_path,
-    /*IN */ afs_int32 file_or_dir,
+    /*IN */ ucafs_entry_type type,
     /*OUT*/ char ** code_name)
 {
-    int ret = dirops_rename(old_fpath, new_path, file_or_dir, code_name);
+    int ret = dirops_rename(old_fpath, new_path, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
         uerror("Renaming '%s' -> '%s' FAILED", old_fpath, new_path);
@@ -125,12 +126,11 @@ afs_int32 SAFSX_rename(
 afs_int32 SAFSX_remove(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*IN */ afs_int32 file_or_dir,
+    /*IN */ ucafs_entry_type type,
     /*OUT*/ char ** code_name)
 {
-    const char * str = file_or_dir == AFSX_IS_FILE ? "rm" : "rmdir";
-    int ret = file_or_dir == AFSX_IS_FILE ? fops_remove(fpath, code_name)
-                                          : dops_remove(fpath, code_name);
+    const char * str = (type == UCAFS_TYPE_FILE) ? "rm" : "rmdir";
+    int ret = dirops_remove(fpath, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
         uerror("%s FAILED: %s", str, fpath);
@@ -216,10 +216,16 @@ afs_int32 SAFSX_readwrite_data(
         goto out;
     }
 
-    //uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
+    // uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
     //      ctx->completed);
 
     ret = 0;
 out:
     return ret;
+}
+
+bool_t xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
+{
+    // TODO no need to make the additional call_
+    return xdr_afs_uint32(xdrs, lp);
 }

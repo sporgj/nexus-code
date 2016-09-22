@@ -11,9 +11,12 @@ const char * global_afs_home_path = nullptr;
 /** path to the default repo director.  home_path/.afsx */
 const char * global_afs_repo_path = nullptr;
 
+const char * global_watched_dir = nullptr;
+
 bool global_env_is_afs = true;
 
-void uspace_set_afs_home(const char * path, bool is_afs)
+void uspace_set_afs_home(const char * path, const char * watched_dir,
+                         bool is_afs)
 {
     if (global_afs_home_path) {
         free((void *)global_afs_home_path);
@@ -23,6 +26,10 @@ void uspace_set_afs_home(const char * path, bool is_afs)
     string temp_str(path);
 
     global_afs_home_path = strdup(temp_str.c_str());
+
+    if (watched_dir) {
+        global_watched_dir = strdup(watched_dir);
+    }
 
     temp_str += "/";
     temp_str += DEFAULT_REPO_DIRNAME;
@@ -66,6 +73,28 @@ void uspace_get_relpath(const char * path, char ** rv)
     }
 
     *rv = strdup(ptr);
+}
+
+// make sure the path is prefixed with /afs
+char * uspace_get_relpath_cstr(const string & path)
+{
+    char * rv;
+    // TODO make sure the prefix matches
+    size_t len = path.length(), prefix_len = strlen(global_afs_home_path) + 1,
+           actual_len;
+
+    if (global_watched_dir) {
+        prefix_len += strlen(global_watched_dir); // 1 for the /
+    }
+
+
+    actual_len = len - prefix_len;
+
+    rv = new char[actual_len + 1];
+    memcpy(rv, path.c_str() + prefix_len, len - prefix_len);
+    rv[actual_len] = '\0';
+
+    return rv;
 }
 
 string * uspace_make_dnode_fpath(const char * fname)

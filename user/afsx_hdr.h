@@ -26,3 +26,9 @@
 
 #define AFSX_IS_DIR     0
 #define AFSX_IS_FILE    1
+
+typedef enum {
+    UCAFS_TYPE_UNKNOWN = 0,
+    UCAFS_TYPE_FILE,
+    UCAFS_TYPE_DIR
+} ucafs_entry_type;

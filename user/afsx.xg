@@ -26,26 +26,35 @@ fversion(
 
 create(
     IN string path<AFSX_PATH_MAX>,
-    afs_int32 file_or_dir,
+    ucafs_entry_type type,
     OUT string crypto_fname<AFSX_FNAME_MAX>
 ) = 131;
 
-frealname(
+lookup(
     IN string fake_name<AFSX_FNAME_MAX>,
     string path<AFSX_PATH_MAX>,
+    ucafs_entry_type type,
     OUT string real_name<AFSX_FNAME_MAX>
 ) = 132;
 
-fencodename(
+find(
     IN string fpath<AFSX_PATH_MAX>,
+    ucafs_entry_type type,
     OUT string fake_name<AFSX_FNAME_MAX>
 ) = 133;
 
 remove(
     IN string fpath<AFSX_PATH_MAX>,
-    afs_int32 file_or_dir,
+    ucafs_entry_type type,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 134;
+
+rename(
+    IN string old_fpath<AFSX_PATH_MAX>,
+    string new_path<AFSX_PATH_MAX>,
+    ucafs_entry_type type,
+    OUT string code_name<AFSX_FNAME_MAX>
+) = 135;
 
 readwrite_start(
     IN int op,
@@ -53,21 +62,14 @@ readwrite_start(
     afs_uint32 max_chunk_size,
     afs_uint32 total_size,
     OUT afs_uint32 * id
-) = 135;
+) = 235;
     
 readwrite_finish(
     IN int id
-) = 136;
+) = 236;
 
 readwrite_data(
     IN afs_uint32 id,
     afs_uint32 size,
     OUT int * moredata
-) split = 137;
-
-rename(
-    IN string old_fpath<AFSX_PATH_MAX>,
-    string new_path<AFSX_PATH_MAX>,
-    afs_int32 file_or_dir,
-    OUT string code_name<AFSX_FNAME_MAX>
-) = 138;
+) split = 237;

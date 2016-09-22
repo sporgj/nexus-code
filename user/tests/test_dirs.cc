@@ -39,23 +39,15 @@ int build_tree(string & curr_dir, int i, int j)
         curr_dir += "/";
         curr_dir += lvl[i][j];
 
-        if (curr_dir.find('.') == std::string::npos) {
-            cout << "d: " << curr_dir << " \t ";
-            if (dops_new(curr_dir.c_str(), &encoded_name)) {
-                return -1;
-            }
-        } else {
-            cout << "f: " << curr_dir << " \t ";
-            if (fops_new(curr_dir.c_str(), &encoded_name)) {
-                return -1;
-            }
+        if (dirops_new(curr_dir.c_str(),
+                       ((curr_dir.find('.') == std::string::npos)
+                            ? UCAFS_TYPE_DIR
+                            : UCAFS_TYPE_FILE),
+                       &encoded_name)) {
+            return -1;
         }
 
-        cout << encoded_name << endl;
-
-        if (rand() % 2) {
-            check_paths.push_back(strdup(curr_dir.c_str()));
-        }
+        cout << curr_dir << " \t " << encoded_name << endl;
 
         return build_tree(curr_dir, i + 1, j);
     }
@@ -66,7 +58,7 @@ int build_tree(string & curr_dir, int i, int j)
 int test_dirs()
 {
     int ret;
-    char * temp, * temp2;
+    char * temp, *temp2;
     /* 1 - building the directory tree */
     for (size_t k = 0; k < Y; k++) {
         string v = string(TEST_AFS_HOME);
@@ -88,16 +80,17 @@ int test_dirs()
     dir += "/";
     dir += lvl[0][0];
 
-    /*
+    string dir1("repo/alice/bob"), dir2("repo/alice/kilda");
     cout << endl;
-    cout << "Removing: " << dir << endl;
-    if (dops_remove(dir.c_str(), &temp)) {
-        cout << "Failed" << endl;
-    } else {
-        cout << "PASSED. Removed: " << temp << endl;
+    cout << "Renaming '" << dir1 << "' to '" << dir2 << "'" << endl;
+    if ((ret
+         = dirops_rename(dir1.c_str(), dir2.c_str(), UCAFS_TYPE_DIR, &temp))) {
+        cout << "FAILED. ret = " << ret << endl;
+        return -1;
     }
-    */
+    cout << "PASSED" << endl;
 
+#if 0
     string dir1("repo/alice/bob"), dir2("repo/alice/kilda");
     /*dir1 += "/";
     dir1 += lvl[0][2];
@@ -166,13 +159,14 @@ int test_dirs()
         return -1;
     }
     cout << temp << endl;
+#endif
 
     return 0;
 }
 
 int main()
 {
-    uspace_set_afs_home(TEST_AFS_HOME, false);
+    uspace_set_afs_home(TEST_AFS_HOME, nullptr, false);
     mk_default_dnode();
     srand(time(NULL));
     test_dirs();

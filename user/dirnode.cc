@@ -7,6 +7,7 @@
 #include "encode.h"
 
 using namespace std;
+using namespace ::google::protobuf;
 
 class dnode;
 
@@ -18,7 +19,7 @@ DirNode::DirNode()
     uuid_generate_time_safe(header.uuid);
 }
 
-inline DirNode * DirNode::load_default_dnode()
+DirNode * DirNode::load_default_dnode()
 {
     string * path = uspace_main_dnode_fpath();
     DirNode * dnode = DirNode::from_file(path->c_str());
@@ -27,57 +28,9 @@ inline DirNode * DirNode::load_default_dnode()
     return dnode;
 }
 
-/**
- * Returns the DirNode object containing the following object
- * @param path is the path to the object
- * @param home_folder is the folder in which the cell resides
- * @return NULL if the path is invalid
- */
-DirNode * DirNode::lookup_path(const char * path, bool omit_last)
+bool DirNode::operator==(const DirNode & d)
 {
-    char * p_path = strdup((char *)path), *pch, *nch;
-    uintptr_t ptr_val = (uintptr_t)p_path + strlen(path);
-    DirNode * dirnode = DirNode::load_default_dnode(), dirnode1 = nullptr;
-    const encoded_fname_t * encoded_fname = nullptr;
-    const char * c_encoded_str = nullptr;
-    string * dnode_path = nullptr;
-
-    nch = strtok_r(p_path, "/", &pch);
-    while (nch) {
-        if (omit_last && ptr_val == (uintptr_t)pch) {
-            break;
-        }
-
-        // let's lookup into the value passed
-        if ((encoded_fname = dirnode->find_dir_by_raw_name(nch)) == NULL) {
-            dirnode = nullptr;
-            break;
-        }
-
-        /* get the encoded file name in string format */
-        c_encoded_str = encode_bin2str(encoded_fname);
-        delete encoded_fname;
-
-        /* create the path to open */
-        dnode_path = uspace_make_dnode_fpath(c_encoded_str);
-        free((void *)c_encoded_str);
-
-        /* open the dirnode file */
-        delete dirnode;
-        if ((dirnode = DirNode::from_file(dnode_path->c_str())) == nullptr) {
-            break;
-        }
-        delete dnode_path;
-        dnode_path = nullptr;
-
-        nch = strtok_r(NULL, "/", &pch);
-    }
-
-    if (dnode_path)
-        delete dnode_path;
-
-    free(p_path);
-    return dirnode;
+    return memcmp(&this->header.uuid, &d.header.uuid, sizeof(uuid_t)) == 0;
 }
 
 DirNode * DirNode::from_file(const char * fpath)
@@ -128,14 +81,6 @@ out:
     return obj;
 }
 
-DirNode * DirNode::from_afs_fpath(const char * fpath, bool omit_last)
-{
-    // TODO for now lets assume everything is in one dnode
-    char * relpath;
-    uspace_get_relpath(fpath, &relpath);
-    return DirNode::lookup_path(relpath, omit_last);
-}
-
 bool DirNode::write(DirNode * dn, fstream * file)
 {
     bool ret = false;
@@ -171,60 +116,61 @@ bool DirNode::write(DirNode * dn, const char * fpath)
     return ret;
 }
 
-const encoded_fname_t *
-DirNode::__add_entry(const char * fname, const encoded_fname_t * p_encoded_name,
-                     bool is_file)
+const encoded_fname_t * DirNode::add(const char * name, ucafs_entry_type type,
+                                     const encoded_fname_t * p_encoded_name)
 {
     encoded_fname_t * encoded_name;
-    raw_fname_t * _dest_fname;
-    size_t slen = strlen(fname) + 1;
+    dnode_fentry * fentry;
 
+    if (type == UCAFS_TYPE_UNKNOWN) {
+        return nullptr;
+    }
+
+    switch (type) {
+    case UCAFS_TYPE_FILE:
+        fentry = this->proto->add_file();
+        break;
+    case UCAFS_TYPE_DIR:
+        fentry = this->proto->add_dir();
+        break;
+    default:
+        return nullptr;
+    }
+
+    encoded_name = new encoded_fname_t;
     if (p_encoded_name) {
-        encoded_name = (encoded_fname_t *)p_encoded_name;
+        memcpy(encoded_name, p_encoded_name, sizeof(encoded_fname_t));
     } else {
-        encoded_name = new encoded_fname_t;
         uuid_generate_time_safe(encoded_name->bin);
     }
 
-    _dest_fname = static_cast<raw_fname_t *>(operator new(slen));
-    memset(_dest_fname, 0, slen);
-    memcpy(_dest_fname->raw, fname, strlen(fname));
-
-    // add the mapping to our dnode
-    dnode_fentry * fentry = is_file ? this->proto->add_file()
-                                    : this->proto->add_dir();
     fentry->set_encoded_name(encoded_name, sizeof(encoded_fname_t));
-    fentry->set_raw_name(_dest_fname, slen);
+    fentry->set_raw_name(name);
 
-    header.count++;
-
-    delete _dest_fname;
+    this->header.count++;
 
     return encoded_name;
 }
 
-/**
- * Adds a new file to the dirnode. Returns an encoded filename
- */
-const encoded_fname_t *
-DirNode::add_file(const char * fname, const encoded_fname_t * p_encoded_name)
-{
-    return this->__add_entry(fname, p_encoded_name, true);
-}
-
-const encoded_fname_t * DirNode::add_dir(const char * fname,
-                                         const encoded_fname_t * p_encoded_name)
-{
-    return this->__add_entry(fname, p_encoded_name, false);
-}
-
-encoded_fname_t * DirNode::__rm_entry(const char * realname, bool is_file)
+const encoded_fname_t * DirNode::rm(const char * realname,
+                                    ucafs_entry_type type)
 {
     encoded_fname_t * result = nullptr;
-
     string name_str(realname);
-    auto fentry_list = is_file ? this->proto->mutable_file()
-                               : this->proto->mutable_dir();
+    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
+    RepeatedPtrField<dnode_fentry> * fentry_list;
+retry:
+    switch (type) {
+    case UCAFS_TYPE_FILE:
+        fentry_list = this->proto->mutable_file();
+        break;
+    case UCAFS_TYPE_DIR:
+        fentry_list = this->proto->mutable_dir();
+        break;
+    default:
+        return nullptr;
+    }
+
     auto curr_fentry = fentry_list->begin();
 
     while (curr_fentry != fentry_list->end()) {
@@ -236,33 +182,140 @@ encoded_fname_t * DirNode::__rm_entry(const char * realname, bool is_file)
             // delete from the list
             fentry_list->erase(curr_fentry);
             header.count--;
-            break;
+            return result;
         }
 
         curr_fentry++;
     }
 
-    return result;
+    if (iterate) {
+        switch (type) {
+        case UCAFS_TYPE_FILE:
+            type = UCAFS_TYPE_DIR;
+            goto retry;
+            break;
+        default:
+            // TODO, go to link
+            break;
+        }
+    }
+
+    return nullptr;
 }
 
-encoded_fname_t * DirNode::rm_file(const char * realname)
+const char * DirNode::lookup(const encoded_fname_t * encoded_name,
+                             ucafs_entry_type type)
 {
-    return this->__rm_entry(realname, true);
+    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
+    const RepeatedPtrField<dnode_fentry> * fentry_list;
+
+retry:
+    switch (type) {
+    case UCAFS_TYPE_FILE:
+        fentry_list = &this->proto->file();
+        break;
+    case UCAFS_TYPE_DIR:
+        fentry_list = &this->proto->dir();
+        break;
+    default:
+        return nullptr;
+    }
+
+    auto curr_fentry = fentry_list->begin();
+    while (curr_fentry != fentry_list->end()) {
+        if (memcmp(encoded_name, curr_fentry->encoded_name().data(),
+                   sizeof(encoded_fname_t)) == 0) {
+            return curr_fentry->raw_name().c_str();
+        }
+
+        curr_fentry++;
+    }
+
+    if (iterate) {
+        switch (type) {
+        case UCAFS_TYPE_FILE:
+            type = UCAFS_TYPE_DIR;
+            goto retry;
+            break;
+        default:
+            // TODO, go to link
+            break;
+        }
+    }
+
+    return nullptr;
 }
 
-encoded_fname_t * DirNode::rm_dir(const char * realname)
+const encoded_fname_t * DirNode::find(const char * realname,
+                                      ucafs_entry_type type)
 {
-    return this->__rm_entry(realname, false);
+    size_t len = strlen(realname);
+    encoded_fname_t * encoded;
+    string name_str(realname);
+    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
+    const RepeatedPtrField<dnode_fentry> * fentry_list;
+
+retry:
+    switch (type) {
+    case UCAFS_TYPE_FILE:
+        fentry_list = &this->proto->file();
+        break;
+    case UCAFS_TYPE_DIR:
+        fentry_list = &this->proto->dir();
+        break;
+    default:
+        return nullptr;
+    }
+
+    auto curr_fentry = fentry_list->begin();
+    while (curr_fentry != fentry_list->end()) {
+        if (!name_str.compare(curr_fentry->raw_name().data())) {
+            encoded = new encoded_fname_t;
+            memcpy(encoded, curr_fentry->encoded_name().data(),
+                   sizeof(encoded_fname_t));
+
+            return encoded;
+        }
+        curr_fentry++;
+    }
+
+    if (iterate) {
+        switch (type) {
+        case UCAFS_TYPE_FILE:
+            type = UCAFS_TYPE_DIR;
+            goto retry;
+            break;
+        default:
+            // TODO, go to link
+            break;
+        }
+    }
+
+    return nullptr;
 }
 
-encoded_fname_t * DirNode::rename_file(const char * oldname,
-                                       const char * newname)
+const encoded_fname_t * DirNode::rename(const char * oldname,
+                                        const char * newname,
+                                        ucafs_entry_type type)
 {
     encoded_fname_t * encoded_name;
-    auto fentry_list = this->proto->mutable_file();
-    auto curr_fentry = fentry_list->begin();
     string name_str(oldname);
+    RepeatedPtrField<dnode_fentry> * fentry_list;
+    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
 
+retry:
+    switch (type) {
+    case UCAFS_TYPE_FILE:
+        fentry_list = this->proto->mutable_file();
+        break;
+    case UCAFS_TYPE_DIR:
+        fentry_list = this->proto->mutable_dir();
+        break;
+    default:
+        return nullptr;
+    }
+
+    auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
         if (!name_str.compare(curr_fentry->raw_name().data())) {
             encoded_name = new encoded_fname_t;
@@ -278,73 +331,22 @@ encoded_fname_t * DirNode::rename_file(const char * oldname,
         curr_fentry++;
     }
 
-    return nullptr;
-}
-
-/**
- * Converts the encoded to the real one
- * @param encoded_name
- * @param use_malloc on if to allocate with malloc
- * @return nullptr if entry not found
- */
-char * DirNode::__enc2raw(const encoded_fname_t * encoded_name, bool use_malloc,
-                          bool is_file)
-{
-    char * realname = nullptr;
-
-    auto fentry_list = is_file ? this->proto->file() : this->proto->dir();
-    auto curr_fentry = fentry_list.begin();
-    while (curr_fentry != fentry_list.end()) {
-        if (memcmp(encoded_name, curr_fentry->encoded_name().data(),
-                   sizeof(encoded_fname_t)) == 0) {
-            size_t len = curr_fentry->raw_name().size();
-            realname = use_malloc ? (char *)calloc(1, len + 1)
-                                  : new char[len + 1];
-            memcpy(realname, curr_fentry->raw_name().c_str(), len);
+    if (iterate) {
+        switch (type) {
+        case UCAFS_TYPE_FILE:
+            type = UCAFS_TYPE_DIR;
+            goto retry;
+            break;
+        default:
+            // TODO, go to link
             break;
         }
-
-        curr_fentry++;
-    }
-
-    return realname;
-}
-
-const encoded_fname_t * DirNode::__raw2enc(const char * realname, bool is_file)
-{
-    size_t len = strlen(realname);
-    encoded_fname_t * encoded;
-    string name_str(realname);
-
-    auto fentry_list = is_file ? this->proto->file() : this->proto->dir();
-    auto curr_fentry = fentry_list.begin();
-    while (curr_fentry != fentry_list.end()) {
-        if (!name_str.compare(curr_fentry->raw_name().data())) {
-            encoded = new encoded_fname_t;
-            memcpy(encoded, curr_fentry->encoded_name().data(),
-                   sizeof(encoded_fname_t));
-
-            return encoded;
-        }
-        curr_fentry++;
     }
 
     return nullptr;
 }
 
-char * DirNode::encoded2raw(const encoded_fname_t * encoded_name,
-                            bool use_malloc)
-{
-    char * value = this->__enc2raw(encoded_name, use_malloc, true);
-    return value ? value : this->__enc2raw(encoded_name, use_malloc, false);
-}
-
-const encoded_fname_t * DirNode::raw2encoded(const char * realname)
-{
-    const encoded_fname_t * value = this->__raw2enc(realname, true);
-    return value ? value : this->__raw2enc(realname, false);
-}
-
+#ifdef UCAFS_DEBUG
 void DirNode::list_files()
 {
     for (size_t i = 0; i < this->proto->file_size(); i++) {
@@ -355,3 +357,4 @@ void DirNode::list_files()
         cout << this->proto->dir(i).raw_name() << "/" << endl;
     }
 }
+#endif

@@ -62,7 +62,7 @@ static bool check_main_dir()
 int main(int argc, char ** argv)
 {
     int ret, updated;
-    uspace_set_afs_home(afs_path, true);
+    uspace_set_afs_home(afs_path, "sgx", true);
 
     /* initialize the enclave */
     sgx_launch_token_t token;

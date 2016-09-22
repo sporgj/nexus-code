@@ -68,7 +68,7 @@ afsx.h: afsx.xg afsx_hdr.h
 
 libucafs.a: $(OBJS)
 	@ar cr $@ $^
-	@echo "ar $(OBJS) => $@"
+	@echo "ar => $@"
 
 rpc.o: rpc.c afsx.ss.c
 	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
@@ -76,6 +76,10 @@ rpc.o: rpc.c afsx.ss.c
 
 %.o: %.cc %.h
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@echo "CXX <= $@"
+
+%.o: %.c %.h
+	@$(CC) $(CFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
 dirnode.o: dirnode.cc dirnode.h dnode.pb.cc

@@ -11,6 +11,17 @@ const char * alias_names[] = { "index.html", "index.html~" };
 #define LEN sizeof(fnames) / sizeof(char *)
 #define SIMLEN sizeof(alias_names) / sizeof(char *)
 
+static void test_dops()
+{
+    char * str, * codenames[LEN];
+}
+
+int main()
+{
+    return 0;
+}
+
+#if 0
 static void test_alias()
 {
     char * str;
@@ -119,3 +130,4 @@ int main()
     test_dops();
     test_alias();
 }
+#endif

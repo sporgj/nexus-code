@@ -11,12 +11,14 @@ LIBS = -L/usr/local/lib -lprotobuf -pthread\
 INCFLAGS = -I/usr/local/include
 
 OBJS = dirnode.o\
+       dircache.o\
        filebox.o\
        uspace.o\
        encode.o\
        dirops.o\
        fileops.o\
        utils.o\
+       slog.o\
        fbox.pb.o\
        dnode.pb.o
 

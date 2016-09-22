@@ -13,9 +13,10 @@ extern const char * global_afs_repo_path;
 
 extern bool global_env_is_afs;
 
-void uspace_set_afs_home(const char * path, bool is_afs);
+void uspace_set_afs_home(const char * path, const char * watched_dir,
+                         bool is_afs);
 
-string * uspace_get_repo_path(); 
+string * uspace_get_repo_path();
 
 string * uspace_main_dnode_fpath();
 
@@ -23,3 +24,5 @@ string * uspace_make_dnode_fpath(const char * fname);
 string * uspace_make_fbox_fpath(const char * fname);
 
 void uspace_get_relpath(const char * path, char ** rv);
+
+char * uspace_get_relpath_cstr(const string & path);
