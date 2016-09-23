@@ -87,6 +87,9 @@ char * uspace_get_relpath_cstr(const string & path)
         prefix_len += strlen(global_watched_dir); // 1 for the /
     }
 
+    if (path[prefix_len] == '/') {
+        prefix_len++;
+    }
 
     actual_len = len - prefix_len;
 

@@ -74,7 +74,7 @@ afs_int32 SAFSX_create(
     return ret;
 }
 
-afs_int32 SAFSX_lookup(
+afs_int32 SAFSX_find(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fake_name,
     /*IN */ char * path,
@@ -90,7 +90,7 @@ afs_int32 SAFSX_lookup(
     return ret;
 }
 
-afs_int32 SAFSX_find(
+afs_int32 SAFSX_lookup(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
     /*IN */ ucafs_entry_type type,
@@ -222,10 +222,4 @@ afs_int32 SAFSX_readwrite_data(
     ret = 0;
 out:
     return ret;
-}
-
-bool_t xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
-{
-    // TODO no need to make the additional call_
-    return xdr_afs_uint32(xdrs, lp);
 }

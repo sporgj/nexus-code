@@ -73,6 +73,14 @@ struct ubik_client;
 #include <rx/rx.h>
 #include <rx/rx_null.h>
 #include "afsx_hdr.h"
+#ifndef UCAFS_ENTRY_TYPE
+#define UCAFS_ENTRY_TYPE
+static bool_t xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
+{
+ // TODO no need to make the additional call_
+ return xdr_afs_uint32(xdrs, lp);
+}
+#endif
 #define AFSX_REQ_MAX 2
 #define AFSX_REQ_MIN 1
 #define AFSX_NULL 0
@@ -90,47 +98,65 @@ extern afs_int32 SAFSX_fversion(
 extern int AFSX_create(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * path,
-	/*IN */ afs_int32 file_or_dir,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *crypto_fname);
 
 extern afs_int32 SAFSX_create(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * path,
-	/*IN */ afs_int32 file_or_dir,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *crypto_fname);
 
-extern int AFSX_frealname(
+extern int AFSX_find(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * fake_name,
 	/*IN */ char * path,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *real_name);
 
-extern afs_int32 SAFSX_frealname(
+extern afs_int32 SAFSX_find(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * fake_name,
 	/*IN */ char * path,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *real_name);
 
-extern int AFSX_fencodename(
+extern int AFSX_lookup(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * fpath,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *fake_name);
 
-extern afs_int32 SAFSX_fencodename(
+extern afs_int32 SAFSX_lookup(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * fpath,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *fake_name);
 
 extern int AFSX_remove(
 	/*IN */ struct rx_connection *z_conn,
 	/*IN */ char * fpath,
-	/*IN */ afs_int32 file_or_dir,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *code_name);
 
 extern afs_int32 SAFSX_remove(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * fpath,
-	/*IN */ afs_int32 file_or_dir,
+	/*IN */ ucafs_entry_type type,
+	/*OUT*/ char * *code_name);
+
+extern int AFSX_rename(
+	/*IN */ struct rx_connection *z_conn,
+	/*IN */ char * old_fpath,
+	/*IN */ char * new_path,
+	/*IN */ ucafs_entry_type type,
+	/*OUT*/ char * *code_name);
+
+extern afs_int32 SAFSX_rename(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * old_fpath,
+	/*IN */ char * new_path,
+	/*IN */ ucafs_entry_type type,
 	/*OUT*/ char * *code_name);
 
 extern int AFSX_readwrite_start(
@@ -172,25 +198,11 @@ extern afs_int32 SAFSX_readwrite_data(
 	/*IN */ afs_uint32 size,
 	/*OUT*/ int * moredata);
 
-extern int AFSX_rename(
-	/*IN */ struct rx_connection *z_conn,
-	/*IN */ char * old_fpath,
-	/*IN */ char * new_path,
-	/*IN */ afs_int32 file_or_dir,
-	/*OUT*/ char * *code_name);
-
-extern afs_int32 SAFSX_rename(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * old_fpath,
-	/*IN */ char * new_path,
-	/*IN */ afs_int32 file_or_dir,
-	/*OUT*/ char * *code_name);
-
 extern int AFSX_ExecuteRequest(struct rx_call *);
 
 /* Opcode-related useful stats for package: AFSX_ */
 #define AFSX_LOWEST_OPCODE   130
-#define AFSX_HIGHEST_OPCODE	138
+#define AFSX_HIGHEST_OPCODE	237
 #define AFSX_NUMBER_OPCODES	9
 
 #define AFSX_NO_OF_STAT_FUNCS	9

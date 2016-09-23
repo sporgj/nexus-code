@@ -85,6 +85,8 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     encoded_fname_t * fname_code = NULL;
     const char * result;
     std::string path_string(dir_path);
+    // TODO no need to do this
+    path_string += "/dummy";
 
     /* 1 - Get the binary version */
     if ((fname_code = encode_str2bin(encoded_name)) == NULL) {
@@ -92,14 +94,13 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     }
 
     // 2 - Get the corresponding dirnode
-    path_string += "/";
     DirNode * dirnode = dcache_lookup(path_string);
     if (dirnode == nullptr) {
         goto out;
     }
 
     // 3 - Get the plain filename
-    if ((result = dirnode->lookup(fname_code, type)) == NULL) {
+    if ((result = dirnode->enc2raw(fname_code, type)) == NULL) {
         goto out;
     }
 
@@ -200,8 +201,10 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     }
 
     /* Perform the operation */
-    if ((fname_code = dirnode->rm(fname, type)) == nullptr) {
-        slog(0, SLOG_ERROR, "Could not remove: %s", fpath);
+    if ((fname_code = (rm ? dirnode->rm(fname, type)
+                          : dirnode->raw2enc(fname, type))) == nullptr) {
+        slog(0, SLOG_WARN, "Could not %s: %s", (rm ? "remove" : "find"),
+             fpath);
         goto out;
     }
 

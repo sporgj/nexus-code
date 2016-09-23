@@ -74,7 +74,7 @@ public:
      * @param encoded_name is the encoded name to look for
      * @return a string of the name
      */
-    const char * lookup(const encoded_fname_t * encoded_name,
+    const char * enc2raw(const encoded_fname_t * encoded_name,
                         ucafs_entry_type type = UCAFS_TYPE_UNKNOWN);
 
     /**
@@ -82,7 +82,7 @@ public:
      * @param rawname is the entry's raw name
      * @return the encoded file name
      */
-    const encoded_fname_t * find(const char * rawname,
+    const encoded_fname_t * raw2enc(const char * rawname,
                                  ucafs_entry_type type = UCAFS_TYPE_UNKNOWN);
 
     /**

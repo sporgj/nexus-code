@@ -133,6 +133,8 @@ const encoded_fname_t * DirNode::add(const char * name, ucafs_entry_type type,
     case UCAFS_TYPE_DIR:
         fentry = this->proto->add_dir();
         break;
+    case UCAFS_TYPE_LINK:
+        fentry = this->proto->add_link();
     default:
         return nullptr;
     }
@@ -157,8 +159,15 @@ const encoded_fname_t * DirNode::rm(const char * realname,
 {
     encoded_fname_t * result = nullptr;
     string name_str(realname);
-    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
     RepeatedPtrField<dnode_fentry> * fentry_list;
+
+    bool iterate;
+    if (type == UCAFS_TYPE_UNKNOWN) {
+        type = UCAFS_TYPE_FILE;
+        iterate = true;
+    } else {
+        iterate = false;
+    }
 retry:
     switch (type) {
     case UCAFS_TYPE_FILE:
@@ -166,6 +175,9 @@ retry:
         break;
     case UCAFS_TYPE_DIR:
         fentry_list = this->proto->mutable_dir();
+        break;
+    case UCAFS_TYPE_LINK:
+        fentry_list = this->proto->mutable_link();
         break;
     default:
         return nullptr;
@@ -194,6 +206,10 @@ retry:
             type = UCAFS_TYPE_DIR;
             goto retry;
             break;
+        case UCAFS_TYPE_DIR:
+            type = UCAFS_TYPE_LINK;
+            goto retry;
+            break;
         default:
             // TODO, go to link
             break;
@@ -203,12 +219,18 @@ retry:
     return nullptr;
 }
 
-const char * DirNode::lookup(const encoded_fname_t * encoded_name,
+const char * DirNode::enc2raw(const encoded_fname_t * encoded_name,
                              ucafs_entry_type type)
 {
-    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
     const RepeatedPtrField<dnode_fentry> * fentry_list;
 
+    bool iterate;
+    if (type == UCAFS_TYPE_UNKNOWN) {
+        type = UCAFS_TYPE_FILE;
+        iterate = true;
+    } else {
+        iterate = false;
+    }
 retry:
     switch (type) {
     case UCAFS_TYPE_FILE:
@@ -216,6 +238,9 @@ retry:
         break;
     case UCAFS_TYPE_DIR:
         fentry_list = &this->proto->dir();
+        break;
+    case UCAFS_TYPE_LINK:
+        fentry_list = &this->proto->link();
         break;
     default:
         return nullptr;
@@ -237,6 +262,10 @@ retry:
             type = UCAFS_TYPE_DIR;
             goto retry;
             break;
+        case UCAFS_TYPE_DIR:
+            type = UCAFS_TYPE_LINK;
+            goto retry;
+            break;
         default:
             // TODO, go to link
             break;
@@ -246,15 +275,21 @@ retry:
     return nullptr;
 }
 
-const encoded_fname_t * DirNode::find(const char * realname,
+const encoded_fname_t * DirNode::raw2enc(const char * realname,
                                       ucafs_entry_type type)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
     string name_str(realname);
-    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
     const RepeatedPtrField<dnode_fentry> * fentry_list;
 
+    bool iterate;
+    if (type == UCAFS_TYPE_UNKNOWN) {
+        type = UCAFS_TYPE_FILE;
+        iterate = true;
+    } else {
+        iterate = false;
+    }
 retry:
     switch (type) {
     case UCAFS_TYPE_FILE:
@@ -262,6 +297,9 @@ retry:
         break;
     case UCAFS_TYPE_DIR:
         fentry_list = &this->proto->dir();
+        break;
+    case UCAFS_TYPE_LINK:
+        fentry_list = &this->proto->link();
         break;
     default:
         return nullptr;
@@ -301,7 +339,13 @@ const encoded_fname_t * DirNode::rename(const char * oldname,
     encoded_fname_t * encoded_name;
     string name_str(oldname);
     RepeatedPtrField<dnode_fentry> * fentry_list;
-    bool iterate = (type == UCAFS_TYPE_UNKNOWN);
+    bool iterate;
+    if (type == UCAFS_TYPE_UNKNOWN) {
+        type = UCAFS_TYPE_FILE;
+        iterate = true;
+    } else {
+        iterate = false;
+    }
 
 retry:
     switch (type) {
@@ -335,6 +379,10 @@ retry:
         switch (type) {
         case UCAFS_TYPE_FILE:
             type = UCAFS_TYPE_DIR;
+            goto retry;
+            break;
+        case UCAFS_TYPE_DIR:
+            type = UCAFS_TYPE_LINK;
             goto retry;
             break;
         default:

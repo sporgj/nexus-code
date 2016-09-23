@@ -1,8 +1,8 @@
 KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs
-CXX = clang++
-CC = clang
+CXX = g++
+CC = gcc
 CPPFLAGS = -g -O0 -std=c++11
 CFLAGS = -g -O0
 LIBS = -L/usr/local/lib -lprotobuf -pthread\

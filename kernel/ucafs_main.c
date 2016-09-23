@@ -1,6 +1,9 @@
 #ifdef AFS_SECURE
-
+#include <linux/dcache.h>
 #include "ucafs_kern.h"
+
+static const char * afs_prefix = "/afs";
+static const uint32_t afs_prefix_len = 4;
 
 static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx" };
 
@@ -65,6 +68,19 @@ struct rx_connection * __get_conn(void)
 
 void __put_conn(struct rx_connection * c) { rx_PutConnection(c); }
 
+static inline ucafs_entry_type dentry_type(struct dentry * dentry)
+{
+    if (d_is_file(dentry)) {
+        return UCAFS_TYPE_FILE;
+    } else if (d_is_dir(dentry)) {
+        return UCAFS_TYPE_DIR;
+    } else if (d_is_symlink(dentry)) {
+        return UCAFS_TYPE_LINK;
+    }
+
+    return UCAFS_TYPE_UNKNOWN;
+}
+
 /**
  * whether to ignore a vnode or not.
  * if not ignore, dest will be set to the full path of the directory
@@ -73,7 +89,7 @@ void __put_conn(struct rx_connection * c) { rx_PutConnection(c); }
  */
 int __is_dentry_ignored(struct dentry * dentry, char ** dest)
 {
-    int len, i;
+    int len, i, total_len;
     char * path, *curr_dir, *result;
     char buf[512];
 
@@ -88,9 +104,11 @@ int __is_dentry_ignored(struct dentry * dentry, char ** dest)
             // we're good
             if (dest) {
                 len = strlen(path);
-                result = kmalloc(len + 1, GFP_KERNEL);
-                memcpy(result, path, len);
-                result[len] = '\0';
+                total_len = afs_prefix_len + len;
+                result = kmalloc(total_len + 1, GFP_KERNEL);
+                memcpy(result, afs_prefix, afs_prefix_len);
+                memcpy(result + afs_prefix_len, path, len);
+                result[total_len] = '\0';
                 *dest = result;
             }
             return 0;
@@ -99,12 +117,17 @@ int __is_dentry_ignored(struct dentry * dentry, char ** dest)
     return 1;
 }
 
+inline int UCAFS_ignore_dentry(struct dentry * dp, char ** dest)
+{
+    return __is_dentry_ignored(dp, dest);
+}
+
 inline int __is_vnode_ignored(struct vcache * avc, char ** dest)
 {
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
 }
 
-int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp)
+int UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -118,7 +141,7 @@ int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    ret = AFSX_create(conn, fpath, file_or_dir, dest);
+    ret = AFSX_create(conn, fpath, type, dest);
     if (ret) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "error on file %s\n", fpath);
@@ -130,21 +153,17 @@ int UCAFS_create(char ** dest, int file_or_dir, struct dentry * dp)
     return ret;
 }
 
-int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp)
+int UCAFS_find(char ** dest, char * fname, ucafs_entry_type type,
+               char * dirpath)
 {
     int ret;
-    char * dirpath;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
     }
 
-    if (__is_dentry_ignored(dp, &dirpath)) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    if ((ret = AFSX_frealname(conn, fname, dirpath, dest))) {
+    if ((ret = AFSX_find(conn, fname, dirpath, type, dest))) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "realname error: %s\n", dirpath);
         }
@@ -154,7 +173,7 @@ int LINUX_AFSX_realname(char ** dest, char * fname, struct dentry * dp)
     return ret;
 }
 
-int LINUX_AFSX_lookup(char ** dest, struct dentry * dp)
+int UCAFS_lookup(char ** dest, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -168,7 +187,7 @@ int LINUX_AFSX_lookup(char ** dest, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    if ((ret = AFSX_fencodename(conn, fpath, dest))) {
+    if ((ret = AFSX_lookup(conn, fpath, dentry_type(dp), dest))) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "lookup error: %s\n", fpath);
         }
@@ -178,7 +197,7 @@ int LINUX_AFSX_lookup(char ** dest, struct dentry * dp)
     return ret;
 }
 
-int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp)
+int UCAFS_remove(char ** dest, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -192,7 +211,7 @@ int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
-    if ((ret = AFSX_remove(conn, fpath, file_or_dir, dest))) {
+    if ((ret = AFSX_remove(conn, fpath, dentry_type(dp), dest))) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "delete error: %s\n", fpath);
         }
@@ -203,10 +222,10 @@ int UCAFS_remove(char ** dest, int file_or_dir, struct dentry * dp)
     return ret;
 }
 
-int UCAFS_rename(char ** dest, int file_or_dir, struct dentry * from_dp, struct dentry * to_dp)
+int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
-    char * from_path = NULL, * to_path = NULL;
+    char * from_path = NULL, *to_path = NULL;
 
     if (!AFSX_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
@@ -219,7 +238,8 @@ int UCAFS_rename(char ** dest, int file_or_dir, struct dentry * from_dp, struct 
         goto out;
     }
 
-    if ((ret = AFSX_rename(conn, from_path, to_path, file_or_dir, dest))) {
+    if ((ret
+         = AFSX_rename(conn, from_path, to_path, dentry_type(from_dp), dest))) {
         goto out;
     }
 
@@ -228,33 +248,8 @@ out:
         kfree(from_path);
     if (to_path)
         kfree(to_path);
-    
+
     return ret;
 }
 
-#if 0
-// TODO test function
-int LINUX_AFSX_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
-{
-    int ret, ignore_from, ignore_to;
-    char * from_path, to_path;
-
-    if (!AFSX_IS_CONNECTED) {
-        return -1;
-    }
-
-    ignore_from = __is_dentry_ignored(from_dp, from_path);
-    ignore_to = __is_dentry_ignored(to_dp, to_path);
-
-    // TODO finish code for moving across protected folders
-    // for now, just support within one folder
-    if (ignore_from || ignore_to) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    return 0;
-}
-#endif
-
-#define MAX_NUM_OF_CHUNKS 32
 #endif

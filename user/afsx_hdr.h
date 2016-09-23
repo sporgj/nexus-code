@@ -30,5 +30,7 @@
 typedef enum {
     UCAFS_TYPE_UNKNOWN = 0,
     UCAFS_TYPE_FILE,
-    UCAFS_TYPE_DIR
+    UCAFS_TYPE_DIR,
+    UCAFS_TYPE_LINK
 } ucafs_entry_type;
+
