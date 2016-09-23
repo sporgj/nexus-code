@@ -135,6 +135,7 @@ const encoded_fname_t * DirNode::add(const char * name, ucafs_entry_type type,
         break;
     case UCAFS_TYPE_LINK:
         fentry = this->proto->add_link();
+        break;
     default:
         return nullptr;
     }
@@ -220,7 +221,7 @@ retry:
 }
 
 const char * DirNode::enc2raw(const encoded_fname_t * encoded_name,
-                             ucafs_entry_type type)
+                              ucafs_entry_type type)
 {
     const RepeatedPtrField<dnode_fentry> * fentry_list;
 
@@ -276,7 +277,7 @@ retry:
 }
 
 const encoded_fname_t * DirNode::raw2enc(const char * realname,
-                                      ucafs_entry_type type)
+                                         ucafs_entry_type type)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
@@ -323,6 +324,10 @@ retry:
             type = UCAFS_TYPE_DIR;
             goto retry;
             break;
+        case UCAFS_TYPE_DIR:
+            type = UCAFS_TYPE_LINK;
+            goto retry;
+            break;
         default:
             // TODO, go to link
             break;
@@ -355,6 +360,9 @@ retry:
     case UCAFS_TYPE_DIR:
         fentry_list = this->proto->mutable_dir();
         break;
+    case UCAFS_TYPE_LINK:
+        fentry_list = this->proto->mutable_link();
+        break;
     default:
         return nullptr;
     }
@@ -362,14 +370,8 @@ retry:
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
         if (!name_str.compare(curr_fentry->raw_name().data())) {
-            encoded_name = new encoded_fname_t;
-            uuid_generate_time_safe(encoded_name->bin);
-
             curr_fentry->set_raw_name(newname);
-            curr_fentry->set_encoded_name(encoded_name->bin,
-                                          sizeof(encoded_fname_t));
-
-            return encoded_name;
+            return (encoded_fname_t *)(curr_fentry->encoded_name().data());
         }
 
         curr_fentry++;

@@ -14,9 +14,8 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
                char ** encoded_name_dest)
 {
     int error = -1; // TODO change this
-    char * fname = dirops_get_fname(fpath), *temp;
+    char * fname = do_get_fname(fpath), *temp;
     DirNode * dirnode = nullptr, *dirnode1 = nullptr;
-    FileBox * fbox = nullptr;
     const encoded_fname_t * fname_code = nullptr;
     string * path1 = nullptr;
     struct dirent * dirent;
@@ -27,7 +26,7 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     }
 
     /* lets get the directory entry */
-    dirnode = dcache_lookup(std::string(fpath));
+    dirnode = dcache_get_dirnode(fpath);
     if (dirnode == nullptr) {
         slog(0, SLOG_ERROR, "Error loading dirnode: %s", fpath);
         goto out;
@@ -56,22 +55,19 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
             goto out;
         }
     } else if (type == UCAFS_TYPE_FILE) {
+        /* TODO: create filebox object */
     }
 
     /* Set the encoded name */
     *encoded_name_dest = temp;
     error = 0;
 out:
-    if (fname_code)
-        delete fname_code;
     if (dirnode)
         dcache_put(dirnode);
     if (dirnode1)
         dcache_put(dirnode1);
     if (fname)
         delete fname;
-    if (fbox)
-        delete fbox;
     if (path1)
         delete path1;
 
@@ -94,7 +90,7 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     }
 
     // 2 - Get the corresponding dirnode
-    DirNode * dirnode = dcache_lookup(path_string);
+    DirNode * dirnode = dcache_get_dirnode(path_string.c_str());
     if (dirnode == nullptr) {
         goto out;
     }
@@ -107,8 +103,6 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     *raw_name_dest = strdup(result);
     error = 0;
 out:
-    if (fname_code)
-        delete fname_code;
     if (dirnode)
         dcache_put(dirnode);
     return error;
@@ -122,16 +116,16 @@ int dirops_rename(const char * from_path, const char * to_path,
     DirNode * dirnode1 = nullptr, *dirnode2 = nullptr;
     const encoded_fname_t * fname_code = nullptr;
 
-    if ((c_old_name = dirops_get_fname(from_path)) == nullptr) {
+    if ((c_old_name = do_get_fname(from_path)) == nullptr) {
         goto out;
     }
 
-    if ((c_new_name = dirops_get_fname(to_path)) == nullptr) {
+    if ((c_new_name = do_get_fname(to_path)) == nullptr) {
         goto out;
     }
 
-    dirnode1 = dcache_lookup(std::string(from_path));
-    dirnode2 = dcache_lookup(std::string(to_path));
+    dirnode1 = dcache_get_dirnode(from_path);
+    dirnode2 = dcache_get_dirnode(to_path);
 
     if (dirnode1 == nullptr || dirnode2 == nullptr) {
         slog(0, SLOG_ERROR, "Could not find dirnode");
@@ -139,10 +133,10 @@ int dirops_rename(const char * from_path, const char * to_path,
     }
 
     if (dirnode1->operator==(*dirnode2)) {
-        dirnode1->rename(c_old_name, c_new_name, type);
+        fname_code = dirnode1->rename(c_old_name, c_new_name, type);
 
         dirnode1->flush();
-        goto out;
+        goto out1;
     }
 
     /* Removing from the owning dirnode */
@@ -166,6 +160,7 @@ int dirops_rename(const char * from_path, const char * to_path,
         goto out;
     }
 
+out1:
     *raw_name_dest = encode_bin2str(fname_code);
     error = AFSX_STATUS_SUCCESS;
 out:
@@ -190,12 +185,12 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     string * dnode_path = nullptr;
 
     /* 1 - Get the corresponding dirnode */
-    DirNode * dirnode = dcache_lookup(fpath);
+    DirNode * dirnode = dcache_get_dirnode(fpath);
     if (dirnode == nullptr) {
         goto out;
     }
 
-    if ((fname = dirops_get_fname(fpath)) == NULL) {
+    if ((fname = do_get_fname(fpath)) == NULL) {
         slog(0, SLOG_ERROR, "Could not get fname: %s", fpath);
         goto out;
     }
@@ -230,8 +225,6 @@ out:
         dcache_put(dirnode);
     if (fname)
         delete fname;
-    if (fname_code)
-        delete fname_code;
     if (dnode_path)
         delete dnode_path;
     return error;

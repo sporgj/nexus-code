@@ -53,19 +53,14 @@ string * uspace_main_dnode_fpath()
     return rv_str;
 }
 
-void uspace_get_relpath(const char * path, char ** rv)
+void uspace_get_relpath_c(const char * path, char ** rv)
 {
     // XXX next time, add watched folders to make sure we load the necessary
     // dnode object
-    const char * ptr = path + strlen(global_afs_home_path)
-                       - (global_env_is_afs ? strlen("/afs") : 0);
+    const char * ptr = path + strlen(global_afs_home_path);
 
-    if (global_env_is_afs) {
-        ptr++;
-    }
-
-    while (*ptr != '/' && *ptr != '\0') {
-        ptr++;
+    if (global_watched_dir) {
+        ptr += strlen(global_watched_dir) + 1;
     }
 
     if (*ptr != '\0') {
@@ -73,31 +68,6 @@ void uspace_get_relpath(const char * path, char ** rv)
     }
 
     *rv = strdup(ptr);
-}
-
-// make sure the path is prefixed with /afs
-char * uspace_get_relpath_cstr(const string & path)
-{
-    char * rv;
-    // TODO make sure the prefix matches
-    size_t len = path.length(), prefix_len = strlen(global_afs_home_path) + 1,
-           actual_len;
-
-    if (global_watched_dir) {
-        prefix_len += strlen(global_watched_dir); // 1 for the /
-    }
-
-    if (path[prefix_len] == '/') {
-        prefix_len++;
-    }
-
-    actual_len = len - prefix_len;
-
-    rv = new char[actual_len + 1];
-    memcpy(rv, path.c_str() + prefix_len, len - prefix_len);
-    rv[actual_len] = '\0';
-
-    return rv;
 }
 
 string * uspace_make_dnode_fpath(const char * fname)

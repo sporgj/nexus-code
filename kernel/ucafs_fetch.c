@@ -225,7 +225,6 @@ static int fetch_proc(ucafs_ctx_t * ctx, struct dcache * tdc,
 
         // let's write this to our tdc
         nbytes = afs_osi_Write(tfile, pos, ctx->buffer, nbytes);
-        ERROR("tdc written: nbytes=%u, len=%u\n", nbytes, len);
         pos += len;
         max_write -= len;
     }
