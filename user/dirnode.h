@@ -21,15 +21,11 @@ private:
     dnode * proto = nullptr;
     string * dnode_fpath = nullptr;
 
-    /**
-     * Private constructor static constructor
-     * @param fb is the dnode object
-     * @param fd is the file stream object
-     */
     DirNode(dnode * fb) { this->proto = fb; };
 
 public:
     DirNode();
+    ~DirNode();
 
     /**
      * Open the dirnode at following fpath

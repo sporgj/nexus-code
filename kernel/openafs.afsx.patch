@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..d818c63 100644
+index 1b99c94..5a3cab4 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -123,17 +123,30 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
@@ -237,6 +237,15 @@ index 1b99c94..d818c63 100644
      AFS_GLOCK();
      code = afs_rename(VTOAFS(oldip), (char *)oldname, VTOAFS(newip), (char *)newname, credp);
      AFS_GUNLOCK();
+@@ -1868,6 +1998,8 @@ afs_linux_ireadlink(struct inode *ip, char *target, int maxlen, uio_seg_t seg)
+     memset(&tuio, 0, sizeof(tuio));
+     memset(&iov, 0, sizeof(iov));
+ 
++    printk(KERN_ERR, "readlink: %s\n", target);
++
+     setup_uio(&tuio, &iov, target, (afs_offs_t) 0, maxlen, UIO_READ, seg);
+     code = afs_readlink(VTOAFS(ip), &tuio, credp);
+     crfree(credp);
 diff --git a/src/afs/afs.h b/src/afs/afs.h
 index f03609c..176f33a 100644
 --- a/src/afs/afs.h
@@ -290,10 +299,10 @@ index 9e9f65b..fe8d680 100644
 +
  #endif /* _AFS_PROTOTYPES_H_ */
 diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
-index 2dd89cf..1cb8fa1 100644
+index 2dd89cf..f80359b 100644
 --- a/src/afs/afs_segments.c
 +++ b/src/afs/afs_segments.c
-@@ -173,6 +173,16 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
+@@ -173,6 +173,15 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
      afs_size_t maxStoredLength;	/* highest offset we've written to server. */
      int safety, marineronce = 0;
  
@@ -301,7 +310,6 @@ index 2dd89cf..1cb8fa1 100644
 +#include "afsx_hdr.h"
 +    code = UCAFS_store(avc, areq);
 +    if (code != AFSX_STATUS_NOOP) {
-+	printk(KERN_ERR "upload_file returned %d\n", code);
 +	return code;
 +    }
 +    code = 0;

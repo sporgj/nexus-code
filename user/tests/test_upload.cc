@@ -84,7 +84,7 @@ static int test_upload()
 
     // lets add it to a fake dnode
     init_dnode();
-    if (fops_new(TEST_FILE, &encoded_name_str)) {
+    if (dirops_new(TEST_FILE, UCAFS_TYPE_FILE, &encoded_name_str)) {
         cout << "Adding to dnode failed" << endl;
         return -1;
     }
@@ -156,7 +156,7 @@ static int test_upload()
 int main(int argc, char ** argv)
 {
     int ret, updated;
-    uspace_set_afs_home("repo", false);
+    uspace_set_afs_home("repo", NULL, false);
     /* initialize the enclave */
     sgx_launch_token_t token;
     ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,

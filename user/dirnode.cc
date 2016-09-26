@@ -19,6 +19,14 @@ DirNode::DirNode()
     uuid_generate_time_safe(header.uuid);
 }
 
+DirNode::~DirNode()
+{
+    if (this->dnode_fpath) {
+        delete dnode_fpath;
+    }
+    delete this->proto;
+}
+
 DirNode * DirNode::load_default_dnode()
 {
     string * path = uspace_main_dnode_fpath();
@@ -50,11 +58,11 @@ DirNode * DirNode::from_file(const char * fpath)
     file.read((char *)&_header, sizeof(dnode_header_t));
 
     if (_header.magic != GLOBAL_MAGIC) {
-        cout << "\n ! Error with file format" << endl;
+        cout << "Error with file format: " << fpath << endl;
         goto out;
     }
 
-    _dnode = new class ::dnode;
+    _dnode = new dnode();
 
     if (_header.len) {
         dnode_buf = new uint8_t[_header.len];
@@ -68,8 +76,7 @@ DirNode * DirNode::from_file(const char * fpath)
         }
     }
 
-    obj = new DirNode();
-    obj->proto = _dnode;
+    obj = new DirNode(_dnode);
     obj->dnode_fpath = new string(fpath);
     memcpy(&obj->header, &_header, sizeof(dnode_header_t));
 
@@ -341,10 +348,22 @@ const encoded_fname_t * DirNode::rename(const char * oldname,
                                         const char * newname,
                                         ucafs_entry_type type)
 {
+    const encoded_fname_t * encoded_name = this->rm(oldname, type);
+    const encoded_fname_t * p_encoded_name;
+    if (encoded_name) {
+        this->rm(newname, type);
+        p_encoded_name = this->add(newname, type, encoded_name);
+        delete p_encoded_name;
+        return encoded_name;
+    }
+    return nullptr;
+
+#if 0
     encoded_fname_t * encoded_name;
-    string name_str(oldname);
+    string oldname_str(oldname), newname_str(newname);
     RepeatedPtrField<dnode_fentry> * fentry_list;
     bool iterate;
+    int found;
     if (type == UCAFS_TYPE_UNKNOWN) {
         type = UCAFS_TYPE_FILE;
         iterate = true;
@@ -367,14 +386,27 @@ retry:
         return nullptr;
     }
 
+    found = 0;
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
-        if (!name_str.compare(curr_fentry->raw_name().data())) {
-            curr_fentry->set_raw_name(newname);
-            return (encoded_fname_t *)(curr_fentry->encoded_name().data());
+        if (!newname_str.compare(curr_fentry->raw_name().data())) {
+            fentry_list->erase(curr_fentry);
+            found++;
+            goto jump;
         }
 
+        if (!oldname_str.compare(curr_fentry->raw_name().data())) {
+            curr_fentry->set_raw_name(newname);
+            encoded_name
+                = (encoded_fname_t *)(curr_fentry->encoded_name().data());
+            found++;
+        }
+jump:
         curr_fentry++;
+    }
+
+    if (found == 2) {
+        return encoded_name;
     }
 
     if (iterate) {
@@ -394,6 +426,7 @@ retry:
     }
 
     return nullptr;
+#endif
 }
 
 #ifdef UCAFS_DEBUG

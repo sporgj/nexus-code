@@ -6,6 +6,7 @@ const char * fnames[] = {"dell.md", "imac.txt", "firefox.app", "a.out", "vagrant
 
 static void test_dnode()
 {
+#if 0
     LOG(INFO) << "Initializing dnode file";
     // create our file and truncate it
     fstream file(TEST_FBOX_PATH, ios::out | ios::trunc);
@@ -47,6 +48,7 @@ static void test_dnode()
     dn->list_files();
 
     delete dn;
+#endif
 }
 
 int main() 

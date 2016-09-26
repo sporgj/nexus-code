@@ -62,6 +62,8 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     *encoded_name_dest = temp;
     error = 0;
 out:
+    if (fname_code)
+        delete fname_code;
     if (dirnode)
         dcache_put(dirnode);
     if (dirnode1)
@@ -153,7 +155,7 @@ int dirops_rename(const char * from_path, const char * to_path,
 
     /* Adding it to the new dirnode */
     dirnode2->rm(c_new_name, type);
-    dirnode2->rm(c_old_name, type);
+    dirnode2->add(c_new_name, type, fname_code);
 
     if (!dirnode2->flush()) {
         slog(0, SLOG_ERROR, "Flushing '%s' dirnode failed", to_path);

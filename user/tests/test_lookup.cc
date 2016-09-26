@@ -8,6 +8,7 @@ const char * folders[] = { "future", "drake", "jeezy" },
 
 int save_file(const char * fname, const encoded_fname_t * ename)
 {
+    /*
     int num = 2;
     const char * estr = encode_bin2str(ename);
     string * dest_path = uspace_make_dnode_fpath(estr);
@@ -25,12 +26,15 @@ int save_file(const char * fname, const encoded_fname_t * ename)
     }
     cout << fname << " ~> " << dest_path->c_str() << endl;
     fp.close();
-
+    
     return num;
+    */
+    return 0;
 }
 
 void test_lookup()
 {
+#if 0
     string * main_dnode_str = uspace_main_dnode_fpath();
     DirNode * dn = new DirNode();
     const encoded_fname_t * ename;
@@ -66,11 +70,12 @@ void test_lookup()
     }
     cout << "Listing dirs: " << endl;
     dn2->list_files();
+#endif
 }
 
 int main()
 {
-    uspace_set_afs_home(TEST_AFS_HOME, false);
+    //uspace_set_afs_home(TEST_AFS_HOME, false);
     test_lookup();
 
     return 0;

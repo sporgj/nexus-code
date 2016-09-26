@@ -48,7 +48,8 @@ void hexdump(uint8_t * buf, uint32_t len)
 
 char * do_get_fname(const char * fpath)
 {
-    size_t i;
+    size_t i = 0;
+    char * rv = nullptr;
     const char * result = fpath + strlen(fpath);
 
     while (*result != '/' && result != fpath) {
@@ -56,5 +57,10 @@ char * do_get_fname(const char * fpath)
         result--;
     }
 
-    return strndup(result + (result != fpath), i + 1);
+    if (result != fpath) {
+        rv = (char *)operator new(i + 1);
+        memcpy(rv, result + 1, i);
+        rv[i] = '\0';
+    }
+    return rv;
 }

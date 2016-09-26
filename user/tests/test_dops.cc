@@ -1,133 +1,147 @@
 #include "defs.h"
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <cstring>
 
 using namespace std;
 
-const char * fnames[]
-    = { "mellow/index.html", "/afs/maatta.sgx/bruyne/firefox.exe",
-        "./Xcode.app", "hello/terminal.bin" };
+#define X 4
+#define Y 3
 
-const char * alias_names[] = { "index.html", "index.html~" };
+const char * lvl[X][Y] = { { "alice", "foo", "bar" },
+                           { "bob", NULL, "oops" },
+                           { "file.md", NULL, "read.txt" },
+                           { NULL, NULL, NULL } };
+vector<char *> check_paths;
 
-#define LEN sizeof(fnames) / sizeof(char *)
-#define SIMLEN sizeof(alias_names) / sizeof(char *)
-
-static void test_dops()
+static void mk_default_dnode()
 {
-    char * str, * codenames[LEN];
+    string * _str = uspace_main_dnode_fpath();
+    DirNode * dn = new DirNode();
+
+    cout << "Saving main dnode: " << _str->c_str() << endl;
+    fstream f(_str->c_str(), ios::out);
+    if (!DirNode::write(dn, &f)) {
+        cout << "Could not save main file" << endl;
+        return;
+    }
+    f.close();
+
+    delete dn;
 }
 
-int main()
+int build_tree(string & curr_dir, int i, int j)
 {
+    char * encoded_name;
+
+    if (lvl[i][j]) {
+        curr_dir += "/";
+        curr_dir += lvl[i][j];
+
+        if (dirops_new(curr_dir.c_str(),
+                       ((curr_dir.find('.') == std::string::npos)
+                            ? UCAFS_TYPE_DIR
+                            : UCAFS_TYPE_FILE),
+                       &encoded_name)) {
+            return -1;
+        }
+
+        cout << curr_dir << " \t " << encoded_name << endl;
+
+        return build_tree(curr_dir, i + 1, j);
+    }
+
     return 0;
 }
 
-#if 0
-static void test_alias()
+int test_dirs()
 {
-    char * str;
-    char * codenames[SIMLEN];
-
-    cout << ". Initializing filebox file" << endl;
-    // create our file and truncate it
-    fstream file(TEST_FBOX_PATH1, ios::out | ios::trunc);
-    DirNode * dn = new DirNode();
-    DirNode::write(dn, &file);
-    file.close();
-    delete dn;
-
-    for (size_t i = 0; i < SIMLEN; i++) {
-        cout << alias_names[i];
-        if (fops_new((char *)alias_names[i], &str)) {
-            cout << " FAILED" << endl;
-            return;
+    int ret;
+    char * temp, *temp2;
+    /* 1 - building the directory tree */
+    for (size_t k = 0; k < Y; k++) {
+        string v = string(TEST_AFS_HOME);
+        if ((ret = build_tree(v, 0, k))) {
+            cout << " ! Failed. ret = " << ret << endl;
+            return -1;
         }
-        codenames[i] = str;
-        cout << " =====> " << str << endl;
+
+        cout << endl;
     }
 
-    cout << ". Removing entries" << endl;
-    fops_plain2code((char *)alias_names[0], &str);
-    cout << alias_names[0] << " ~> " << str << endl;
-
-    fops_plain2code((char *)alias_names[1], &str);
-    cout << alias_names[1] << " ~> " << str << endl;
-}
-
-static void test_dops()
-{
-    char * str;
-    char * codenames[LEN];
-
-    cout << ". Initializing filebox file" << endl;
-    // create our file and truncate it
-    fstream file(TEST_FBOX_PATH1, ios::out | ios::trunc);
-    DirNode * dn = new DirNode();
-    DirNode::write(dn, &file);
-    file.close();
-    delete dn;
-
-    cout << "\n. Adding entries to the filebox " << endl;
-    for (size_t i = 0; i < LEN; i++) {
-        cout << fnames[i];
-        if (fops_new((char *)fnames[i], &str)) {
-            cout << " FAILED" << endl;
-            return;
-        }
-        codenames[i] = str;
-        cout << " =====> " << str << endl;
+    /* 2 - Loooking up directories */
+    for (size_t k = 0; k < check_paths.size(); k++) {
+        cout << check_paths[k] << endl;
     }
 
-    cout << "\n. Filldir operation (encoded -> plain)" << endl;
-    for (size_t i = 0; i < LEN; i++) {
-        cout << codenames[i];
-        if (fops_code2plain(codenames[i], (char *)"", &str)) {
-            cout << " FAILED" << endl;
-            return;
-        }
-        cout << " ======> " << str << endl;
+    string f1("repo/foo"), f2("repo/foo");
+    f1 += "/";
+    f2 += "/";
+    f1 += "config.lock";
+    f2 += "config";
+
+    cout << "Creating: " << f1 << "\t";
+    if (dirops_new(f1.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    cout << "Finding: " << f1 << "\t";
+    if (dirops_plain2code(f1.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "not found" << endl;
+    } else {
+        cout << temp << endl;
     }
 
-    cout << "\n. Lookup operation (plain -> encoded)" << endl;
-    for (size_t i = 0; i < LEN; i++) {
-        cout << fnames[i];
-        if (fops_plain2code((char *)fnames[i], &str)) {
-            cout << " FAILED" << endl;
-            return;
-        }
-        cout << " ======> " << str << endl;
+    cout << "Renaming '" << f1 << "' -> '" << f2 << "'" << endl;
+    if (dirops_rename(f1.c_str(), f2.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "Error" << endl;
+        return -1;
     }
 
-    dn = DirNode::from_file(TEST_FBOX_PATH1);
-
-    cout << "\n. Listing entries" << endl;
-    dn->list_files();
-
-    cout << "\n. Deleting entries" << endl;
-    srand(time(0));
-    for (size_t i = 0; i < 2; i++) {
-        int j = rand() % LEN;
-        cout << "Removing '" << fnames[j] << "'... ";
-        if (fops_remove((char *)fnames[j], &str)) {
-            cout << "FAILED" << endl;
-            ;
-            continue;
-        }
-        cout << str << endl;
+    cout << "Finding: " << f1 << "\t";
+    if (dirops_plain2code(f1.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "Success" << endl;
+    } else {
+        cout << "Error" << endl;
+        return -1;
     }
 
-    cout << "\n. Listing entries" << endl;
-    dn = DirNode::from_file(TEST_FBOX_PATH1);
-    dn->list_files();
+    if (1) {
+        return 0;
+    }
+
+    cout << "Recreating: " << f1 << "\t";
+    if (dirops_new(f1.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    cout << "Finding: " << f1 << "\t";
+    if (dirops_plain2code(f1.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    cout << "Finding: " << f2 << "\t";
+    if (dirops_plain2code(f2.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+    cout << temp << endl;
+
+    return 0;
 }
 
 int main()
 {
-    FLAGS_colorlogtostderr = true;
-    FLAGS_minloglevel = 0;
-    FLAGS_logtostderr = true;
-    google::InitGoogleLogging("--logtostderr=true --colorlogtostderr=true");
-
-    test_dops();
-    test_alias();
+    uspace_set_afs_home(TEST_AFS_HOME, nullptr, false);
+    mk_default_dnode();
+    srand(time(NULL));
+    test_dirs();
+    return 0;
 }
-#endif
