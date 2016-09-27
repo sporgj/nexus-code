@@ -90,6 +90,10 @@ filebox.o: filebox.cc filebox.h fbox.pb.cc
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
+%.pb.o: %.pb.cc
+	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
+	@echo "CXX <= $@"
+
 %.pb.cc: %.proto
 	protoc --cpp_out=./ $^
 

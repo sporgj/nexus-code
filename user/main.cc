@@ -4,7 +4,6 @@
  * @author judicael
  *
  */
-#include <glog/logging.h>
 #include <iostream>
 #include <fstream>
 
@@ -34,7 +33,7 @@ static bool check_main_dir()
     if (!f1) {
         // create the folder
         if (mkdir(afsx_repo->c_str(), S_IRWXG)) {
-            LOG(ERROR) << "Could not mkdir: " << afsx_repo;
+            cout << "Could not mkdir: " << afsx_repo << endl;
             return false;
         }
     }
@@ -81,7 +80,6 @@ int main(int argc, char ** argv)
 
     cout << ". Loaded enclave" << endl;
 
-    google::InitGoogleLogging("--logtostderr=1");
     if (!check_main_dir()) {
         return -1;
     }

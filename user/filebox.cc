@@ -8,7 +8,7 @@ using namespace std;
 FileBox::FileBox()
 {
     memset(&this->header, 0, sizeof(fbox_header_t));
-    this->proto = new class ::fbox;
+    this->proto = new fbox();
 
     // every filebox has a default segmentt
     this->create_segment();
@@ -34,7 +34,7 @@ FileBox * FileBox::from_file(const char * fname)
 
     file.read((char *)&_header, sizeof(fbox_header_t));
 
-    _fbox = new class ::fbox;
+    _fbox = new fbox();
     if (_header.plen) {
         buffer = new uint8_t[_header.plen];
 

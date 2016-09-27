@@ -267,7 +267,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     ret = AFSX_STATUS_ERROR;
-    ERROR("fetching %s\n", path);
+    ERROR("fetching %s (%u)\n", path, avc->f.m.Length);
 
     if (init_fserv(avc, &ctx, areq)) {
         goto out;

@@ -78,7 +78,7 @@ struct ubik_client;
 static bool_t xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
 {
  // TODO no need to make the additional call_
- return xdr_afs_uint32(xdrs, lp);
+ return xdr_afs_uint32(xdrs, (afs_uint32 *)lp);
 }
 #endif
 #define AFSX_REQ_MAX 2

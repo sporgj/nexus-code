@@ -194,6 +194,7 @@ int UCAFS_lookup(char ** dest, struct dentry * dp)
         *dest = NULL;
     }
 
+    kfree(fpath);
     return ret;
 }
 

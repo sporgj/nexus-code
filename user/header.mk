@@ -3,10 +3,11 @@ KERNSRC_PATH = ../kernel
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
-CPPFLAGS = -g -O0 -std=c++11
-CFLAGS = -g -O0
+FLAGS := -g -O0
+CPPFLAGS = $(FLAGS) -std=c++11
+CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib -lprotobuf -pthread\
-       -lglog\
+       -ltcmalloc\
        -luuid
 INCFLAGS = -I/usr/local/include
 
