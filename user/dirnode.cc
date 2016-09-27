@@ -1,5 +1,4 @@
 #include <string>
-#include <glog/logging.h>
 #include <uuid/uuid.h>
 
 #include "uspace.h"

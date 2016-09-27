@@ -1,7 +1,7 @@
 include header.mk
 include sgx_defs.mk
 
-OPENAFS_PATH := /home/vagrant/openafs
+OPENAFS_PATH := $(HOME)/openafs
 OPENAFS_INC := $(OPENAFS_PATH)/include
 OPENAFS_SRC := $(OPENAFS_PATH)/src
 OPENAFS_LIB := $(OPENAFS_PATH)/lib
