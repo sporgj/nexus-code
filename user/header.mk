@@ -7,7 +7,6 @@ FLAGS := -g -O0
 CPPFLAGS = $(FLAGS) -std=c++11
 CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib -lprotobuf -pthread\
-       -ltcmalloc\
        -luuid
 INCFLAGS = -I/usr/local/include
 

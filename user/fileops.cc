@@ -1,6 +1,5 @@
 #include <cstdint>
 #include <vector>
-#include <glog/logging.h>
 #include <iostream>
 
 #include "fileops.h"
