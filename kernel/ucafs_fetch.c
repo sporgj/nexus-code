@@ -2,7 +2,8 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_fetch: " fmt, ##args)
 
-static int fetch_read(ucafs_ctx_t * ctx, uint32_t len, uint32_t * bytes_read)
+static int
+fetch_read(ucafs_ctx_t * ctx, uint32_t len, uint32_t * bytes_read)
 {
     uint32_t nbytes;
 
@@ -16,8 +17,11 @@ static int fetch_read(ucafs_ctx_t * ctx, uint32_t len, uint32_t * bytes_read)
     return 0;
 }
 
-static int fetch_write(ucafs_ctx_t * ctx, uint32_t len,
-                       uint32_t * bytes_written, int * moredata)
+static int
+fetch_write(ucafs_ctx_t * ctx,
+            uint32_t len,
+            uint32_t * bytes_written,
+            int * moredata)
 {
     uint32_t nbytes;
     int ret = -1;
@@ -53,8 +57,8 @@ out1:
     return ret;
 }
 
-static void fetch_cleanup(ucafs_ctx_t * ctx, struct afs_FetchOutput * o,
-                          int error)
+static void
+fetch_cleanup(ucafs_ctx_t * ctx, struct afs_FetchOutput * o, int error)
 {
     struct rx_call * afs_call;
     int code;
@@ -87,8 +91,8 @@ static void fetch_cleanup(ucafs_ctx_t * ctx, struct afs_FetchOutput * o,
     kfree(ctx);
 }
 
-static int init_sgx_socket(struct rx_connection * conn, ucafs_ctx_t * ctx,
-                           char * path)
+static int
+init_sgx_socket(struct rx_connection * conn, ucafs_ctx_t * ctx, char * path)
 {
     int ret;
     /* 1 -  Connect to the userspace daemon */
@@ -110,10 +114,10 @@ static int init_sgx_socket(struct rx_connection * conn, ucafs_ctx_t * ctx,
     return 0;
 }
 
-int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
-               struct vrequest * areq)
+int
+init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx, struct vrequest * areq)
 {
-    int ret = -1, code, temp;
+    int ret = -1, code = 0, temp;
     uint32_t nbytes, tlen = avc->f.m.Length;
     struct afs_conn * tc;
     struct rx_connection * rx_conn;
@@ -150,7 +154,7 @@ int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
             RX_AFS_GLOCK();
             if (temp != sizeof(afs_int32)) {
                 ERROR("FileServer is sending BS. amt=%d, nbytes=%u\n", temp,
-                        ntohl(nbytes));
+                      ntohl(nbytes));
                 code = rx_Error(afs_call);
                 RX_AFS_GUNLOCK();
                 rx_EndCall(afs_call, code);
@@ -160,8 +164,8 @@ int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
         } else {
             RX_AFS_GLOCK();
         }
-    } 
-    
+    }
+
     if (code == RXGEN_OPCODE || afs_serverHasNo64Bit(tc)) {
         RX_AFS_GUNLOCK();
         if (afs_call == NULL) {
@@ -178,7 +182,7 @@ int init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx,
     code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, 0, tlen);
     RX_AFS_GLOCK();
 #endif
-    
+
     if (code) {
         ERROR("FetchData call failed %d\n", code);
         goto out;
@@ -201,15 +205,17 @@ out:
     return ret;
 }
 
-static int fetch_proc(ucafs_ctx_t * ctx, struct dcache * tdc,
-                      uint32_t bytes_left, uint32_t * bytes_done)
+static int
+fetch_proc(ucafs_ctx_t * ctx,
+           struct dcache * tdc,
+           uint32_t bytes_left,
+           uint32_t * bytes_done)
 {
     int ret = -1, moredata;
-    uint32_t tdc_len = AFS_CHUNKTOSIZE(tdc->f.chunk), len, nbytes, max_write,
-             pos;
+    uint32_t tdc_len = AFS_CHUNKTOSIZE(tdc->f.chunk), len, nbytes, pos;
     struct osi_file * tfile = afs_CFileOpen(&tdc->f.inode);
-
-    max_write = bytes_left > tdc_len ? tdc_len : bytes_left;
+    uint32_t max_write = bytes_left > tdc_len ? tdc_len : bytes_left;
+    
     pos = 0;
 
     while (max_write) {
@@ -231,14 +237,14 @@ static int fetch_proc(ucafs_ctx_t * ctx, struct dcache * tdc,
 
     *bytes_done = pos;
 
-    // let's read upto max_write
     ret = 0;
 out:
     osi_UFSClose(tfile);
     return ret;
 }
 
-int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
+int
+UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
 {
     int ret;
     uint32_t bytes_left, pos = 0, nbytes;
@@ -267,7 +273,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     ret = AFSX_STATUS_ERROR;
-    ERROR("fetching %s (%u)\n", path, avc->f.m.Length);
+    ERROR("fetching %s (%d)\n", path, (int)avc->f.m.Length);
 
     if (init_fserv(avc, &ctx, areq)) {
         goto out;
@@ -279,7 +285,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     bytes_left = avc->f.m.Length;
-    //ObtainWriteLock(&afs_xdcache, 6505);
+    // ObtainWriteLock(&afs_xdcache, 6505);
     ObtainWriteLock(&avc->lock, 6507);
     while (bytes_left) {
         tdc = afs_GetDCache(avc, pos, areq, &offset, &len, 2);
@@ -312,7 +318,7 @@ int UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
 
 out1:
     ReleaseWriteLock(&avc->lock);
-    //ReleaseWriteLock(&afs_xdcache);
+// ReleaseWriteLock(&afs_xdcache);
 out:
     if (conn) {
         __put_conn(conn);

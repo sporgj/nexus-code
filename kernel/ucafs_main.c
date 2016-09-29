@@ -235,6 +235,8 @@ int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
     ignore_from = __is_dentry_ignored(from_dp, &from_path);
     ignore_to = __is_dentry_ignored(to_dp, &to_path);
 
+    printk(KERN_ERR "renaming: %s -> %s\n", from_path, to_path);
+
     if (ignore_from && ignore_to) {
         goto out;
     }

@@ -25,6 +25,7 @@ typedef struct {
     struct rx_call * afs_call;
     struct rx_connection * rx_conn;
     struct vrequest * areq;
+    struct rx_connection * udp_conn;
 } ucafs_ctx_t;
 
 int __is_vnode_ignored(struct vcache * vcache, char ** dest);
