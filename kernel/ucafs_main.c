@@ -131,6 +131,7 @@ int UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
 {
     int ret;
     char * fpath;
+    struct rx_connection * conn = NULL;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
@@ -140,6 +141,8 @@ int UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
     if (__is_dentry_ignored(dp, &fpath)) {
         return AFSX_STATUS_NOOP;
     }
+
+    conn = __get_conn();
 
     ret = AFSX_create(conn, fpath, type, dest);
     if (ret) {
@@ -149,6 +152,7 @@ int UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
         *dest = NULL;
     }
 
+    __put_conn(conn);
     kfree(fpath);
     return ret;
 }
@@ -157,11 +161,14 @@ int UCAFS_find(char ** dest, char * fname, ucafs_entry_type type,
                char * dirpath)
 {
     int ret;
+    struct rx_connection * conn = NULL;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
     }
+
+    conn = __get_conn();
 
     if ((ret = AFSX_find(conn, fname, dirpath, type, dest))) {
         if (ret == AFSX_STATUS_ERROR) {
@@ -169,7 +176,8 @@ int UCAFS_find(char ** dest, char * fname, ucafs_entry_type type,
         }
         *dest = NULL;
     }
-
+    
+    __put_conn(conn);
     return ret;
 }
 
@@ -177,6 +185,7 @@ int UCAFS_lookup(char ** dest, struct dentry * dp)
 {
     int ret;
     char * fpath;
+    struct rx_connection * conn = NULL;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
@@ -187,13 +196,17 @@ int UCAFS_lookup(char ** dest, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
+    conn = __get_conn();
+
     if ((ret = AFSX_lookup(conn, fpath, dentry_type(dp), dest))) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "lookup error: %s\n", fpath);
         }
+        // TODO empty head
         *dest = NULL;
     }
 
+    __put_conn(conn);
     kfree(fpath);
     return ret;
 }
@@ -202,6 +215,7 @@ int UCAFS_remove(char ** dest, struct dentry * dp)
 {
     int ret;
     char * fpath;
+    struct rx_connection * conn = NULL;
 
     *dest = NULL;
     if (!AFSX_IS_CONNECTED) {
@@ -212,6 +226,8 @@ int UCAFS_remove(char ** dest, struct dentry * dp)
         return AFSX_STATUS_NOOP;
     }
 
+    conn = __get_conn();
+
     if ((ret = AFSX_remove(conn, fpath, dentry_type(dp), dest))) {
         if (ret == AFSX_STATUS_ERROR) {
             printk(KERN_ERR "delete error: %s\n", fpath);
@@ -219,6 +235,7 @@ int UCAFS_remove(char ** dest, struct dentry * dp)
         *dest = NULL;
     }
 
+    __put_conn(conn);
     kfree(fpath);
     return ret;
 }
@@ -227,6 +244,7 @@ int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
     char * from_path = NULL, *to_path = NULL;
+    struct rx_connection * conn = NULL;
 
     if (!AFSX_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
@@ -241,11 +259,14 @@ int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
         goto out;
     }
 
+    conn = __get_conn();
+
+    *dest = NULL;
     if ((ret
          = AFSX_rename(conn, from_path, to_path, dentry_type(from_dp), dest))) {
-        goto out;
     }
 
+    __put_conn(conn);
 out:
     if (from_path)
         kfree(from_path);

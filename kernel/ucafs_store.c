@@ -285,6 +285,7 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
 
     /* start the session with the fileserver */
     if (store_init(avc, &ctx, path, areq)) {
+        ret = AFSX_STATUS_ERROR;
         ERROR("error initializing store\n");
         goto out;
     }
