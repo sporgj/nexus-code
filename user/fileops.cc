@@ -79,10 +79,10 @@ xfer_context_t * fileops_get_context(uint32_t id)
 
 int fileops_process_data(xfer_context_t * ctx)
 {
-    int ret;
+    int ret = 0;
     
     //hexdump((uint8_t *)ctx->buffer, ctx->valid_buflen > 50 ? 50 : ctx->valid_buflen);
-    ecall_crypt_data(global_eid, &ret, ctx);
+    //ecall_crypt_data(global_eid, &ret, ctx);
     if (ret) {
         goto out;
     }

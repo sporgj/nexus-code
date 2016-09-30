@@ -1,5 +1,5 @@
 #include "ucafs_kern.h"
-undef ERROR
+#undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_store: " fmt, ##args)
 
 /**
@@ -121,6 +121,7 @@ out:
 static int
 store_close(ucafs_ctx_t * ctx,
             struct AFSFetchStatus * status,
+            struct vcache * avc,
             int code,
             struct vrequest * areq)
 {
@@ -146,7 +147,7 @@ store_close(ucafs_ctx_t * ctx,
 
     /* if everything is ok, process the request */
     if (code == 0) {
-        afs_ProcessFS(ctx->avc, status, areq);
+        afs_ProcessFS(avc, status, areq);
     }
 
     /* close the request */
@@ -260,11 +261,10 @@ out:
 int
 UCAFS_store(struct vcache * avc, struct vrequest * areq)
 {
-    int ret;
+    int ret, hash, index, chunk_no;
     ucafs_ctx_t * ctx = NULL;
     afs_int32 bytes_left;
     afs_uint32 nbytes;
-    afs_hyper_t new_dv, old_dv;
     char * path = NULL;
     struct dcache * tdc = NULL;
     struct AFSFetchStatus outstatus;
@@ -294,47 +294,78 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
     /* to avoid pageout when reading files, make sure all the vcache dirty
     // pages are flushed to disk. This also obtains the GLOCK() */
     osi_VM_StoreAllSegments(avc);
-    
-    /* set the data versions */
-    hset(old_dv, avc->f.m.DataVersion);
-    hset(new_dv, avc->f.m.DataVersion);
 
     ConvertWToSLock(&avc->lock);
+    hash = DVHash(&avc->f.fid);
 
-    /* iterate through every dcache entry of the vcache */
+    /* grab lock to the beginning to the hash chain */
+    ObtainWriteLock(&afs_xdcache, 6503);
+    index = afs_dvhashTbl[hash];
     bytes_left = ctx->len;
-    while (bytes_left > 0) {
-        /* TODO: Store reference to tdc entries. We will need to update
-         * their version number to that of the avc */
 
-        if ((tdc = afs_FindDCache(avc, ctx->off)) == NULL) {
-            ERROR("we failed to failed tdc. byte=%d", ctx->off);
-            goto out;
+    chunk_no = 0;
+    ret = EIO;
+    while (index != NULLIDX) {
+        if (afs_indexUnique[index] == avc->f.fid.Fid.Unique) {
+            /* get the tdc at that index */
+            tdc = afs_GetValidDSlot(index); // increments refcount
+            if (!tdc) {
+                ERROR("tdc null. path=%s, index=%d, chunk_no=%d", path, index,
+                      chunk_no);
+                goto out1;
+            }
+
+            // XXX check if the TDC has data
+            // XXX what about the avc->truncPos
+
+            ReleaseReadLock(&tdc->tlock);
+            /* if the fid matches, proceeed, else return the tdc */
+            if (FidCmp(&tdc->f.fid, &avc->f.fid) == 0) {
+                ObtainSharedLock(&tdc->lock, 6504);
+                if (storeproc(ctx, tdc, &nbytes)) {
+                    goto out2;
+                }
+
+                /* update the dcache entry */
+                UpgradeSToWLock(&tdc->lock, 6505);
+                tdc->f.states &= ~DWriting;
+                tdc->dflags |= DFEntryMod;
+                ReleaseWriteLock(&tdc->lock);
+
+                bytes_left -= nbytes;
+            }
+
+            afs_PutDCache(tdc);
+            tdc = NULL;
         }
 
-        if (storeproc(ctx, tdc, &nbytes)) {
-            goto out;
-        }
+        index = afs_dvnextTbl[index];
+        chunk_no++;
+    }
 
+    /* TODO: run afs_analyze here to make sure all the packets went through */
+    UpgradeSToWLock(&avc->lock, 6506);
+    avc->f.states &= ~CDirty;
+    ConvertWToSLock(&avc->lock);
+
+    ret = 0;
+
+/* responsible for exits in the loop */
+out2:
+    /* In case there's an exit in the loop, the tdc's shared lock is still
+     * held and needs to be released */
+    if (tdc) {
+        ReleaseSharedLock(&tdc->lock);
         afs_PutDCache(tdc);
         tdc = NULL;
-
-        bytes_left -= nbytes;
     }
 
-    if (bytes_left > 0) {
-        ERROR("some bytes left=%d\n", bytes_left);
-        goto out;
-    }
+/* if GetValidDSlot returns NULL */
+out1:
+    ReleaseWriteLock(&afs_xdcache);
 
-    avc->f.states &= ~CDirty;
-    ret = 0;
 out:
-    if (tdc) {
-        afs_PutDCache(tdc);
-    }
-
-    store_close(ctx, &outstatus, ret, areq);
+    store_close(ctx, &outstatus, avc, ret, areq);
 
     if (path)
         kfree(path);

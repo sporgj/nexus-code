@@ -301,12 +301,13 @@ UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
             goto out1;
         }
 
-        ReleaseWriteLock(&tdc->lock);
         hset(tdc->f.versionNo, avc->f.m.DataVersion);
         tdc->f.states &= ~DWriting;
         tdc->dflags |= DFEntryMod;
         tdc->validPos = nbytes;
         afs_AdjustSize(tdc, nbytes);
+        
+        ReleaseWriteLock(&tdc->lock);
         afs_PutDCache(tdc);
         tdc = NULL;
 
