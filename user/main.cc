@@ -11,8 +11,8 @@
 #include <unistd.h>
 #include <sgx_urts.h>
 
-#include "dirnode.h"
-#include "uspace.h"
+#include "uc_dnode.h"
+#include "uc_uspace.h"
 #include "enclave_common.h"
 
 #define ENCLAVE_FILENAME "sgx/enclave.signed.so"
@@ -26,33 +26,29 @@ extern "C" int setup_rx(int);
 const char afs_path[] = "/afs/maatta.sgx/user/bruyne";
 static bool check_main_dir()
 {
-    string * afsx_repo = uspace_get_repo_path();
-    fstream f1(afsx_repo->c_str(), ios::in);
+    sds afsx_repo = uc_get_repo_path();
     struct stat stat_buf;
 
-    if (!f1) {
+    if (stat(afsx_repo, &stat_buf)) {
         // create the folder
-        if (mkdir(afsx_repo->c_str(), S_IRWXG)) {
+        if (mkdir(afsx_repo, S_IRWXG)) {
             cout << "Could not mkdir: " << afsx_repo << endl;
             return false;
         }
     }
-    f1.close();
-    delete afsx_repo;
+    sdsfree(afsx_repo);
 
-    string * afsx_dnode = uspace_main_dnode_fpath();
-    if (stat(afsx_dnode->c_str(), &stat_buf)) {
+    sds afsx_dnode = uc_main_dnode_fpath();
+    if (stat(afsx_dnode, &stat_buf)) {
         cout << ". Initializing a new filebox" << endl;
-        fstream f2(afsx_dnode->c_str(), ios::out | ios::binary);
-        DirNode * dirnode = new DirNode;
-        if (!DirNode::write(dirnode, &f2)) {
+        struct dirnode * dirnode = dn_new();
+        if (!dn_write(dirnode, afsx_dnode)) {
             cout << ". Writing main dirnode failed" << endl;
             return false;
         }
-        f2.close();
     }
 
-    delete afsx_dnode;
+    sdsfree(afsx_dnode);
 
     cout << ". Everything looks ok" << endl;
     return true;
@@ -61,7 +57,7 @@ static bool check_main_dir()
 int main(int argc, char ** argv)
 {
     int ret, updated;
-    uspace_set_afs_home(afs_path, "sgx", true);
+    uc_set_afs_home(afs_path, "sgx", true);
 
     /* initialize the enclave */
     sgx_launch_token_t token;

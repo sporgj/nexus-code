@@ -24,7 +24,7 @@ FileBox * FileBox::from_file(const char * fname)
     fbox * _fbox = nullptr;
     fbox_header_t _header;
     uint8_t * buffer;
-    string * fpath = uspace_make_dnode_fpath(fname);
+    string * fpath = nullptr; // TODO uspace_make_dnode_fpath(fname);
 
     fstream file(fpath->c_str(), ios::in | ios::binary);
     if (!file) {

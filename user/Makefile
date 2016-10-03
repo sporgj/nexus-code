@@ -10,7 +10,7 @@ OBJS := rpc.o afsx.ss.o enclave_u.o $(OBJS)
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
 RXINC := -I$(OPENAFS_INC)
-RXLIBS := -L$(OPENAFS_LIB) -lrx -llwp
+RXLIBS := $(OPENAFS_LIB)/librx.a $(OPENAFS_LIB)/liblwp.a #-L$(OPENAFS_LIB) -lrx -llwp
 
 CPPFLAGS += $(App_Cpp_Flags)
 
@@ -30,9 +30,14 @@ $(1): $(1).cc libucafs.a
 endef
 
 $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
-tests: $(addprefix tests/, $(TESTS)) tests/test_upload
+tests: $(addprefix tests/, $(TESTS)) tests/test_upload tests/test_dirs
 
 tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
+	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS)\
+		$(RXLIBS) $(App_Link_Flags) -o $@
+	@echo "CXX <= $@"
+
+tests/test_dirs: tests/test_dirs.cc libucafs.a afsx.cs.o
 	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS)\
 		$(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
@@ -80,9 +85,9 @@ rpc.o: rpc.c afsx.ss.c
 
 %.o: %.c %.h
 	@$(CC) $(CFLAGS) $(INCFLAGS) -c $< -o $@
-	@echo "CXX <= $@"
+	@echo "CC <= $@"
 
-dirnode.o: dirnode.cc dirnode.h dnode.pb.cc
+uc_dnode.o: uc_dnode.cc uc_dnode.h dnode.pb.cc
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 

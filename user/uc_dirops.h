@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
 /**
  * Creates a new file at the corresponding file path
  * @param fpath is the file path

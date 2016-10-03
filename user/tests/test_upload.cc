@@ -56,7 +56,7 @@ static int test_upload()
     // start_srv();
     int moredata;
     uint32_t padded_len;
-    char * encoded_name_str;
+    char * encoded_name_str = NULL;
     u_long host;
     struct rx_securityClass * null_securityObject;
 
@@ -77,13 +77,23 @@ static int test_upload()
     }
 
     int result;
-    if (AFSX_fversion(conn, 4, &result)) {
-        cout << "Can't computer " << endl;
-        return -1;
-    }
 
     // lets add it to a fake dnode
     init_dnode();
+
+    cout << "Creating new file" << endl;
+    char * file = strdup("repo/file.txt");
+    if (AFSX_create(conn, file, UCAFS_TYPE_FILE, &encoded_name_str)) {
+        cout << "ERROR" << endl;
+        return -1;
+    }
+
+    cout << "repo/file.txt" << " -> " << encoded_name_str << endl;
+
+    if (1) {
+        return -1;
+    }
+
     if (dirops_new(TEST_FILE, UCAFS_TYPE_FILE, &encoded_name_str)) {
         cout << "Adding to dnode failed" << endl;
         return -1;
@@ -158,6 +168,7 @@ int main(int argc, char ** argv)
     int ret, updated;
     uspace_set_afs_home("repo", NULL, false);
     /* initialize the enclave */
+    /*
     sgx_launch_token_t token;
     ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
                              &global_eid, NULL);
@@ -173,7 +184,7 @@ int main(int argc, char ** argv)
         cout << "Initializing enclave failed" << endl;
         return -1;
     }
-
+    */
     cout << "Initialized enclave" << endl;
 
     if (argc > 1) {

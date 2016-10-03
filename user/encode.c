@@ -181,9 +181,11 @@ char * encode_bin2str(const encoded_fname_t * code)
 encoded_fname_t * encode_str2bin(const char * encoded_filename)
 {
     size_t src_sz = strlen(encoded_filename);
+    size_t i, dst_sz;
+    const char * _encoded_fname;
     
     if (src_sz > UCAFS_FNAME_PREFIX_LEN) {
-        for (size_t i = 0; i < UCAFS_FNAME_PREFIX_LEN; i++) {
+        for (i = 0; i < UCAFS_FNAME_PREFIX_LEN; i++) {
             // if it's not prefixed, don't even bother
             if (encoded_filename[i] != UCAFS_FNAME_PREFIX[i]) {
                 return NULL;
@@ -194,10 +196,10 @@ encoded_fname_t * encode_str2bin(const char * encoded_filename)
         return NULL;
     }
 
-    const char * _encoded_fname = encoded_filename + UCAFS_FNAME_PREFIX_LEN;
+    _encoded_fname = encoded_filename + UCAFS_FNAME_PREFIX_LEN;
     src_sz -= UCAFS_FNAME_PREFIX_LEN;
 
-    size_t dst_sz = ecryptfs_max_decoded_size(src_sz);
+    dst_sz = ecryptfs_max_decoded_size(src_sz);
     encoded_fname_t * code = (encoded_fname_t *)calloc(1, dst_sz);
     if (code == NULL) {
         return NULL;

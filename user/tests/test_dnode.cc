@@ -53,10 +53,5 @@ static void test_dnode()
 
 int main() 
 {
-    FLAGS_colorlogtostderr = true;
-    FLAGS_minloglevel = 0;
-    FLAGS_logtostderr = true;
-    google::InitGoogleLogging("--logtostderr=true --colorlogtostderr=true");
-
     test_dnode();
 }

@@ -5,7 +5,7 @@
 #include <encode.h>
 #include <dirnode.h>
 #include <dirops.h>
-#include <utils.h>
+#include <uc_utils.h>
 #include <uspace.h>
 #include <enclave_common.h>
 

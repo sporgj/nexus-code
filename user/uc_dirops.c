@@ -1,13 +1,13 @@
-#include <string>
-#include <unistd.h>
+#include <string.h>
 
-#include "uspace.h"
-#include "dirnode.h"
-#include "filebox.h"
+#include "types.h"
+#include "uc_dirops.h"
+#include "uc_dnode.h"
+#include "uc_dcache.h"
+
+#include "uc_uspace.h"
 #include "encode.h"
-#include "dircache.h"
-#include "dirops.h"
-#include "utils.h"
+#include "uc_utils.h"
 #include "slog.h"
 
 int dirops_new(const char * fpath, ucafs_entry_type type,
@@ -15,10 +15,9 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
 {
     int error = -1; // TODO change this
     char * fname = do_get_fname(fpath), *temp;
-    DirNode * dirnode = nullptr, *dirnode1 = nullptr;
-    const encoded_fname_t * fname_code = nullptr;
-    string * path1 = nullptr;
-    struct dirent * dirent;
+    struct dirnode * dirnode = NULL, *dirnode1 = NULL;
+    const encoded_fname_t * fname_code = NULL;
+    sds path1 = NULL;
 
     if (fname == NULL) {
         slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
@@ -26,21 +25,19 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     }
 
     /* lets get the directory entry */
-    dirnode = dcache_get_dirnode(fpath);
-    if (dirnode == nullptr) {
+    if ((dirnode = dcache_get(fpath)) == NULL) {
         slog(0, SLOG_ERROR, "Error loading dirnode: %s", fpath);
         goto out;
     }
 
     /* Get filename and add it to DirNode */
-    fname_code = dirnode->add(fname, type);
-    if (fname_code == nullptr) {
+    if ((fname_code = dn_add(dirnode, fname, type)) == NULL) {
         slog(0, SLOG_ERROR, "Add file operation failed: %s", fpath);
         goto out;
     }
 
     // 3 - Flush to disk
-    if (!dirnode->flush()) {
+    if (!dn_flush(dirnode)) {
         slog(0, SLOG_ERROR, "Flushing '%s' failed", fpath);
         goto out;
     }
@@ -48,9 +45,9 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     temp = encode_bin2str(fname_code);
 
     if (type == UCAFS_TYPE_DIR) {
-        dirnode1 = new DirNode();
-        path1 = uspace_make_dnode_fpath(temp);
-        if (!DirNode::write(dirnode1, path1->c_str())) {
+        dirnode1 = dn_new();
+        path1 = uc_get_dnode_path(temp);
+        if (!dn_write(dirnode1, path1)) {
             slog(0, SLOG_ERROR, "Creating: '%s' dirnode failed", fpath);
             goto out;
         }
@@ -62,18 +59,17 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     *encoded_name_dest = temp;
     error = 0;
 out:
-    if (fname_code)
-        delete fname_code;
     if (dirnode)
         dcache_put(dirnode);
     if (dirnode1)
         dcache_put(dirnode1);
     if (fname)
-        delete fname;
+        sdsfree(fname);
     if (path1)
-        delete path1;
+        sdsfree(path1);
 
     return error;
+
 }
 
 int dirops_code2plain(char * encoded_name, char * dir_path,
@@ -82,9 +78,6 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     int error = -1; // TODO
     encoded_fname_t * fname_code = NULL;
     const char * result;
-    std::string path_string(dir_path);
-    // TODO no need to do this
-    path_string += "/dummy";
 
     /* 1 - Get the binary version */
     if ((fname_code = encode_str2bin(encoded_name)) == NULL) {
@@ -92,21 +85,21 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     }
 
     // 2 - Get the corresponding dirnode
-    DirNode * dirnode = dcache_get_dirnode(path_string.c_str());
-    if (dirnode == nullptr) {
+    struct dirnode * dn = dcache_get_dir(dir_path);
+    if (dn == NULL) {
         goto out;
     }
 
     // 3 - Get the plain filename
-    if ((result = dirnode->enc2raw(fname_code, type)) == NULL) {
+    if ((result = dn_enc2raw(dn, fname_code, type)) == NULL) {
         goto out;
     }
 
     *raw_name_dest = strdup(result);
     error = 0;
 out:
-    if (dirnode)
-        dcache_put(dirnode);
+    if (dn)
+        dcache_put(dn);
     return error;
 }
 
@@ -114,50 +107,58 @@ int dirops_rename(const char * from_path, const char * to_path,
                   ucafs_entry_type type, char ** raw_name_dest)
 {
     int error = AFSX_STATUS_NOOP;
-    char * c_old_name = NULL, *c_new_name = NULL;
-    DirNode * dirnode1 = nullptr, *dirnode2 = nullptr;
-    const encoded_fname_t * fname_code = nullptr;
+    sds c_old_name = NULL, c_new_name = NULL;
+    struct dirnode * dirnode1 = NULL, *dirnode2 = NULL;
+    const encoded_fname_t * fname_code = NULL;
 
-    if ((c_old_name = do_get_fname(from_path)) == nullptr) {
+    if ((c_old_name = do_get_fname(from_path)) == NULL) {
         goto out;
     }
 
-    if ((c_new_name = do_get_fname(to_path)) == nullptr) {
+    if ((c_new_name = do_get_fname(to_path)) == NULL) {
         goto out;
     }
 
-    dirnode1 = dcache_get_dirnode(from_path);
-    dirnode2 = dcache_get_dirnode(to_path);
+    dirnode1 = dcache_get(from_path);
+    dirnode2 = dcache_get(to_path);
 
-    if (dirnode1 == nullptr || dirnode2 == nullptr) {
+    if (dirnode1 == NULL || dirnode2 == NULL) {
         slog(0, SLOG_ERROR, "Could not find dirnode");
         goto out;
     }
 
-    if (dirnode1->operator==(*dirnode2)) {
-        fname_code = dirnode1->rename(c_old_name, c_new_name, type);
+	if (dn_equals(dirnode1, dirnode2)) {
+		fname_code = dn_rename(dirnode1, c_old_name, c_new_name, type);
+		if (fname_code == NULL) {
+			slog(0, SLOG_ERROR, "Could not accomplish rename");
+			goto out;
+		}
 
-        dirnode1->flush();
-        goto out1;
-    }
+		if (!dn_flush(dirnode1)) {
+			slog(0, SLOG_ERROR, "Could not flush dirnode");
+			goto out;
+		}
+
+		goto out1;
+	}
 
     /* Removing from the owning dirnode */
-    fname_code = dirnode1->rm(c_old_name, type);
-    if (fname_code == nullptr) {
+    fname_code = dn_rm(dirnode1, c_old_name, type);
+    if (fname_code == NULL) {
         slog(0, SLOG_ERROR, "fname '%s' does not exist", c_old_name);
         goto out;
     }
 
-    if (!dirnode1->flush()) {
+    if (!dn_flush(dirnode1)) {
         slog(0, SLOG_ERROR, "Flushing '%s' dirnode failed", from_path);
         goto out;
     }
 
     /* Adding it to the new dirnode */
-    dirnode2->rm(c_new_name, type);
-    dirnode2->add(c_new_name, type, fname_code);
+    dn_rm(dirnode2, c_new_name, type);
+    dn_add_alias(dirnode2, c_new_name, type, fname_code);
 
-    if (!dirnode2->flush()) {
+    if (!dn_flush(dirnode2)) {
         slog(0, SLOG_ERROR, "Flushing '%s' dirnode failed", to_path);
         goto out;
     }
@@ -167,9 +168,9 @@ out1:
     error = AFSX_STATUS_SUCCESS;
 out:
     if (c_old_name)
-        free(c_old_name);
+        sdsfree(c_old_name);
     if (c_new_name)
-        free(c_new_name);
+        sdsfree(c_new_name);
     if (dirnode2)
         dcache_put(dirnode2);
     if (dirnode1)
@@ -184,11 +185,11 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     int error = -1; // TODO
     char * fname = NULL, *c_temp = NULL;
     const encoded_fname_t * fname_code = NULL;
-    string * dnode_path = nullptr;
+    sds dnode_path = NULL;
 
     /* 1 - Get the corresponding dirnode */
-    DirNode * dirnode = dcache_get_dirnode(fpath);
-    if (dirnode == nullptr) {
+    struct dirnode * dirnode = dcache_get(fpath);
+    if (dirnode == NULL) {
         goto out;
     }
 
@@ -198,14 +199,14 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     }
 
     /* Perform the operation */
-    if ((fname_code = (rm ? dirnode->rm(fname, type)
-                          : dirnode->raw2enc(fname, type))) == nullptr) {
+    if ((fname_code = (rm ? dn_rm(dirnode, fname, type)
+                          : dn_raw2enc(dirnode, fname, type))) == NULL) {
         slog(0, SLOG_WARN, "Could not %s: %s", (rm ? "remove" : "find"),
              fpath);
         goto out;
     }
 
-    if (rm && !dirnode->flush()) {
+    if (rm && !dn_flush(dirnode)) {
         slog(0, SLOG_ERROR, "Error flushing: %s", fpath);
         goto out;
     }
@@ -213,22 +214,23 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     /* now delete the file from the filesystem */
     if (type == UCAFS_TYPE_DIR) {
         c_temp = encode_bin2str(fname_code);
-        dnode_path = uspace_make_dnode_fpath(c_temp);
-        if (unlink(dnode_path->c_str())) {
-            slog(0, SLOG_ERROR, "Could not remove: %s", dnode_path->c_str());
+        dnode_path = uc_get_dnode_path(c_temp);
+        if (unlink(dnode_path)) {
+			free(c_temp);
+            slog(0, SLOG_ERROR, "Could not remove: %s", dnode_path);
             goto out;
         }
     }
 
-    *encoded_fname_dest = encode_bin2str(fname_code);
+    *encoded_fname_dest = c_temp;
     error = 0;
 out:
     if (rm && dirnode)
         dcache_put(dirnode);
     if (fname)
-        delete fname;
+        sdsfree(fname);
     if (dnode_path)
-        delete dnode_path;
+        sdsfree(dnode_path);
     return error;
 }
 
@@ -243,3 +245,4 @@ int dirops_remove(const char * fpath_raw, ucafs_entry_type type,
 {
     return encode_or_remove(fpath_raw, type, encoded_fname_dest, true);
 }
+

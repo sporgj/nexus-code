@@ -7,21 +7,22 @@ FLAGS := -g -O0
 CPPFLAGS = $(FLAGS) -std=c++11
 CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib -lprotobuf -pthread\
-       -luuid
+       -luuid -ltcmalloc
 INCFLAGS = -I/usr/local/include
 
-OBJS = dirnode.o\
-       dircache.o\
+OBJS = uc_dnode.o\
+       uc_dirops.o\
+       uc_dcache.o\
        filebox.o\
-       uspace.o\
+       uc_uspace.o\
        encode.o\
-       dirops.o\
        fileops.o\
-       utils.o\
+       uc_utils.o\
        slog.o\
+       sds.o\
+       hashmap.o\
        fbox.pb.o\
        dnode.pb.o
 
-TESTS := test_dnode test_dops test_lookup test_crypto\
-	   test_dirs
+TESTS := test_dnode test_dops test_lookup test_crypto
 GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a 

@@ -3,7 +3,7 @@
 #include "dirops.h"
 #include "fileops.h"
 #include "afsx_hdr.h"
-#include "utils.h"
+#include "uc_utils.h"
 
 #define N_SECURITY_OBJECTS 1
 
