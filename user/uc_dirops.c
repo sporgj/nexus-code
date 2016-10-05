@@ -9,6 +9,9 @@
 #include "encode.h"
 #include "uc_utils.h"
 #include "slog.h"
+#include "hashmap.h"
+
+static map_t encoded_to_raw_table = NULL;
 
 int dirops_new(const char * fpath, ucafs_entry_type type,
                char ** encoded_name_dest)
@@ -67,6 +70,8 @@ out:
         sdsfree(fname);
     if (path1)
         sdsfree(path1);
+    if (fname_code)
+        free((void *)fname_code);
 
     return error;
 
@@ -98,6 +103,8 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     *raw_name_dest = strdup(result);
     error = 0;
 out:
+    if (fname_code)
+        free(fname_code);
     if (dn)
         dcache_put(dn);
     return error;
@@ -127,20 +134,20 @@ int dirops_rename(const char * from_path, const char * to_path,
         goto out;
     }
 
-	if (dn_equals(dirnode1, dirnode2)) {
-		fname_code = dn_rename(dirnode1, c_old_name, c_new_name, type);
-		if (fname_code == NULL) {
-			slog(0, SLOG_ERROR, "Could not accomplish rename");
-			goto out;
-		}
+    if (dn_equals(dirnode1, dirnode2)) {
+        fname_code = dn_rename(dirnode1, c_old_name, c_new_name, type);
+        if (fname_code == NULL) {
+            slog(0, SLOG_ERROR, "Could not accomplish rename");
+            goto out;
+        }
 
-		if (!dn_flush(dirnode1)) {
-			slog(0, SLOG_ERROR, "Could not flush dirnode");
-			goto out;
-		}
+        if (!dn_flush(dirnode1)) {
+            slog(0, SLOG_ERROR, "Could not flush dirnode");
+            goto out;
+        }
 
-		goto out1;
-	}
+        goto out1;
+    }
 
     /* Removing from the owning dirnode */
     fname_code = dn_rm(dirnode1, c_old_name, type);
@@ -211,12 +218,13 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
         goto out;
     }
 
+    c_temp = encode_bin2str(fname_code);
     /* now delete the file from the filesystem */
-    if (type == UCAFS_TYPE_DIR) {
-        c_temp = encode_bin2str(fname_code);
+    if (rm && type == UCAFS_TYPE_DIR) {
+        dcache_rm(fpath);
         dnode_path = uc_get_dnode_path(c_temp);
         if (unlink(dnode_path)) {
-			free(c_temp);
+            free(c_temp);
             slog(0, SLOG_ERROR, "Could not remove: %s", dnode_path);
             goto out;
         }
@@ -231,6 +239,8 @@ out:
         sdsfree(fname);
     if (dnode_path)
         sdsfree(dnode_path);
+    if (fname_code)
+        free((void *)fname_code);
     return error;
 }
 

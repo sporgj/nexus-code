@@ -14,10 +14,11 @@ void uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs)
     global_env_is_afs = is_afs;
 
     global_home_path = sdsnew(path);
+    global_home_path = sdscat(global_home_path, "/");
 
     if (watched_dir) {
-        global_home_path = sdscat(global_home_path, "/");
         global_home_path = sdscat(global_home_path, watched_dir);
+        global_home_path = sdscat(global_home_path, "/");
     }
 
     global_repo_path = sdsnew(path);
@@ -44,7 +45,7 @@ sds uc_get_dnode_path(const char * dnode_name)
 
 static sds __relpath(const char * path, bool parent)
 {
-    size_t len;
+    int len;
     // TODO let's assume the path sent to us has a valid prefix
     const char *ptr1 = path + strlen(global_home_path),
                *ptr2 = path + strlen(path);

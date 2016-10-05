@@ -4,6 +4,8 @@
 #include "dnode.pb.h"
 #include "slog.h"
 
+#include <iostream>
+
 using namespace ::google::protobuf;
 
 class dnode;
@@ -24,8 +26,13 @@ struct dirnode * dn_new()
     memset(&obj->header, 0, sizeof(dnode_header_t));
     uuid_generate_time_safe(obj->header.uuid);
     obj->proto = new dnode();
+    obj->dnode_path = NULL;
 
     return obj;
+}
+
+const sds dn_get_fpath(struct dirnode * dirnode) {
+    return dirnode->dnode_path;
 }
 
 bool dn_equals(struct dirnode * dn1, struct dirnode * dn2)
@@ -36,10 +43,12 @@ bool dn_equals(struct dirnode * dn1, struct dirnode * dn2)
 void dn_free(struct dirnode * dirnode)
 {
     delete dirnode->proto;
-    free(dirnode);
+
     if (dirnode->dnode_path) {
         sdsfree(dirnode->dnode_path);
     }
+
+    free(dirnode);
 }
 
 struct dirnode * dn_default_dnode()
@@ -74,8 +83,9 @@ struct dirnode * dn_from_file(const sds filepath)
 
     /* read the header from the file */
     nbytes = fread(&header, sizeof(dnode_header_t), 1, fd);
-    if (nbytes != sizeof(dnode_header_t)) {
-        slog(0, SLOG_ERROR, "dirnode - could not read header: %s", filepath);
+    if (!nbytes) {
+        slog(0, SLOG_ERROR, "dirnode - could not read header: %s (nbytes=%u)",
+                filepath, nbytes);
         goto out;
     }
 
@@ -86,11 +96,9 @@ struct dirnode * dn_from_file(const sds filepath)
             goto out;
         }
 
-        if ((nbytes = fread(buffer, header.len, 1, fd)) != header.len) {
-            slog(0, SLOG_ERROR, "dirnode - reading protobuf failed: %s",
-                filepath);
-            slog(0, SLOG_ERROR, "dirnode - expected=%u, actual=%u", header.len,
-                nbytes);
+        if ((nbytes = fread(buffer, 1, header.len, fd)) != header.len) {
+            slog(0, SLOG_ERROR, "dirnode - reading protobuf failed:"
+                    "expected=%u, actual=%u", header.len, nbytes);
             goto out;
         }
 
@@ -128,7 +136,7 @@ out:
 bool dn_write(struct dirnode * dn, const char * fpath)
 {
     bool ret = false;
-    uint8_t * buffer;
+    uint8_t * buffer = NULL;
     size_t len = CRYPTO_CEIL_TO_BLKSIZE(dn->proto->ByteSize());
     FILE * fd;
 
@@ -152,6 +160,7 @@ bool dn_write(struct dirnode * dn, const char * fpath)
     dn->header.len = dn->proto->GetCachedSize();
 
     fwrite(&dn->header, sizeof(dnode_header_t), 1, fd);
+    fwrite(buffer, dn->header.len, 1, fd);
 
     ret = true;
 out:
@@ -159,6 +168,8 @@ out:
     if (buffer) {
         free(buffer);
     }
+
+    return ret;
 }
 
 bool dn_flush(struct dirnode * dn)
@@ -250,7 +261,9 @@ retry:
     len = strlen(realname);
 
     while (curr_fentry != fentry_list->end()) {
-        if (strncmp(realname, curr_fentry->raw_name().data(), len) == 0) {
+        const string &str_entry = curr_fentry->raw_name();
+        if (len == str_entry.size() &&
+                memcmp(realname, str_entry.data(), len) == 0) {
             result = (encoded_fname_t *)malloc(sizeof(encoded_fname_t));
             if (result == NULL) {
                 return NULL;
@@ -317,8 +330,7 @@ retry:
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
         if (memcmp(encoded_name, curr_fentry->encoded_name().data(),
-                sizeof(encoded_fname_t))
-            == 0) {
+                sizeof(encoded_fname_t)) == 0) {
             return curr_fentry->raw_name().c_str();
         }
 
@@ -375,7 +387,10 @@ retry:
 
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
-        if (strncmp(realname, curr_fentry->raw_name().data(), len) == 0) {
+        const string& str_entry = curr_fentry->raw_name();
+
+        if (len == str_entry.size() &&
+                memcmp(realname, curr_fentry->raw_name().data(), len) == 0) {
             return (encoded_fname_t *)curr_fentry->encoded_name().data();
         }
         curr_fentry++;

@@ -1,8 +1,7 @@
 #include "cdefs.h"
 #include "afsx.h"
-#include "dirops.h"
+#include "uc_dirops.h"
 #include "fileops.h"
-#include "afsx_hdr.h"
 #include "uc_utils.h"
 
 #define N_SECURITY_OBJECTS 1

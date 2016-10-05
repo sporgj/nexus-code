@@ -21,6 +21,10 @@ struct dirnode * dn_default_dnode();
  */
 struct dirnode * dn_from_file(const sds file_path);
 
+void dn_free(struct dirnode * dirnode);
+
+const sds dn_get_fpath(struct dirnode * dirnode);
+
 /**
  * Writes the dnode to disk
  * @param dn

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "filebox.h"
-#include "uspace.h"
+#include "uc_uspace.h"
 
 using namespace std;
 

@@ -5,7 +5,7 @@
 #include <vector>
 
 using namespace std;
-#define N 1024*16
+#define N 5*1024
 #define AFSX_CUSTOM_PORT 11987
 
 extern "C" {
@@ -14,29 +14,17 @@ extern "C" {
 
 sgx_enclave_id_t global_eid = 0;
 
-extern "C" int setup_rx(int);
-
-static int start_srv()
-{
-    cout << "Starting server" << endl;
-    setup_rx(AFSX_CUSTOM_PORT);
-    return 0;
-}
-
 static void mk_default_dnode()
 {
-    string * _str = uspace_main_dnode_fpath();
-    DirNode * dn = new DirNode();
+    sds _str = uc_main_dnode_fpath();
+    struct dirnode * dn = dn_new();
 
-    cout << "Saving main dnode: " << _str->c_str() << endl;
-    fstream f(_str->c_str(), ios::out);
-    if (!DirNode::write(dn, &f)) {
+    if (!dn_write(dn, _str)) {
         cout << "Could not save main file" << endl;
         return;
     }
-    f.close();
 
-    delete dn;
+    dn_free(dn);
 }
 
 static int test_static_dirs()
@@ -52,57 +40,27 @@ static int test_static_dirs()
             printf("\n Failed\n");
             return -1;
         }
+        free(name);
+
+        if (dirops_remove(curr_dir.c_str(), UCAFS_TYPE_FILE, &name)) {
+            printf("Remove '%s' failed\n", curr_dir.c_str());
+            return -1;
+        }
 
         printf("\r%s -> %s -> %d/%d", curr_dir.c_str(), name, i, N);
+        free(name);
     }
 
     printf("\n");
     return 0;
 }
 
-static int test_rpc_dirs()
-{
-    char * encoded_name_str = NULL;
-    u_long host;
-    struct rx_securityClass * null_securityObject;
-    char buffer[50];
-    cout << ". Connecting... [localhost:" << AFSX_CUSTOM_PORT << "]" << endl;
-
-    rx_Init(0);
-
-    /* set the address to the current machine */
-    host = htonl(INADDR_LOOPBACK);
-    null_securityObject = rxnull_NewClientSecurityObject();
-    struct rx_connection * conn = rx_NewConnection(host, AFSX_CUSTOM_PORT,
-        AFSX_SERVICE_ID, null_securityObject, AFSX_NULL);
-
-    mk_default_dnode();
-
-    for (size_t i = 0; i < N; i++) {
-        sprintf(buffer, "img%d.jpeg", i);
-        string curr_dir = "repo/";
-        curr_dir += buffer;
-        if (AFSX_create(conn, (char *)curr_dir.c_str(), UCAFS_TYPE_FILE,
-                &encoded_name_str)) {
-            printf("\n Failed\n");
-            return -1;
-        }
-
-        printf("\r%s -> %s -> %d/%d", curr_dir.c_str(), encoded_name_str, i, N);
-    }
-
-    return 0;
-}
-
 int main(int argc, char * argv[])
 {
-    uspace_set_afs_home("repo", NULL, false);
+    uc_set_afs_home("repo", NULL, false);
+    mk_default_dnode();
+    dcache_init();
 
-    if (argc > 1) {
-        start_srv();
-        return 0;
-    }
-
-    test_rpc_dirs();
+    test_static_dirs();
     return 0;
 }

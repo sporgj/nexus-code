@@ -3,15 +3,12 @@
 #include <iostream>
 
 #include <encode.h>
-#include <dirnode.h>
-#include <dirops.h>
+#include <uc_dnode.h>
+#include <uc_dirops.h>
 #include <uc_utils.h>
-#include <uspace.h>
 #include <enclave_common.h>
 
-#include <glog/logging.h>
+extern "C" int setup_rx(int);
+extern "C" int dcache_init(void);
 
 #define TEST_AFS_HOME "repo"
-
-#define TEST_FBOX_PATH "./dummy.dnode"
-#define TEST_FBOX_PATH1 "./dirops.dnode"

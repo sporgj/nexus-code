@@ -3,7 +3,7 @@ KERNSRC_PATH = ../kernel
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
-FLAGS := -g -O0
+FLAGS := -O0 -g
 CPPFLAGS = $(FLAGS) -std=c++11
 CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib -lprotobuf -pthread\

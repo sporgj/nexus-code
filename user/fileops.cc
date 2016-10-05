@@ -4,7 +4,7 @@
 
 #include "fileops.h"
 #include "filebox.h"
-#include "dirops.h"
+#include "uc_dirops.h"
 #include "uc_utils.h"
 #include "afsx_hdr.h"
 #include "enclave_common.h"

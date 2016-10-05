@@ -9,7 +9,7 @@
 static map_t dcache_table = NULL;
 
 typedef struct {
-    const char * fpath;
+    sds fpath;
 } dirent_t;
 
 void dcache_init()
@@ -28,19 +28,42 @@ static dirent_t * lookup_cache(const sds dirpath)
     return err == MAP_OK ? dirent : NULL;
 }
 
+/**
+ * Inserts a new mapping into the dcache
+ */
+static void insert_into_dcache(const sds dirpath, struct dirnode * dn)
+{
+    dirent_t * dirent = malloc(sizeof(dirent_t));
+    dirent->fpath = sdsdup(dn_get_fpath(dn));
+    hashmap_put(dcache_table, dirpath, dirent);
+}
+
 static struct dirnode * dcache_resolve(dirent_t * dirent)
 {
     // TODO increase reference count
-    sds dnode_path = uc_get_dnode_path(dirent->fpath);
-    struct dirnode * dn = dn_from_file(dnode_path);
-    sdsfree(dnode_path);
-
-    return dn;
+    return dn_from_file(dirent->fpath);
 }
 
 void dcache_put(struct dirnode * dn)
 {
-    free(dn);
+    dn_free(dn);
+}
+
+void dcache_rm(const sds dirpath) {
+    int err;
+    dirent_t * dirent;
+    // removes the directory
+    sds relative_path = uc_get_relative_path(dirpath);
+
+    /* TODO update the call for removal to involve returning the element */
+    err = hashmap_get(dcache_table, relative_path, (void **)&dirent);
+    if (err == MAP_OK) {
+        sdsfree(dirent->fpath);
+        free(dirent);
+        hashmap_remove(dcache_table, relative_path);
+    }
+
+    sdsfree(relative_path);
 }
 
 static struct dirnode * dcache_traverse(const sds relative_dirpath)
@@ -73,7 +96,7 @@ static struct dirnode * dcache_traverse(const sds relative_dirpath)
         free(encoded_name_str);
 
         /* open the dnode for that path */
-        cfree(&dn);
+        dn_free(dn);
         dn = dn_from_file(dnode_path);
 
         sdsfree(dnode_path);
@@ -90,7 +113,7 @@ static struct dirnode * dcache_traverse(const sds relative_dirpath)
 
     if (!found) {
         if (dn) {
-            cfree(&dn);
+            dn_free(dn);
         }
 
         if (dnode_path) {
@@ -122,10 +145,15 @@ struct dirnode * __dcache_path(const char * path, bool get_parent_path)
 
     /* lookup in the dnode_cache to find the entry */
     dirent_t * dirent = lookup_cache(relative_path);
-    dnode = (dirent == NULL) ? dcache_resolve(dirent)
-                             : dcache_traverse(relative_path);
-
-    sdsfree(relative_path);
+    if (dirent) {
+        dnode = dcache_resolve(dirent);
+        // only free when we're not adding the entry to the dcache
+        sdsfree(relative_path);
+    } else {
+        dnode = dcache_traverse(relative_path);
+        /* now add entry to the cache */
+        insert_into_dcache(relative_path, dnode);
+    }
 
     return dnode;
 }

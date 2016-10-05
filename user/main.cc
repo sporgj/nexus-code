@@ -12,6 +12,7 @@
 #include <sgx_urts.h>
 
 #include "uc_dnode.h"
+#include "uc_dcache.h"
 #include "uc_uspace.h"
 #include "enclave_common.h"
 
@@ -22,6 +23,7 @@ using namespace std;
 sgx_enclave_id_t global_eid = 0;
 
 extern "C" int setup_rx(int);
+extern "C" void dcache_init();
 
 const char afs_path[] = "/afs/maatta.sgx/user/bruyne";
 static bool check_main_dir()
@@ -59,6 +61,7 @@ int main(int argc, char ** argv)
     int ret, updated;
     uc_set_afs_home(afs_path, "sgx", true);
 
+#if 0
     /* initialize the enclave */
     sgx_launch_token_t token;
     ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
@@ -73,8 +76,11 @@ int main(int argc, char ** argv)
         cout << "Enclave could not be initialized" << endl;
         return -1;
     }
+#endif
 
     cout << ". Loaded enclave" << endl;
+
+    dcache_init();
 
     if (!check_main_dir()) {
         return -1;

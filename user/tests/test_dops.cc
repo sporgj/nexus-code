@@ -17,18 +17,15 @@ vector<char *> check_paths;
 
 static void mk_default_dnode()
 {
-    string * _str = uspace_main_dnode_fpath();
-    DirNode * dn = new DirNode();
+    sds _str = uc_main_dnode_fpath();
+    struct dirnode * dn = dn_new();
 
-    cout << "Saving main dnode: " << _str->c_str() << endl;
-    fstream f(_str->c_str(), ios::out);
-    if (!DirNode::write(dn, &f)) {
+    if (!dn_write(dn, _str)) {
         cout << "Could not save main file" << endl;
         return;
     }
-    f.close();
 
-    delete dn;
+    dn_free(dn);
 }
 
 int build_tree(string & curr_dir, int i, int j)
@@ -91,8 +88,17 @@ int test_dirs()
     cout << "Finding: " << f1 << "\t";
     if (dirops_plain2code(f1.c_str(), UCAFS_TYPE_FILE, &temp)) {
         cout << "not found" << endl;
+        return -1;
     } else {
         cout << temp << endl;
+    }
+
+    cout << "Finding: " << f2 << "\t";
+    if (dirops_plain2code(f2.c_str(), UCAFS_TYPE_FILE, &temp)) {
+        cout << "not found" << endl;
+    } else {
+        cout << temp << "\t ERROR" << endl;
+        return -1;
     }
 
     cout << "Renaming '" << f1 << "' -> '" << f2 << "'" << endl;
@@ -107,10 +113,6 @@ int test_dirs()
     } else {
         cout << "Error" << endl;
         return -1;
-    }
-
-    if (1) {
-        return 0;
     }
 
     cout << "Recreating: " << f1 << "\t";
@@ -134,12 +136,22 @@ int test_dirs()
     }
     cout << temp << endl;
 
+    string f3("repo/foo");
+    cout << "Removing: " << f3 << "\t";
+    if (dirops_remove(f3.c_str(), UCAFS_TYPE_DIR, &temp)) {
+        cout << "FAILED" << endl;
+        return -1;
+    }
+
+    cout << "WORKED" << endl;
+
     return 0;
 }
 
 int main()
 {
-    uspace_set_afs_home(TEST_AFS_HOME, nullptr, false);
+    uc_set_afs_home(TEST_AFS_HOME, nullptr, false);
+    dcache_init();
     mk_default_dnode();
     srand(time(NULL));
     test_dirs();

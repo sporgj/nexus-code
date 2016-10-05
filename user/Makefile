@@ -38,7 +38,7 @@ tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
 	@echo "CXX <= $@"
 
 tests/test_dirs: tests/test_dirs.cc libucafs.a afsx.cs.o
-	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS)\
+	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) -O $^ $(LIBS)\
 		$(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
