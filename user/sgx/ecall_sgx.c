@@ -1,7 +1,7 @@
 #include "enclave_private.h"
 #include "seqptrmap.h"
 
-#include "../types.h"
+#include "../uc_types.h"
 
 #include <string.h>
 
