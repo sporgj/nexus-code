@@ -1,0 +1,5 @@
+*.o
+*.a
+*.so
+user/mbedtls
+*cscope.out*

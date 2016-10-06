@@ -14,9 +14,9 @@ struct dirnode {
     sds dnode_path;
 };
 
-struct dirnode * dirnode_new()
+uc_dirnode_t * dirnode_new()
 {
-    struct dirnode * obj = (struct dirnode *)malloc(sizeof(struct dirnode));
+    uc_dirnode_t * obj = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
     if (obj == NULL) {
         return NULL;
     }
@@ -29,16 +29,16 @@ struct dirnode * dirnode_new()
     return obj;
 }
 
-const sds dirnode_get_fpath(struct dirnode * dirnode) {
+const sds dirnode_get_fpath(uc_dirnode_t * dirnode) {
     return dirnode->dnode_path;
 }
 
-bool dirnode_equals(struct dirnode * dn1, struct dirnode * dn2)
+bool dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2)
 {
     return memcmp(&dn1->header, &dn2->header, sizeof(dnode_header_t)) == 0;
 }
 
-void dirnode_free(struct dirnode * dirnode)
+void dirnode_free(uc_dirnode_t * dirnode)
 {
     delete dirnode->protobuf;
 
@@ -49,9 +49,9 @@ void dirnode_free(struct dirnode * dirnode)
     free(dirnode);
 }
 
-struct dirnode * dirnode_default_dnode()
+uc_dirnode_t * dirnode_default_dnode()
 {
-    struct dirnode * dn;
+    uc_dirnode_t * dn;
     sds path = uc_main_dnode_fpath();
     if (path == NULL) {
         return NULL;
@@ -63,9 +63,9 @@ struct dirnode * dirnode_default_dnode()
     return dn;
 }
 
-struct dirnode * dirnode_from_file(const sds filepath)
+uc_dirnode_t * dirnode_from_file(const sds filepath)
 {
-    struct dirnode * obj = NULL;
+    uc_dirnode_t * obj = NULL;
     dnode * _dnode = NULL;
     dnode_header_t header;
     uint8_t * buffer = NULL;
@@ -107,7 +107,7 @@ struct dirnode * dirnode_from_file(const sds filepath)
         }
     }
 
-    obj = (struct dirnode *)malloc(sizeof(struct dirnode));
+    obj = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
     if (obj == NULL) {
         slog(0, SLOG_ERROR, "dirnode - allocating dirnode object failed");
         goto out;
@@ -131,7 +131,7 @@ out:
     return obj;
 }
 
-bool dirnode_write(struct dirnode * dn, const char * fpath)
+bool dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
     bool ret = false;
     uint8_t * buffer = NULL;
@@ -170,13 +170,13 @@ out:
     return ret;
 }
 
-bool dirnode_flush(struct dirnode * dn)
+bool dirnode_flush(uc_dirnode_t * dn)
 {
     assert(dn != NULL);
     return dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
 }
 
-const encoded_fname_t * dirnode_add_alias(struct dirnode * dn, const sds name,
+const encoded_fname_t * dirnode_add_alias(uc_dirnode_t * dn, const sds name,
     ucafs_entry_type type, const encoded_fname_t * p_encoded_name)
 {
     encoded_fname_t * encoded_name;
@@ -220,13 +220,13 @@ const encoded_fname_t * dirnode_add_alias(struct dirnode * dn, const sds name,
 }
 
 const encoded_fname_t * dirnode_add(
-    struct dirnode * dn, const sds name, ucafs_entry_type type)
+    uc_dirnode_t * dn, const sds name, ucafs_entry_type type)
 {
     return dirnode_add_alias(dn, name, type, NULL);
 }
 
 const encoded_fname_t * dirnode_rm(
-    struct dirnode * dn, const sds realname, ucafs_entry_type type)
+    uc_dirnode_t * dn, const sds realname, ucafs_entry_type type)
 {
     encoded_fname_t * result = NULL;
     RepeatedPtrField<dnode_fentry> * fentry_list;
@@ -298,7 +298,7 @@ retry:
     return NULL;
 }
 
-const char * dirnode_enc2raw(const struct dirnode * dn,
+const char * dirnode_enc2raw(const uc_dirnode_t * dn,
     const encoded_fname_t * encoded_name, ucafs_entry_type type)
 {
     const RepeatedPtrField<dnode_fentry> * fentry_list;
@@ -355,7 +355,7 @@ retry:
 }
 
 const encoded_fname_t * dirnode_raw2enc(
-    const struct dirnode * dn, const char * realname, ucafs_entry_type type)
+    const uc_dirnode_t * dn, const char * realname, ucafs_entry_type type)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
@@ -413,7 +413,7 @@ retry:
     return NULL;
 }
 
-const encoded_fname_t * dirnode_rename(struct dirnode * dn,
+const encoded_fname_t * dirnode_rename(uc_dirnode_t * dn,
     const sds oldname, const sds newname, ucafs_entry_type type)
 {
     const encoded_fname_t * encoded_name = dirnode_rm(dn, oldname, type);

@@ -35,14 +35,14 @@ lookup_cache(const sds dirpath)
  * Inserts a new mapping into the dcache
  */
 static void
-insert_into_dcache(const sds dirpath, struct dirnode * dn)
+insert_into_dcache(const sds dirpath, uc_dirnode_t * dn)
 {
     dirent_t * dirent = malloc(sizeof(dirent_t));
     dirent->fpath = sdsdup(dirnode_get_fpath(dn));
     hashmap_put(dcache_table, dirpath, dirent);
 }
 
-static struct dirnode *
+static uc_dirnode_t *
 dcache_resolve(dirent_t * dirent)
 {
     // TODO increase reference count
@@ -50,7 +50,7 @@ dcache_resolve(dirent_t * dirent)
 }
 
 void
-dcache_put(struct dirnode * dn)
+dcache_put(uc_dirnode_t * dn)
 {
     dirnode_free(dn);
 }
@@ -74,7 +74,7 @@ dcache_rm(const char * dirpath)
     sdsfree(relative_path);
 }
 
-static struct dirnode *
+static uc_dirnode_t *
 dcache_traverse(const sds relative_dirpath)
 {
     char * encoded_name_str = NULL;
@@ -85,7 +85,7 @@ dcache_traverse(const sds relative_dirpath)
     uintptr_t ptr_val;
 
     // TODO check for null
-    struct dirnode * dn = dirnode_default_dnode();
+    uc_dirnode_t * dn = dirnode_default_dnode();
 
     c_rel_path = strdup(relative_dirpath);
 
@@ -141,10 +141,10 @@ dcache_traverse(const sds relative_dirpath)
  * a traversal and caches the content
  * @param path is the path to the file
  */
-struct dirnode *
+uc_dirnode_t *
 __dcache_path(const char * path, bool get_parent_path)
 {
-    struct dirnode * dnode;
+    uc_dirnode_t * dnode;
 
     /* get the relative path */
     sds relative_path = get_parent_path ? uc_get_relative_parentpath(path)
@@ -168,13 +168,13 @@ __dcache_path(const char * path, bool get_parent_path)
     return dnode;
 }
 
-struct dirnode *
+uc_dirnode_t *
 dcache_get(const char * path)
 {
     return __dcache_path(path, true);
 }
 
-struct dirnode *
+uc_dirnode_t *
 dcache_get_dir(const char * path)
 {
     return __dcache_path(path, false);

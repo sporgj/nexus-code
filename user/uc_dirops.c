@@ -15,7 +15,7 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
 {
     int error = -1; // TODO change this
     char * fname = do_get_fname(fpath), *temp;
-    struct dirnode * dirnode = NULL, *dirnode1 = NULL;
+    uc_dirnode_t * dirnode = NULL, *dirnode1 = NULL;
     const encoded_fname_t * fname_code = NULL;
     sds path1 = NULL;
 
@@ -87,7 +87,7 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     }
 
     // 2 - Get the corresponding dirnode
-    struct dirnode * dn = dcache_get_dir(dir_path);
+    uc_dirnode_t * dn = dcache_get_dir(dir_path);
     if (dn == NULL) {
         goto out;
     }
@@ -112,7 +112,7 @@ int dirops_rename(const char * from_path, const char * to_path,
 {
     int error = AFSX_STATUS_NOOP;
     sds c_old_name = NULL, c_new_name = NULL;
-    struct dirnode * dirnode1 = NULL, *dirnode2 = NULL;
+    uc_dirnode_t * dirnode1 = NULL, *dirnode2 = NULL;
     const encoded_fname_t * fname_code = NULL;
 
     if ((c_old_name = do_get_fname(from_path)) == NULL) {
@@ -192,7 +192,7 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     sds dnode_path = NULL;
 
     /* 1 - Get the corresponding dirnode */
-    struct dirnode * dirnode = dcache_get(fpath);
+    uc_dirnode_t * dirnode = dcache_get(fpath);
     if (dirnode == NULL) {
         goto out;
     }

@@ -34,7 +34,7 @@ fileops_start(int op,
     int ret = -1;
     size_t id = 0;
     crypto_context_t * crypto_ctx = NULL;
-    struct filebox * fb = NULL;
+    uc_filebox_t * fb = NULL;
     xfer_context_t * xfer_ctx = NULL;
 
     *retptr = -2;
@@ -113,7 +113,7 @@ out:
 int
 fileops_finish(size_t id)
 {
-    struct filebox * fb;
+    uc_filebox_t * fb;
     xfer_context_t * xfer_ctx;
     crypto_context_t * crypto_ctx;
     int ret = -2;

@@ -40,7 +40,7 @@ static bool check_main_dir()
     sds afsx_dnode = uc_main_dnode_fpath();
     if (stat(afsx_dnode, &stat_buf)) {
         cout << ". Initializing a new filebox" << endl;
-        struct dirnode * dirnode = dirnode_new();
+        uc_dirnode_t * dirnode = dirnode_new();
         if (!dirnode_write(dirnode, afsx_dnode)) {
             cout << ". Writing main dirnode failed" << endl;
             return false;

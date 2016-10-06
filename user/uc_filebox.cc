@@ -18,10 +18,10 @@ struct filebox {
     sds fbox_path;
 };
 
-struct filebox *
+uc_filebox_t *
 filebox_new()
 {
-    struct filebox * fb = (struct filebox *)malloc(sizeof(struct filebox));
+    uc_filebox_t * fb = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
     if (fb == NULL) {
         return NULL;
     }
@@ -35,7 +35,7 @@ filebox_new()
 }
 
 void
-filebox_free(struct filebox * fb)
+filebox_free(uc_filebox_t * fb)
 {
     delete fb->protobuf;
 
@@ -46,10 +46,10 @@ filebox_free(struct filebox * fb)
     free(fb);
 }
 
-struct filebox *
+uc_filebox_t *
 filebox_from_file(const sds filepath)
 {
-    struct filebox * obj = NULL;
+    uc_filebox_t * obj = NULL;
     fbox * proto = nullptr;
     fbox_header_t header;
     uint8_t * buffer = NULL;
@@ -93,7 +93,7 @@ filebox_from_file(const sds filepath)
         }
     }
 
-    obj = (struct filebox *)malloc(sizeof(struct filebox));
+    obj = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
     if (obj == NULL) {
         slog(0, SLOG_ERROR, "filebox - allocating dirnode object failed");
         goto out;
@@ -118,7 +118,7 @@ out:
 }
 
 bool
-filebox_write(struct filebox * fb, const char * fpath)
+filebox_write(uc_filebox_t * fb, const char * fpath)
 {
     bool ret = false;
     uint8_t * buffer = NULL;
@@ -158,13 +158,13 @@ out:
 }
 
 bool
-filebox_flush(struct filebox * fb)
+filebox_flush(uc_filebox_t * fb)
 {
     return fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
 }
 
 crypto_context_t *
-filebox_get_crypto(struct filebox * fb, size_t chunk_id)
+filebox_get_crypto(uc_filebox_t * fb, size_t chunk_id)
 {
     return (crypto_context_t *)calloc(1, sizeof(crypto_context_t));
 }
