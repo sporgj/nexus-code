@@ -1,10 +1,8 @@
-#include "uc_dnode.h"
+#include "uc_dirnode.h"
 #include "uc_uspace.h"
 
 #include "dnode.pb.h"
-#include "slog.h"
-
-#include <iostream>
+#include "third/slog.h"
 
 using namespace ::google::protobuf;
 
@@ -12,7 +10,7 @@ class dnode;
 
 struct dirnode {
     dnode_header_t header;
-    dnode * proto;
+    dnode * protobuf;
     sds dnode_path;
 };
 
@@ -25,7 +23,7 @@ struct dirnode * dirnode_new()
 
     memset(&obj->header, 0, sizeof(dnode_header_t));
     uuid_generate_time_safe(obj->header.uuid);
-    obj->proto = new dnode();
+    obj->protobuf = new dnode();
     obj->dnode_path = NULL;
 
     return obj;
@@ -42,7 +40,7 @@ bool dirnode_equals(struct dirnode * dn1, struct dirnode * dn2)
 
 void dirnode_free(struct dirnode * dirnode)
 {
-    delete dirnode->proto;
+    delete dirnode->protobuf;
 
     if (dirnode->dnode_path) {
         sdsfree(dirnode->dnode_path);
@@ -90,20 +88,20 @@ struct dirnode * dirnode_from_file(const sds filepath)
     }
 
     _dnode = new dnode();
-    if (header.len) {
-        if ((buffer = (uint8_t *)malloc(header.len)) == NULL) {
+    if (header.protolen) {
+        if ((buffer = (uint8_t *)malloc(header.protolen)) == NULL) {
             slog(0, SLOG_ERROR, "dirnode - allocation for dnode failed");
             goto out;
         }
 
-        if ((nbytes = fread(buffer, 1, header.len, fd)) != header.len) {
-            slog(0, SLOG_ERROR, "dirnode - reading protobuf failed:"
-                    "expected=%u, actual=%u", header.len, nbytes);
+        if ((nbytes = fread(buffer, 1, header.protolen, fd)) != header.protolen) {
+            slog(0, SLOG_ERROR, "dirnode - reading protobufbuf failed:"
+                    "expected=%u, actual=%u", header.protolen, nbytes);
             goto out;
         }
 
-        if (!_dnode->ParseFromArray(buffer, header.len)) {
-            slog(0, SLOG_ERROR, "dirnode - parsing protobuf failed: %s",
+        if (!_dnode->ParseFromArray(buffer, header.protolen)) {
+            slog(0, SLOG_ERROR, "dirnode - parsing protobufbuf failed: %s",
                 filepath);
             goto out;
         }
@@ -116,7 +114,7 @@ struct dirnode * dirnode_from_file(const sds filepath)
     }
 
     obj->dnode_path = sdsdup(filepath);
-    obj->proto = _dnode;
+    obj->protobuf = _dnode;
     memcpy(&obj->header, &header, sizeof(dnode_header_t));
     error = 0;
 out:
@@ -137,7 +135,7 @@ bool dirnode_write(struct dirnode * dn, const char * fpath)
 {
     bool ret = false;
     uint8_t * buffer = NULL;
-    size_t len = CRYPTO_CEIL_TO_BLKSIZE(dn->proto->ByteSize());
+    size_t len = CRYPTO_CEIL_TO_BLKSIZE(dn->protobuf->ByteSize());
     FILE * fd;
 
     fd = fopen(fpath, "wb");
@@ -151,16 +149,16 @@ bool dirnode_write(struct dirnode * dn, const char * fpath)
         goto out;
     }
 
-    if (!dn->proto->SerializeToArray(buffer, len)) {
+    if (!dn->protobuf->SerializeToArray(buffer, len)) {
         slog(0, SLOG_ERROR, "dirnode - serialization failed");
         goto out;
     }
 
     /* GetCachedSize returns the size computed from ByteSize() */
-    dn->header.len = dn->proto->GetCachedSize();
+    dn->header.protolen = dn->protobuf->GetCachedSize();
 
     fwrite(&dn->header, sizeof(dnode_header_t), 1, fd);
-    fwrite(buffer, dn->header.len, 1, fd);
+    fwrite(buffer, dn->header.protolen, 1, fd);
 
     ret = true;
 out:
@@ -195,13 +193,13 @@ const encoded_fname_t * dirnode_add_alias(struct dirnode * dn, const sds name,
 
     switch (type) {
     case UCAFS_TYPE_FILE:
-        fentry = dn->proto->add_file();
+        fentry = dn->protobuf->add_file();
         break;
     case UCAFS_TYPE_DIR:
-        fentry = dn->proto->add_dir();
+        fentry = dn->protobuf->add_dir();
         break;
     case UCAFS_TYPE_LINK:
-        fentry = dn->proto->add_link();
+        fentry = dn->protobuf->add_link();
         break;
     default:
         return NULL;
@@ -245,13 +243,13 @@ const encoded_fname_t * dirnode_rm(
 retry:
     switch (type) {
     case UCAFS_TYPE_FILE:
-        fentry_list = dn->proto->mutable_file();
+        fentry_list = dn->protobuf->mutable_file();
         break;
     case UCAFS_TYPE_DIR:
-        fentry_list = dn->proto->mutable_dir();
+        fentry_list = dn->protobuf->mutable_dir();
         break;
     case UCAFS_TYPE_LINK:
-        fentry_list = dn->proto->mutable_link();
+        fentry_list = dn->protobuf->mutable_link();
         break;
     default:
         return NULL;
@@ -315,13 +313,13 @@ const char * dirnode_enc2raw(const struct dirnode * dn,
 retry:
     switch (type) {
     case UCAFS_TYPE_FILE:
-        fentry_list = &dn->proto->file();
+        fentry_list = &dn->protobuf->file();
         break;
     case UCAFS_TYPE_DIR:
-        fentry_list = &dn->proto->dir();
+        fentry_list = &dn->protobuf->dir();
         break;
     case UCAFS_TYPE_LINK:
-        fentry_list = &dn->proto->link();
+        fentry_list = &dn->protobuf->link();
         break;
     default:
         return NULL;
@@ -373,13 +371,13 @@ const encoded_fname_t * dirnode_raw2enc(
 retry:
     switch (type) {
     case UCAFS_TYPE_FILE:
-        fentry_list = &dn->proto->file();
+        fentry_list = &dn->protobuf->file();
         break;
     case UCAFS_TYPE_DIR:
-        fentry_list = &dn->proto->dir();
+        fentry_list = &dn->protobuf->dir();
         break;
     case UCAFS_TYPE_LINK:
-        fentry_list = &dn->proto->link();
+        fentry_list = &dn->protobuf->link();
         break;
     default:
         return NULL;

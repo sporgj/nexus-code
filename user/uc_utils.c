@@ -1,5 +1,7 @@
 #include <string.h>
-#include "sds.h"
+
+#include "third/sds.h"
+
 #include "uc_utils.h"
 
 // http://stackoverflow.com/questions/16804251/how-would-i-create-a-hex-dump-utility-in-c

@@ -1,7 +1,7 @@
 #include "cdefs.h"
 #include "afsx.h"
 #include "uc_dirops.h"
-#include "fileops.h"
+#include "uc_fileops.h"
 #include "uc_utils.h"
 
 #define N_SECURITY_OBJECTS 1
@@ -99,7 +99,7 @@ afs_int32 SAFSX_lookup(
     if (ret) {
         *fake_name = EMPTY_STR_HEAP;
     } else {
-        printf("fencode: %s ~> %s\n", fpath, *fake_name);
+        uinfo("fencode: %s ~> %s\n", fpath, *fake_name);
     }
     return ret;
 }
@@ -173,8 +173,7 @@ afs_int32 SAFSX_readwrite_finish(
 {
     uint32_t total;
     int op;
-    int ret = fileops_finish(id, &op, &total);
-    uinfo("end %s: id=%d, total_bytes=%u", RWOP_TO_STR(op), id, total);
+    int ret = fileops_finish(id);
 
     return ret;
 }
@@ -214,9 +213,6 @@ afs_int32 SAFSX_readwrite_data(
                abytes, rx_Error(z_call));
         goto out;
     }
-
-    // uinfo("%s: id=%u, len=%u, done=%u", RWOP_TO_STR(ctx->op), id, size,
-    //      ctx->completed);
 
     ret = 0;
 out:

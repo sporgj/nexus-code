@@ -6,7 +6,8 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#include "encode.h"
+
+#include "uc_encode.h"
 
 /* 64 characters forming a 6-bit target field */
 char portable_filename_chars[] = ("-.0123456789ABCD"
@@ -42,8 +43,11 @@ static const unsigned char filename_rev_map[256] = {
  * @src: Source location for the filename to encode
  * @src_size: Size of the source in bytes
  */
-static void ecryptfs_encode_for_filename(unsigned char * dst, size_t * dst_size,
-                                         unsigned char * src, size_t src_size)
+static void
+ecryptfs_encode_for_filename(unsigned char * dst,
+                             size_t * dst_size,
+                             unsigned char * src,
+                             size_t src_size)
 {
     size_t num_blocks;
     size_t block_num = 0;
@@ -82,8 +86,10 @@ static void ecryptfs_encode_for_filename(unsigned char * dst, size_t * dst_size,
         else
             src_block = &src[block_num * 3];
         dst_block[0] = ((src_block[0] >> 2) & 0x3F);
-        dst_block[1] = (((src_block[0] << 4) & 0x30) | ((src_block[1] >> 4) & 0x0F));
-        dst_block[2] = (((src_block[1] << 2) & 0x3C) | ((src_block[2] >> 6) & 0x03));
+        dst_block[1]
+            = (((src_block[0] << 4) & 0x30) | ((src_block[1] >> 4) & 0x0F));
+        dst_block[2]
+            = (((src_block[1] << 2) & 0x3C) | ((src_block[2] >> 6) & 0x03));
         dst_block[3] = (src_block[2] & 0x3F);
         dst[dst_offset++] = portable_filename_chars[dst_block[0]];
         dst[dst_offset++] = portable_filename_chars[dst_block[1]];
@@ -95,7 +101,8 @@ out:
     return;
 }
 
-static size_t ecryptfs_max_decoded_size(size_t encoded_size)
+static size_t
+ecryptfs_max_decoded_size(size_t encoded_size)
 {
     /* Not exact; conservatively long. Every block of 4
      * encoded characters decodes into a block of 3
@@ -115,9 +122,11 @@ static size_t ecryptfs_max_decoded_size(size_t encoded_size)
  * @src: The encoded set of octets to decode.
  * @src_size: The size of the encoded set of octets to decode.
  */
-static void ecryptfs_decode_from_filename(unsigned char * dst, size_t * dst_size,
-                                          const unsigned char * src,
-                                          size_t src_size)
+static void
+ecryptfs_decode_from_filename(unsigned char * dst,
+                              size_t * dst_size,
+                              const unsigned char * src,
+                              size_t src_size)
 {
     uint8_t current_bit_offset = 0;
     size_t src_byte_offset = 0;
@@ -158,7 +167,8 @@ out:
     return;
 }
 
-char * encode_bin2str(const encoded_fname_t * code)
+char *
+encode_bin2str(const encoded_fname_t * code)
 {
     char * result = NULL;
     size_t sz;
@@ -172,18 +182,19 @@ char * encode_bin2str(const encoded_fname_t * code)
     }
 
     memcpy(result, UCAFS_FNAME_PREFIX, UCAFS_FNAME_PREFIX_LEN);
-    ecryptfs_encode_for_filename((uint8_t *)result + UCAFS_FNAME_PREFIX_LEN, &sz,
-                                 (uint8_t *)code, sizeof(encoded_fname_t));
+    ecryptfs_encode_for_filename((uint8_t *)result + UCAFS_FNAME_PREFIX_LEN,
+                                 &sz, (uint8_t *)code, sizeof(encoded_fname_t));
 
     return result;
 }
 
-encoded_fname_t * encode_str2bin(const char * encoded_filename)
+encoded_fname_t *
+encode_str2bin(const char * encoded_filename)
 {
     size_t src_sz = strlen(encoded_filename);
     size_t i, dst_sz;
     const char * _encoded_fname;
-    
+
     if (src_sz > UCAFS_FNAME_PREFIX_LEN) {
         for (i = 0; i < UCAFS_FNAME_PREFIX_LEN; i++) {
             // if it's not prefixed, don't even bother

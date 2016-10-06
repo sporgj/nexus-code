@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "types.h"
-#include "uc_filebox.h"
+extern "C" {
+#include "third/slog.h"
+}
+
 #include "fbox.pb.h"
-#include "slog.h"
-#include "sds.h"
+
+#include "uc_filebox.h"
+#include "uc_types.h"
 
 class fbox;
 
@@ -15,7 +18,8 @@ struct filebox {
     sds fbox_path;
 };
 
-struct filebox * filebox_new()
+struct filebox *
+filebox_new()
 {
     struct filebox * fb = (struct filebox *)malloc(sizeof(struct filebox));
     if (fb == NULL) {
@@ -30,7 +34,8 @@ struct filebox * filebox_new()
     uuid_generate_time_safe(fb->header.uuid);
 }
 
-void filebox_free(struct filebox * fb)
+void
+filebox_free(struct filebox * fb)
 {
     delete fb->protobuf;
 
@@ -41,7 +46,8 @@ void filebox_free(struct filebox * fb)
     free(fb);
 }
 
-struct filebox * filebox_from_file(const sds filepath)
+struct filebox *
+filebox_from_file(const sds filepath)
 {
     struct filebox * obj = NULL;
     fbox * proto = nullptr;
@@ -61,7 +67,7 @@ struct filebox * filebox_from_file(const sds filepath)
     nbytes = fread(&header, sizeof(fbox_header_t), 1, fd);
     if (!nbytes) {
         slog(0, SLOG_ERROR, "filebox - could not read header: %s (nbytes=%u)",
-                filepath, nbytes);
+             filepath, nbytes);
         goto out;
     }
 
@@ -72,15 +78,17 @@ struct filebox * filebox_from_file(const sds filepath)
             goto out;
         }
 
-        if ((nbytes = fread(buffer, 1, header.protolen, fd)) != header.protolen) {
+        if ((nbytes = fread(buffer, 1, header.protolen, fd))
+            != header.protolen) {
             slog(0, SLOG_ERROR, "filebox - reading protobuf failed:"
-                    "expected=%u, actual=%u", header.protolen, nbytes);
+                                "expected=%u, actual=%u",
+                 header.protolen, nbytes);
             goto out;
         }
 
         if (!proto->ParseFromArray(buffer, header.protolen)) {
             slog(0, SLOG_ERROR, "filebox - parsing protobuf failed: %s",
-                filepath);
+                 filepath);
             goto out;
         }
     }
@@ -109,7 +117,8 @@ out:
     return obj;
 }
 
-bool filebox_write(struct filebox * fb, const char * fpath)
+bool
+filebox_write(struct filebox * fb, const char * fpath)
 {
     bool ret = false;
     uint8_t * buffer = NULL;
@@ -146,10 +155,17 @@ out:
     }
 
     return ret;
-
 }
 
-bool filebox_flush(struct filebox * fb)
+bool
+filebox_flush(struct filebox * fb)
 {
     return fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
 }
+
+crypto_context_t *
+filebox_get_crypto(struct filebox * fb, size_t chunk_id)
+{
+    return (crypto_context_t *)calloc(1, sizeof(crypto_context_t));
+}
+

@@ -37,9 +37,9 @@ typedef enum {
 
 typedef struct {
     int op;
-    int crypto_id;
-    uint32_t seg_id;
-    uint32_t id;
+    size_t id;
+    size_t crypto_id;
+    size_t seg_id;
     char * buffer;
     uint32_t buflen;
     uint32_t valid_buflen; // how much "good" data can be read from the buffer
@@ -71,16 +71,16 @@ typedef struct {
 } __attribute__((packed)) crypto_context_t;
 
 typedef struct {
-    uint32_t magic;
-    uint32_t count;
-    uint32_t len;
     uuid_t uuid;
+    uint32_t count;
+    uint32_t protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 
 typedef struct {
-    uint32_t seg_count; // number of segments in the file
-    uint32_t flen;
-    uint32_t plen; // length of the protocol buffer
-    crypto_context_t crypto; // crypto protecting the whole protocol buffer file
+    uuid_t uuid;
+    uint32_t chunk_count;
+    uint32_t filelen;
+    uint32_t protolen;
+    crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;

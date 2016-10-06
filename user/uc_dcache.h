@@ -6,4 +6,4 @@ struct dirnode * dcache_get_dir(const char * path);
 
 void dcache_put(struct dirnode * dn);
 
-void dcache_rm(const sds dirpath);
+void dcache_rm(const char * dirpath);

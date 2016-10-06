@@ -6,7 +6,7 @@ OPENAFS_INC := $(OPENAFS_PATH)/include
 OPENAFS_SRC := $(OPENAFS_PATH)/src
 OPENAFS_LIB := $(OPENAFS_PATH)/lib
 
-OBJS := rpc.o afsx.ss.o enclave_u.o $(OBJS)
+OBJS := uc_rpc.o afsx.ss.o enclave_u.o $(OBJS)
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
 RXINC := -I$(OPENAFS_INC)
@@ -57,7 +57,7 @@ afsx.cs.o: afsx.cs.c afsx.h
 afsx.cs.c: afsx.xg
 	$(RXGEN) -A -x -C -o $@ $<
 
-ucafs: main.cc libucafs.a
+ucafs: main.cc libucafs.a third/libthird.a
 	@$(CXX) $(CPPFLAGS) $^ $(LIBS) $(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
@@ -71,12 +71,15 @@ afsx.ss.c: afsx.xg afsx.h
 afsx.h: afsx.xg afsx_hdr.h
 	$(RXGEN) -A -x -h -o $@ $<
 
-libucafs.a: $(OBJS)
+libthird.a: third/libthird.a
+	make -C third/ && cp $^ $@
+
+libucafs.a: $(OBJS) libthird.a
 	@ar cr $@ $^
 	@echo "ar => $@"
 
-rpc.o: rpc.c afsx.ss.c
-	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+uc_rpc.o: uc_rpc.c afsx.ss.c
+	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 
 %.o: %.cc %.h
@@ -84,14 +87,14 @@ rpc.o: rpc.c afsx.ss.c
 	@echo "CXX <= $@"
 
 %.o: %.c %.h
-	@$(CC) $(CFLAGS) $(INCFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(App_C_Flags) $(INCFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-uc_dnode.o: uc_dnode.cc uc_dnode.h dnode.pb.cc
+uc_dirnode.o: uc_dirnode.cc uc_dirnode.h dnode.pb.cc
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
-filebox.o: filebox.cc filebox.h fbox.pb.cc
+uc_filebox.o: uc_filebox.cc uc_filebox.h fbox.pb.cc
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 

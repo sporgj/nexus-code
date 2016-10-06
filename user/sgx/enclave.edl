@@ -1,5 +1,5 @@
 enclave {
-    include "types.h"
+    include "uc_types.h"
 
     trusted {
         public int ecall_init_enclave();

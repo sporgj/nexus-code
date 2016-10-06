@@ -10,19 +10,17 @@ LIBS = -L/usr/local/lib -lprotobuf -pthread\
        -luuid -ltcmalloc
 INCFLAGS = -I/usr/local/include
 
-OBJS = uc_dnode.o\
+OBJS = uc_dirnode.o\
+       uc_filebox.o\
        uc_dirops.o\
        uc_dcache.o\
-       filebox.o\
        uc_uspace.o\
-       encode.o\
-       fileops.o\
+       uc_encode.o\
+       uc_fileops.o\
        uc_utils.o\
-       slog.o\
-       sds.o\
-       hashmap.o\
        fbox.pb.o\
        dnode.pb.o
 
 TESTS := test_dnode test_dops test_lookup test_crypto
-GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a 
+GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a libthird.a\
+	   enclave_u.*

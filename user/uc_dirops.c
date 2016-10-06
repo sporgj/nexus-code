@@ -1,17 +1,14 @@
 #include <string.h>
 
-#include "types.h"
+#include "third/slog.h"
+
 #include "uc_dirops.h"
-#include "uc_dnode.h"
+#include "uc_dirnode.h"
 #include "uc_dcache.h"
 
 #include "uc_uspace.h"
-#include "encode.h"
+#include "uc_encode.h"
 #include "uc_utils.h"
-#include "slog.h"
-#include "hashmap.h"
-
-static map_t encoded_to_raw_table = NULL;
 
 int dirops_new(const char * fpath, ucafs_entry_type type,
                char ** encoded_name_dest)

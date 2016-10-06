@@ -9,14 +9,11 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
-#include <sgx_urts.h>
 
-#include "uc_dnode.h"
+#include "uc_dirnode.h"
 #include "uc_dcache.h"
 #include "uc_uspace.h"
-#include "enclave_common.h"
-
-#define ENCLAVE_FILENAME "sgx/enclave.signed.so"
+#include "uc_sgx.h"
 
 using namespace std;
 
