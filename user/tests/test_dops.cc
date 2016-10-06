@@ -18,14 +18,14 @@ vector<char *> check_paths;
 static void mk_default_dnode()
 {
     sds _str = uc_main_dnode_fpath();
-    struct dirnode * dn = dn_new();
+    struct dirnode * dn = dirnode_new();
 
-    if (!dn_write(dn, _str)) {
+    if (!dirnode_write(dn, _str)) {
         cout << "Could not save main file" << endl;
         return;
     }
 
-    dn_free(dn);
+    dirnode_free(dn);
 }
 
 int build_tree(string & curr_dir, int i, int j)

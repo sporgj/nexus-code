@@ -34,13 +34,13 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     }
 
     /* Get filename and add it to DirNode */
-    if ((fname_code = dn_add(dirnode, fname, type)) == NULL) {
+    if ((fname_code = dirnode_add(dirnode, fname, type)) == NULL) {
         slog(0, SLOG_ERROR, "Add file operation failed: %s", fpath);
         goto out;
     }
 
     // 3 - Flush to disk
-    if (!dn_flush(dirnode)) {
+    if (!dirnode_flush(dirnode)) {
         slog(0, SLOG_ERROR, "Flushing '%s' failed", fpath);
         goto out;
     }
@@ -48,9 +48,9 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     temp = encode_bin2str(fname_code);
 
     if (type == UCAFS_TYPE_DIR) {
-        dirnode1 = dn_new();
+        dirnode1 = dirnode_new();
         path1 = uc_get_dnode_path(temp);
-        if (!dn_write(dirnode1, path1)) {
+        if (!dirnode_write(dirnode1, path1)) {
             slog(0, SLOG_ERROR, "Creating: '%s' dirnode failed", fpath);
             goto out;
         }
@@ -96,7 +96,7 @@ int dirops_code2plain(char * encoded_name, char * dir_path,
     }
 
     // 3 - Get the plain filename
-    if ((result = dn_enc2raw(dn, fname_code, type)) == NULL) {
+    if ((result = dirnode_enc2raw(dn, fname_code, type)) == NULL) {
         goto out;
     }
 
@@ -134,14 +134,14 @@ int dirops_rename(const char * from_path, const char * to_path,
         goto out;
     }
 
-    if (dn_equals(dirnode1, dirnode2)) {
-        fname_code = dn_rename(dirnode1, c_old_name, c_new_name, type);
+    if (dirnode_equals(dirnode1, dirnode2)) {
+        fname_code = dirnode_rename(dirnode1, c_old_name, c_new_name, type);
         if (fname_code == NULL) {
             slog(0, SLOG_ERROR, "Could not accomplish rename");
             goto out;
         }
 
-        if (!dn_flush(dirnode1)) {
+        if (!dirnode_flush(dirnode1)) {
             slog(0, SLOG_ERROR, "Could not flush dirnode");
             goto out;
         }
@@ -150,22 +150,22 @@ int dirops_rename(const char * from_path, const char * to_path,
     }
 
     /* Removing from the owning dirnode */
-    fname_code = dn_rm(dirnode1, c_old_name, type);
+    fname_code = dirnode_rm(dirnode1, c_old_name, type);
     if (fname_code == NULL) {
         slog(0, SLOG_ERROR, "fname '%s' does not exist", c_old_name);
         goto out;
     }
 
-    if (!dn_flush(dirnode1)) {
+    if (!dirnode_flush(dirnode1)) {
         slog(0, SLOG_ERROR, "Flushing '%s' dirnode failed", from_path);
         goto out;
     }
 
     /* Adding it to the new dirnode */
-    dn_rm(dirnode2, c_new_name, type);
-    dn_add_alias(dirnode2, c_new_name, type, fname_code);
+    dirnode_rm(dirnode2, c_new_name, type);
+    dirnode_add_alias(dirnode2, c_new_name, type, fname_code);
 
-    if (!dn_flush(dirnode2)) {
+    if (!dirnode_flush(dirnode2)) {
         slog(0, SLOG_ERROR, "Flushing '%s' dirnode failed", to_path);
         goto out;
     }
@@ -206,14 +206,14 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     }
 
     /* Perform the operation */
-    if ((fname_code = (rm ? dn_rm(dirnode, fname, type)
-                          : dn_raw2enc(dirnode, fname, type))) == NULL) {
+    if ((fname_code = (rm ? dirnode_rm(dirnode, fname, type)
+                          : dirnode_raw2enc(dirnode, fname, type))) == NULL) {
         slog(0, SLOG_WARN, "Could not %s: %s", (rm ? "remove" : "find"),
              fpath);
         goto out;
     }
 
-    if (rm && !dn_flush(dirnode)) {
+    if (rm && !dirnode_flush(dirnode)) {
         slog(0, SLOG_ERROR, "Error flushing: %s", fpath);
         goto out;
     }

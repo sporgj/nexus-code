@@ -34,19 +34,19 @@ static dirent_t * lookup_cache(const sds dirpath)
 static void insert_into_dcache(const sds dirpath, struct dirnode * dn)
 {
     dirent_t * dirent = malloc(sizeof(dirent_t));
-    dirent->fpath = sdsdup(dn_get_fpath(dn));
+    dirent->fpath = sdsdup(dirnode_get_fpath(dn));
     hashmap_put(dcache_table, dirpath, dirent);
 }
 
 static struct dirnode * dcache_resolve(dirent_t * dirent)
 {
     // TODO increase reference count
-    return dn_from_file(dirent->fpath);
+    return dirnode_from_file(dirent->fpath);
 }
 
 void dcache_put(struct dirnode * dn)
 {
-    dn_free(dn);
+    dirnode_free(dn);
 }
 
 void dcache_rm(const sds dirpath) {
@@ -76,14 +76,14 @@ static struct dirnode * dcache_traverse(const sds relative_dirpath)
     uintptr_t ptr_val;
 
     // TODO check for null
-    struct dirnode * dn = dn_default_dnode();
+    struct dirnode * dn = dirnode_default_dnode();
 
     c_rel_path = strdup(relative_dirpath);
 
     nch = strtok_r(c_rel_path, "/", &pch);
     while (nch) {
         /* find the entry in the dirnode */
-        if ((encoded_fname = dn_raw2enc(dn, nch, UCAFS_TYPE_DIR)) == NULL) {
+        if ((encoded_fname = dirnode_raw2enc(dn, nch, UCAFS_TYPE_DIR)) == NULL) {
             break;
         }
 
@@ -96,8 +96,8 @@ static struct dirnode * dcache_traverse(const sds relative_dirpath)
         free(encoded_name_str);
 
         /* open the dnode for that path */
-        dn_free(dn);
-        dn = dn_from_file(dnode_path);
+        dirnode_free(dn);
+        dn = dirnode_from_file(dnode_path);
 
         sdsfree(dnode_path);
         dnode_path = NULL;
@@ -113,7 +113,7 @@ static struct dirnode * dcache_traverse(const sds relative_dirpath)
 
     if (!found) {
         if (dn) {
-            dn_free(dn);
+            dirnode_free(dn);
         }
 
         if (dnode_path) {

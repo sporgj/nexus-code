@@ -16,7 +16,7 @@ struct dirnode {
     sds dnode_path;
 };
 
-struct dirnode * dn_new()
+struct dirnode * dirnode_new()
 {
     struct dirnode * obj = (struct dirnode *)malloc(sizeof(struct dirnode));
     if (obj == NULL) {
@@ -31,16 +31,16 @@ struct dirnode * dn_new()
     return obj;
 }
 
-const sds dn_get_fpath(struct dirnode * dirnode) {
+const sds dirnode_get_fpath(struct dirnode * dirnode) {
     return dirnode->dnode_path;
 }
 
-bool dn_equals(struct dirnode * dn1, struct dirnode * dn2)
+bool dirnode_equals(struct dirnode * dn1, struct dirnode * dn2)
 {
     return memcmp(&dn1->header, &dn2->header, sizeof(dnode_header_t)) == 0;
 }
 
-void dn_free(struct dirnode * dirnode)
+void dirnode_free(struct dirnode * dirnode)
 {
     delete dirnode->proto;
 
@@ -51,7 +51,7 @@ void dn_free(struct dirnode * dirnode)
     free(dirnode);
 }
 
-struct dirnode * dn_default_dnode()
+struct dirnode * dirnode_default_dnode()
 {
     struct dirnode * dn;
     sds path = uc_main_dnode_fpath();
@@ -59,13 +59,13 @@ struct dirnode * dn_default_dnode()
         return NULL;
     }
 
-    dn = dn_from_file(path);
+    dn = dirnode_from_file(path);
     sdsfree(path);
 
     return dn;
 }
 
-struct dirnode * dn_from_file(const sds filepath)
+struct dirnode * dirnode_from_file(const sds filepath)
 {
     struct dirnode * obj = NULL;
     dnode * _dnode = NULL;
@@ -133,7 +133,7 @@ out:
     return obj;
 }
 
-bool dn_write(struct dirnode * dn, const char * fpath)
+bool dirnode_write(struct dirnode * dn, const char * fpath)
 {
     bool ret = false;
     uint8_t * buffer = NULL;
@@ -172,13 +172,13 @@ out:
     return ret;
 }
 
-bool dn_flush(struct dirnode * dn)
+bool dirnode_flush(struct dirnode * dn)
 {
     assert(dn != NULL);
-    return dn->dnode_path ? dn_write(dn, dn->dnode_path) : false;
+    return dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
 }
 
-const encoded_fname_t * dn_add_alias(struct dirnode * dn, const sds name,
+const encoded_fname_t * dirnode_add_alias(struct dirnode * dn, const sds name,
     ucafs_entry_type type, const encoded_fname_t * p_encoded_name)
 {
     encoded_fname_t * encoded_name;
@@ -221,13 +221,13 @@ const encoded_fname_t * dn_add_alias(struct dirnode * dn, const sds name,
     return encoded_name;
 }
 
-const encoded_fname_t * dn_add(
+const encoded_fname_t * dirnode_add(
     struct dirnode * dn, const sds name, ucafs_entry_type type)
 {
-    return dn_add_alias(dn, name, type, NULL);
+    return dirnode_add_alias(dn, name, type, NULL);
 }
 
-const encoded_fname_t * dn_rm(
+const encoded_fname_t * dirnode_rm(
     struct dirnode * dn, const sds realname, ucafs_entry_type type)
 {
     encoded_fname_t * result = NULL;
@@ -300,7 +300,7 @@ retry:
     return NULL;
 }
 
-const char * dn_enc2raw(const struct dirnode * dn,
+const char * dirnode_enc2raw(const struct dirnode * dn,
     const encoded_fname_t * encoded_name, ucafs_entry_type type)
 {
     const RepeatedPtrField<dnode_fentry> * fentry_list;
@@ -356,7 +356,7 @@ retry:
     return NULL;
 }
 
-const encoded_fname_t * dn_raw2enc(
+const encoded_fname_t * dirnode_raw2enc(
     const struct dirnode * dn, const char * realname, ucafs_entry_type type)
 {
     size_t len = strlen(realname);
@@ -415,14 +415,14 @@ retry:
     return NULL;
 }
 
-const encoded_fname_t * dn_rename(struct dirnode * dn,
+const encoded_fname_t * dirnode_rename(struct dirnode * dn,
     const sds oldname, const sds newname, ucafs_entry_type type)
 {
-    const encoded_fname_t * encoded_name = dn_rm(dn, oldname, type);
+    const encoded_fname_t * encoded_name = dirnode_rm(dn, oldname, type);
     const encoded_fname_t * p_encoded_name;
     if (encoded_name) {
-        dn_rm(dn, newname, type);
-        p_encoded_name = dn_add_alias(dn, newname, type, encoded_name);
+        dirnode_rm(dn, newname, type);
+        p_encoded_name = dirnode_add_alias(dn, newname, type, encoded_name);
         return encoded_name;
     }
     return NULL;
