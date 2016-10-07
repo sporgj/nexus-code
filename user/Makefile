@@ -23,24 +23,14 @@ cryptolib: copyconfig
 	cd mbedtls/library && make clean && make SHARED=t
 
 define make-test-target
-$(1): $(1).cc libucafs.a
-	@$(CXX) -DTEST_ENV $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).cc\
-		libucafs.a $$(LIBS) $$(App_Link_Flags) -o $(1)
+$(1): $(1).c libucafs.a
+	$(CC) -DTEST_ENV $$(CFLAGS) -I./ $$(INCFLAGS) $(1).c\
+		libucafs.a $$(LIBS) $$(App_Link_Flags) -lcheck -o $(1)
 	@echo "CXX <= $(1)"
 endef
 
 $(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
-tests: $(addprefix tests/, $(TESTS)) tests/test_upload tests/test_dirs
-
-tests/test_upload: tests/test_upload.cc libucafs.a afsx.cs.o
-	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) $^ $(LIBS)\
-		$(RXLIBS) $(App_Link_Flags) -o $@
-	@echo "CXX <= $@"
-
-tests/test_dirs: tests/test_dirs.cc libucafs.a afsx.cs.o
-	@$(CXX) -DTEST_ENV $(CPPFLAGS) -I./ $(INCFLAGS) $(RXINC) -O $^ $(LIBS)\
-		$(RXLIBS) $(App_Link_Flags) -o $@
-	@echo "CXX <= $@"
+tests: $(addprefix tests/, $(TESTS))
 
 enclave_u.c: sgx/enclave.edl
 	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
@@ -71,8 +61,11 @@ afsx.ss.c: afsx.xg afsx.h
 afsx.h: afsx.xg afsx_hdr.h
 	$(RXGEN) -A -x -h -o $@ $<
 
+third/libthird.a:
+	make -C third/
+
 libthird.a: third/libthird.a
-	make -C third/ && cp $^ $@
+	cp $^ $@
 
 libucafs.a: $(OBJS) libthird.a
 	@ar cr $@ $^

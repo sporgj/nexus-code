@@ -5,7 +5,7 @@
 #include "uc_dirops.h"
 #include "uc_dirnode.h"
 #include "uc_dcache.h"
-
+#include "uc_filebox.h"
 #include "uc_uspace.h"
 #include "uc_encode.h"
 #include "uc_utils.h"
@@ -16,6 +16,7 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     int error = -1; // TODO change this
     char * fname = do_get_fname(fpath), *temp;
     uc_dirnode_t * dirnode = NULL, *dirnode1 = NULL;
+    uc_filebox_t * filebox = NULL;
     const encoded_fname_t * fname_code = NULL;
     sds path1 = NULL;
 
@@ -43,22 +44,38 @@ int dirops_new(const char * fpath, ucafs_entry_type type,
     }
 
     temp = encode_bin2str(fname_code);
+    path1 = uc_get_dnode_path(temp);
 
     if (type == UCAFS_TYPE_DIR) {
-        dirnode1 = dirnode_new();
-        path1 = uc_get_dnode_path(temp);
+        if ((dirnode1 = dirnode_new()) == NULL) {
+            slog(0, SLOG_ERROR, "new dirnode failed: %s", fpath);
+            goto out;
+        }
+
         if (!dirnode_write(dirnode1, path1)) {
             slog(0, SLOG_ERROR, "Creating: '%s' dirnode failed", fpath);
             goto out;
         }
     } else if (type == UCAFS_TYPE_FILE) {
-        /* TODO: create filebox object */
+        if ((filebox = filebox_new()) == NULL) {
+            slog(0, SLOG_ERROR, "Creating '%s' filebox failed", fpath);
+            goto out;
+        }
+
+        if (!filebox_write(filebox, path1)) {
+            slog(0, SLOG_ERROR, "Writing filebox to '%s' failed", path1);
+            goto out;
+        }
     }
 
     /* Set the encoded name */
     *encoded_name_dest = temp;
     error = 0;
 out:
+    /* TODO probably need to perform an additional check here concerning
+     * failed dirnode/filebox writes to disk. */
+    if (filebox)
+        filebox_free(filebox);
     if (dirnode)
         dcache_put(dirnode);
     if (dirnode1)
@@ -217,7 +234,7 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
 
     c_temp = encode_bin2str(fname_code);
     /* now delete the file from the filesystem */
-    if (rm && type == UCAFS_TYPE_DIR) {
+    if (rm) {
         dcache_rm(fpath);
         dnode_path = uc_get_dnode_path(c_temp);
         if (unlink(dnode_path)) {

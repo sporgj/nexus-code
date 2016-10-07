@@ -32,6 +32,8 @@ filebox_new()
 
     // TODO initialize default segment;
     uuid_generate_time_safe(fb->header.uuid);
+
+    return fb;
 }
 
 void
