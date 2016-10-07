@@ -12,6 +12,7 @@ RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 RXINC := -I$(OPENAFS_INC)
 RXLIBS := $(OPENAFS_LIB)/librx.a $(OPENAFS_LIB)/liblwp.a #-L$(OPENAFS_LIB) -lrx -llwp
 
+CFLAGS += $(App_C_Flags)
 CPPFLAGS += $(App_Cpp_Flags)
 
 all: ucafs
@@ -22,15 +23,6 @@ copyconfig:
 cryptolib: copyconfig
 	cd mbedtls/library && make clean && make SHARED=t
 
-define make-test-target
-$(1): $(1).c libucafs.a
-	$(CC) -DTEST_ENV $$(CFLAGS) -I./ $$(INCFLAGS) $(1).c\
-		libucafs.a $$(LIBS) $$(App_Link_Flags) -lcheck -o $(1)
-	@echo "CXX <= $(1)"
-endef
-
-$(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
-tests: $(addprefix tests/, $(TESTS))
 
 enclave_u.c: sgx/enclave.edl
 	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
@@ -47,7 +39,7 @@ afsx.cs.o: afsx.cs.c afsx.h
 afsx.cs.c: afsx.xg
 	$(RXGEN) -A -x -C -o $@ $<
 
-ucafs: main.cc libucafs.a third/libthird.a
+ucafs: main.cc libucafs.a
 	@$(CXX) $(CPPFLAGS) $^ $(LIBS) $(RXLIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
@@ -68,7 +60,7 @@ libthird.a: third/libthird.a
 	cp $^ $@
 
 libucafs.a: $(OBJS) libthird.a
-	@ar cr $@ $^
+	ar cr $@ $(OBJS) third/*.o
 	@echo "ar => $@"
 
 uc_rpc.o: uc_rpc.c afsx.ss.c

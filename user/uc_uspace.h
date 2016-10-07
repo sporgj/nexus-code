@@ -2,6 +2,10 @@
 
 #include "third/sds.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * path to the default home directory
  */
@@ -32,3 +36,7 @@ uc_get_relative_parentpath(const char * path);
 
 sds
 uc_get_relative_path(const char * path);
+
+#ifdef __cplusplus
+}
+#endif

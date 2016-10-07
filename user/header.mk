@@ -1,10 +1,12 @@
 KERNSRC_PATH = ../kernel
 
+SGX_DEBUG := 1
+
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
-FLAGS := -O0 -g
-CPPFLAGS = $(FLAGS) -std=c++11
+FLAGS := 
+CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib -lprotobuf -pthread\
        -luuid -ltcmalloc
