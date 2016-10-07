@@ -5,7 +5,9 @@
 
 #include "uc_dirnode.h"
 #include "uc_encode.h"
+#include "uc_filebox.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 
 static map_t dcache_table = NULL;
 
@@ -178,4 +180,41 @@ uc_dirnode_t *
 dcache_get_dir(const char * path)
 {
     return __dcache_path(path, false);
+}
+
+uc_filebox_t *
+dcache_get_filebox(const char * path)
+{
+    const encoded_fname_t * codename;
+    char * fname = NULL, * temp = NULL;
+    sds fbox_path = NULL;
+    uc_filebox_t * fb;
+    uc_dirnode_t * dirnode = dcache_get(path);
+
+    if (dirnode == NULL) {
+        return NULL;
+    }
+
+    if ((fname = do_get_fname(path)) == NULL) {
+        return NULL;
+    }
+
+    /* get the entry in the file */
+    codename = dirnode_raw2enc(dirnode, fname, UCAFS_TYPE_FILE);
+    if (codename == NULL) {
+        goto out;
+    }
+
+    temp = encode_bin2str(codename);
+    fbox_path = uc_get_dnode_path(temp);
+
+    fb = filebox_from_file(fbox_path);
+
+    free(temp);
+    sdsfree(fbox_path);
+out:
+    dirnode_free(dirnode);
+    if (codename)
+        free((void *)codename);
+    return fb;
 }

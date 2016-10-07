@@ -57,6 +57,17 @@ filebox_flush(uc_filebox_t * fb);
 crypto_context_t *
 filebox_get_crypto(uc_filebox_t * fb, size_t chunk_id);
 
+/**
+ * Updates the crypto context at the specified chunk id
+ * @param fb
+ * @param chunk_id
+ * @param crypto_ctx
+ */
+void
+filebox_set_crypto(uc_filebox_t * fb,
+                   size_t chunk_id,
+                   crypto_context_t * crypto_ctx);
+
 #ifdef __cplusplus
 }
 #endif

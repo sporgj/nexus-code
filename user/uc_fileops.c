@@ -3,6 +3,7 @@
 #include "third/seqptrmap.h"
 #include "third/slog.h"
 
+#include "uc_dcache.h"
 #include "uc_filebox.h"
 #include "uc_sgx.h"
 #include "uc_types.h"
@@ -40,7 +41,7 @@ fileops_start(int op,
     *retptr = -2;
 
     /* get the filebox object */
-    if ((fb = filebox_new()) == NULL) {
+    if ((fb = dcache_get_filebox(fpath)) == NULL) {
         *retptr = -1;
         slog(0, SLOG_ERROR, "fileops - filebox (%s) could not be found", fpath);
         return NULL;

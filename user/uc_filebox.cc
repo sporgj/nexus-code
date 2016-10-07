@@ -30,8 +30,12 @@ filebox_new()
     fb->protobuf = new fbox();
     fb->fbox_path = NULL;
 
-    // TODO initialize default segment;
     uuid_generate_time_safe(fb->header.uuid);
+
+    /* creating default segment */
+    fbox_segment * segment = fb->protobuf->add_seg();
+    segment->set_num(0);
+    segment->set_size(0);
 
     return fb;
 }
@@ -168,6 +172,23 @@ filebox_flush(uc_filebox_t * fb)
 crypto_context_t *
 filebox_get_crypto(uc_filebox_t * fb, size_t chunk_id)
 {
-    return (crypto_context_t *)calloc(1, sizeof(crypto_context_t));
+    crypto_context_t * crypto_ctx
+        = (crypto_context_t *)malloc(sizeof(crypto_context_t));
+    if (crypto_ctx == NULL) {
+        return NULL;
+    }
+
+    memcpy(crypto_ctx, fb->protobuf->mutable_seg(chunk_id)->crypto().data(),
+           sizeof(crypto_context_t));
+
+    return crypto_ctx;
 }
 
+void
+filebox_set_crypto(uc_filebox_t * fb,
+                   size_t chunk_id,
+                   crypto_context_t * crypto_ctx)
+{
+    fb->protobuf->mutable_seg(chunk_id)->set_crypto(crypto_ctx,
+                                                    sizeof(crypto_context_t));
+}

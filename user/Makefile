@@ -60,7 +60,7 @@ libthird.a: third/libthird.a
 	cp $^ $@
 
 libucafs.a: $(OBJS) libthird.a
-	ar cr $@ $(OBJS) third/*.o
+	@ar cr $@ $(OBJS) third/*.o
 	@echo "ar => $@"
 
 uc_rpc.o: uc_rpc.c afsx.ss.c
