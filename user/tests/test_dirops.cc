@@ -6,7 +6,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <gperftools/heap-profiler.h>
+
 #include "uc_test.h"
+
+#define TOTAL_FILE_COUNT 600
 
 TEST(UC_DIROPS, SimpleFileCreation)
 {
@@ -41,6 +45,36 @@ TEST(UC_DIROPS, SimpleFileCreation)
     free(test2);
     sdsfree(path);
     sdsfree(path2);
+}
+
+TEST(UC_DIROPS, FileCreationMemTest)
+{
+    char buf[50], * test;
+
+    //HeapProfilerStart("memtest");
+
+    uinfo("Generating %d files...", TOTAL_FILE_COUNT);
+    /* generate a number of filenames */
+    for (size_t i = 0; i < TOTAL_FILE_COUNT; i++) {
+	snprintf(buf, sizeof(buf), "%s/img%d.png", TEST_REPO_DIR, i);
+	ASSERT_EQ(0, dirops_new(buf, UCAFS_TYPE_FILE, &test));
+	printf("\r%d/%d", i, TOTAL_FILE_COUNT);
+	free(test);
+    }
+    printf("\n");
+
+    uinfo("Looking up files...");
+    /* generate a number of filenames */
+    for (size_t i = 0; i < TOTAL_FILE_COUNT; i++) {
+	snprintf(buf, sizeof(buf), "%s/img%d.png", TEST_REPO_DIR, i);
+	ASSERT_EQ(0, dirops_plain2code(buf, UCAFS_TYPE_FILE, &test));
+	printf("\r%d/%d", i, TOTAL_FILE_COUNT);
+	free(test);
+    }
+    printf("\n");
+
+    //HeapProfilerDump("Done here");
+    //HeapProfilerStop();
 }
 
 int main(int argc, char ** argv)

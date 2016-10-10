@@ -247,13 +247,14 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     *encoded_fname_dest = c_temp;
     error = 0;
 out:
-    if (rm && dirnode)
+    if (dirnode)
         dcache_put(dirnode);
     if (fname)
         sdsfree(fname);
     if (dnode_path)
         sdsfree(dnode_path);
-    if (fname_code)
+    // dirnode only returns a new pointer when removing
+    if (rm && fname_code)
         free((void *)fname_code);
     return error;
 }

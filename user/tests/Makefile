@@ -11,7 +11,10 @@ all: clean tests
 
 tests: $(TESTS)
 
-test_dirops: test_dirops.cc uc_test.h
+libucafs.a: ../libucafs.a
+	make -C ../ && cp $< $@
+
+test_dirops: test_dirops.cc uc_test.h libucafs.a
 	@$(CXX) $(CPPFLAGS) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
 	@echo "$(CXX) => $@"
 
@@ -27,7 +30,7 @@ test_dirops: test_dirops.cc uc_test.h
 
 .PHONY: clean
 clean: repo/.afsx
-	rm -rf repo/.afsx/* *.o
+	rm -rf repo/.afsx/* *.o *.a
 
 repo/.afsx:
 	mkdir -p $@
