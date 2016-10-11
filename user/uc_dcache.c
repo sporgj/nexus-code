@@ -196,6 +196,7 @@ dcache_get_filebox(const char * path)
     }
 
     if ((fname = do_get_fname(path)) == NULL) {
+        dirnode_free(dirnode);
         return NULL;
     }
 
@@ -214,7 +215,5 @@ dcache_get_filebox(const char * path)
     sdsfree(fbox_path);
 out:
     dirnode_free(dirnode);
-    if (codename)
-        free((void *)codename);
     return fb;
 }

@@ -151,7 +151,7 @@ afs_int32 SAFSX_readwrite_start(
     int ret;
     xfer_context_t * ctx;
 
-    ctx = fileops_start(op, fpath, max_chunk_size, total_size, &ret);
+    *id = fileops_start(op, fpath, max_chunk_size, total_size, &ret);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);
@@ -160,9 +160,8 @@ afs_int32 SAFSX_readwrite_start(
         return AFSX_STATUS_NOOP;
     }
 
-    *id = ctx->id;
     uinfo("begin %s: %s (%u, %u) id=%d", RWOP_TO_STR(op), fpath, max_chunk_size,
-          total_size, ctx->id);
+          total_size, *id);
 
     return AFSX_STATUS_SUCCESS;
 }
@@ -171,11 +170,7 @@ afs_int32 SAFSX_readwrite_finish(
     /*IN */ struct rx_call * z_call,
     /*IN */ int id)
 {
-    uint32_t total;
-    int op;
-    int ret = fileops_finish(id);
-
-    return ret;
+    return fileops_finish(id);
 }
 
 afs_int32 SAFSX_readwrite_data(
@@ -187,28 +182,22 @@ afs_int32 SAFSX_readwrite_data(
     int ret = AFSX_STATUS_ERROR;
     afs_uint32 abytes;
 
-    xfer_context_t * ctx = fileops_get_context(id);
-    if (ctx == NULL) {
-        uerror("rw failed: id %d could not be found", id);
+    uint8_t ** buf = fileops_get_buffer(id, size);
+    if (buf == NULL) {
+        uerror("rw failed: id=%d,size=%d could not be found", id, size);
         goto out;
     }
 
-    if (ctx->buflen < size) {
-        uerror("size %d sent is above the cap = %d", size, ctx->buflen);
-        goto out;
-    }
-
-    if ((abytes = rx_Read(z_call, ctx->buffer, size)) != size) {
+    if ((abytes = rx_Read(z_call, *buf, size)) != size) {
         uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
                rx_Error(z_call));
         goto out;
     }
 
-    ctx->valid_buflen = size;
-    // process the data
-    fileops_process_data(ctx);
+    // TODO check return
+    fileops_process_data(buf);
 
-    if ((abytes = rx_Write(z_call, ctx->buffer, size)) != size) {
+    if ((abytes = rx_Write(z_call, *buf, size)) != size) {
         uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
                abytes, rx_Error(z_call));
         goto out;

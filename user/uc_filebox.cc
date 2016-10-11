@@ -21,12 +21,14 @@ struct filebox {
 uc_filebox_t *
 filebox_new()
 {
+    crypto_context_t crypto_ctx;
     uc_filebox_t * fb = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
     if (fb == NULL) {
         return NULL;
     }
 
     memset(&fb->header, 0, sizeof(fbox_header_t));
+    fb->header.chunk_count = 1;
     fb->protobuf = new fbox();
     fb->fbox_path = NULL;
 
@@ -36,6 +38,10 @@ filebox_new()
     fbox_segment * segment = fb->protobuf->add_seg();
     segment->set_num(0);
     segment->set_size(0);
+    segment->set_name(std::string("0"));
+
+    memset(&crypto_ctx, 0, sizeof(crypto_context_t));
+    segment->set_crypto((char *)&crypto_ctx, sizeof(crypto_context_t));
 
     return fb;
 }

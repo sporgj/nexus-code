@@ -37,9 +37,9 @@ typedef enum {
 
 typedef struct {
     int op;
-    size_t id;
-    size_t crypto_id;
-    size_t seg_id;
+    int id;
+    int crypto_id;
+    int seg_id;
     char * buffer;
     uint32_t buflen;
     uint32_t valid_buflen; // how much "good" data can be read from the buffer

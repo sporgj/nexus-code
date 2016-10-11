@@ -5,7 +5,7 @@ include $(UCAFS_DIR)/sgx_defs.mk
 
 LIBS += $(App_Link_Flags) -lgtest
 
-TESTS = test_dirops
+TESTS = test_dirops test_fetchstore
 
 all: clean tests
 
@@ -14,8 +14,8 @@ tests: $(TESTS)
 libucafs.a: ../libucafs.a
 	make -C ../ && cp $< $@
 
-test_dirops: test_dirops.cc uc_test.h libucafs.a
-	@$(CXX) $(CPPFLAGS) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
+test_%: test_%.cc uc_test.h libucafs.a
+	@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
 	@echo "$(CXX) => $@"
 
 #define make-test-target

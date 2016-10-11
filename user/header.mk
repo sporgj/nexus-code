@@ -8,8 +8,9 @@ CC = gcc
 FLAGS := 
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
-LIBS = -L/usr/local/lib -lprotobuf -pthread\
-       -luuid -ltcmalloc
+LIBS = -L/usr/local/lib -lprotobuf -pthread -luuid\
+       -ltcmalloc -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
+       -fno-builtin-free
 INCFLAGS = -I/usr/local/include
 
 OBJS = uc_dirnode.o\
