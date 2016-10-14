@@ -1,12 +1,13 @@
-#include "cdefs.h"
 #include "afsx.h"
+#include "cdefs.h"
 #include "uc_dirops.h"
 #include "uc_fileops.h"
 #include "uc_utils.h"
 
 #define N_SECURITY_OBJECTS 1
 
-int setup_rx(int port)
+int
+setup_rx(int port)
 {
     struct rx_securityClass *(security_objs[N_SECURITY_OBJECTS]);
     struct rx_service * service;
@@ -45,7 +46,8 @@ out:
     return ret;
 }
 
-afs_int32 SAFSX_fversion(
+afs_int32
+SAFSX_fversion(
     /*IN */ struct rx_call * z_call,
     /*IN */ int dummy,
     /*OOU */ int * result)
@@ -56,7 +58,8 @@ afs_int32 SAFSX_fversion(
     return 0;
 }
 
-afs_int32 SAFSX_create(
+afs_int32
+SAFSX_create(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * path,
     /*IN */ ucafs_entry_type type,
@@ -65,15 +68,18 @@ afs_int32 SAFSX_create(
     int ret = dirops_new(path, type, crypto_fname);
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
-        uerror("create FAILED (ret=%d): %s", ret, path);
     } else {
-        uinfo("%s: %s ~> %s", (type == UCAFS_TYPE_FILE ? "touch" : "mkdir"),
+        uinfo("%s: %s ~> %s",
+              (type == UCAFS_TYPE_FILE
+                   ? "touch"
+                   : (type == UCAFS_TYPE_DIR ? "mkdir" : "link")),
               path, *crypto_fname);
     }
     return ret;
 }
 
-afs_int32 SAFSX_find(
+afs_int32
+SAFSX_find(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fake_name,
     /*IN */ char * path,
@@ -89,7 +95,8 @@ afs_int32 SAFSX_find(
     return ret;
 }
 
-afs_int32 SAFSX_lookup(
+afs_int32
+SAFSX_lookup(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
     /*IN */ ucafs_entry_type type,
@@ -99,12 +106,13 @@ afs_int32 SAFSX_lookup(
     if (ret) {
         *fake_name = EMPTY_STR_HEAP;
     } else {
-        uinfo("fencode: %s ~> %s\n", fpath, *fake_name);
+        uinfo("fencode: %s ~> %s", fpath, *fake_name);
     }
     return ret;
 }
 
-afs_int32 SAFSX_rename(
+afs_int32
+SAFSX_rename(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * old_fpath,
     /*IN */ char * new_path,
@@ -122,7 +130,8 @@ afs_int32 SAFSX_rename(
     return ret;
 }
 
-afs_int32 SAFSX_remove(
+afs_int32
+SAFSX_remove(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
     /*IN */ ucafs_entry_type type,
@@ -140,18 +149,19 @@ afs_int32 SAFSX_remove(
 }
 
 #define RWOP_TO_STR(op) (op == UCAFS_WRITEOP ? "write" : "read")
-afs_int32 SAFSX_readwrite_start(
+afs_int32
+SAFSX_readwrite_start(
     /*IN */ struct rx_call * z_call,
     /*IN */ int op,
     /*IN */ char * fpath,
     /*IN */ afs_uint32 max_chunk_size,
     /*IN */ afs_uint32 total_size,
-    /*OUT*/ afs_uint32 * id)
+    /*OUT*/ afs_int32 * id)
 {
     int ret;
     xfer_context_t * ctx;
 
-    *id = fileops_start(op, fpath, max_chunk_size, total_size, &ret);
+    ret = fileops_start(op, fpath, max_chunk_size, total_size, id);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);
@@ -166,16 +176,18 @@ afs_int32 SAFSX_readwrite_start(
     return AFSX_STATUS_SUCCESS;
 }
 
-afs_int32 SAFSX_readwrite_finish(
+afs_int32
+SAFSX_readwrite_finish(
     /*IN */ struct rx_call * z_call,
-    /*IN */ int id)
+    /*IN */ afs_int32 id)
 {
     return fileops_finish(id);
 }
 
-afs_int32 SAFSX_readwrite_data(
+afs_int32
+SAFSX_readwrite_data(
     /*IN */ struct rx_call * z_call,
-    /*IN */ afs_uint32 id,
+    /*IN */ afs_int32 id,
     /*IN */ afs_uint32 size,
     /*OUT */ int * moredata)
 {
@@ -184,7 +196,6 @@ afs_int32 SAFSX_readwrite_data(
 
     uint8_t ** buf = fileops_get_buffer(id, size);
     if (buf == NULL) {
-        uerror("rw failed: id=%d,size=%d could not be found", id, size);
         goto out;
     }
 

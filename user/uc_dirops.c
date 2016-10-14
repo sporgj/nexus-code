@@ -237,7 +237,7 @@ static int encode_or_remove(const char * fpath, ucafs_entry_type type,
     if (rm) {
         dcache_rm(fpath);
         dnode_path = uc_get_dnode_path(c_temp);
-        if (unlink(dnode_path)) {
+        if (type != UCAFS_TYPE_LINK && unlink(dnode_path)) {
             free(c_temp);
             slog(0, SLOG_ERROR, "Could not remove: %s", dnode_path);
             goto out;

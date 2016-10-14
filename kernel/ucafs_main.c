@@ -6,6 +6,7 @@ static const char * afs_prefix = "/afs";
 static const uint32_t afs_prefix_len = 4;
 
 static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx" };
+static const int watch_dir_len[] = { sizeof(watch_dirs[0]) -1 };
 
 struct rx_connection * conn = NULL, *ping_conn = NULL;
 
@@ -81,6 +82,14 @@ static inline ucafs_entry_type dentry_type(struct dentry * dentry)
     return UCAFS_TYPE_UNKNOWN;
 }
 
+
+bool
+startsWith(const char * pre, const char * str)
+{
+    size_t lenpre = strlen(pre), lenstr = strlen(str);
+    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
+}
+
 /**
  * whether to ignore a vnode or not.
  * if not ignore, dest will be set to the full path of the directory
@@ -96,10 +105,15 @@ int __is_dentry_ignored(struct dentry * dentry, char ** dest)
     // TODO cache the inode number
     path = dentry_path_raw(dentry, buf, sizeof(buf));
 
+    /*
+    printk(KERN_ERR "\ndentry_name: %s, inode=%p\n", dentry->d_name.name, dentry->d_inode);
+    print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf), 1);
+    */
+
     for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
         curr_dir = watch_dirs[i];
 
-        if (strnstr(path, curr_dir, strlen(curr_dir))) {
+        if (startsWith(curr_dir, path)) {
             // TODO maybe check the prefix on the name
             // we're good
             if (dest) {

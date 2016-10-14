@@ -15,6 +15,8 @@
 #include "uc_uspace.h"
 #include "uc_sgx.h"
 
+#define ENCLAVE_FILENAME "sgx/enclave.signed.so"
+
 using namespace std;
 
 sgx_enclave_id_t global_eid = 0;
@@ -58,7 +60,6 @@ int main(int argc, char ** argv)
     int ret, updated;
     uc_set_afs_home(afs_path, "sgx", true);
 
-#if 0
     /* initialize the enclave */
     sgx_launch_token_t token;
     ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
@@ -73,7 +74,6 @@ int main(int argc, char ** argv)
         cout << "Enclave could not be initialized" << endl;
         return -1;
     }
-#endif
 
     cout << ". Loaded enclave" << endl;
 

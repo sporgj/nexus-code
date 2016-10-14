@@ -130,6 +130,7 @@ init_fserv(struct vcache * avc, ucafs_ctx_t ** pp_ctx, struct vrequest * areq)
         goto out;
     }
     memset(ctx, 0, sizeof(ucafs_ctx_t));
+    ctx->id = -1;
 
     /* 1 - Connect to the AFS fileserver */
     tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rx_conn);
@@ -246,7 +247,7 @@ out:
 int
 UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
 {
-    int ret;
+    int ret, chunk_no;
     uint32_t bytes_left, pos = 0, nbytes;
     afs_size_t offset, len;
     char * path;
@@ -284,10 +285,13 @@ UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
         goto out;
     }
 
+    chunk_no = 0;
     bytes_left = avc->f.m.Length;
+
     // ObtainWriteLock(&afs_xdcache, 6505);
     ObtainWriteLock(&avc->lock, 6507);
     while (bytes_left) {
+        ERROR("tdc. path=%s, chunk_no=%d, offset=%d\n", path, chunk_no, pos);
         tdc = afs_GetDCache(avc, pos, areq, &offset, &len, 2);
         if (tdc == NULL) {
             ERROR("tdc is null. pos=%u, bytes_left=%u\n", pos, bytes_left);
@@ -313,6 +317,7 @@ UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
 
         pos += nbytes;
         bytes_left -= nbytes;
+        chunk_no++;
     }
     avc->f.states |= CDecrypted;
     ret = 0;

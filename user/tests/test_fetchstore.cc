@@ -27,8 +27,9 @@ generate_stream()
     ASSERT_TRUE(output_buffer != NULL) << "Malloc failed";
 
     /* generate the random stream */
+    srand(time(0));
     for (size_t i = 0; i < FILE_LEN; i++) {
-        input_buffer[i] = i % UINT8_MAX;
+        input_buffer[i] = rand() % UINT8_MAX;
     }
 }
 

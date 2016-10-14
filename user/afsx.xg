@@ -70,15 +70,15 @@ readwrite_start(
     string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_chunk_size,
     afs_uint32 total_size,
-    OUT afs_uint32 * id
+    OUT afs_int32 * id
 ) = 235;
     
 readwrite_finish(
-    IN int id
+    IN afs_int32 id
 ) = 236;
 
 readwrite_data(
-    IN afs_uint32 id,
+    IN afs_int32 id,
     afs_uint32 size,
     OUT int * moredata
 ) split = 237;

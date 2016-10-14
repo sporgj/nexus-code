@@ -68,14 +68,11 @@ int ecall_init_crypto(xfer_context_t * xfer_ctx, crypto_context_t * fcrypto)
     /* copy the crypto data */
     memcpy(&__ctx->crypto_data, fcrypto, sizeof(crypto_context_t));
     if (xfer_ctx->op == UCPRIV_ENCRYPT) {
-        //sgx_read_rand((uint8_t *)&__ctx->iv, sizeof(crypto_iv_t));
+        sgx_read_rand((uint8_t *)&__ctx->iv, sizeof(crypto_iv_t));
         memcpy(&__ctx->crypto_data.iv, &__ctx->iv, sizeof(crypto_iv_t));
     } else {
         memcpy(&__ctx->iv, &__ctx->crypto_data.iv, sizeof(crypto_iv_t));
     }
-
-    // TODO change this when filebox is fixed
-    memset(&__ctx->iv, 0, sizeof(crypto_iv_t));
 
     gcm_ctx = &__ctx->gcm_ctx;
     mbedtls_gcm_init(gcm_ctx);

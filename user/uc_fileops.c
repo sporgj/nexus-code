@@ -8,6 +8,7 @@
 #include "uc_sgx.h"
 #include "uc_types.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 
 struct seqptrmap * xfer_context_array = NULL;
 
@@ -104,17 +105,17 @@ out:
 }
 
 uint8_t **
-fileops_get_buffer(size_t id, size_t valid_buflen)
+fileops_get_buffer(int id, size_t valid_buflen)
 {
     xfer_context_t * xfer_ctx = seqptrmap_get(xfer_context_array, id);
     if (xfer_ctx == NULL) {
-        slog(0, SLOG_ERROR, "fileops - id=%d could not be found");
+        slog(0, SLOG_ERROR, "fileops - id=%d could not be found", id);
         return NULL;
     }
 
     if (valid_buflen > xfer_ctx->buflen) {
         slog(0, SLOG_ERROR, "fileops - id (%d) valid buflen too big (%d > %d)",
-             valid_buflen, xfer_ctx->buflen);
+             id, valid_buflen, xfer_ctx->buflen);
         return NULL;
     }
 
@@ -130,10 +131,12 @@ fileops_process_data(uint8_t ** buffer)
         = (xfer_context_t *)((uintptr_t)buffer
                              - offsetof(xfer_context_t, buffer));
 
+    //hexdump(*buffer, MIN(xfer_ctx->valid_buflen, 32));
     ecall_crypt_data(global_eid, &ret, xfer_ctx);
     if (ret) {
         goto out;
     }
+    //hexdump(*buffer, MIN(xfer_ctx->valid_buflen, 32));
 
     xfer_ctx->completed += xfer_ctx->valid_buflen;
 out:
@@ -141,7 +144,7 @@ out:
 }
 
 int
-fileops_finish(size_t id)
+fileops_finish(int id)
 {
     uc_filebox_t * fb;
     xfer_context_t * xfer_ctx;

@@ -165,7 +165,7 @@ extern int AFSX_readwrite_start(
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
 	/*IN */ afs_uint32 total_size,
-	/*OUT*/ afs_uint32 * id);
+	/*OUT*/ afs_int32 * id);
 
 extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ struct rx_call *z_call,
@@ -173,19 +173,19 @@ extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
 	/*IN */ afs_uint32 total_size,
-	/*OUT*/ afs_uint32 * id);
+	/*OUT*/ afs_int32 * id);
 
 extern int AFSX_readwrite_finish(
 	/*IN */ struct rx_connection *z_conn,
-	/*IN */ int id);
+	/*IN */ afs_int32 id);
 
 extern afs_int32 SAFSX_readwrite_finish(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ int id);
+	/*IN */ afs_int32 id);
 
 extern int StartAFSX_readwrite_data(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ afs_uint32 id,
+	/*IN */ afs_int32 id,
 	/*IN */ afs_uint32 size);
 
 extern int EndAFSX_readwrite_data(
@@ -194,7 +194,7 @@ extern int EndAFSX_readwrite_data(
 
 extern afs_int32 SAFSX_readwrite_data(
 	/*IN */ struct rx_call *z_call,
-	/*IN */ afs_uint32 id,
+	/*IN */ afs_int32 id,
 	/*IN */ afs_uint32 size,
 	/*OUT*/ int * moredata);
 

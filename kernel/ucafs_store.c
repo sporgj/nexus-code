@@ -2,6 +2,9 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_store: " fmt, ##args)
 
+extern afs_int32 *afs_dchashTbl;
+extern afs_int32 *afs_dcnextTbl;
+
 /**
  * Reads from the file on disk, sends over RPC and rereads response
  * inside the buffer
@@ -151,7 +154,7 @@ store_close(ucafs_ctx_t * ctx,
     }
 
     /* close the request */
-    if (ctx->id) {
+    if (ctx->id != -1) {
         AFSX_readwrite_finish(ctx->udp_conn, ctx->id);
     }
 
@@ -187,6 +190,7 @@ store_init(struct vcache * avc,
         return -1;
     }
     memset(ctx, 0, sizeof(ucafs_ctx_t));
+    ctx->id = -1;
 
     /* allocate an afs_Conn */
     if ((tc = afs_Conn(&avc->f.fid, areq, 0, &rx_conn)) == NULL) {
@@ -261,7 +265,7 @@ out:
 int
 UCAFS_store(struct vcache * avc, struct vrequest * areq)
 {
-    int ret, hash, index, chunk_no;
+    int ret, chunk_no;
     ucafs_ctx_t * ctx = NULL;
     afs_int32 bytes_left;
     afs_uint32 nbytes;
@@ -297,15 +301,42 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
     osi_VM_StoreAllSegments(avc);
 
     ConvertWToSLock(&avc->lock);
-    hash = DVHash(&avc->f.fid);
 
     /* grab lock to the beginning to the hash chain */
-    ObtainWriteLock(&afs_xdcache, 6503);
-    index = afs_dvhashTbl[hash];
     bytes_left = ctx->len;
-
     chunk_no = 0;
+
+    ERROR("pid (%d) %s (%d)\n", current->pid, path, bytes_left);
+
     ret = EIO;
+    while (bytes_left > 0) {
+        tdc = afs_FindDCache(avc, ctx->off);
+        if (!tdc) {
+            ERROR("tdc null. path=%s, chunk_no=%d", path, chunk_no);
+            goto out;
+        }
+
+        //ERROR("tdc. path=%s, chunk_no=%d, offset=%d\n", path, tdc->f.chunk, ctx->off);
+
+        ObtainSharedLock(&tdc->lock, 6504);
+        if (storeproc(ctx, tdc, &nbytes)) {
+            goto out2;
+        }
+
+        /* update the dcache entry */
+        UpgradeSToWLock(&tdc->lock, 6505);
+        tdc->f.states &= ~DWriting;
+        tdc->dflags |= DFEntryMod;
+        ReleaseWriteLock(&tdc->lock);
+
+        bytes_left -= nbytes;
+        chunk_no++;
+
+        afs_PutDCache(tdc);
+        tdc = NULL;
+    }
+
+#if 0
     while (index != NULLIDX) {
         if (afs_indexUnique[index] == avc->f.fid.Fid.Unique) {
             /* get the tdc at that index */
@@ -316,6 +347,7 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
                 goto out1;
             }
 
+            ERROR("tdc. chunk=%d, index=%d\n", tdc->f.chunk, tdc->index);
             // XXX check if the TDC has data
             // XXX what about the avc->truncPos
 
@@ -340,9 +372,10 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
             tdc = NULL;
         }
 
-        index = afs_dvnextTbl[index];
+        index = afs_dcnextTbl[index];
         chunk_no++;
     }
+#endif
 
     /* TODO: run afs_analyze here to make sure all the packets went through */
     UpgradeSToWLock(&avc->lock, 6506);
@@ -360,10 +393,6 @@ out2:
         afs_PutDCache(tdc);
         tdc = NULL;
     }
-
-/* if GetValidDSlot returns NULL */
-out1:
-    ReleaseWriteLock(&afs_xdcache);
 
 out:
     store_close(ctx, &outstatus, avc, ret, areq);

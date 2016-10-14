@@ -269,7 +269,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_uint32 * id)
+int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_int32 * id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 235;
@@ -290,7 +290,7 @@ int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_ui
 
 	/* Un-marshal the reply arguments */
 	z_xdrs.x_op = XDR_DECODE;
-	if ((!xdr_afs_uint32(&z_xdrs, id))) {
+	if ((!xdr_afs_int32(&z_xdrs, id))) {
 		z_result = RXGEN_CC_UNMARSHAL;
 		goto fail;
 	}
@@ -313,7 +313,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_readwrite_finish(struct rx_connection *z_conn,int id)
+int AFSX_readwrite_finish(struct rx_connection *z_conn,afs_int32 id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 236;
@@ -324,7 +324,7 @@ int AFSX_readwrite_finish(struct rx_connection *z_conn,int id)
 
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_int(&z_xdrs, &id))) {
+	     || (!xdr_afs_int32(&z_xdrs, &id))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;
 	}
@@ -347,7 +347,7 @@ fail:
 	return z_result;
 }
 
-int StartAFSX_readwrite_data(struct rx_call *z_call,afs_uint32 id,afs_uint32 size)
+int StartAFSX_readwrite_data(struct rx_call *z_call,afs_int32 id,afs_uint32 size)
 {
 	static int z_op = 237;
 	int z_result;
@@ -356,7 +356,7 @@ int StartAFSX_readwrite_data(struct rx_call *z_call,afs_uint32 id,afs_uint32 siz
 
 	/* Marshal the arguments */
 	if ((!xdr_int(&z_xdrs, &z_op))
-	     || (!xdr_afs_uint32(&z_xdrs, &id))
+	     || (!xdr_afs_int32(&z_xdrs, &id))
 	     || (!xdr_afs_uint32(&z_xdrs, &size))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;

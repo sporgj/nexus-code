@@ -27,7 +27,7 @@ fileops_start(int op,
  * @reutrn NULL if id is invalid or valid_buflen > buffer_size
  */
 uint8_t **
-fileops_get_buffer(size_t id, size_t valid_buflen);
+fileops_get_buffer(int id, size_t valid_buflen);
 
 /**
  * Processes the transfer
@@ -43,7 +43,7 @@ fileops_process_data(uint8_t ** buffer);
  * @return 0 on success
  */
 int
-fileops_finish(size_t id);
+fileops_finish(int id);
 
 #ifdef __cplusplus
 }

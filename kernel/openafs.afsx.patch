@@ -40,7 +40,7 @@ index ac4f800..4033fad 100644
  module_exit(afspag_cleanup);
  
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..64f75c2 100644
+index 1b99c94..f1251fc 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -123,13 +123,27 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
@@ -53,8 +53,7 @@ index 1b99c94..64f75c2 100644
  	       ICL_TYPE_OFFSET, ICL_HANDLE_OFFSET(pos), ICL_TYPE_INT32,
                 (afs_int32)bufsize, ICL_TYPE_INT32, 99999);
      code = afs_linux_VerifyVCache(vcp, NULL);
--
-+    /*
+ 
 +#ifdef AFS_SECURE
 +#include "afsx_hdr.h"
 +    {
@@ -69,7 +68,7 @@ index 1b99c94..64f75c2 100644
 +	crfree(credp);
 +    }
 +#endif
-+*/
++
      if (code == 0) {
  	/* Linux's FlushPages implementation doesn't ever use credp,
  	 * so we optimise by not using it */
@@ -230,7 +229,7 @@ index 1b99c94..64f75c2 100644
 +#ifdef AFS_SECURE
 +    {
 +	char * dest;
-+	
++
 +	if (!UCAFS_lookup(&dest, dp)) {
 +	    is_ucafs_file = 1;
 +	    comp = dest;
@@ -244,7 +243,7 @@ index 1b99c94..64f75c2 100644
  
 +#ifdef AFS_SECURE
 +    if (is_ucafs_file) {
-+        osi_linux_free((void *)comp);	
++        osi_linux_free((void *)comp);
 +    }
 +#endif
 +
@@ -384,7 +383,7 @@ index 1b99c94..64f75c2 100644
 +		newname);*/
 +	    newname = dest;
 +	    oldname = dest;
-+	}  
++	}
 +    }
 +#endif
 +
@@ -463,15 +462,13 @@ index 9e9f65b..fe8d680 100644
 +
  #endif /* _AFS_PROTOTYPES_H_ */
 diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
-index 2dd89cf..0b43b9a 100644
+index 2dd89cf..324d0f9 100644
 --- a/src/afs/afs_segments.c
 +++ b/src/afs/afs_segments.c
-@@ -172,7 +172,16 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
-     unsigned int i, j, minj, moredata, high, off;
+@@ -173,6 +173,15 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
      afs_size_t maxStoredLength;	/* highest offset we've written to server. */
      int safety, marineronce = 0;
--
-+/*
+ 
 +#ifdef AFS_SECURE
 +#include "afsx_hdr.h"
 +    code = UCAFS_store(avc, areq);
@@ -479,8 +476,8 @@ index 2dd89cf..0b43b9a 100644
 +	return code;
 +    }
 +    code = 0;
-+#endif 
-+*/
++#endif
++
      AFS_STATCNT(afs_StoreAllSegments);
  
      hash = DVHash(&avc->f.fid);
