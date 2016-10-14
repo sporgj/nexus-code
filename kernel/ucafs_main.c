@@ -1,18 +1,19 @@
 #ifdef AFS_SECURE
-#include <linux/dcache.h>
 #include "ucafs_kern.h"
+#include <linux/dcache.h>
 
 static const char * afs_prefix = "/afs";
 static const uint32_t afs_prefix_len = 4;
 
 static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx" };
-static const int watch_dir_len[] = { sizeof(watch_dirs[0]) -1 };
+static const int watch_dir_len[] = { sizeof(watch_dirs[0]) - 1 };
 
-struct rx_connection * conn = NULL, *ping_conn = NULL;
+struct rx_connection *conn = NULL, *ping_conn = NULL;
 
 int AFSX_IS_CONNECTED = 0;
 
-int LINUX_AFSX_connect()
+int
+LINUX_AFSX_connect()
 {
     u_long host;
     struct rx_securityClass * null_securityObject;
@@ -38,7 +39,8 @@ int LINUX_AFSX_connect()
     return 0;
 }
 
-int LINUX_AFSX_ping(void)
+int
+LINUX_AFSX_ping(void)
 {
     int ret, dummy;
 
@@ -53,7 +55,8 @@ int LINUX_AFSX_ping(void)
     return 0;
 }
 
-struct rx_connection * __get_conn(void)
+struct rx_connection *
+__get_conn(void)
 {
     u_long host;
     struct rx_securityClass * null_securityObject;
@@ -67,9 +70,14 @@ struct rx_connection * __get_conn(void)
     return conn;
 }
 
-void __put_conn(struct rx_connection * c) { rx_PutConnection(c); }
+void
+__put_conn(struct rx_connection * c)
+{
+    rx_PutConnection(c);
+}
 
-static inline ucafs_entry_type dentry_type(struct dentry * dentry)
+static inline ucafs_entry_type
+dentry_type(struct dentry * dentry)
 {
     if (d_is_file(dentry)) {
         return UCAFS_TYPE_FILE;
@@ -81,7 +89,6 @@ static inline ucafs_entry_type dentry_type(struct dentry * dentry)
 
     return UCAFS_TYPE_UNKNOWN;
 }
-
 
 bool
 startsWith(const char * pre, const char * str)
@@ -96,19 +103,22 @@ startsWith(const char * pre, const char * str)
  *
  * @return bool true if path is to be ignored
  */
-int __is_dentry_ignored(struct dentry * dentry, char ** dest)
+int
+__is_dentry_ignored(struct dentry * dentry, char ** dest)
 {
     int len, i, total_len;
-    char * path, *curr_dir, *result;
+    char *path, *curr_dir, *result;
     char buf[512];
 
     // TODO cache the inode number
+    printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d dentry_name=%s",
+           dentry->d_parent, dentry, dentry->d_iname, dentry->d_name.len,
+           dentry->d_name.name);
     path = dentry_path_raw(dentry, buf, sizeof(buf));
 
-    /*
-    printk(KERN_ERR "\ndentry_name: %s, inode=%p\n", dentry->d_name.name, dentry->d_inode);
-    print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf), 1);
-    */
+    printk(KERN_ERR "path=%p\n", path);
+    print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf),
+                   1);
 
     for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
         curr_dir = watch_dirs[i];
@@ -131,17 +141,20 @@ int __is_dentry_ignored(struct dentry * dentry, char ** dest)
     return 1;
 }
 
-inline int UCAFS_ignore_dentry(struct dentry * dp, char ** dest)
+inline int
+UCAFS_ignore_dentry(struct dentry * dp, char ** dest)
 {
     return __is_dentry_ignored(dp, dest);
 }
 
-inline int __is_vnode_ignored(struct vcache * avc, char ** dest)
+inline int
+__is_vnode_ignored(struct vcache * avc, char ** dest)
 {
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
 }
 
-int UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
+int
+UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -171,8 +184,8 @@ int UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
     return ret;
 }
 
-int UCAFS_find(char ** dest, char * fname, ucafs_entry_type type,
-               char * dirpath)
+int
+UCAFS_find(char ** dest, char * fname, ucafs_entry_type type, char * dirpath)
 {
     int ret;
     struct rx_connection * conn = NULL;
@@ -185,17 +198,15 @@ int UCAFS_find(char ** dest, char * fname, ucafs_entry_type type,
     conn = __get_conn();
 
     if ((ret = AFSX_find(conn, fname, dirpath, type, dest))) {
-        if (ret == AFSX_STATUS_ERROR) {
-            printk(KERN_ERR "realname error: %s\n", dirpath);
-        }
         *dest = NULL;
     }
-    
+
     __put_conn(conn);
     return ret;
 }
 
-int UCAFS_lookup(char ** dest, struct dentry * dp)
+int
+UCAFS_lookup(char ** dest, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -206,6 +217,10 @@ int UCAFS_lookup(char ** dest, struct dentry * dp)
         return -1;
     }
 
+    if (dp->d_name.len > 100) {
+        return -1;
+    }
+
     if (__is_dentry_ignored(dp, &fpath)) {
         return AFSX_STATUS_NOOP;
     }
@@ -213,10 +228,6 @@ int UCAFS_lookup(char ** dest, struct dentry * dp)
     conn = __get_conn();
 
     if ((ret = AFSX_lookup(conn, fpath, dentry_type(dp), dest))) {
-        if (ret == AFSX_STATUS_ERROR) {
-            printk(KERN_ERR "lookup error: %s\n", fpath);
-        }
-        // TODO empty head
         *dest = NULL;
     }
 
@@ -225,7 +236,8 @@ int UCAFS_lookup(char ** dest, struct dentry * dp)
     return ret;
 }
 
-int UCAFS_remove(char ** dest, struct dentry * dp)
+int
+UCAFS_remove(char ** dest, struct dentry * dp)
 {
     int ret;
     char * fpath;
@@ -243,9 +255,6 @@ int UCAFS_remove(char ** dest, struct dentry * dp)
     conn = __get_conn();
 
     if ((ret = AFSX_remove(conn, fpath, dentry_type(dp), dest))) {
-        if (ret == AFSX_STATUS_ERROR) {
-            printk(KERN_ERR "delete error: %s\n", fpath);
-        }
         *dest = NULL;
     }
 
@@ -254,10 +263,11 @@ int UCAFS_remove(char ** dest, struct dentry * dp)
     return ret;
 }
 
-int UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
+int
+UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
-    char * from_path = NULL, *to_path = NULL;
+    char *from_path = NULL, *to_path = NULL;
     struct rx_connection * conn = NULL;
 
     if (!AFSX_IS_CONNECTED) {
