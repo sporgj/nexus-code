@@ -1,7 +1,10 @@
 include header.mk
 
+CC=gcc
+
 APP_PATH = ..
 OBJS = ecall_sgx.o\
+	   uc_enclave.o\
 	   elasticarray.o\
 	   elasticqueue.o\
 	   seqptrmap.o

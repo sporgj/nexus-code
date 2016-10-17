@@ -1,16 +1,6 @@
 #include "enclave_private.h"
 #include "seqptrmap.h"
 
-#include "../uc_types.h"
-
-#include <string.h>
-
-#include <sgx_tseal.h>
-#include <sgx_utils.h>
-
-#include <mbedtls/aes.h>
-#include <mbedtls/gcm.h>
-
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
 typedef struct {
@@ -195,4 +185,16 @@ out:
     free(__ctx);
     seqptrmap_delete(crypto_hashmap, xfer_ctx->crypto_id);
     return error;
+}
+
+int
+ecall_crypto_dirnode(dnode_header_t * header, uint8_t * data, crypto_op_t op)
+{
+    return crypto_metadata(&header->crypto_ctx, header->protolen, data, op);
+}
+
+int
+ecall_crypto_filebox(fbox_header_t * header, uint8_t * data, crypto_op_t op)
+{
+    return crypto_metadata(&header->crypto_ctx, header->protolen, data, op);
 }

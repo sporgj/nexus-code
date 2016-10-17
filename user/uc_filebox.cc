@@ -8,6 +8,7 @@ extern "C" {
 #include "fbox.pb.h"
 
 #include "uc_filebox.h"
+#include "uc_sgx.h"
 #include "uc_types.h"
 
 class fbox;
@@ -98,6 +99,14 @@ filebox_from_file(const sds filepath)
             goto out;
         }
 
+        /* decrypt the content with enclave */
+        ecall_crypto_filebox(global_eid, &error, &header, buffer,
+                            UCPRIV_DECRYPT);
+        if (error) {
+            slog(0, SLOG_ERROR, "filebox - enclave encryption failed");
+            goto out;
+        }
+
         if (!proto->ParseFromArray(buffer, header.protolen)) {
             slog(0, SLOG_ERROR, "filebox - parsing protobuf failed: %s",
                  filepath);
@@ -132,6 +141,7 @@ out:
 bool
 filebox_write(uc_filebox_t * fb, const char * fpath)
 {
+    int error;
     bool ret = false;
     uint8_t * buffer = NULL;
     size_t len = CRYPTO_CEIL_TO_BLKSIZE(fb->protobuf->ByteSize());
@@ -155,6 +165,13 @@ filebox_write(uc_filebox_t * fb, const char * fpath)
 
     /* GetCachedSize returns the size computed from ByteSize() */
     fb->header.protolen = fb->protobuf->GetCachedSize();
+
+    ecall_crypto_filebox(global_eid, &error, &fb->header, buffer,
+                         UCPRIV_ENCRYPT);
+    if (error) {
+        slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
+        goto out;
+    }
 
     fwrite(&fb->header, sizeof(fbox_header_t), 1, fd);
     fwrite(buffer, fb->header.protolen, 1, fd);

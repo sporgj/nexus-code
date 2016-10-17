@@ -65,7 +65,6 @@ typedef struct { uuid_t bin; } encoded_fname_t;
 
 typedef struct {
     crypto_ekey_t ekey;
-    crypto_ekey_t skey;
     crypto_tag_t mac;
     crypto_iv_t iv;
 } __attribute__((packed)) crypto_context_t;
