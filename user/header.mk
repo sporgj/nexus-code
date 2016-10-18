@@ -1,16 +1,19 @@
-KERNSRC_PATH = ../kernel
+ifdef TEST_ENV
+	include ../build.mk
+else
+	include build.mk
+endif
 
-SGX_DEBUG := 1
+KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
-FLAGS := 
+FLAGS := #-fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
+	-fno-builtin-free
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
-LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid\
-       -ltcmalloc -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
-       -fno-builtin-free
+LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid
 INCFLAGS = -I/usr/local/include
 
 OBJS = uc_dirnode.o\

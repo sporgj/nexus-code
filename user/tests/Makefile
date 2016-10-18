@@ -1,4 +1,5 @@
 UCAFS_DIR := ..
+TEST_ENV := 1
 
 include $(UCAFS_DIR)/header.mk
 include $(UCAFS_DIR)/sgx_defs.mk
@@ -15,7 +16,7 @@ libucafs.a: ../libucafs.a
 	make -C ../ && cp $< $@
 
 test_%: test_%.cc uc_test.h libucafs.a
-	@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
+	$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
 	@echo "$(CXX) => $@"
 
 #define make-test-target
