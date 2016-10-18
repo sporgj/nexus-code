@@ -8,7 +8,7 @@ CC = gcc
 FLAGS := 
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
-LIBS = -L/usr/local/lib -lprotobuf -pthread -luuid\
+LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid\
        -ltcmalloc -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
        -fno-builtin-free
 INCFLAGS = -I/usr/local/include
