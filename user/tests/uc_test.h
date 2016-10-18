@@ -81,5 +81,7 @@ init_systems()
     uinfo("Initializing...");
     uc_set_afs_home(TEST_REPO_DIR, NULL, false);
     dcache_init();
-    init_enclave();
+    if (init_enclave()) {
+        exit(-1);
+    }
 }
