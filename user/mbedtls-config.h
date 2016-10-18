@@ -45,7 +45,7 @@
 //#define MBEDTLS_FS_IO
 
 /* mbed TLS modules */
-#define MBEDTLS_AESNI_C
+//#define MBEDTLS_AESNI_C
 #define MBEDTLS_AES_C
 #define MBEDTLS_ASN1_PARSE_C
 #define MBEDTLS_ASN1_WRITE_C
