@@ -15,6 +15,8 @@ struct seqptrmap * crypto_hashmap = NULL;
 
 int ecall_init_enclave()
 {
+#if 0
+    /* uncomment this when ready to push */
     sgx_key_request_t request;
     sgx_status_t status;
     int ret;
@@ -39,6 +41,9 @@ int ecall_init_enclave()
     ret = E_SUCCESS;
 out:
     return ret;
+#endif
+    memset(&__enclave_encryption_key__, 0, sizeof(sgx_key_128bit_t));
+    return 0;
 }
 
 /**
