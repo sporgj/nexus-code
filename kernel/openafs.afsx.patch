@@ -40,18 +40,16 @@ index ac4f800..4033fad 100644
  module_exit(afspag_cleanup);
  
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..8401dce 100644
+index 1b99c94..5b60d5c 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
-@@ -129,7 +129,22 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
- 	       ICL_TYPE_OFFSET, ICL_HANDLE_OFFSET(pos), ICL_TYPE_INT32,
+@@ -130,6 +130,21 @@ afs_linux_aio_read(struct kiocb *iocb, const struct iovec *buf,
                 (afs_int32)bufsize, ICL_TYPE_INT32, 99999);
      code = afs_linux_VerifyVCache(vcp, NULL);
--
-+#if 0
+ 
 +#ifdef AFS_SECURE
 +#include "afsx_hdr.h"
-+    {
++    if (code == 0) {
 +        struct vrequest * treq;
 +	cred_t * credp = crref();
 +	afs_CreateReq(&treq, credp);
@@ -63,7 +61,7 @@ index 1b99c94..8401dce 100644
 +	crfree(credp);
 +    }
 +#endif
-+#endif
++
      if (code == 0) {
  	/* Linux's FlushPages implementation doesn't ever use credp,
  	 * so we optimise by not using it */
@@ -531,15 +529,13 @@ index 9e9f65b..fe8d680 100644
 +
  #endif /* _AFS_PROTOTYPES_H_ */
 diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
-index 2dd89cf..ae66a7e 100644
+index 2dd89cf..324d0f9 100644
 --- a/src/afs/afs_segments.c
 +++ b/src/afs/afs_segments.c
-@@ -172,7 +172,16 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
-     unsigned int i, j, minj, moredata, high, off;
+@@ -173,6 +173,15 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
      afs_size_t maxStoredLength;	/* highest offset we've written to server. */
      int safety, marineronce = 0;
--
-+#if 0
+ 
 +#ifdef AFS_SECURE
 +#include "afsx_hdr.h"
 +    code = UCAFS_store(avc, areq);
@@ -548,7 +544,7 @@ index 2dd89cf..ae66a7e 100644
 +    }
 +    code = 0;
 +#endif
-+#endif
++
      AFS_STATCNT(afs_StoreAllSegments);
  
      hash = DVHash(&avc->f.fid);

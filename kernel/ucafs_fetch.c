@@ -247,7 +247,7 @@ out:
 int
 UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
 {
-    int ret, chunk_no;
+    int ret, chunk_no, redown = 0;
     uint32_t bytes_left, pos = 0, nbytes;
     afs_size_t offset, len;
     char * path;
@@ -261,7 +261,12 @@ UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     if (avc->f.states & CDecrypted) {
-        return AFSX_STATUS_NOOP;
+        /* let's make sure we have all the portions on the disk */
+        if (afs_DCacheMissingChunks(avc) == 0) {
+            return AFSX_STATUS_NOOP;
+        }
+
+        redown = 1;
     }
 
     if (__is_vnode_ignored(avc, &path)) {
@@ -274,7 +279,8 @@ UCAFS_fetch(struct vcache * avc, struct vrequest * areq)
     }
 
     ret = AFSX_STATUS_ERROR;
-    ERROR("fetching %s (%d)\n", path, (int)avc->f.m.Length);
+    ERROR((redown ? "redownloading" : "fetching") " %s (%d)\n", path,
+          (int)avc->f.m.Length);
 
     if (init_fserv(avc, &ctx, areq)) {
         goto out;

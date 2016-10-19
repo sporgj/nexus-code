@@ -111,14 +111,14 @@ __is_dentry_ignored(struct dentry * dentry, char ** dest)
     char buf[512];
 
     // TODO cache the inode number
-    printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d dentry_name=%s",
+    /*printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d dentry_name=%s",
            dentry->d_parent, dentry, dentry->d_iname, dentry->d_name.len,
-           dentry->d_name.name);
+           dentry->d_name.name);*/
     path = dentry_path_raw(dentry, buf, sizeof(buf));
 
-    printk(KERN_ERR "path=%p\n", path);
+    /*printk(KERN_ERR "path=%p\n", path);
     print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf),
-                   1);
+                   1);*/
 
     for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
         curr_dir = watch_dirs[i];
@@ -168,7 +168,6 @@ UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
     if (__is_dentry_ignored(dp, &fpath)) {
         return AFSX_STATUS_NOOP;
     }
-
     conn = __get_conn();
 
     ret = AFSX_create(conn, fpath, type, dest);
