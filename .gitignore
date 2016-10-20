@@ -3,3 +3,4 @@
 *.so
 user/mbedtls
 *cscope.out*
+user/build.mk

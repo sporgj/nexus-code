@@ -18,14 +18,14 @@
 
 #define UCAFS_MAX_CELLS 5
 
-#define UCAFS_WRITEOP 1
-#define UCAFS_READOP 0
-
 #define AFSX_CRYPTO_BLK_SIZE 16
 #define TOBLKSIZE(x) 16 - (x % 16)
 
-#define AFSX_IS_DIR     0
-#define AFSX_IS_FILE    1
+#define UC_ENCRYPT    0x00000001
+#define UC_DECRYPT    0x00000002
+#define UC_VERIFY     0x00000004
+
+typedef uint32_t uc_crypto_op_t;
 
 typedef enum {
     UCAFS_TYPE_UNKNOWN = 0,

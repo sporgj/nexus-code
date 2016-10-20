@@ -13,10 +13,10 @@ enclave {
                 [in, out] crypto_context_t * fcrypto);
 
         public int ecall_crypto_dirnode([in, out]dnode_header_t * header,
-                [user_check] uint8_t * data, crypto_op_t op);
+                [user_check] uint8_t * data, uc_crypto_op_t op);
 
         public int ecall_crypto_filebox([in, out]fbox_header_t * header,
-                [user_check] uint8_t * data, crypto_op_t op);
+                [user_check] uint8_t * data, uc_crypto_op_t op);
     };
 
 };

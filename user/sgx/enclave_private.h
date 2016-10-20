@@ -11,7 +11,7 @@
 #include <sgx_utils.h>
 
 #include <mbedtls/aes.h>
-#include <mbedtls/gcm.h>
+#include <mbedtls/md.h>
 
 #ifndef MIN
 #define MIN(a,b) (a<b)?a:b
@@ -34,13 +34,13 @@ extern "C" {
 
 extern sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
-int enclave_crypto_ekey(crypto_ekey_t * ekey, crypto_op_t op);
+int enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op);
 
 int
 crypto_metadata(crypto_context_t * p_ctx,
                 size_t protolen,
                 uint8_t * data,
-                crypto_op_t op);
+                uc_crypto_op_t op);
 
 #ifdef __cplusplus
 }

@@ -9,22 +9,18 @@ typedef struct { uint8_t bin[16]; } uuid_t;
 
 #define GLOBAL_MAGIC 0x20160811
 
-#define CRYPTO_AES_IV_SIZE 16
 #define CRYPTO_AES_KEY_SIZE 16
 #define CRYPTO_AES_KEY_SIZE_BITS CRYPTO_AES_KEY_SIZE << 3
 #define CRYPTO_CRYPTO_BLK_SIZE 16
-#define CRYPTO_GCMTAG_SIZE 16
+#define CRYPTO_MAC_KEY_SIZE 16
+#define CRYPTO_MAC_KEY_SIZE_BITS 16
+#define CRYPTO_MAC_DIGEST_SIZE 16
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                                      \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
 
 #define DEFAULT_REPO_DIRNAME ".afsx"
 #define DEFAULT_DNODE_FNAME "main.dnode"
-
-typedef enum {
-    UCPRIV_ENCRYPT = UCAFS_WRITEOP,
-    UCPRIV_DECRYPT = UCAFS_READOP
-} crypto_op_t;
 
 typedef enum {
     E_SUCCESS = 0,
@@ -36,10 +32,10 @@ typedef enum {
 } enclave_error_t;
 
 typedef struct {
-    int op;
-    int id;
-    int crypto_id;
+    int xfer_id;
+    int enclave_crypto_id;
     int seg_id;
+    uc_crypto_op_t op;
     char * buffer;
     uint32_t buflen;
     uint32_t valid_buflen; // how much "good" data can be read from the buffer
@@ -48,11 +44,14 @@ typedef struct {
     char * path;
 } xfer_context_t;
 
-typedef struct { uint8_t iv[CRYPTO_AES_IV_SIZE]; } crypto_iv_t;
+typedef struct {
+    uint8_t nonce[16];
+    uint8_t block[16];
+} crypto_iv_t;
 
 typedef struct { uint8_t ekey[CRYPTO_AES_KEY_SIZE]; } crypto_ekey_t;
 
-typedef struct { uint8_t tag[CRYPTO_GCMTAG_SIZE]; } crypto_tag_t;
+typedef struct { uint8_t ekey[CRYPTO_MAC_DIGEST_SIZE]; } crypto_mac_t;
 
 typedef struct {
 #ifdef __cplusplus
@@ -65,8 +64,9 @@ typedef struct { uuid_t bin; } encoded_fname_t;
 
 typedef struct {
     crypto_ekey_t ekey;
-    crypto_tag_t mac;
+    crypto_ekey_t mkey;
     crypto_iv_t iv;
+    crypto_mac_t mac;
 } __attribute__((packed)) crypto_context_t;
 
 typedef struct {
