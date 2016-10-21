@@ -37,7 +37,7 @@ crypto_metadata(crypto_context_t * p_ctx,
     crypto_mac_t mac;
     crypto_iv_t iv;
     crypto_ekey_t _CONFIDENTIAL *_ekey, *_mkey;
-    uint8_t nonce[16] = {0};
+    uint8_t stream_block[16] = { 0 };
 
     if (protolen == 0) {
         return E_SUCCESS;
@@ -68,19 +68,13 @@ crypto_metadata(crypto_context_t * p_ctx,
     memcpy(&iv, &crypto_ctx.iv, sizeof(crypto_iv_t));
 
     mbedtls_aes_init(&aes_ctx);
-    if (op == UC_ENCRYPT) {
-        mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)_ekey,
-                               CRYPTO_AES_KEY_SIZE_BITS);
-    } else {
-        mbedtls_aes_setkey_dec(&aes_ctx, (uint8_t *)_ekey,
-                               CRYPTO_AES_KEY_SIZE_BITS);
-    }
+    mbedtls_aes_setkey_enc(&aes_ctx, (uint8_t *)_ekey,
+                           CRYPTO_AES_KEY_SIZE_BITS);
 
     mbedtls_md_init(&hmac_ctx);
     mbedtls_md_setup(&hmac_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
                      1);
-    mbedtls_md_hmac_starts(&hmac_ctx, (uint8_t *)_mkey,
-                           CRYPTO_MAC_KEY_SIZE_BITS);
+    mbedtls_md_hmac_starts(&hmac_ctx, (uint8_t *)_mkey, CRYPTO_MAC_KEY_SIZE);
 
     p_data = data;
     bytes_left = protolen;
@@ -90,10 +84,17 @@ crypto_metadata(crypto_context_t * p_ctx,
 
         memcpy(p_input, p_data, len);
 
-        mbedtls_aes_crypt_ctr(&aes_ctx, len, &off, nonce, iv.bytes,
-                              p_input, p_output);
+        if (op == UC_ENCRYPT) {
+            mbedtls_aes_crypt_ctr(&aes_ctx, len, &off, iv.bytes, stream_block,
+                                  p_input, p_output);
 
-        mbedtls_md_hmac_update(&hmac_ctx, p_input, len);
+            mbedtls_md_hmac_update(&hmac_ctx, p_output, len);
+        } else {
+            mbedtls_md_hmac_update(&hmac_ctx, p_input, len);
+
+            mbedtls_aes_crypt_ctr(&aes_ctx, len, &off, iv.bytes, stream_block,
+                                  p_input, p_output);
+        }
 
         memcpy(p_data, p_output, len);
 
@@ -110,7 +111,7 @@ crypto_metadata(crypto_context_t * p_ctx,
         enclave_crypto_ekey(_mkey, UC_ENCRYPT);
         memcpy(p_ctx, &crypto_ctx, sizeof(crypto_context_t));
     } else {
-        mbedtls_gcm_finish(&hmac_ctx, (uint8_t *)&mac);
+        mbedtls_md_hmac_finish(&hmac_ctx, (uint8_t *)&mac);
         error = memcmp(&mac, &crypto_ctx.mac, sizeof(crypto_mac_t));
     }
 

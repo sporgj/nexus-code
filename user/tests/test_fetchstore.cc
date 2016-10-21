@@ -7,7 +7,7 @@
 #include <uc_fileops.h>
 #include <uc_sgx.h>
 
-#define FILE_LEN 1024
+#define FILE_LEN 10
 #define CHUNK_LEN 16 + 1
 
 static uint8_t *input_buffer, *output_buffer, *temp_buffer;

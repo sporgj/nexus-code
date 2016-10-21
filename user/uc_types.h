@@ -3,7 +3,9 @@
 #ifndef UCPRIV_ENCLAVE
 #include <uuid/uuid.h>
 #else
-typedef struct { uint8_t bin[16]; } uuid_t;
+typedef struct {
+    uint8_t bin[16];
+} uuid_t;
 #endif
 #include "afsx_hdr.h"
 
@@ -16,7 +18,7 @@ typedef struct { uint8_t bin[16]; } uuid_t;
 #define CRYPTO_MAC_KEY_SIZE_BITS 16
 #define CRYPTO_MAC_DIGEST_SIZE 32
 
-#define CRYPTO_CEIL_TO_BLKSIZE(x)                                                      \
+#define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
 
 #define DEFAULT_REPO_DIRNAME ".afsx"
@@ -48,9 +50,13 @@ typedef struct {
     uint8_t bytes[16];
 } crypto_iv_t;
 
-typedef struct { uint8_t ekey[CRYPTO_AES_KEY_SIZE]; } crypto_ekey_t;
+typedef struct {
+    uint8_t ekey[CRYPTO_AES_KEY_SIZE];
+} crypto_ekey_t;
 
-typedef struct { uint8_t ekey[CRYPTO_MAC_DIGEST_SIZE]; } crypto_mac_t;
+typedef struct {
+    uint8_t bytes[CRYPTO_MAC_DIGEST_SIZE];
+} crypto_mac_t;
 
 typedef struct {
 #ifdef __cplusplus
@@ -59,7 +65,9 @@ typedef struct {
 } raw_fname_t;
 
 /* 128 bits */
-typedef struct { uuid_t bin; } encoded_fname_t;
+typedef struct {
+    uuid_t bin;
+} encoded_fname_t;
 
 typedef struct {
     crypto_ekey_t ekey;

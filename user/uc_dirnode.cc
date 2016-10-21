@@ -96,7 +96,7 @@ uc_dirnode_t * dirnode_from_file(const sds filepath)
         }
 
         if ((nbytes = fread(buffer, 1, header.protolen, fd)) != header.protolen) {
-            slog(0, SLOG_ERROR, "dirnode - reading protobufbuf failed:"
+            slog(0, SLOG_ERROR, "dirnode - reading protobuf failed:"
                     "expected=%u, actual=%u", header.protolen, nbytes);
             goto out;
         }
@@ -110,7 +110,7 @@ uc_dirnode_t * dirnode_from_file(const sds filepath)
         }
 
         if (!_dnode->ParseFromArray(buffer, header.protolen)) {
-            slog(0, SLOG_ERROR, "dirnode - parsing protobufbuf failed: %s",
+            slog(0, SLOG_ERROR, "dirnode - parsing protobuf failed: %s",
                 filepath);
             goto out;
         }

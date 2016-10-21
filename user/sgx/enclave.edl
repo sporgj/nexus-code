@@ -10,7 +10,7 @@ enclave {
         public int ecall_crypt_data([in, out] xfer_context_t * f_ctx);
 
         public int ecall_finish_crypto([in] xfer_context_t * f_ctx, 
-                [in, out] crypto_context_t * fcrypto);
+                [user_check] crypto_context_t * fcrypto);
 
         public int ecall_crypto_dirnode([in, out]dnode_header_t * header,
                 [user_check] uint8_t * data, uc_crypto_op_t op);
