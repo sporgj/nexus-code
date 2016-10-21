@@ -161,7 +161,7 @@ SAFSX_readwrite_start(
     int ret;
     xfer_context_t * ctx;
 
-    ret = fileops_start(op, fpath, max_chunk_size, total_size, id);
+    ret = fileops_start(op, fpath, max_chunk_size, 0, total_size, id);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);

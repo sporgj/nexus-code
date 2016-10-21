@@ -17,6 +17,13 @@ typedef struct {
 
 struct seqptrmap * crypto_hashmap = NULL;
 
+void __carry_over(uint8_t * iv, int index)
+{
+    if (++iv[index] == 0 && index >= 0) {
+        __carry_over(iv, index - 1);
+    }
+}
+
 int
 ecall_init_enclave()
 {
@@ -58,7 +65,8 @@ out:
 int
 ecall_init_crypto(xfer_context_t * xfer_ctx, crypto_context_t * file_crypto_ctx)
 {
-    int error = E_ERROR_CRYPTO;
+    int error = E_ERROR_CRYPTO, off, i;
+    uint8_t * iv;
     enclave_context_t __SECRET * __ctx;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
@@ -123,6 +131,19 @@ ecall_init_crypto(xfer_context_t * xfer_ctx, crypto_context_t * file_crypto_ctx)
     if (__ctx->p_input == NULL) {
         error = E_ERROR_ALLOC;
         goto out;
+    }
+
+    /* compute the IV */
+    if (op & UC_DECRYPT) {
+        iv = __ctx->ctx_iv.bytes;
+        off = xfer_ctx->position / CRYPTO_CRYPTO_BLK_SIZE;
+
+        for (i = off; i > 0; i--) {
+            if (++iv[CRYPTO_CRYPTO_BLK_SIZE - 1] == 0) {
+                // let's carry over
+                __carry_over(iv, CRYPTO_CRYPTO_BLK_SIZE - 2);
+            }
+        }
     }
 
     __ctx->op = op;

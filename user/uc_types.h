@@ -42,7 +42,8 @@ typedef struct {
     uint32_t buflen;
     uint32_t valid_buflen; // how much "good" data can be read from the buffer
     uint32_t completed;
-    uint32_t raw_len;
+    int32_t position;
+    uint32_t total_len;
     char * path;
 } xfer_context_t;
 

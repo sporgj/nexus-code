@@ -9,7 +9,8 @@ extern "C" {
  * @param op is the operation to use (WRITEOP?READOP) TODO change to enum
  * @param fpath is the file path
  * @param max_xfer_size is the maximum amount of data to be sent at anytime
- * @param filelength is the file length
+ * @param position is the position in the file which we are to encrypt
+ * @param total_len is the file length
  * @param id will contain the id of the fileop
  * @return NULL if operation fails
  */
@@ -17,7 +18,8 @@ int
 fileops_start(int op,
               const char * fpath,
               uint32_t max_chunk_size,
-              uint32_t filelength,
+              int32_t position,
+              uint32_t total_len,
               int * id);
 
 /**

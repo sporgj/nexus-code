@@ -30,7 +30,8 @@ int
 fileops_start(int op,
               const char * fpath,
               uint32_t max_xfer_size,
-              uint32_t filelength,
+              int32_t position,
+              uint32_t total_len,
               int * p_id)
 {
     int ret = -1;
@@ -39,6 +40,16 @@ fileops_start(int op,
     xfer_context_t * xfer_ctx = NULL;
 
     *p_id = -2;
+
+    if (position % 16) {
+        slog(0, SLOG_ERROR, "fileops - invalid offset(%d)", position);
+        return ret;
+    }
+
+    if ((op & UC_ENCRYPT) && (op & UC_DECRYPT)) {
+        slog(0, SLOG_ERROR, "fileops - Can't try to encrypt and decrypt");
+        return ret;
+    }
 
     /* get the filebox object */
     if ((fb = dcache_get_filebox(fpath)) == NULL) {
@@ -63,7 +74,8 @@ fileops_start(int op,
     xfer_ctx->op = op;
     xfer_ctx->completed = 0;
     xfer_ctx->buflen = max_xfer_size;
-    xfer_ctx->raw_len = filelength;
+    xfer_ctx->position = position;
+    xfer_ctx->total_len = total_len;
     xfer_ctx->path = strdup(fpath);
 
     /* TODO: change the argument to the appropriate index */

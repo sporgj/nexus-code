@@ -19,7 +19,7 @@
 #define UCAFS_MAX_CELLS 5
 
 #define AFSX_CRYPTO_BLK_SIZE 16
-#define TOBLKSIZE(x) 16 - (x % 16)
+#define TOBLKSIZE(x) x + 16 - (x % 16)
 
 #define UC_ENCRYPT    0x00000001
 #define UC_DECRYPT    0x00000002
