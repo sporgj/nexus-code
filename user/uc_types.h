@@ -14,7 +14,7 @@ typedef struct { uint8_t bin[16]; } uuid_t;
 #define CRYPTO_CRYPTO_BLK_SIZE 16
 #define CRYPTO_MAC_KEY_SIZE 16
 #define CRYPTO_MAC_KEY_SIZE_BITS 16
-#define CRYPTO_MAC_DIGEST_SIZE 16
+#define CRYPTO_MAC_DIGEST_SIZE 32
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                                      \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
@@ -45,8 +45,7 @@ typedef struct {
 } xfer_context_t;
 
 typedef struct {
-    uint8_t nonce[16];
-    uint8_t block[16];
+    uint8_t bytes[16];
 } crypto_iv_t;
 
 typedef struct { uint8_t ekey[CRYPTO_AES_KEY_SIZE]; } crypto_ekey_t;

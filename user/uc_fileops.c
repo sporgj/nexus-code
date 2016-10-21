@@ -83,13 +83,13 @@ fileops_start(int op,
         xfer_context_array = seqptrmap_init();
     }
 
-    if ((xfer_ctx->id = seqptrmap_add(xfer_context_array, xfer_ctx)) == -1) {
+    if ((xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx)) == -1) {
         // TODO delete context from enclave space
         slog(0, SLOG_ERROR, "fileops - Adding to list failed");
         goto out;
     }
 
-    *p_id = xfer_ctx->id;
+    *p_id = xfer_ctx->xfer_id;
     ret = 0;
 out:
     if (crypto_ctx) {
@@ -174,7 +174,7 @@ fileops_finish(int id)
     }
 
     /* save the filebox to disk */
-    if (xfer_ctx->op == UCAFS_WRITEOP) {
+    if (xfer_ctx->op == UC_ENCRYPT) {
         filebox_set_crypto(fb, 0, crypto_ctx);
         filebox_flush(fb);
         filebox_free(fb);

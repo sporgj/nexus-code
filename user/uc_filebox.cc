@@ -101,7 +101,7 @@ filebox_from_file(const sds filepath)
 
         /* decrypt the content with enclave */
         ecall_crypto_filebox(global_eid, &error, &header, buffer,
-                            UCPRIV_DECRYPT);
+                            UC_DECRYPT);
         if (error) {
             slog(0, SLOG_ERROR, "filebox - enclave encryption failed");
             goto out;
@@ -167,7 +167,7 @@ filebox_write(uc_filebox_t * fb, const char * fpath)
     fb->header.protolen = fb->protobuf->GetCachedSize();
 
     ecall_crypto_filebox(global_eid, &error, &fb->header, buffer,
-                         UCPRIV_ENCRYPT);
+                         UC_ENCRYPT);
     if (error) {
         slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
         goto out;

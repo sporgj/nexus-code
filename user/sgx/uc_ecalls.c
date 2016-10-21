@@ -12,6 +12,7 @@ typedef struct {
     mbedtls_md_context_t hmac_ctx;
     uint8_t * p_input;
     uint8_t * p_output;
+    uint8_t nonce[16];
 } enclave_context_t;
 
 struct seqptrmap * crypto_hashmap = NULL;
@@ -139,7 +140,7 @@ ecall_crypt_data(xfer_context_t * xfer_ctx)
     int error = E_ERROR_ERROR, bytes_left;
     size_t nbytes; 
     size_t * pos;
-    uint8_t *p_in, *p_out, *p_buf;
+    uint8_t *p_in, *p_out, *p_buf, *nonce;
     crypto_iv_t * iv;
     enclave_context_t __SECRET * __ctx;
     mbedtls_aes_context * aes_ctx;
@@ -152,6 +153,7 @@ ecall_crypt_data(xfer_context_t * xfer_ctx)
     }
 
     op = __ctx->op;
+    nonce = __ctx->nonce;
     iv = &__ctx->ctx_iv;
     aes_ctx = &__ctx->aes_ctx;
     hmac_ctx = &__ctx->hmac_ctx;
@@ -163,12 +165,11 @@ ecall_crypt_data(xfer_context_t * xfer_ctx)
 
     bytes_left = xfer_ctx->valid_buflen;
     while (bytes_left > 0) {
-        nbytes = bytes_left > E_CRYPTO_BUFFER_LEN ? E_CRYPTO_BUFFER_LEN
-                                                  : bytes_left;
+        nbytes = MIN(bytes_left,  E_CRYPTO_BUFFER_LEN);
         memcpy(p_in, p_buf, nbytes);
 
         if (op & UC_ENCRYPT) {
-            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, pos, iv->nonce, iv->block,
+            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, pos, nonce, iv->bytes,
                                   p_in, p_out);
         }
 
@@ -178,7 +179,7 @@ ecall_crypt_data(xfer_context_t * xfer_ctx)
         }
 
         if (op & UC_DECRYPT) {
-            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, pos, iv->nonce, iv->block,
+            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, pos, nonce, iv->bytes,
                                   p_in, p_out);
         }
 

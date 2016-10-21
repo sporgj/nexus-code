@@ -148,7 +148,7 @@ SAFSX_remove(
     return ret;
 }
 
-#define RWOP_TO_STR(op) (op == UCAFS_WRITEOP ? "write" : "read")
+#define RWOP_TO_STR(op) (op == UC_ENCRYPT ? "write" : "read")
 afs_int32
 SAFSX_readwrite_start(
     /*IN */ struct rx_call * z_call,

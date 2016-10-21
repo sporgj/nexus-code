@@ -44,7 +44,7 @@ run_fetch_store(int op, sds path, uint8_t * p_input, uint8_t * p_output)
     ASSERT_EQ(0, fileops_start(op, path, CHUNK_LEN, FILE_LEN, &xfer_id))
         << "fileops_start failed";
 
-    uinfo("%s...", op == UCAFS_WRITEOP ? "Uploading" : "Downloading");
+    uinfo("%s...", op == UC_ENCRYPT ? "Uploading" : "Downloading");
     for (size_t i = 0; i < FILE_LEN; i += CHUNK_LEN) {
         len = (FILE_LEN - i < CHUNK_LEN) ? (FILE_LEN - i) : CHUNK_LEN;
 
@@ -72,8 +72,8 @@ TEST(UC_FETCHSTORE, LocalTest)
         << "dirops_new failed";
 
     generate_stream();
-    run_fetch_store(UCAFS_WRITEOP, path, input_buffer, output_buffer);
-    run_fetch_store(UCAFS_READOP, path, output_buffer, temp_buffer);
+    run_fetch_store(UC_ENCRYPT, path, input_buffer, output_buffer);
+    run_fetch_store(UC_DECRYPT, path, output_buffer, temp_buffer);
 
     printf("\n");
     uinfo("Input..");

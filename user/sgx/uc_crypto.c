@@ -29,7 +29,7 @@ crypto_metadata(crypto_context_t * p_ctx,
                 uc_crypto_op_t op)
 {
     int error = E_ERROR_ERROR, bytes_left, len;
-    uint32_t off = 0;
+    size_t off = 0;
     mbedtls_aes_context aes_ctx;
     mbedtls_md_context_t hmac_ctx;
     uint8_t *p_input = NULL, *p_output = NULL, *p_data;
@@ -37,13 +37,18 @@ crypto_metadata(crypto_context_t * p_ctx,
     crypto_mac_t mac;
     crypto_iv_t iv;
     crypto_ekey_t _CONFIDENTIAL *_ekey, *_mkey;
+    uint8_t nonce[16] = {0};
+
+    if (protolen == 0) {
+        return E_SUCCESS;
+    }
 
     p_input = (uint8_t *)malloc(E_CRYPTO_BUFFER_LEN);
     if (p_input == NULL) {
         return E_ERROR_ERROR;
     }
 
-    p_output = p_output;
+    p_output = p_input;
 
     /* gather the cryptographic information */
     memcpy(&crypto_ctx, p_ctx, sizeof(crypto_context_t));
@@ -85,7 +90,7 @@ crypto_metadata(crypto_context_t * p_ctx,
 
         memcpy(p_input, p_data, len);
 
-        mbedtls_aes_crypt_ctr(&aes_ctx, len, &off, &iv.nonce, &iv.block,
+        mbedtls_aes_crypt_ctr(&aes_ctx, len, &off, nonce, iv.bytes,
                               p_input, p_output);
 
         mbedtls_md_hmac_update(&hmac_ctx, p_input, len);

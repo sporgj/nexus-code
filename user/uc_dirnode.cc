@@ -103,7 +103,7 @@ uc_dirnode_t * dirnode_from_file(const sds filepath)
 
         /* decrypt the content with enclave */
         ecall_crypto_dirnode(global_eid, &error, &header, buffer,
-                             UCPRIV_DECRYPT);
+                             UC_DECRYPT);
         if (error) {
             slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
             goto out;
@@ -168,7 +168,7 @@ bool dirnode_write(uc_dirnode_t * dn, const char * fpath)
     dn->header.protolen = dn->protobuf->GetCachedSize();
 
     ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer,
-                         UCPRIV_ENCRYPT);
+                         UC_ENCRYPT);
     if (error) {
         slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
         goto out;
