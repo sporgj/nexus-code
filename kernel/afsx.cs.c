@@ -269,7 +269,7 @@ fail:
 	return z_result;
 }
 
-int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 total_size,afs_int32 * id)
+int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_uint32 max_chunk_size,afs_uint32 offset,afs_uint32 total_size,afs_int32 * id)
 {
 	struct rx_call *z_call = rx_NewCall(z_conn);
 	static int z_op = 235;
@@ -283,6 +283,7 @@ int AFSX_readwrite_start(struct rx_connection *z_conn,int op,char * fpath,afs_ui
 	     || (!xdr_int(&z_xdrs, &op))
 	     || (!xdr_string(&z_xdrs, &fpath, AFSX_PATH_MAX))
 	     || (!xdr_afs_uint32(&z_xdrs, &max_chunk_size))
+	     || (!xdr_afs_uint32(&z_xdrs, &offset))
 	     || (!xdr_afs_uint32(&z_xdrs, &total_size))) {
 		z_result = RXGEN_CC_MARSHAL;
 		goto fail;

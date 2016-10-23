@@ -164,6 +164,7 @@ extern int AFSX_readwrite_start(
 	/*IN */ int op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
+	/*IN */ afs_uint32 offset,
 	/*IN */ afs_uint32 total_size,
 	/*OUT*/ afs_int32 * id);
 
@@ -172,6 +173,7 @@ extern afs_int32 SAFSX_readwrite_start(
 	/*IN */ int op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_chunk_size,
+	/*IN */ afs_uint32 offset,
 	/*IN */ afs_uint32 total_size,
 	/*OUT*/ afs_int32 * id);
 

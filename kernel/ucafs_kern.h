@@ -22,6 +22,7 @@ typedef struct {
     void * buffer;
     int32_t len;
     int32_t off;
+    int32_t file_offset;
     struct rx_call * afs_call;
     struct rx_connection * rx_conn;
     struct vrequest * areq;

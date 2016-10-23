@@ -2,8 +2,8 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_store: " fmt, ##args)
 
-extern afs_int32 *afs_dchashTbl;
-extern afs_int32 *afs_dcnextTbl;
+extern afs_int32 * afs_dchashTbl;
+extern afs_int32 * afs_dcnextTbl;
 
 /**
  * Reads from the file on disk, sends over RPC and rereads response
@@ -237,8 +237,9 @@ store_init(struct vcache * avc,
 
     /* start a connection with our client */
     ctx->udp_conn = __get_conn();
-    if ((ret = AFSX_readwrite_start(ctx->udp_conn, UCAFS_WRITEOP, path,
-                                    AFSX_PACKET_SIZE, len, &ctx->id))) {
+    ret = AFSX_readwrite_start(ctx->udp_conn, UC_ENCRYPT, path,
+                               AFSX_PACKET_SIZE, 0, len, &ctx->id);
+    if (ret) {
         ERROR("Starting connection with uspace failed (ret=%d)\n", ret);
         goto out;
     }
@@ -316,7 +317,8 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
             goto out;
         }
 
-        //ERROR("tdc. path=%s, chunk_no=%d, offset=%d\n", path, tdc->f.chunk, ctx->off);
+        // ERROR("tdc. path=%s, chunk_no=%d, offset=%d\n", path, tdc->f.chunk,
+        // ctx->off);
 
         ObtainSharedLock(&tdc->lock, 6504);
         if (storeproc(ctx, tdc, &nbytes)) {
