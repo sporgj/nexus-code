@@ -58,6 +58,21 @@ SAFSX_fversion(
     return 0;
 }
 
+static const char *
+struct_type_to_str(ucafs_entry_type type)
+{
+    switch (type) {
+    case UCAFS_TYPE_FILE:
+        return "touch";
+    case UCAFS_TYPE_DIR:
+        return "mkdir";
+    case UCAFS_TYPE_LINK:
+        return "softlink";
+    default:
+        return "(unknown)";
+    }
+}
+
 afs_int32
 SAFSX_create(
     /*IN */ struct rx_call * z_call,
@@ -69,11 +84,7 @@ SAFSX_create(
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
     } else {
-        uinfo("%s: %s ~> %s",
-              (type == UCAFS_TYPE_FILE
-                   ? "touch"
-                   : (type == UCAFS_TYPE_DIR ? "mkdir" : "link")),
-              path, *crypto_fname);
+        uinfo("%s: %s ~> %s", struct_type_to_str(type), path, *crypto_fname);
     }
     return ret;
 }
@@ -155,13 +166,14 @@ SAFSX_readwrite_start(
     /*IN */ int op,
     /*IN */ char * fpath,
     /*IN */ afs_uint32 max_chunk_size,
+    /*IN */ afs_uint32 offset,
     /*IN */ afs_uint32 total_size,
     /*OUT*/ afs_int32 * id)
 {
     int ret;
     xfer_context_t * ctx;
 
-    ret = fileops_start(op, fpath, max_chunk_size, 0, total_size, id);
+    ret = fileops_start(op, fpath, max_chunk_size, offset, total_size, id);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);
@@ -170,8 +182,8 @@ SAFSX_readwrite_start(
         return AFSX_STATUS_NOOP;
     }
 
-    uinfo("begin %s: %s (%u, %u) id=%d", RWOP_TO_STR(op), fpath, max_chunk_size,
-          total_size, *id);
+    uinfo("begin %s: %s (%u, %u, %u) id=%d", RWOP_TO_STR(op), fpath,
+          max_chunk_size, offset, total_size, *id);
 
     return AFSX_STATUS_SUCCESS;
 }

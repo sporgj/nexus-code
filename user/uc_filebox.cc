@@ -47,6 +47,26 @@ filebox_new()
     return fb;
 }
 
+uc_filebox_t *
+filebox_from_fbox(const uc_filebox_t * fbox)
+{
+    uc_filebox_t * new_fbox = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
+    if (new_fbox) {
+        return NULL;
+    }
+
+    /* since we're reading from an in-memory copy of the filebox,
+     * it's unencrypted and so can be copied by the protocol buffer
+     * copy-of constructor */
+    memcpy(&new_fbox->header, &fbox->header, sizeof(fbox_header_t));
+    uuid_generate_time_safe(new_fbox->header.uuid);
+
+    new_fbox->protobuf = new ::fbox(*fbox->protobuf);
+
+    return new_fbox;
+}
+
+
 void
 filebox_free(uc_filebox_t * fb)
 {

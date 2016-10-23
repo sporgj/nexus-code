@@ -27,6 +27,14 @@ uc_filebox_t *
 filebox_from_file(const sds file_path);
 
 /**
+ * Creates a filebox from an existing one
+ * @param fbox is the filebox to copy from
+ * @return a new filebox
+ */
+uc_filebox_t *
+filebox_from_fbox(const uc_filebox_t * fbox);
+
+/**
  * Deallocates the filebox from the heap
  * @param fb
  */
