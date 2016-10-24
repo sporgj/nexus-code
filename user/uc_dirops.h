@@ -19,6 +19,18 @@ dirops_new(const char * fpath,
            char ** encoded_name_dest);
 
 /**
+ * Creates a hardlink between two paths.
+ * @param new_path
+ * @param old_path
+ * @param encoded_name_dest
+ * @return 0 on success
+ */
+int
+dirops_hardlink(const char * new_path,
+                const char * old_path,
+                char ** encoded_name_dest);
+
+/**
  * Returns the raw file name of an encoded path
  * @param encoded_name is the encoded file name
  * @param dir_path is the directory in which the file resides

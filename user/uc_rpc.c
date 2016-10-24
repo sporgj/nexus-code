@@ -133,7 +133,6 @@ SAFSX_rename(
     int ret = dirops_rename(old_fpath, new_path, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
-        uerror("Renaming '%s' -> '%s' FAILED", old_fpath, new_path);
     } else {
         uinfo("Renamed '%s' -> '%s'", old_fpath, new_path);
     }
@@ -152,9 +151,23 @@ SAFSX_remove(
     int ret = dirops_remove(fpath, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
-        uerror("%s FAILED: %s", str, fpath);
     } else {
         uinfo("%s: %s ~> %s", str, fpath, *code_name);
+    }
+    return ret;
+}
+
+afs_int32 SAFSX_hardlink(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * new_path,
+	/*IN */ char * old_path,
+	/*OUT*/ char * *code_name)
+{
+    int ret = dirops_hardlink(new_path, old_path, code_name);
+    if (ret) {
+        *code_name = EMPTY_STR_HEAP;
+    } else {
+        uinfo("hardlink: %s (%s) ~> %s", new_path, *code_name, old_path);
     }
     return ret;
 }

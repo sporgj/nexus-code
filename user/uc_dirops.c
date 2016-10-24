@@ -270,9 +270,9 @@ out:
         free(temp);
     }
     if (new_fbox_path)
-        free(new_fbox_path);
+        sdsfree(new_fbox_path);
     if (fname)
-        free(fname);
+        sdsfree(fname);
     if (old_filebox)
         filebox_free(old_filebox);
     if (new_filebox)

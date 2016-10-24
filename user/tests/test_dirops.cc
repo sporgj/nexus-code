@@ -77,6 +77,36 @@ TEST(UC_DIROPS, FileCreationMemTest)
     //HeapProfilerStop();
 }
 
+TEST(UC_DIROPS, HardLinkTest)
+{
+    const char * fname = "test.txt", * fname2 = "test2.txt";
+    char * test, * test2;
+    sds path = MK_PATH(fname), path2 = MK_PATH(fname2);
+
+    /* checking dirops_new returns 0 */
+    ASSERT_EQ(0, dirops_new(path, UCAFS_TYPE_FILE, &test))
+	<< "dirops_new failed";
+    uinfo("%s -> %s", path, test);
+
+    ASSERT_EQ(0, dirops_hardlink(path2, path, &test2));
+    uinfo("hardlink: %s (%s) -> %s", path, test2, path2);
+
+    uinfo("Deleting %s", path);
+    ASSERT_TRUE(dirops_remove(path, UCAFS_TYPE_FILE, &test) == 0)
+	<< path << " could not be removed";
+
+    uinfo("Checking hardlink still exists");
+    struct stat stat_buf;
+    sdsfree(path);
+    path = uc_get_dnode_path(test2);
+    ASSERT_EQ(0, stat(path, &stat_buf)) << "Filebox " << path << " not found";
+
+    free(test);
+    free(test2);
+    sdsfree(path);
+    sdsfree(path2);
+}
+
 int main(int argc, char ** argv)
 {
     init_systems();
