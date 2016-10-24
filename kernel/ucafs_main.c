@@ -55,6 +55,18 @@ LINUX_AFSX_ping(void)
     return 0;
 }
 
+char * uc_mkpath(const char * parent_path, const char * fname)
+{
+    int len1 = strlen(parent_path), len2 = strlen(fname);
+    char * rv = (char *)kmalloc(len1 + len2 + 1, GFP_KERNEL);
+    memcpy(rv, parent_path, len1);
+    rv[len1] = '/';
+    memcpy(rv + len1 + 1, fname, len2);
+    rv[len1 + len2] = '\0';
+
+    return rv;
+}
+
 struct rx_connection *
 __get_conn(void)
 {
@@ -117,6 +129,8 @@ __is_dentry_ignored(struct dentry * dentry, char ** dest)
     path = dentry_path_raw(dentry, buf, sizeof(buf));
 
     if (IS_ERR_OR_NULL(path)) {
+        print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf,
+                       sizeof(buf), 1);
         return 1;
     }
 
@@ -156,6 +170,12 @@ inline int
 __is_vnode_ignored(struct vcache * avc, char ** dest)
 {
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
+}
+
+inline int
+ucafs_vnode_path(struct vcache * avc, char ** dest)
+{
+    return __is_vnode_ignored(avc, dest);
 }
 
 int
@@ -269,6 +289,34 @@ UCAFS_remove(char ** dest, struct dentry * dp)
 }
 
 int
+ucafs_remove(char * parent_path,
+             char * file_name,
+             ucafs_entry_type type,
+             char ** dest)
+{
+    int ret;
+    char * fpath;
+    struct rx_connection * uc_conn; 
+    
+    *dest = NULL;
+    if (!AFSX_IS_CONNECTED) {
+        return -1;
+    }
+
+    uc_conn = __get_conn();
+    fpath = uc_mkpath(parent_path, file_name);
+
+    if ((ret = AFSX_remove(uc_conn, fpath, type, dest))) {
+        kfree(*dest);
+        *dest = NULL;
+    }
+
+    __put_conn(uc_conn);
+    kfree(fpath);
+    return ret;
+}
+
+int
 UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
@@ -291,9 +339,45 @@ UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
     conn = __get_conn();
 
     *dest = NULL;
-    if ((ret
-         = AFSX_rename(conn, from_path, to_path, dentry_type(from_dp), dest))) {
+    ret = AFSX_rename(conn, from_path, to_path, dentry_type(from_dp), dest);
+    if (ret) {
+        /// TODO
     }
+
+    __put_conn(conn);
+out:
+    if (from_path)
+        kfree(from_path);
+    if (to_path)
+        kfree(to_path);
+
+    return ret;
+}
+
+int
+UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp)
+{
+    int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
+    char * from_path = NULL, * to_path = NULL;
+    struct rx_connection * conn = NULL;
+
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    ignore_from = __is_dentry_ignored(new_dp, &from_path);
+    ignore_to = __is_dentry_ignored(to_dp, &to_path);
+
+    if (ignore_from && ignore_to) {
+        goto out;
+    }
+
+    conn = __get_conn();
+
+    *dest = NULL;
+    if ((ret = AFSX_hardlink(conn, from_path, to_path, dest))) {
+        // TODO
+    } 
 
     __put_conn(conn);
 out:

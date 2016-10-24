@@ -13,6 +13,16 @@ extern int
 UCAFS_ignore_dentry(struct dentry * dp, char ** dest);
 
 /**
+ * Returns the full path to the vnode if it resides in a "watched"
+ * directory
+ * @param avc is the vnode to resole
+ * @param dest is the pointer to hold the string. Free with kfree
+ * @return 0 on success
+ */
+int
+ucafs_vnode_path(struct vcache * avc, char ** dest);
+
+/**
  * Creates a new file/dir in the dentry dp
  * @param dest is the encoded filename destination ptr
  * @param is_file is (AFSX_IS_DIR/AFSX_IS_FILE)
@@ -25,6 +35,12 @@ UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp);
 extern int
 UCAFS_remove(char ** dest, struct dentry * dp);
 
+int
+ucafs_remove(char * parent_path,
+             char * file_name,
+             ucafs_entry_type type,
+             char ** dest);
+
 extern int
 UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp);
 
@@ -36,6 +52,9 @@ UCAFS_find(char ** dest,
 
 extern int
 UCAFS_lookup(char ** dest, struct dentry * dp);
+
+extern int
+UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp);
 
 extern int
 UCAFS_store(struct vcache * avc, struct vrequest * areq);
