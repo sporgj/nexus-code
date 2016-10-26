@@ -60,6 +60,12 @@ UCAFS_find(char ** dest,
 extern int
 UCAFS_lookup(char ** dest, struct dentry * dp);
 
+int
+ucafs_plain2code(char * parent_path,
+                 char * plain_file_name,
+                 ucafs_entry_type type,
+                 char ** dest);
+
 extern int
 UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp);
 
@@ -78,4 +84,17 @@ UCAFS_get(struct afs_conn * tc,
           struct vcache * avc,
           afs_int32 size,
           struct afs_FetchOutput * tsmall);
+
+/* dnlc prototypes */
+int
+uc_silly_del(const char * key);
+
+char *
+uc_silly_get(const char * key);
+
+int
+uc_silly_add(const char * sillyname,
+             const char * realname,
+             const char * shadowname);
+
 #endif

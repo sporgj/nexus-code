@@ -11,7 +11,8 @@ SRC = afsx.h \
       ucafs_get.c \
       ucafs_fetch.c \
       ucafs_store.c \
-	  ucafs_dirops.c \
+      ucafs_dirops.c \
+      ucafs_dnlc.c \
       ucafs_main.c
 
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
