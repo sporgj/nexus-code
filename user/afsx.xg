@@ -8,16 +8,7 @@ prefix S
 %#include <rx/rx.h>
 %#include <rx/rx_null.h>
 
-%#include "afsx_hdr.h"
-
-%#ifndef UCAFS_ENTRY_TYPE
-%#define UCAFS_ENTRY_TYPE
-%static bool_t xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
-%{
-%    // TODO no need to make the additional call_
-%    return xdr_afs_uint32(xdrs, (afs_uint32 *)lp);
-%}
-%#endif
+%#include "ucafs_defs.h"
 
 /* maximum number of requests to be handled silmutaneously */
 %#define AFSX_REQ_MAX           2
@@ -35,41 +26,49 @@ fversion(
 
 create(
     IN string path<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string crypto_fname<AFSX_FNAME_MAX>
 ) = 131;
 
 find(
     IN string fake_name<AFSX_FNAME_MAX>,
     string path<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string real_name<AFSX_FNAME_MAX>
 ) = 132;
 
 lookup(
     IN string fpath<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string fake_name<AFSX_FNAME_MAX>
 ) = 133;
 
 remove(
     IN string fpath<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 134;
 
 rename(
     IN string old_fpath<AFSX_PATH_MAX>,
     string new_path<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 135;
+
+sillyrename(
+    IN string dirpath<AFSX_PATH_MAX>,
+    string old_name<AFSX_FNAME_MAX>,
+    string new_name<AFSX_FNAME_MAX>,
+    afs_int32 type,
+    OUT string code_name<AFSX_FNAME_MAX>
+) = 139;
 
 hardlink(
     IN string new_path<AFSX_PATH_MAX>,
     string old_path<AFSX_PATH_MAX>,
     OUT string code_name<AFSX_FNAME_MAX>
-) = 136;
+) = 161;
 
 readwrite_start(
     IN int op,

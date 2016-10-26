@@ -55,7 +55,8 @@ LINUX_AFSX_ping(void)
     return 0;
 }
 
-char * uc_mkpath(const char * parent_path, const char * fname)
+char *
+uc_mkpath(const char * parent_path, const char * fname)
 {
     int len1 = strlen(parent_path), len2 = strlen(fname);
     char * rv = (char *)kmalloc(len1 + len2 + 1, GFP_KERNEL);
@@ -123,7 +124,8 @@ __is_dentry_ignored(struct dentry * dentry, char ** dest)
     char buf[512];
 
     /* TODO cache the inode number
-    printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d dentry_name=%s",
+    printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d
+    dentry_name=%s",
            dentry->d_parent, dentry, dentry->d_iname, dentry->d_name.len,
            dentry->d_name.name); */
     path = dentry_path_raw(dentry, buf, sizeof(buf));
@@ -289,34 +291,6 @@ UCAFS_remove(char ** dest, struct dentry * dp)
 }
 
 int
-ucafs_remove(char * parent_path,
-             char * file_name,
-             ucafs_entry_type type,
-             char ** dest)
-{
-    int ret;
-    char * fpath;
-    struct rx_connection * uc_conn; 
-    
-    *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
-        return -1;
-    }
-
-    uc_conn = __get_conn();
-    fpath = uc_mkpath(parent_path, file_name);
-
-    if ((ret = AFSX_remove(uc_conn, fpath, type, dest))) {
-        kfree(*dest);
-        *dest = NULL;
-    }
-
-    __put_conn(uc_conn);
-    kfree(fpath);
-    return ret;
-}
-
-int
 UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
@@ -358,7 +332,7 @@ int
 UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp)
 {
     int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
-    char * from_path = NULL, * to_path = NULL;
+    char *from_path = NULL, *to_path = NULL;
     struct rx_connection * conn = NULL;
 
     if (!AFSX_IS_CONNECTED) {
@@ -377,7 +351,7 @@ UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp)
     *dest = NULL;
     if ((ret = AFSX_hardlink(conn, from_path, to_path, dest))) {
         // TODO
-    } 
+    }
 
     __put_conn(conn);
 out:

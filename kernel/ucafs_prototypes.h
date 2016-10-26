@@ -1,7 +1,7 @@
 #ifndef AFS_SGX_H
 #define AFS_SGX_H
 
-#include "afsx_hdr.h"
+#include "ucafs_defs.h"
 
 extern int
 LINUX_AFSX_connect(void);
@@ -36,13 +36,20 @@ extern int
 UCAFS_remove(char ** dest, struct dentry * dp);
 
 int
-ucafs_remove(char * parent_path,
-             char * file_name,
-             ucafs_entry_type type,
-             char ** dest);
+ucafs_remove2(char * parent_path,
+              char * file_name,
+              ucafs_entry_type type,
+              char ** dest);
 
 extern int
 UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp);
+
+int
+ucafs_rename2(char * dirpath,
+              char * oldname,
+              char * newname,
+              ucafs_entry_type type,
+              char ** dest);
 
 extern int
 UCAFS_find(char ** dest,

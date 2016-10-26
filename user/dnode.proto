@@ -11,4 +11,5 @@ message dnode {
     repeated fentry file = 1;
     repeated fentry dir = 2;
     repeated fentry link = 3;
+    repeated fentry silly = 4;
 }

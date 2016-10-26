@@ -5,12 +5,13 @@ OPENAFS_SRC_AFS = $(OPENAFS_SRC)/afs
 CC := clang
 SRC = afsx.h \
       afsx.cs.c \
-      afsx_hdr.h \
+      ucafs_defs.h \
+      ucafs_kern.h \
+      ucafs_prototypes.h \
       ucafs_get.c \
       ucafs_fetch.c \
       ucafs_store.c \
-      ucafs_kern.h \
-      afs_secure.h \
+	  ucafs_dirops.c \
       ucafs_main.c
 
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
@@ -31,7 +32,7 @@ afsx.cs.c: $(COMMONPATH)/afsx.xg
 afsx.h: $(COMMONPATH)/afsx.xg afsx_hdr.h
 	$(RXGEN) -A -x -h -o $@ $<
 
-afsx_hdr.h: $(COMMONPATH)/afsx_hdr.h
+ucafs_defs.h: $(COMMONPATH)/ucafs_defs.h
 	cp -u $^ $@
 
 .PHONY: install

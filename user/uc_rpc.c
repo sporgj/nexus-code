@@ -5,6 +5,12 @@
 #include "uc_utils.h"
 
 #define N_SECURITY_OBJECTS 1
+bool_t
+xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
+{
+    // TODO no need to make the additional call_
+    return xdr_afs_uint32(xdrs, (afs_uint32 *)lp);
+}
 
 int
 setup_rx(int port)
@@ -77,7 +83,7 @@ afs_int32
 SAFSX_create(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * path,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** crypto_fname)
 {
     int ret = dirops_new(path, type, crypto_fname);
@@ -94,7 +100,7 @@ SAFSX_find(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fake_name,
     /*IN */ char * path,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** real_name)
 {
     int ret = dirops_code2plain(fake_name, path, type, real_name);
@@ -110,7 +116,7 @@ afs_int32
 SAFSX_lookup(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** fake_name)
 {
     int ret = dirops_plain2code(fpath, type, fake_name);
@@ -127,7 +133,7 @@ SAFSX_rename(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * old_fpath,
     /*IN */ char * new_path,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** code_name)
 {
     int ret = dirops_rename(old_fpath, new_path, type, code_name);
@@ -141,10 +147,29 @@ SAFSX_rename(
 }
 
 afs_int32
+SAFSX_sillyrename(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ char * dirpath,
+    /*IN */ char * old_name,
+    /*IN */ char * new_name,
+    /*IN */ afs_int32 type,
+    /*OUT*/ char ** code_name)
+{
+    int ret = dirops_rename2(dirpath, old_name, new_name, type, code_name);
+    if (ret) {
+        *code_name = EMPTY_STR_HEAP;
+    } else {
+        uinfo("sillyrename: %s (%s -> %s)", old_name, new_name);
+    }
+
+    return ret;
+}
+
+afs_int32
 SAFSX_remove(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** code_name)
 {
     const char * str = (type == UCAFS_TYPE_FILE) ? "rm" : "rmdir";
@@ -157,11 +182,12 @@ SAFSX_remove(
     return ret;
 }
 
-afs_int32 SAFSX_hardlink(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * new_path,
-	/*IN */ char * old_path,
-	/*OUT*/ char * *code_name)
+afs_int32
+SAFSX_hardlink(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ char * new_path,
+    /*IN */ char * old_path,
+    /*OUT*/ char ** code_name)
 {
     int ret = dirops_hardlink(new_path, old_path, code_name);
     if (ret) {

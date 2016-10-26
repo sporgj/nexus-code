@@ -79,6 +79,7 @@ TEST(UC_DIROPS, FileCreationMemTest)
 
 TEST(UC_DIROPS, HardLinkTest)
 {
+    create_default_dnode();
     const char * fname = "test.txt", * fname2 = "test2.txt";
     char * test, * test2;
     sds path = MK_PATH(fname), path2 = MK_PATH(fname2);
@@ -103,6 +104,40 @@ TEST(UC_DIROPS, HardLinkTest)
 
     free(test);
     free(test2);
+    sdsfree(path);
+    sdsfree(path2);
+}
+
+// TODO free variables
+TEST(UC_DIROPS, SillyRenameTest)
+{
+    create_default_dnode();
+    const char * parent_path = "repo";
+    const char * fname = "test.txt", * fname2 = "test2.txt";
+    char * test, * test2;
+    sds path = MK_PATH(fname), path2 = MK_PATH(fname2);
+
+    /* checking dirops_new returns 0 */
+    ASSERT_EQ(0, dirops_new(path, UCAFS_TYPE_FILE, &test))
+	<< "dirops_new failed";
+    uinfo("%s -> %s", path, test);
+
+    /* do a sillyrename */
+    ASSERT_EQ(0, dirops_rename2(parent_path, fname, fname2, UCAFS_TYPE_FILE, &test2)) <<
+            "Could not sillyrename :(";
+
+    ASSERT_NE(0, strcmp(test, test2)) << "Real and silly values have to differ";
+
+    ASSERT_NE(0, dirops_plain2code(path, UCAFS_TYPE_FILE, &test))
+        << "File is not suppose to be found";
+
+    ASSERT_EQ(0, dirops_plain2code(path2, UCAFS_TYPE_FILE, &test))
+        << "New file: " << path2 << " could not be found";
+
+    ASSERT_EQ(0, strcmp(test, test2))
+        << "dirops returns different lookup value: test1=" << test
+        << ", test2=" << test2;
+
     sdsfree(path);
     sdsfree(path2);
 }

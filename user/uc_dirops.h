@@ -74,6 +74,13 @@ dirops_rename(const char * from_path,
               const char * to_path,
               ucafs_entry_type type,
               char ** raw_name_dest);
+
+int
+dirops_rename2(const char * parent_path,
+               const char * old_name,
+               const char * new_name,
+               ucafs_entry_type type,
+               char ** encoded_name_dest);
 #ifdef __cplusplus
 }
 #endif

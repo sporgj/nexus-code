@@ -127,6 +127,81 @@ out:
 }
 
 int
+dirops_rename2(const char * parent_path,
+               const char * old_name,
+               const char * new_name,
+               ucafs_entry_type type,
+               char ** encoded_name_dest)
+{
+    int error = AFSX_STATUS_NOOP;
+    uc_dirnode_t * dirnode = NULL;
+    const encoded_fname_t * codename1 = NULL, * codename2 = NULL;
+    char * codename1_str = NULL, * codename2_str = NULL;
+    sds path1 = NULL, path2 = NULL;
+    sds oldname = sdsnew(old_name), newname = sdsnew(new_name);
+
+    dirnode = dcache_get_dir(parent_path);
+    if (dirnode == NULL) {
+        return -1;
+    }
+
+    /* delete the old_name */
+    codename1 = dirnode_rm(dirnode, oldname, type);
+    if (codename1 == NULL) {
+        slog(0, SLOG_ERROR, "dirops_rename - Removing '%s' from dirnode",
+                oldname);
+        goto out;
+    }
+
+    /* insert into the dirnode */ 
+    type = (type == UCAFS_TYPE_LINK) ? UCAFS_TYPE_LINK : UCAFS_TYPE_FILE;
+
+    codename2 = dirnode_add(dirnode, newname, type);
+    if (codename2 == NULL) {
+        slog(0, SLOG_ERROR, "dops_sillyrename - Could not add file");
+        goto out;
+    }
+
+    if (!dirnode_flush(dirnode)) {
+        slog(0, SLOG_ERROR, "dops_sillyrename - Could not flush dirnode");
+        goto out;
+    }
+
+    /* move the filebox object name */
+    codename1_str = encode_bin2str(codename1);
+    codename2_str = encode_bin2str(codename2);
+
+    path1 = uc_get_dnode_path(codename1_str);
+    path2 = uc_get_dnode_path(codename2_str);
+
+    if (rename(path1, path2)) {
+        slog(0, SLOG_ERROR, "dirops_rename - renaming filebox failed");
+        goto out;
+    }
+
+    *encoded_name_dest = codename2_str;
+
+    error = 0;
+out:
+    if (codename1)
+        free((void *)codename1);
+    if (codename2)
+        free((void *)codename2);
+    if (codename1_str)
+        free(codename1_str);
+    if (codename2_str && error) {
+        free(codename2_str);
+    }
+    if (path1)
+        sdsfree(path1);
+    if (path2)
+        sdsfree(path2);
+    dcache_put(dirnode);
+
+    return error;
+}
+
+int
 dirops_rename(const char * from_path,
               const char * to_path,
               ucafs_entry_type type,
@@ -307,9 +382,9 @@ encode_or_remove(const char * fpath,
     }
 
     /* Perform the operation */
-    if ((fname_code = (rm ? dirnode_rm(dirnode, fname, type)
-                          : dirnode_raw2enc(dirnode, fname, type)))
-        == NULL) {
+    fname_code = rm ? dirnode_rm(dirnode, fname, type)
+                    : dirnode_raw2enc(dirnode, fname, type);
+    if (fname_code == NULL) {
         slog(0, SLOG_WARN, "Could not %s: %s", (rm ? "remove" : "find"), fpath);
         goto out;
     }

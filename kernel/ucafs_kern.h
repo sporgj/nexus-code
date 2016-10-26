@@ -9,7 +9,7 @@
 #include "afs/sysincludes.h"
 #include "afsincludes.h"
 
-#include "afs_secure.h"
+#include "ucafs_prototypes.h"
 #include "afsx.h"
 
 extern struct rx_connection * conn;
@@ -35,5 +35,7 @@ int __is_dentry_ignored(struct dentry * dentry, char ** dest);
 struct rx_connection * __get_conn(void);
 void __put_conn(struct rx_connection * c);
 
+char *
+uc_mkpath(const char * parent_path, const char * fname);
 
 #endif

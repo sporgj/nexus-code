@@ -7,7 +7,7 @@ typedef struct {
     uint8_t bin[16];
 } uuid_t;
 #endif
-#include "afsx_hdr.h"
+#include "ucafs_defs.h"
 
 #define GLOBAL_MAGIC 0x20160811
 
