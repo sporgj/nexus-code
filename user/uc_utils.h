@@ -1,6 +1,14 @@
 #pragma once
 #include <stdlib.h>
 
+#ifndef MIN
+#define MIN(x,y) ((x) < (y) ? (x) : (y))
+#endif
+
+#ifndef MAX
+#define MAX(a,b) a>b?a:b
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
