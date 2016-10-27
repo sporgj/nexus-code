@@ -2,6 +2,17 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_get: " fmt, ##args)
 
+static afs_int32
+_rxfs_fetchInit(struct afs_conn * tc,
+                struct rx_connection * rxconn,
+                struct vcache * avc,
+                afs_offs_t base,
+                afs_uint32 size,
+                afs_int32 * alength,
+                struct dcache * adc,
+                struct osi_file * fP,
+                struct rx_call ** afs_call);
+
 static int
 _read(ucafs_ctx_t * ctx, uint32_t len, uint32_t * bytes_read)
 {
@@ -114,95 +125,6 @@ _setup_daemon(struct rx_connection * conn, ucafs_ctx_t * ctx, char * path)
     return 0;
 }
 
-static int
-_setup_fserv(struct vcache * avc,
-             struct afs_conn * tc,
-             struct rx_connection * rx_conn,
-             int32_t base,
-             int32_t tlen,
-             ucafs_ctx_t ** pp_ctx)
-{
-    int ret = -1, code = 0, temp;
-    uint32_t nbytes;
-    struct rx_call * afs_call = NULL;
-    ucafs_ctx_t * ctx = NULL;
-
-    ctx = (ucafs_ctx_t *)kmalloc(sizeof(ucafs_ctx_t), GFP_KERNEL);
-    if (ctx == NULL) {
-        ERROR("Could not allocate context\n");
-        goto out;
-    }
-    memset(ctx, 0, sizeof(ucafs_ctx_t));
-    ctx->id = -1;
-
-    /* 1 - Connect to the AFS fileserver */
-    RX_AFS_GUNLOCK();
-    afs_call = rx_NewCall(rx_conn);
-    RX_AFS_GLOCK();
-
-#ifdef AFS_64BIT_CLIENT
-    if (!afs_serverHasNo64Bit(tc)) {
-        ctx->srv_64bit = 1;
-        RX_AFS_GUNLOCK();
-        code = StartRXAFS_FetchData64(afs_call, &avc->f.fid.Fid, base, tlen);
-
-        if (code == 0) {
-            // read the length from the the server
-            temp = rx_Read(afs_call, (char *)&nbytes, sizeof(afs_int32));
-            RX_AFS_GLOCK();
-            if (temp != sizeof(afs_int32)) {
-                ERROR("FileServer is sending BS. amt=%d, nbytes=%u\n", temp,
-                      ntohl(nbytes));
-                code = rx_Error(afs_call);
-                RX_AFS_GUNLOCK();
-                rx_EndCall(afs_call, code);
-                RX_AFS_GLOCK();
-                afs_call = NULL;
-            }
-        } else {
-            RX_AFS_GLOCK();
-        }
-    }
-
-    if (code == RXGEN_OPCODE || afs_serverHasNo64Bit(tc)) {
-        RX_AFS_GUNLOCK();
-        if (afs_call == NULL) {
-            afs_call = rx_NewCall(rx_conn);
-        }
-        code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, base, tlen);
-        RX_AFS_GLOCK();
-
-        ctx->srv_64bit = 0;
-        afs_serverSetNo64Bit(tc);
-    }
-#else
-    RX_AFS_GUNLOCK();
-    code = StartRXAFS_FetchData(afs_call, &avc->f.fid.Fid, base, tlen);
-    RX_AFS_GLOCK();
-#endif
-
-    if (code) {
-        ERROR("FetchData call failed %d\n", code);
-        goto out;
-    }
-
-    RX_AFS_GUNLOCK();
-    temp = rx_Read(afs_call, (char *)&nbytes, sizeof(afs_int32));
-    RX_AFS_GLOCK();
-    if (temp != sizeof(afs_int32)) {
-        ERROR("BS. amt=%d, nbytes=%u\n", temp, ntohl(nbytes));
-        goto out;
-    }
-
-    ctx->len = ntohl(nbytes);
-    *pp_ctx = ctx;
-
-    ret = 0;
-out:
-    ctx->afs_call = afs_call;
-    return ret;
-}
-
 /**
  * Pulls data from the server and decrypts it
  */
@@ -217,7 +139,7 @@ UCAFS_get(struct afs_conn * tc,
           struct afs_FetchOutput * tsmall)
 {
     int ret;
-    afs_int32 bytes_left, pos = 0, len, nbytes;
+    afs_int32 bytes_left = 0, pos = base, len, nbytes;
     char * path = NULL;
     ucafs_ctx_t * ctx = NULL;
 
@@ -234,6 +156,15 @@ UCAFS_get(struct afs_conn * tc,
         return AFSX_STATUS_NOOP;
     }
 
+    ctx = (ucafs_ctx_t *)kmalloc(sizeof(ucafs_ctx_t), GFP_KERNEL);
+    if (ctx == NULL) {
+        ERROR("Could not allocate context\n");
+        goto out;
+    }
+
+    memset(ctx, 0, sizeof(ucafs_ctx_t));
+    ctx->id = -1;
+
 #if 0
     /* if we are getting an updated version of the file, we need to
      * verify it */
@@ -243,20 +174,24 @@ UCAFS_get(struct afs_conn * tc,
 #endif
 
     /* get the offset */
-    if (_setup_fserv(avc, tc, rxconn, base, size, &ctx)) {
+    if (_rxfs_fetchInit(tc, rxconn, avc, base, size, &bytes_left, adc, fp,
+                        &ctx->afs_call)) {
         goto out;
     }
 
+    /* allocate the context */
+
     conn = __get_conn();
     ctx->file_offset = base;
+    ctx->len = bytes_left;
+
     if (_setup_daemon(conn, ctx, path)) {
         goto out;
     }
 
     fp->offset = 0;
-    bytes_left = ctx->len;
-    /*ERROR("fetching %s (size=%d, len=%d, offset=%d)\n", path, size,
-          bytes_left, base);*/
+    ERROR("fetching %s (size=%d, len=%d, offset=%d)\n", path, size,
+          bytes_left, base);
 
     /* we can now download the file and return to afs_GetDCache */
     while (bytes_left > 0) {
@@ -286,4 +221,196 @@ out:
     }
     _cleanup(ctx, tsmall, ret);
     return ret;
+}
+
+struct rxfs_fetch {
+    struct rx_call * call;
+};
+
+static afs_int32
+_rxfs_fetchInit(struct afs_conn * tc,
+                struct rx_connection * rxconn,
+                struct vcache * avc,
+                afs_offs_t base,
+                afs_uint32 size,
+                afs_int32 * alength,
+                struct dcache * adc,
+                struct osi_file * fP,
+                struct rx_call ** afs_call)
+{
+    struct rxfs_fetch * v;
+    int code = 0, code1 = 0;
+#ifdef AFS_64BIT_CLIENT
+    afs_uint32 length_hi = 0;
+#endif
+    afs_uint32 length = 0, bytes;
+
+    v = (struct rxfs_fetch *)osi_AllocSmallSpace(sizeof(struct rxfs_fetch));
+    if (!v)
+        osi_Panic("rxfs_fetchInit: osi_AllocSmallSpace returned NULL\n");
+    memset(v, 0, sizeof(struct rxfs_fetch));
+
+    RX_AFS_GUNLOCK();
+    v->call = rx_NewCall(rxconn);
+    RX_AFS_GLOCK();
+    if (v->call) {
+#ifdef AFS_64BIT_CLIENT
+        afs_size_t length64;     /* as returned from server */
+        if (!afs_serverHasNo64Bit(tc)) {
+            afs_uint64 llbytes = size;
+            RX_AFS_GUNLOCK();
+            code = StartRXAFS_FetchData64(v->call,
+                    (struct AFSFid *) &avc->f.fid.Fid,
+                    base, llbytes);
+            if (code != 0) {
+                RX_AFS_GLOCK();
+                afs_Trace2(afs_iclSetp, CM_TRACE_FETCH64CODE,
+                        ICL_TYPE_POINTER, avc, ICL_TYPE_INT32, code);
+            } else {
+                bytes = rx_Read(v->call, (char *)&length_hi, sizeof(afs_int32));
+                RX_AFS_GLOCK();
+                if (bytes == sizeof(afs_int32)) {
+                    length_hi = ntohl(length_hi);
+                } else {
+                    code = rx_Error(v->call);
+                    RX_AFS_GUNLOCK();
+                    code1 = rx_EndCall(v->call, code);
+                    RX_AFS_GLOCK();
+                    v->call = NULL;
+                }
+            }
+        }
+        if (code == RXGEN_OPCODE || afs_serverHasNo64Bit(tc)) {
+            if (base > 0x7FFFFFFF) {
+                code = EFBIG;
+            } else {
+                afs_uint32 pos;
+                pos = base;
+                RX_AFS_GUNLOCK();
+                if (!v->call)
+                    v->call = rx_NewCall(rxconn);
+                code =
+                    StartRXAFS_FetchData(
+                            v->call, (struct AFSFid*)&avc->f.fid.Fid,
+                            pos, size);
+                RX_AFS_GLOCK();
+            }
+            afs_serverSetNo64Bit(tc);
+        }
+        if (!code) {
+            RX_AFS_GUNLOCK();
+            bytes = rx_Read(v->call, (char *)&length, sizeof(afs_int32));
+            RX_AFS_GLOCK();
+            if (bytes == sizeof(afs_int32))
+                length = ntohl(length);
+            else {
+                RX_AFS_GUNLOCK();
+                code = rx_Error(v->call);
+                code1 = rx_EndCall(v->call, code);
+                v->call = NULL;
+                length = 0;
+                RX_AFS_GLOCK();
+            }
+        }
+        FillInt64(length64, length_hi, length);
+
+        if (!code) {
+            /* Check if the fileserver said our length is bigger than can fit
+             * in a signed 32-bit integer. If it is, we can't handle that, so
+             * error out. */
+            if (length64 > MAX_AFS_INT32) {
+                static int warned;
+                if (!warned) {
+                    warned = 1;
+                    afs_warn("afs: Warning: FetchData64 returned too much data "
+                            "(length64 %u.%u); this should not happen! "
+                            "Aborting fetch request.\n",
+                            length_hi, length);
+                }
+                RX_AFS_GUNLOCK();
+                code = rx_EndCall(v->call, RX_PROTOCOL_ERROR);
+                v->call = NULL;
+                length = 0;
+                RX_AFS_GLOCK();
+                code = code != 0 ? code : EIO;
+            }
+        }
+
+        if (!code) {
+            /* Check if the fileserver said our length was negative. If it
+             * is, just treat it as a 0 length, since some older fileservers
+             * returned negative numbers when they meant to return 0. Note
+             * that we must do this in this 64-bit-specific block, since
+             * length64 being negative will screw up our conversion to the
+             * 32-bit 'alength' below. */
+            if (length64 < 0) {
+                length_hi = length = 0;
+                FillInt64(length64, 0, 0);
+            }
+        }
+
+        afs_Trace3(afs_iclSetp, CM_TRACE_FETCH64LENG,
+                ICL_TYPE_POINTER, avc, ICL_TYPE_INT32, code,
+                ICL_TYPE_OFFSET,
+                ICL_HANDLE_OFFSET(length64));
+        if (!code)
+            *alength = length;
+#else /* AFS_64BIT_CLIENT */
+        RX_AFS_GUNLOCK();
+        code = StartRXAFS_FetchData(v->call, (struct AFSFid *)&avc->f.fid.Fid,
+                base, size);
+        RX_AFS_GLOCK();
+        if (code == 0) {
+            RX_AFS_GUNLOCK();
+            bytes =
+                rx_Read(v->call, (char *)&length, sizeof(afs_int32));
+            RX_AFS_GLOCK();
+            if (bytes == sizeof(afs_int32)) {
+                *alength = ntohl(length);
+                if (*alength < 0) {
+                    /* Older fileservers can return a negative length when they
+                     * meant to return 0; just assume negative lengths were
+                     * meant to be 0 lengths. */
+                    *alength = 0;
+                }
+            } else {
+                code = rx_Error(v->call);
+                code1 = rx_EndCall(v->call, code);
+                v->call = NULL;
+            }
+        }
+#endif /* AFS_64BIT_CLIENT */
+    } else
+        code = -1;
+
+    /* We need to cast here, in order to avoid issues if *alength is
+     * negative. Some, older, fileservers can return a negative length,
+     * which the rest of the code deals correctly with. */
+    if (code == 0 && *alength > (afs_int32) size) {
+        /* The fileserver told us it is going to send more data than we
+         * requested. It shouldn't do that, and accepting that much data
+         * can make us take up more cache space than we're supposed to,
+         * so error. */
+        static int warned;
+        if (!warned) {
+            warned = 1;
+            afs_warn("afs: Warning: FetchData64 returned more data than "
+                    "requested (requested %ld, got %ld); this should not "
+                    "happen! Aborting fetch request.\n",
+                    (long)size, (long)*alength);
+        }
+        code = rx_Error(v->call);
+        RX_AFS_GUNLOCK();
+        code1 = rx_EndCall(v->call, code);
+        RX_AFS_GLOCK();
+        v->call = NULL;
+        code = EIO;
+    }
+
+    if (!code && code1)
+        code = code1;
+
+    *afs_call = v->call;
+
+    return 0;
 }
