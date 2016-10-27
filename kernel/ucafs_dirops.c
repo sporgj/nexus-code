@@ -1,4 +1,7 @@
 #include "ucafs_kern.h"
+#undef ERROR
+#define ERROR(fmt, args...)                                                    \
+    printk(KERN_ERR "ucafs_dirops(%s): " fmt, __FUNCTION__, ##args)
 
 int
 ucafs_rename2(char * dirpath,
@@ -41,7 +44,7 @@ ucafs_remove2(char * parent_path,
         return -1;
     }
 
-    printk(KERN_ERR "parent_path:%s, fname:%s\n", parent_path, file_name);
+    ERROR("parent_path=%s, fname=%s\n", parent_path, file_name);
 
     uc_conn = __get_conn();
     fpath = uc_mkpath(parent_path, file_name);
@@ -71,7 +74,7 @@ ucafs_plain2code(char * parent_path,
         return -1;
     }
 
-    printk(KERN_ERR "parent_path:%s, fname:%s\n", parent_path, plain_file_name);
+    ERROR("parent_path:%s, fname:%s\n", parent_path, plain_file_name);
 
     uc_conn = __get_conn();
     fpath = uc_mkpath(parent_path, plain_file_name);

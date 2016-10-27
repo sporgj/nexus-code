@@ -151,7 +151,7 @@ uc_silly_del(const char * sillyname)
     /* iterate through the bucket and deallocate */
     hash_for_each_possible(silly_hashtable, temp, node, key)
     {
-        if (strcmp(temp->sillyname, key) == 0) {
+        if (strcmp(temp->sillyname, sillyname) == 0) {
             printk(KERN_ERR "silly_del: %s->%s\n", temp->sillyname,
                    temp->realname);
             // delete the entry

@@ -59,11 +59,11 @@ char *
 uc_mkpath(const char * parent_path, const char * fname)
 {
     int len1 = strlen(parent_path), len2 = strlen(fname);
-    char * rv = (char *)kmalloc(len1 + len2 + 1, GFP_KERNEL);
+    char * rv = (char *)kmalloc(len1 + len2 + 2, GFP_KERNEL);
     memcpy(rv, parent_path, len1);
     rv[len1] = '/';
     memcpy(rv + len1 + 1, fname, len2);
-    rv[len1 + len2] = '\0';
+    rv[len1 + len2 + 1] = '\0';
 
     return rv;
 }
