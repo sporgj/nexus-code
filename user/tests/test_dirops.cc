@@ -12,6 +12,111 @@
 
 #define TOTAL_FILE_COUNT 600
 
+class TestDirops : public ::testing::Test {
+protected:
+    virtual void SetUp()
+    {
+	int status;
+	char cmd[100] = {0};
+	setup_repo_path();
+	sds dir = uc_get_repo_path();
+
+        // destroy all files in the repo folder
+	sprintf(cmd, "rm -rf %s", dir);
+	// cout << "Running: " << cmd;
+	status = system(cmd);
+	// cout << ", status = " << status << endl;
+
+	sprintf(cmd, "mkdir -p %s", dir);
+	// cout << "Running: " << cmd;
+	status = system(cmd);
+	// cout << ", status = " << status << endl;
+
+	create_default_dnode();
+	init_systems();
+	sdsfree(dir);
+    }
+};
+
+TEST_F(TestDirops, FileCreation) {
+    const char * fname = "test.txt";
+    char *test, *test2;
+    sds path = MK_PATH(fname);
+
+    /* checking dirops_new returns 0 */
+    ASSERT_EQ(0, dirops_new(path, UCAFS_TYPE_FILE, &test))
+	<< "dirops_new failed";
+
+    uinfo("%s -> %s", path, test); 
+    uinfo("Looking filebox for '%s'", path);
+
+    /* Asserting the filebox file was creating */
+    struct stat stat_buf;
+    sds path2 = uc_get_dnode_path(test);
+    ASSERT_EQ(0, stat(path2, &stat_buf)) << "Filebox does not exist";
+
+    /* deleting the entry from the dirnode */
+    uinfo("Deleting %s", path);
+    ASSERT_TRUE(dirops_remove(path, UCAFS_TYPE_FILE, &test2) == 0)
+	<< path << " could not be removed";
+
+    /* checking that the string from creating is same as deletion */
+    ASSERT_STREQ(test, test2) << "Deleted string is different from created one";
+
+    /* Verifying the filebox file has been deleted */
+    ASSERT_FALSE(stat(path2, &stat_buf) == 0) << "Filebox file was not deleted";
+
+    free(test);
+    free(test2);
+    sdsfree(path);
+    sdsfree(path2);
+}
+
+TEST_F(TestDirops, FileRenaming1) {
+    const char * fname1 = "test1.txt", * fname2 = "test2.txt";
+    sds path1 = MK_PATH(fname1), path2 = MK_PATH(fname2), temp_path = NULL;
+    char * temp1, * temp2, * temp3, * temp4;
+    ucafs_entry_type type = UCAFS_TYPE_FILE;
+    struct stat stat_buf;
+    
+    /* Creating the files */
+    ASSERT_EQ(0, dirops_new(path1, type, &temp1))
+	<< "dirops_new failed";
+    uinfo("Created file: %s -> %s", path1, temp1);
+
+    uinfo("Renaming: %s -> %s", path1, path2);
+    ASSERT_EQ(0, dirops_move1(path1, path2, type, &temp2, &temp3))
+	<< "dirops_move1 failed";
+
+    /* verifying the names are not the same */
+    ASSERT_STREQ(temp1, temp2) << "renaming sent the wrong old name"; 
+
+    ASSERT_STRNE(temp1, temp3) << "new and old name should differ";
+
+    /* check that the renamed file is not accessible */
+    temp_path = do_get_dir(path1);
+    ASSERT_NE(0, dirops_code2plain(temp1, temp_path, type, &temp4));
+    sdsfree(temp_path);
+
+    /* verifying the old dnode path is not accessible */
+    temp_path = uc_get_dnode_path(temp1);
+    ASSERT_NE(0, stat(temp_path, &stat_buf)) << temp_path
+                                             << " should not exist";
+    sdsfree(temp_path);
+
+    temp_path = uc_get_dnode_path(temp3);
+    ASSERT_EQ(0, stat(temp_path, &stat_buf)) << temp_path
+	<< " filebox is not accessible";
+    sdsfree(temp_path);
+
+    free(temp1);
+    free(temp2);
+    free(temp3);
+    sdsfree(path1);
+    sdsfree(path2);
+}
+
+#if 0
 TEST(UC_DIROPS, SimpleFileCreation)
 {
     const char * fname = "test.txt";
@@ -141,12 +246,4 @@ TEST(UC_DIROPS, SillyRenameTest)
     sdsfree(path);
     sdsfree(path2);
 }
-
-int main(int argc, char ** argv)
-{
-    init_systems();
-    create_default_dnode();
-
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
+#endif

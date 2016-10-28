@@ -89,7 +89,7 @@ __put_conn(struct rx_connection * c)
     rx_PutConnection(c);
 }
 
-static inline ucafs_entry_type
+inline ucafs_entry_type
 dentry_type(struct dentry * dentry)
 {
     if (d_is_file(dentry)) {
@@ -101,6 +101,12 @@ dentry_type(struct dentry * dentry)
     }
 
     return UCAFS_TYPE_UNKNOWN;
+}
+
+inline ucafs_entry_type
+vnode_type(struct vcache * avc)
+{
+    return dentry_type(d_find_alias(AFSTOV(avc)));
 }
 
 bool
@@ -287,44 +293,6 @@ UCAFS_remove(char ** dest, struct dentry * dp)
 
     __put_conn(conn);
     kfree(fpath);
-    return ret;
-}
-
-int
-UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
-{
-    int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
-    char *from_path = NULL, *to_path = NULL;
-    struct rx_connection * conn = NULL;
-
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    ignore_from = __is_dentry_ignored(from_dp, &from_path);
-    ignore_to = __is_dentry_ignored(to_dp, &to_path);
-
-    printk(KERN_ERR "renaming: %s -> %s\n", from_path, to_path);
-
-    if (ignore_from && ignore_to) {
-        goto out;
-    }
-
-    conn = __get_conn();
-
-    *dest = NULL;
-    ret = AFSX_rename(conn, from_path, to_path, dentry_type(from_dp), dest);
-    if (ret) {
-        /// TODO
-    }
-
-    __put_conn(conn);
-out:
-    if (from_path)
-        kfree(from_path);
-    if (to_path)
-        kfree(to_path);
-
     return ret;
 }
 

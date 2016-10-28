@@ -46,5 +46,24 @@ do_get_fname(const char * fpath)
         result--;
     }
 
+    if (result == fpath) {
+        return NULL;
+    }
+
     return sdsnew(result + 1);
+}
+
+sds
+do_get_dir(const char * fpath)
+{
+    const char * result = fpath + strlen(fpath);
+    while (*result != '/' && result != fpath) {
+        result--;
+    }
+
+    if (result == fpath) {
+        return NULL;
+    }
+
+    return sdsnewlen(fpath, (uintptr_t)(result - fpath));
 }

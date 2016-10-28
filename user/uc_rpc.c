@@ -131,16 +131,21 @@ SAFSX_lookup(
 afs_int32
 SAFSX_rename(
     /*IN */ struct rx_call * z_call,
-    /*IN */ char * old_fpath,
-    /*IN */ char * new_path,
+    /*IN */ char * from_path,
+    /*IN */ char * oldname,
+    /*IN */ char * to_path,
+    /*IN */ char * newname,
     /*IN */ afs_int32 type,
-    /*OUT*/ char ** code_name)
+    /*OUT*/ char ** old_shadow_name,
+    /*OUT*/ char ** new_shadow_name)
 {
-    int ret = dirops_rename(old_fpath, new_path, type, code_name);
+    int ret = dirops_move(from_path, oldname, to_path, newname, type,
+                          old_shadow_name, new_shadow_name);
     if (ret) {
-        *code_name = EMPTY_STR_HEAP;
+        *old_shadow_name = EMPTY_STR_HEAP;
+        *new_shadow_name = EMPTY_STR_HEAP;
     } else {
-        uinfo("Renamed '%s' -> '%s'", old_fpath, new_path);
+        uinfo("Renamed '%s' -> '%s'", from_path, to_path);
     }
 
     return ret;

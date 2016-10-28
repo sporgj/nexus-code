@@ -4,9 +4,9 @@ TEST_ENV := 1
 include $(UCAFS_DIR)/header.mk
 include $(UCAFS_DIR)/sgx_defs.mk
 
-LIBS += $(App_Link_Flags) -lgtest
+LIBS += $(App_Link_Flags) -lgtest -lgtest_main
 
-TESTS = test_dirops test_fetchstore
+TESTS = test_dirops
 
 all: clean tests
 

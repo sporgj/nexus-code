@@ -41,8 +41,13 @@ ucafs_remove2(char * parent_path,
               ucafs_entry_type type,
               char ** dest);
 
-extern int
-UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp);
+int
+ucafs_rename(struct vcache * from_vnode,
+             char * oldname,
+             struct vcache * to_vnode,
+             char * newname,
+             char ** old_shadowname,
+             char ** new_shadowname);
 
 int
 ucafs_rename2(char * dirpath,

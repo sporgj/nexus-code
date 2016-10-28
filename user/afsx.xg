@@ -51,9 +51,12 @@ remove(
 
 rename(
     IN string old_fpath<AFSX_PATH_MAX>,
+    string oldname<AFSX_FNAME_MAX>,
     string new_path<AFSX_PATH_MAX>,
+    string newname<AFSX_FNAME_MAX>,
     afs_int32 type,
-    OUT string code_name<AFSX_FNAME_MAX>
+    OUT string old_shadow_name<AFSX_FNAME_MAX>,
+    string new_shadow_name<AFSX_FNAME_MAX>
 ) = 135;
 
 sillyrename(

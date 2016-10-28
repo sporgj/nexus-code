@@ -68,12 +68,28 @@ int
 dirops_remove(const char * fpath_raw,
               ucafs_entry_type type,
               char ** encoded_fname_dest);
+int
+dirops_move(const char * from_dir,
+            const char * oldname,
+            const char * to_dir,
+            const char * newname,
+            ucafs_entry_type type,
+            char ** ptr_oldname,
+            char ** ptr_newname);
 
+int
+dirops_move1(const char * from_fpath,
+             const char * to_fpath,
+             ucafs_entry_type type,
+             char ** ptr_oldname,
+             char ** ptr_newname);
+#if 0
 int
 dirops_rename(const char * from_path,
               const char * to_path,
               ucafs_entry_type type,
               char ** raw_name_dest);
+#endif
 
 int
 dirops_rename2(const char * parent_path,

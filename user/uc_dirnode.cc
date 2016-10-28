@@ -15,7 +15,8 @@ struct dirnode {
     sds dnode_path;
 };
 
-uc_dirnode_t * dirnode_new()
+uc_dirnode_t *
+dirnode_new()
 {
     uc_dirnode_t * obj = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
     if (obj == NULL) {
@@ -30,16 +31,20 @@ uc_dirnode_t * dirnode_new()
     return obj;
 }
 
-const sds dirnode_get_fpath(uc_dirnode_t * dirnode) {
+const sds
+dirnode_get_fpath(uc_dirnode_t * dirnode)
+{
     return dirnode->dnode_path;
 }
 
-bool dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2)
+bool
+dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2)
 {
     return memcmp(&dn1->header, &dn2->header, sizeof(dnode_header_t)) == 0;
 }
 
-void dirnode_free(uc_dirnode_t * dirnode)
+void
+dirnode_free(uc_dirnode_t * dirnode)
 {
     delete dirnode->protobuf;
 
@@ -50,7 +55,8 @@ void dirnode_free(uc_dirnode_t * dirnode)
     free(dirnode);
 }
 
-uc_dirnode_t * dirnode_default_dnode()
+uc_dirnode_t *
+dirnode_default_dnode()
 {
     uc_dirnode_t * dn;
     sds path = uc_main_dnode_fpath();
@@ -64,7 +70,8 @@ uc_dirnode_t * dirnode_default_dnode()
     return dn;
 }
 
-uc_dirnode_t * dirnode_from_file(const sds filepath)
+uc_dirnode_t *
+dirnode_from_file(const sds filepath)
 {
     uc_dirnode_t * obj = NULL;
     dnode * _dnode = NULL;
@@ -84,7 +91,7 @@ uc_dirnode_t * dirnode_from_file(const sds filepath)
     nbytes = fread(&header, sizeof(dnode_header_t), 1, fd);
     if (!nbytes) {
         slog(0, SLOG_ERROR, "dirnode - could not read header: %s (nbytes=%u)",
-                filepath, nbytes);
+             filepath, nbytes);
         goto out;
     }
 
@@ -95,15 +102,16 @@ uc_dirnode_t * dirnode_from_file(const sds filepath)
             goto out;
         }
 
-        if ((nbytes = fread(buffer, 1, header.protolen, fd)) != header.protolen) {
+        if ((nbytes = fread(buffer, 1, header.protolen, fd))
+            != header.protolen) {
             slog(0, SLOG_ERROR, "dirnode - reading protobuf failed:"
-                    "expected=%u, actual=%u", header.protolen, nbytes);
+                                "expected=%u, actual=%u",
+                 header.protolen, nbytes);
             goto out;
         }
 
         /* decrypt the content with enclave */
-        ecall_crypto_dirnode(global_eid, &error, &header, buffer,
-                             UC_DECRYPT);
+        ecall_crypto_dirnode(global_eid, &error, &header, buffer, UC_DECRYPT);
         if (error) {
             slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
             goto out;
@@ -111,7 +119,7 @@ uc_dirnode_t * dirnode_from_file(const sds filepath)
 
         if (!_dnode->ParseFromArray(buffer, header.protolen)) {
             slog(0, SLOG_ERROR, "dirnode - parsing protobuf failed: %s",
-                filepath);
+                 filepath);
             goto out;
         }
     }
@@ -140,7 +148,8 @@ out:
     return obj;
 }
 
-bool dirnode_write(uc_dirnode_t * dn, const char * fpath)
+bool
+dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
     bool ret = false;
     int error;
@@ -167,8 +176,7 @@ bool dirnode_write(uc_dirnode_t * dn, const char * fpath)
     /* GetCachedSize returns the size computed from ByteSize() */
     dn->header.protolen = dn->protobuf->GetCachedSize();
 
-    ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer,
-                         UC_ENCRYPT);
+    ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer, UC_ENCRYPT);
     if (error) {
         slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
         goto out;
@@ -187,14 +195,18 @@ out:
     return ret;
 }
 
-bool dirnode_flush(uc_dirnode_t * dn)
+bool
+dirnode_flush(uc_dirnode_t * dn)
 {
     assert(dn != NULL);
     return dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
 }
 
-const encoded_fname_t * dirnode_add_alias(uc_dirnode_t * dn, const sds name,
-    ucafs_entry_type type, const encoded_fname_t * p_encoded_name)
+encoded_fname_t *
+dirnode_add_alias(uc_dirnode_t * dn,
+                  const char * name,
+                  ucafs_entry_type type,
+                  const encoded_fname_t * p_encoded_name)
 {
     encoded_fname_t * encoded_name;
     dnode_fentry * fentry;
@@ -236,14 +248,14 @@ const encoded_fname_t * dirnode_add_alias(uc_dirnode_t * dn, const sds name,
     return encoded_name;
 }
 
-const encoded_fname_t * dirnode_add(
-    uc_dirnode_t * dn, const sds name, ucafs_entry_type type)
+encoded_fname_t *
+dirnode_add(uc_dirnode_t * dn, const char * name, ucafs_entry_type type)
 {
     return dirnode_add_alias(dn, name, type, NULL);
 }
 
-const encoded_fname_t * dirnode_rm(
-    uc_dirnode_t * dn, const sds realname, ucafs_entry_type type)
+encoded_fname_t *
+dirnode_rm(uc_dirnode_t * dn, const char * realname, ucafs_entry_type type)
 {
     encoded_fname_t * result = NULL;
     RepeatedPtrField<dnode_fentry> * fentry_list;
@@ -276,16 +288,16 @@ retry:
     len = strlen(realname);
 
     while (curr_fentry != fentry_list->end()) {
-        const string &str_entry = curr_fentry->raw_name();
-        if (len == str_entry.size() &&
-                memcmp(realname, str_entry.data(), len) == 0) {
+        const string & str_entry = curr_fentry->raw_name();
+        if (len == str_entry.size()
+            && memcmp(realname, str_entry.data(), len) == 0) {
             result = (encoded_fname_t *)malloc(sizeof(encoded_fname_t));
             if (result == NULL) {
                 return NULL;
             }
 
             memcpy(result, curr_fentry->encoded_name().data(),
-                sizeof(encoded_fname_t));
+                   sizeof(encoded_fname_t));
 
             // delete from the list
             fentry_list->erase(curr_fentry);
@@ -315,8 +327,10 @@ retry:
     return NULL;
 }
 
-const char * dirnode_enc2raw(const uc_dirnode_t * dn,
-    const encoded_fname_t * encoded_name, ucafs_entry_type type)
+const char *
+dirnode_enc2raw(const uc_dirnode_t * dn,
+                const encoded_fname_t * encoded_name,
+                ucafs_entry_type type)
 {
     const RepeatedPtrField<dnode_fentry> * fentry_list;
 
@@ -345,7 +359,8 @@ retry:
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
         if (memcmp(encoded_name, curr_fentry->encoded_name().data(),
-                sizeof(encoded_fname_t)) == 0) {
+                   sizeof(encoded_fname_t))
+            == 0) {
             return curr_fentry->raw_name().c_str();
         }
 
@@ -371,8 +386,10 @@ retry:
     return NULL;
 }
 
-const encoded_fname_t * dirnode_raw2enc(
-    const uc_dirnode_t * dn, const char * realname, ucafs_entry_type type)
+const encoded_fname_t *
+dirnode_raw2enc(const uc_dirnode_t * dn,
+                const char * realname,
+                ucafs_entry_type type)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
@@ -402,10 +419,10 @@ retry:
 
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
-        const string& str_entry = curr_fentry->raw_name();
+        const string & str_entry = curr_fentry->raw_name();
 
-        if (len == str_entry.size() &&
-                memcmp(realname, curr_fentry->raw_name().data(), len) == 0) {
+        if (len == str_entry.size()
+            && memcmp(realname, curr_fentry->raw_name().data(), len) == 0) {
             return (encoded_fname_t *)curr_fentry->encoded_name().data();
         }
         curr_fentry++;
@@ -430,16 +447,27 @@ retry:
     return NULL;
 }
 
-const encoded_fname_t * dirnode_rename(uc_dirnode_t * dn,
-    const sds oldname, const sds newname, ucafs_entry_type type)
+int
+dirnode_rename(uc_dirnode_t * dn,
+               const char * oldname,
+               const char * newname,
+               ucafs_entry_type type,
+               encoded_fname_t ** ptr_shadow1_bin,
+               encoded_fname_t ** ptr_shadow2_bin)
 {
-    const encoded_fname_t * encoded_name = dirnode_rm(dn, oldname, type);
-    const encoded_fname_t * p_encoded_name;
-    if (encoded_name) {
-        dirnode_rm(dn, newname, type);
-        p_encoded_name = dirnode_add_alias(dn, newname, type, encoded_name);
-        return encoded_name;
+    *ptr_shadow1_bin = dirnode_rm(dn, oldname, type);
+    if (*ptr_shadow1_bin) {
+        // TODO poor code
+        // it is necessary to return the codename of the existing entry
+        // otherwise, we get a lingering file in the AFS server
+        *ptr_shadow2_bin = dirnode_rm(dn, newname, type);
+        if (*ptr_shadow2_bin == NULL) {
+            *ptr_shadow2_bin = dirnode_add(dn, newname, type);
+        } else {
+            *ptr_shadow2_bin
+                = dirnode_add_alias(dn, newname, type, *ptr_shadow2_bin);
+        }
+        return *ptr_shadow2_bin ? -1 : 0;
     }
-    return NULL;
+    return -1;
 }
-

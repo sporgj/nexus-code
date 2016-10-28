@@ -38,4 +38,10 @@ void __put_conn(struct rx_connection * c);
 char *
 uc_mkpath(const char * parent_path, const char * fname);
 
+ucafs_entry_type
+vnode_type(struct vcache * avc);
+
+ucafs_entry_type
+vnode_type(struct vcache * avc);
+
 #endif

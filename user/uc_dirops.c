@@ -135,8 +135,8 @@ dirops_rename2(const char * parent_path,
 {
     int error = AFSX_STATUS_NOOP;
     uc_dirnode_t * dirnode = NULL;
-    const encoded_fname_t * codename1 = NULL, * codename2 = NULL;
-    char * codename1_str = NULL, * codename2_str = NULL;
+    const encoded_fname_t *codename1 = NULL, *codename2 = NULL;
+    char *codename1_str = NULL, *codename2_str = NULL;
     sds path1 = NULL, path2 = NULL;
     sds oldname = sdsnew(old_name), newname = sdsnew(new_name);
 
@@ -149,11 +149,11 @@ dirops_rename2(const char * parent_path,
     codename1 = dirnode_rm(dirnode, oldname, type);
     if (codename1 == NULL) {
         slog(0, SLOG_ERROR, "dirops_rename - Removing '%s' from dirnode",
-                oldname);
+             oldname);
         goto out;
     }
 
-    /* insert into the dirnode */ 
+    /* insert into the dirnode */
     type = (type == UCAFS_TYPE_LINK) ? UCAFS_TYPE_LINK : UCAFS_TYPE_FILE;
 
     codename2 = dirnode_add(dirnode, newname, type);
@@ -201,6 +201,183 @@ out:
     return error;
 }
 
+int
+dirops_move(const char * from_dir,
+            const char * oldname,
+            const char * to_dir,
+            const char * newname,
+            ucafs_entry_type type,
+            char ** ptr_oldname,
+            char ** ptr_newname)
+{
+    int error = AFSX_STATUS_NOOP;
+    uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL;
+    encoded_fname_t *shadow1_bin = NULL, *shadow2_bin = NULL;
+    char *shadow1_str = NULL, * shadow2_str = NULL;
+    sds path1 = NULL, path2 = NULL;
+
+    /* get the dirnode objects */
+    dirnode1 = dcache_get_dir(from_dir);
+    if (dirnode1 == NULL) {
+        return -1;
+    }
+
+    dirnode2 = dcache_get_dir(to_dir);
+    if (dirnode2 == NULL) {
+        dcache_put(dirnode1);
+        return -1;
+    }
+
+    if (dirnode_equals(dirnode1, dirnode2)) {
+        if (dirnode_rename(dirnode1, oldname, newname, type, &shadow1_bin,
+                           &shadow2_bin)) {
+            slog(0, SLOG_ERROR, "dops_move - Could not rename (%s) %s -> %s",
+                 from_dir, oldname, newname);
+            goto out;
+        }
+
+        /* now write out the dirnode object */
+        if (!dirnode_flush(dirnode1)) {
+            slog(0, SLOG_ERROR, "dops_move - Could not flush dirnode (%s)",
+                 from_dir);
+            goto out;
+        }
+    } else {
+        /* get the shadow names */
+        shadow1_bin = dirnode_rm(dirnode1, oldname, type);
+        if (shadow1_bin == NULL) {
+            slog(0, SLOG_ERROR, "dirops_move - Could not find '%s' in dirnode",
+                 oldname);
+            goto out;
+        }
+
+        // the new file might still exist in the dirnode
+        dirnode_rm(dirnode2, newname, type);
+        shadow2_bin = dirnode_add(dirnode2, newname, type);
+        if (shadow2_bin == NULL) {
+            slog(0, SLOG_ERROR, "dops_move - Could not add '%s' to dirnode",
+                 newname);
+            goto out;
+        }
+
+        /* write the dirnode object */
+        if (!dirnode_flush(dirnode1)) {
+            slog(0, SLOG_ERROR, "dops_move - Could not flush dirnode (%s)",
+                 from_dir);
+            goto out;
+        }
+
+        if (!dirnode_flush(dirnode2)) {
+            slog(0, SLOG_ERROR, "dops_move - Could not flush dirnode (%s)",
+                 to_dir);
+            goto out;
+        }
+    }
+
+    /* now delete the structures on disk */
+    shadow1_str = encode_bin2str(shadow1_bin);
+    if (shadow1_str == NULL) {
+        slog(0, SLOG_ERROR, "dops_move - Could not convert shadowname to str");
+        goto out;
+    }
+
+    shadow2_str = encode_bin2str(shadow2_bin);
+    if (shadow2_str == NULL) {
+        slog(0, SLOG_ERROR, "dops_move - Could not convert shadowname to str");
+        goto out;
+    }
+
+    path1 = uc_get_dnode_path(shadow1_str);
+    path2 = uc_get_dnode_path(shadow2_str);
+
+    /* move the metadata file */
+    if (type != UCAFS_TYPE_LINK) {
+        if (rename(path1, path2)) {
+            slog(0, SLOG_ERROR, "dops_move - renaming metadata file failed");
+            goto out;
+        }
+    } else {
+        slog(0, SLOG_WARN, "dops_move - renaming link (%s) %s -> %s", from_dir,
+             oldname, newname);
+    }
+
+    *ptr_oldname = shadow1_str;
+    *ptr_newname = shadow2_str;
+
+    error = 0;
+out:
+    dcache_put(dirnode1);
+    dcache_put(dirnode2);
+
+    if (shadow1_bin) {
+        free(shadow1_bin);
+    }
+
+    if (shadow2_bin) {
+        free(shadow2_bin);
+    }
+
+    if (error && shadow1_str) {
+        free(shadow1_str);
+    }
+
+    if (error && shadow2_str) {
+        free(shadow2_str);
+    }
+
+    if (path1) {
+        sdsfree(path1);
+    }
+
+    if (path2) {
+        sdsfree(path2);
+    }
+
+    return error;
+}
+
+int
+dirops_move1(const char * from_fpath,
+             const char * to_fpath,
+             ucafs_entry_type type,
+             char ** ptr_oldname,
+             char ** ptr_newname)
+{
+    int error = AFSX_STATUS_ERROR;
+    sds fname1 = NULL, fname2 = NULL, path1 = NULL, path2 = NULL;
+
+    if ((fname1 = do_get_fname(from_fpath)) == NULL) {
+        goto out;
+    }
+
+    if ((fname2 = do_get_fname(to_fpath)) == NULL) {
+        goto out;
+    }
+
+    if ((path1 = do_get_dir(from_fpath)) == NULL) {
+        goto out;
+    }
+
+    if ((path2 = do_get_dir(to_fpath)) == NULL) {
+        goto out;
+    }
+
+    error = dirops_move(path1, fname1, path2, fname2, type, ptr_oldname,
+                        ptr_newname);
+out:
+    if (fname1)
+        sdsfree(fname1);
+    if (fname2)
+        sdsfree(fname2);
+    if (path1)
+        sdsfree(path1);
+    if (path2)
+        sdsfree(path2);
+
+    return error;
+}
+
+#if 0
 int
 dirops_rename(const char * from_path,
               const char * to_path,
@@ -281,6 +458,7 @@ out:
 
     return error;
 }
+#endif
 
 int
 dirops_hardlink(const char * new_path,

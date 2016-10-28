@@ -53,17 +53,17 @@ dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2);
 bool
 dirnode_flush(uc_dirnode_t * dn);
 
-const encoded_fname_t *
-dirnode_add(uc_dirnode_t * dn, sds fname, ucafs_entry_type type);
+encoded_fname_t *
+dirnode_add(uc_dirnode_t * dn, const char * fname, ucafs_entry_type type);
 
-const encoded_fname_t *
+encoded_fname_t *
 dirnode_add_alias(uc_dirnode_t * dn,
                   sds fname,
                   ucafs_entry_type type,
                   const encoded_fname_t * p_encoded_name);
 
-const encoded_fname_t *
-dirnode_rm(uc_dirnode_t * dn, const sds realname, ucafs_entry_type type);
+encoded_fname_t *
+dirnode_rm(uc_dirnode_t * dn, const char * realname, ucafs_entry_type type);
 
 const char *
 dirnode_enc2raw(const uc_dirnode_t * dn,
@@ -75,11 +75,13 @@ dirnode_raw2enc(const uc_dirnode_t * dn,
                 const char * realname,
                 ucafs_entry_type type);
 
-const encoded_fname_t *
+int
 dirnode_rename(uc_dirnode_t * dn,
-               const sds oldname,
-               const sds newname,
-               ucafs_entry_type type);
+               const char * oldname,
+               const char * newname,
+               ucafs_entry_type type,
+               encoded_fname_t ** ptr_shadow1_bin,
+               encoded_fname_t ** ptr_shadow2_bin);
 
 #ifdef __cplusplus
 }
