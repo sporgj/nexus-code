@@ -40,7 +40,7 @@ index ac4f800..4033fad 100644
  module_exit(afspag_cleanup);
  
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..cd12005 100644
+index 1b99c94..3e9513c 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -315,6 +315,13 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -447,7 +447,42 @@ index 1b99c94..cd12005 100644
      AFS_GLOCK();
      code = afs_rmdir(VTOAFS(dip), (char *)name, credp);
      AFS_GUNLOCK();
-@@ -1868,6 +2083,8 @@ afs_linux_ireadlink(struct inode *ip, char *target, int maxlen, uio_seg_t seg)
+@@ -1828,6 +2043,9 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
+     const char *oldname = olddp->d_name.name;
+     const char *newname = newdp->d_name.name;
+     struct dentry *rehash = NULL;
++    /* ucafs code */
++    char * new_shadow = NULL, * old_shadow = NULL;
++    int is_ucafs_file = 0, ret;
+ 
+     /* Prevent any new references during rename operation. */
+ 
+@@ -1838,10 +2056,24 @@ afs_linux_rename(struct inode *oldip, struct dentry *olddp,
+ 
+     afs_maybe_shrink_dcache(olddp);
+ 
++    /* ucafs code */
++    ret = ucafs_rename(VTOAFS(oldip), oldname, VTOAFS(newip), newname,
++	&old_shadow, &new_shadow);
++    if (ret == 0) {
++	is_ucafs_file = 1;
++	oldname = old_shadow;
++	newname = new_shadow;
++    }
++
+     AFS_GLOCK();
+     code = afs_rename(VTOAFS(oldip), (char *)oldname, VTOAFS(newip), (char *)newname, credp);
+     AFS_GUNLOCK();
+ 
++    if (is_ucafs_file) {
++	kfree(new_shadow);
++	kfree(old_shadow);
++    }
++
+     if (!code)
+ 	olddp->d_time = 0;      /* force to revalidate */
+ 
+@@ -1868,6 +2100,8 @@ afs_linux_ireadlink(struct inode *ip, char *target, int maxlen, uio_seg_t seg)
      memset(&tuio, 0, sizeof(tuio));
      memset(&iov, 0, sizeof(iov));
  
@@ -457,7 +492,7 @@ index 1b99c94..cd12005 100644
      code = afs_readlink(VTOAFS(ip), &tuio, credp);
      crfree(credp);
 diff --git a/src/afs/VNOPS/afs_vnop_remove.c b/src/afs/VNOPS/afs_vnop_remove.c
-index 3e62781..6088729 100644
+index 3e62781..44ac441 100644
 --- a/src/afs/VNOPS/afs_vnop_remove.c
 +++ b/src/afs/VNOPS/afs_vnop_remove.c
 @@ -183,6 +183,11 @@ afs_remove(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
@@ -479,7 +514,7 @@ index 3e62781..6088729 100644
 +    /* ucafs code */
 +    is_ucafs_file = (ucafs_vnode_path(adp, &ucafs_path) == 0);
 +    if (is_ucafs_file) {
-+	ret = ucafs_plain2code(ucafs_path, aname, UCAFS_TYPE_FILE, &ucafs_name1);
++	ret = ucafs_plain2code(ucafs_path, aname, UCAFS_TYPE_UNKNOWN, &ucafs_name1);
 +	if (ret == 0) {
 +	    old_aname = aname;
 +	    aname = ucafs_name1;
@@ -516,7 +551,7 @@ index 3e62781..6088729 100644
 +        printk(KERN_ERR "vnop_remove: %s\n", aname);
 +	if (is_ucafs_file) {
 +	    // TODO implement delete by shadow name
-+	    if (ucafs_remove2(ucafs_path, old_aname, UCAFS_TYPE_FILE,
++	    if (ucafs_remove2(ucafs_path, old_aname, UCAFS_TYPE_UNKNOWN,
 +			&ucafs_name2) == 0) {
 +		// strcmp(aname, ucafs_name2) == 0;
 +		kfree(ucafs_name2);
@@ -555,47 +590,18 @@ index 3e62781..6088729 100644
  	    VREF(AFSTOV(avc));
  #else
 diff --git a/src/afs/VNOPS/afs_vnop_rename.c b/src/afs/VNOPS/afs_vnop_rename.c
-index 468555a..773361d 100644
+index 468555a..92ac7d1 100644
 --- a/src/afs/VNOPS/afs_vnop_rename.c
 +++ b/src/afs/VNOPS/afs_vnop_rename.c
-@@ -46,6 +46,10 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
-     struct AFSVolSync tsync;
-     struct rx_connection *rxconn;
-     XSTATS_DECLS;
-+    /* ucafs code */
-+    char * new_shadow = NULL, * old_shadow = NULL;
-+    int is_ucafs_file = 0, ret;
-+
-     AFS_STATCNT(afs_rename);
-     afs_Trace4(afs_iclSetp, CM_TRACE_RENAME, ICL_TYPE_POINTER, aodp,
- 	       ICL_TYPE_STRING, aname1, ICL_TYPE_POINTER, andp,
-@@ -151,6 +155,14 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
- 	}
+@@ -169,6 +169,8 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
+ 	goto done;
      }
  
-+    /* ucafs code */
-+    ret = ucafs_rename(aodp, aname1, andp, aname2, &old_shadow, &new_shadow);
-+    if (ret == 0) {
-+	is_ucafs_file = 1;
-+	aname1 = old_shadow;
-+	aname2 = new_shadow;
-+    }
++    printk(KERN_ERR "renaming: %s ~> %s\n", aname1, aname2);
 +
-     if (code == 0)
- 	code = afs_dir_Lookup(tdc1, aname1, &fileFid.Fid);
-     if (code) {
-@@ -439,6 +451,11 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
-     }
-     code = returnCode;
-   done:
-+    if (is_ucafs_file) {
-+	kfree(new_shadow);
-+	kfree(old_shadow);
-+    }
-+
-     osi_FreeSmallSpace(OutOldDirStatus);
-     osi_FreeSmallSpace(OutNewDirStatus);
-     return code;
+     if (!AFS_IS_DISCON_RW) {
+     	/* Connected. */
+ 	do {
 diff --git a/src/afs/afs.h b/src/afs/afs.h
 index f03609c..176f33a 100644
 --- a/src/afs/afs.h

@@ -5,6 +5,8 @@ message dnode {
     message fentry {
         required bytes encoded_name = 1;
         required bytes raw_name = 2;
+        // mostly used in softlinks (to find matching filebox)
+        required bytes extended_info = 3;
     }
 
     // all the entries
