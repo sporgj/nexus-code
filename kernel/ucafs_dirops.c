@@ -11,7 +11,7 @@ ucafs_rename(struct vcache * from_vnode,
              char ** old_shadowname,
              char ** new_shadowname)
 {
-    int ret;
+    int ret = AFSX_STATUS_NOOP;
     char *from_path = NULL, *to_path = NULL;
     struct rx_connection * uc_conn = NULL;
     int ignore_from, ignore_to;
@@ -27,12 +27,10 @@ ucafs_rename(struct vcache * from_vnode,
         goto out;
     }
 
-    printk(KERN_ERR "renaming: %s -> %s\n", from_path, to_path);
-
     uc_conn = __get_conn();
 
     ret = AFSX_rename(conn, from_path, oldname, to_path, newname,
-                      vnode_type(from_vnode), old_shadowname, new_shadowname);
+                      UCAFS_TYPE_UNKNOWN, old_shadowname, new_shadowname);
     if (ret) {
         kfree(*old_shadowname);
         kfree(*new_shadowname);
