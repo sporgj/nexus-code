@@ -13,7 +13,9 @@
 extern "C" {
 #endif
 
-char * do_get_fname(const char * fpath);
+#include "third/sds.h"
+
+sds do_get_fname(const char * fpath);
 
 sds do_get_dir(const char * fpath);
 

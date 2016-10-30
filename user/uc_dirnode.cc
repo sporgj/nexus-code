@@ -212,6 +212,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
     dnode_fentry * fentry;
 
     if (type == UCAFS_TYPE_UNKNOWN) {
+        slog(0, SLOG_ERROR, "dirnode_add - Entry type not specified");
         return NULL;
     }
 
@@ -255,7 +256,10 @@ dirnode_add(uc_dirnode_t * dn, const char * name, ucafs_entry_type type)
 }
 
 encoded_fname_t *
-dirnode_rm(uc_dirnode_t * dn, const char * realname, ucafs_entry_type type)
+dirnode_rm(uc_dirnode_t * dn,
+           const char * realname,
+           ucafs_entry_type type,
+           ucafs_entry_type * p_type)
 {
     encoded_fname_t * result = NULL;
     RepeatedPtrField<dnode_fentry> * fentry_list;
@@ -302,6 +306,7 @@ retry:
             // delete from the list
             fentry_list->erase(curr_fentry);
             dn->header.count--;
+            *p_type = type;
             return result;
         }
 
@@ -330,9 +335,11 @@ retry:
 const char *
 dirnode_enc2raw(const uc_dirnode_t * dn,
                 const encoded_fname_t * encoded_name,
-                ucafs_entry_type type)
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type)
 {
     const RepeatedPtrField<dnode_fentry> * fentry_list;
+    int ret;
 
     bool iterate;
     if (type == UCAFS_TYPE_UNKNOWN) {
@@ -358,9 +365,10 @@ retry:
 
     auto curr_fentry = fentry_list->begin();
     while (curr_fentry != fentry_list->end()) {
-        if (memcmp(encoded_name, curr_fentry->encoded_name().data(),
-                   sizeof(encoded_fname_t))
-            == 0) {
+        ret = memcmp(encoded_name, curr_fentry->encoded_name().data(),
+                     sizeof(encoded_fname_t));
+        if (ret == 0) {
+            *p_type = type;
             return curr_fentry->raw_name().c_str();
         }
 
@@ -389,7 +397,8 @@ retry:
 const encoded_fname_t *
 dirnode_raw2enc(const uc_dirnode_t * dn,
                 const char * realname,
-                ucafs_entry_type type)
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type)
 {
     size_t len = strlen(realname);
     encoded_fname_t * encoded;
@@ -423,6 +432,7 @@ retry:
 
         if (len == str_entry.size()
             && memcmp(realname, curr_fentry->raw_name().data(), len) == 0) {
+            *p_type = type;
             return (encoded_fname_t *)curr_fentry->encoded_name().data();
         }
         curr_fentry++;
@@ -455,19 +465,26 @@ dirnode_rename(uc_dirnode_t * dn,
                encoded_fname_t ** ptr_shadow1_bin,
                encoded_fname_t ** ptr_shadow2_bin)
 {
-    *ptr_shadow1_bin = dirnode_rm(dn, oldname, type);
+    encoded_fname_t * shadow2_bin;
+    ucafs_entry_type atype, atype1;
+
+    *ptr_shadow2_bin = NULL;
+    *ptr_shadow1_bin = dirnode_rm(dn, oldname, type, &atype);
     if (*ptr_shadow1_bin) {
-        // TODO poor code
         // it is necessary to return the codename of the existing entry
         // otherwise, we get a lingering file in the AFS server
-        *ptr_shadow2_bin = dirnode_rm(dn, newname, type);
-        if (*ptr_shadow2_bin == NULL) {
-            *ptr_shadow2_bin = dirnode_add(dn, newname, type);
+        //
+        // Pass the UNKOWN flag to ensure any copy of the existing file is
+        // erased
+        shadow2_bin = dirnode_rm(dn, newname, UCAFS_TYPE_UNKNOWN, &atype1);
+        if (shadow2_bin == NULL) {
+            shadow2_bin = dirnode_add(dn, newname, atype);
         } else {
-            *ptr_shadow2_bin
-                = dirnode_add_alias(dn, newname, type, *ptr_shadow2_bin);
+            shadow2_bin = dirnode_add_alias(dn, newname, atype, shadow2_bin);
         }
-        return *ptr_shadow2_bin ? -1 : 0;
+
+        *ptr_shadow2_bin = shadow2_bin;
+        return shadow2_bin == NULL ? -1 : 0;
     }
     return -1;
 }

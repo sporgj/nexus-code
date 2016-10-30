@@ -98,6 +98,7 @@ dirops_code2plain(char * encoded_name,
 {
     int error = -1; // TODO
     encoded_fname_t * fname_code = NULL;
+    ucafs_entry_type atype;
     const char * result;
 
     /* 1 - Get the binary version */
@@ -112,7 +113,7 @@ dirops_code2plain(char * encoded_name,
     }
 
     // 3 - Get the plain filename
-    if ((result = dirnode_enc2raw(dn, fname_code, type)) == NULL) {
+    if ((result = dirnode_enc2raw(dn, fname_code, type, &atype)) == NULL) {
         goto out;
     }
 
@@ -134,6 +135,7 @@ dirops_rename2(const char * parent_path,
                char ** encoded_name_dest)
 {
     int error = AFSX_STATUS_NOOP;
+    ucafs_entry_type atype;
     uc_dirnode_t * dirnode = NULL;
     const encoded_fname_t *codename1 = NULL, *codename2 = NULL;
     char *codename1_str = NULL, *codename2_str = NULL;
@@ -146,7 +148,7 @@ dirops_rename2(const char * parent_path,
     }
 
     /* delete the old_name */
-    codename1 = dirnode_rm(dirnode, oldname, type);
+    codename1 = dirnode_rm(dirnode, oldname, type, &atype);
     if (codename1 == NULL) {
         slog(0, SLOG_ERROR, "dirops_rename - Removing '%s' from dirnode",
              oldname);
@@ -211,6 +213,7 @@ dirops_move(const char * from_dir,
             char ** ptr_newname)
 {
     int error = AFSX_STATUS_NOOP;
+    ucafs_entry_type atype;
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL;
     encoded_fname_t *shadow1_bin = NULL, *shadow2_bin = NULL;
     char *shadow1_str = NULL, * shadow2_str = NULL;
@@ -244,7 +247,7 @@ dirops_move(const char * from_dir,
         }
     } else {
         /* get the shadow names */
-        shadow1_bin = dirnode_rm(dirnode1, oldname, type);
+        shadow1_bin = dirnode_rm(dirnode1, oldname, type, &atype);
         if (shadow1_bin == NULL) {
             slog(0, SLOG_ERROR, "dirops_move - Could not find '%s' in dirnode",
                  oldname);
@@ -252,8 +255,8 @@ dirops_move(const char * from_dir,
         }
 
         // the new file might still exist in the dirnode
-        dirnode_rm(dirnode2, newname, type);
-        shadow2_bin = dirnode_add(dirnode2, newname, type);
+        dirnode_rm(dirnode2, newname, UCAFS_TYPE_UNKNOWN, &atype);
+        shadow2_bin = dirnode_add(dirnode2, newname, atype);
         if (shadow2_bin == NULL) {
             slog(0, SLOG_ERROR, "dops_move - Could not add '%s' to dirnode",
                  newname);
@@ -546,6 +549,7 @@ encode_or_remove(const char * fpath,
     int error = -1; // TODO
     char *fname = NULL, *c_temp = NULL;
     const encoded_fname_t * fname_code = NULL;
+    ucafs_entry_type atype;
     sds dnode_path = NULL;
 
     /* 1 - Get the corresponding dirnode */
@@ -560,8 +564,8 @@ encode_or_remove(const char * fpath,
     }
 
     /* Perform the operation */
-    fname_code = rm ? dirnode_rm(dirnode, fname, type)
-                    : dirnode_raw2enc(dirnode, fname, type);
+    fname_code = rm ? dirnode_rm(dirnode, fname, type, &atype)
+                    : dirnode_raw2enc(dirnode, fname, type, &atype);
     if (fname_code == NULL) {
         slog(0, SLOG_WARN, "Could not %s: %s", (rm ? "remove" : "find"), fpath);
         goto out;

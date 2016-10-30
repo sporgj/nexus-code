@@ -63,17 +63,22 @@ dirnode_add_alias(uc_dirnode_t * dn,
                   const encoded_fname_t * p_encoded_name);
 
 encoded_fname_t *
-dirnode_rm(uc_dirnode_t * dn, const char * realname, ucafs_entry_type type);
+dirnode_rm(uc_dirnode_t * dn,
+           const char * realname,
+           ucafs_entry_type type,
+           ucafs_entry_type * p_type);
 
 const char *
 dirnode_enc2raw(const uc_dirnode_t * dn,
                 const encoded_fname_t * encoded_name,
-                ucafs_entry_type type);
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type);
 
 const encoded_fname_t *
 dirnode_raw2enc(const uc_dirnode_t * dn,
                 const char * realname,
-                ucafs_entry_type type);
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type);
 
 int
 dirnode_rename(uc_dirnode_t * dn,

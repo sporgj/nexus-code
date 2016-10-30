@@ -84,6 +84,7 @@ dcache_traverse(const sds relative_dirpath)
     sds dnode_path = NULL;
     const encoded_fname_t * encoded_fname;
     bool found = false;
+    ucafs_entry_type atype;
     uintptr_t ptr_val;
 
     // TODO check for null
@@ -94,8 +95,8 @@ dcache_traverse(const sds relative_dirpath)
     nch = strtok_r(c_rel_path, "/", &pch);
     while (nch) {
         /* find the entry in the dirnode */
-        if ((encoded_fname = dirnode_raw2enc(dn, nch, UCAFS_TYPE_DIR))
-            == NULL) {
+        encoded_fname = dirnode_raw2enc(dn, nch, UCAFS_TYPE_DIR, &atype);
+        if (encoded_fname == NULL) {
             break;
         }
 
@@ -190,6 +191,7 @@ dcache_get_filebox(const char * path)
     sds fbox_path = NULL;
     uc_filebox_t * fb;
     uc_dirnode_t * dirnode = dcache_get(path);
+    ucafs_entry_type atype;
 
     if (dirnode == NULL) {
         return NULL;
@@ -201,7 +203,7 @@ dcache_get_filebox(const char * path)
     }
 
     /* get the entry in the file */
-    codename = dirnode_raw2enc(dirnode, fname, UCAFS_TYPE_FILE);
+    codename = dirnode_raw2enc(dirnode, fname, UCAFS_TYPE_FILE, &atype);
     if (codename == NULL) {
         goto out;
     }

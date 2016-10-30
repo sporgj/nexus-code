@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "third/sds.h"
-
 #include "uc_utils.h"
 
 // https://gist.github.com/ccbrown/9722406

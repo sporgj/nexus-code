@@ -145,7 +145,7 @@ SAFSX_rename(
         *old_shadow_name = EMPTY_STR_HEAP;
         *new_shadow_name = EMPTY_STR_HEAP;
     } else {
-        uinfo("Renamed '%s' -> '%s'", from_path, to_path);
+        uinfo("Renamed '%s' -> '%s'", oldname, newname);
     }
 
     return ret;
