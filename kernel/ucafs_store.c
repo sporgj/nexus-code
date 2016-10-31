@@ -282,8 +282,8 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
         return AFSX_STATUS_NOOP;
     }
 
-    // if it's not dirty, ignore
-    if (!(avc->f.states & CDirty)) {
+    // if it's not dirty or deleted, ignore
+    if (!(avc->f.states & CDirty) || (avc->f.states & CUnlinked)) {
         kfree(path);
         return AFSX_STATUS_SUCCESS;
     }

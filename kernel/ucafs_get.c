@@ -190,9 +190,10 @@ UCAFS_get(struct afs_conn * tc,
     }
 
     fp->offset = 0;
+    /*
     ERROR("fetching %s (size=%d, len=%d, offset=%d)\n", path, size,
           bytes_left, base);
-
+    */
     /* we can now download the file and return to afs_GetDCache */
     while (bytes_left > 0) {
         len = bytes_left > ctx->buflen ? ctx->buflen : bytes_left;
