@@ -40,8 +40,8 @@ sds
 do_make_path(const char * dirpath, const char * fname)
 {
     sds result = sdsnew(dirpath);
-    sdscat(result, "/");
-    sdscat(result, fname);
+    result = sdscat(result, "/");
+    result = sdscat(result, fname);
 
     return result;
 }
@@ -55,7 +55,7 @@ do_get_fname(const char * fpath)
     }
 
     if (result == fpath) {
-        return NULL;
+        return sdsnew(result);
     }
 
     return sdsnew(result + 1);
@@ -70,7 +70,7 @@ do_get_dir(const char * fpath)
     }
 
     if (result == fpath) {
-        return NULL;
+        return sdsnew(fpath);
     }
 
     return sdsnewlen(fpath, (uintptr_t)(result - fpath));

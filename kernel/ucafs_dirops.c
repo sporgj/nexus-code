@@ -30,7 +30,7 @@ ucafs_rename(struct vcache * from_vnode,
     uc_conn = __get_conn();
 
     ret = AFSX_rename(conn, from_path, oldname, to_path, newname,
-                      UCAFS_TYPE_UNKNOWN, old_shadowname, new_shadowname);
+                      UC_ANY, old_shadowname, new_shadowname);
     if (ret) {
         kfree(*old_shadowname);
         kfree(*new_shadowname);
@@ -42,32 +42,6 @@ out:
         kfree(from_path);
     if (to_path)
         kfree(to_path);
-
-    return ret;
-}
-
-int
-ucafs_rename2(char * dirpath,
-              char * oldname,
-              char * newname,
-              ucafs_entry_type type,
-              char ** dest)
-{
-    int ret;
-    struct rx_connection * uc_conn;
-
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    uc_conn = __get_conn();
-
-    ret = AFSX_sillyrename(uc_conn, dirpath, oldname, newname, type, dest);
-    if (ret) {
-        *dest = NULL;
-    }
-
-    __put_conn(uc_conn);
 
     return ret;
 }
@@ -130,5 +104,69 @@ ucafs_plain2code(char * parent_path,
     __put_conn(uc_conn);
     kfree(fpath);
 
+    return ret;
+}
+
+int ucafs_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest)
+{
+    int ret;
+
+    int ignore_from, ignore_to;
+    char *from_path = NULL, *to_path = NULL;
+    struct rx_connection * conn = NULL;
+
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    ignore_from = __is_dentry_ignored(olddp, &from_path);
+    ignore_to = __is_dentry_ignored(newdp, &to_path);
+
+    if (ignore_from && ignore_to) {
+        goto out;
+    }
+
+    conn = __get_conn();
+
+    *dest = NULL;
+    if ((ret = AFSX_hardlink(conn, from_path, to_path, dest))) {
+        kfree(*dest);
+    }
+
+    __put_conn(conn);
+out:
+    if (from_path)
+        kfree(from_path);
+    if (to_path)
+        kfree(to_path);
+
+    return ret;
+}
+
+int ucafs_softlink(struct dentry *dp, char * target, char ** dest)
+{
+    int ret;
+    char * fpath;
+    struct rx_connection * conn = NULL;
+
+    *dest = NULL;
+    if (!AFSX_IS_CONNECTED) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    if (__is_dentry_ignored(dp, &fpath)) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    conn = __get_conn();
+
+    ret = AFSX_softlink(conn, fpath, target, dest);
+    if (ret) {
+        kfree(*dest);
+        *dest = NULL;
+    }
+
+    __put_conn(conn);
+    kfree(fpath);
     return ret;
 }

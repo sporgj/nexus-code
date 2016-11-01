@@ -60,10 +60,16 @@ rename(
 ) = 135;
 
 hardlink(
-    IN string new_path<AFSX_PATH_MAX>,
-    string old_path<AFSX_PATH_MAX>,
+    IN string old_path<AFSX_PATH_MAX>,
+    string new_path<AFSX_PATH_MAX>,
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 161;
+
+softlink(
+    IN string old_path<AFSX_PATH_MAX>,
+    string new_path<AFSX_PATH_MAX>,
+    OUT string code_name<AFSX_FNAME_MAX>
+) = 171;
 
 readwrite_start(
     IN int op,

@@ -93,14 +93,14 @@ inline ucafs_entry_type
 dentry_type(struct dentry * dentry)
 {
     if (d_is_file(dentry)) {
-        return UCAFS_TYPE_FILE;
+        return UC_FILE;
     } else if (d_is_dir(dentry)) {
-        return UCAFS_TYPE_DIR;
+        return UC_DIR;
     } else if (d_is_symlink(dentry)) {
-        return UCAFS_TYPE_LINK;
+        return UC_LINK;
     }
 
-    return UCAFS_TYPE_UNKNOWN;
+    return UC_ANY;
 }
 
 inline ucafs_entry_type

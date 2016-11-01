@@ -379,9 +379,9 @@ dirops_softlink(const char * target_path,
 
     link_info->total_len = link_info_len;
     link_info->type = UC_SOFTLINK;
-    memset(&link_info->meta_file, 0, sizeof(link_info->meta_file));
     /* the meta file is useless */
-    memcpy(&link_info->target_link, target_fname, len);
+    memset(&link_info->meta_file, 0, sizeof(link_info->meta_file));
+    memcpy(&link_info->target_link, target_path, len);
 
     /* 5 - add it to the dirnode */
     shadow_name2 = dirnode_add_link(link_dnode, link_fname, link_info);
@@ -684,8 +684,10 @@ dirops_remove(const char * fpath_raw,
     }
 
     /* we only need to call for hardlinks */
-    if (link_info && link_info->type == UC_HARDLINK) {
-        __delete_metadata_file(&link_info->meta_file, 1);
+    if (link_info) {
+        if (link_info->type == UC_HARDLINK) {
+            __delete_metadata_file(&link_info->meta_file, 1);
+        }
     } else {
         // delete a normal file or directory
         __delete_metadata_file(shadow_name, type == UC_FILE);

@@ -26,7 +26,7 @@ RXLIBS = -lrx\
 
 GEN = afsx.cs.c afsx.h afsx_hdr.h
 
-all: afsx.cs.c afsx.h
+all: afsx.cs.c afsx.h ucafs_defs.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
 	$(RXGEN) -A -x -C -o $@ $^
 

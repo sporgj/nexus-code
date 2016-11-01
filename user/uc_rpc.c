@@ -171,8 +171,8 @@ SAFSX_remove(
 afs_int32
 SAFSX_hardlink(
     /*IN */ struct rx_call * z_call,
-    /*IN */ char * new_path,
     /*IN */ char * old_path,
+    /*IN */ char * new_path,
     /*OUT*/ char ** code_name)
 {
     int ret = dirops_hardlink(old_path, new_path, code_name);
@@ -180,6 +180,21 @@ SAFSX_hardlink(
         *code_name = EMPTY_STR_HEAP;
     } else {
         uinfo("hardlink: %s (%s) ~> %s", new_path, *code_name, old_path);
+    }
+    return ret;
+}
+
+afs_int32 SAFSX_softlink(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * old_path,
+	/*IN */ char * new_path,
+	/*OUT*/ char * *code_name)
+{
+    int ret = dirops_softlink(old_path, new_path, code_name);
+    if (ret) {
+        *code_name = EMPTY_STR_HEAP;
+    } else {
+        uinfo("sotflink: %s (%s) ~> %s", new_path, *code_name, old_path);
     }
     return ret;
 }

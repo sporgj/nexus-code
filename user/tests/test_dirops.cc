@@ -225,6 +225,50 @@ TEST_F(TestDirops, HardLinkTest3)
 	<< "fileboxes must equal one another";
 }
 
+TEST_F(TestDirops, SoftLinkTest1)
+{
+    create_default_dnode();
+    const char * filename = "test.txt", * linkname = "test2.txt";
+    char * temp, * temp2, *temp3;
+    sds filepath = MK_PATH(filename), linkpath = MK_PATH(linkname),
+        filebox_path;
+    sds filedir = do_get_dir(filepath), linkdir = do_get_dir(linkpath);
+    struct stat stat_buf;
+
+    /* 1 - Create the file */
+    ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp))
+	<< "dirops_new failed";
+    filebox_path = uc_get_dnode_path(temp);
+
+    /* 2 - hardlink the file */
+    ASSERT_EQ(0, dirops_softlink(filepath, linkpath, &temp2));
+
+    /* 3 - delete original file */
+    ASSERT_TRUE(dirops_remove(filepath, UC_FILE, &temp) == 0)
+	<< filepath << " could not be removed";
+
+    /* 4 - Access the hardlink */
+    ASSERT_EQ(0, dirops_plain2code(linkpath, UC_LINK, &temp3))
+	<< "Could not reference hardlink";
+    ASSERT_EQ(0, dirops_code2plain(temp3, linkdir, UC_LINK, &temp3));
+
+    /* 5 - Check filebox file does not exist */
+    ASSERT_NE(0, stat(filebox_path, &stat_buf))
+	<< "Filebox should not be deleted";
+
+    /* 6 - Delete softlink */
+    ASSERT_EQ(0, dirops_remove(linkpath, UC_LINK, &temp)); 
+
+    /* 7 - Access the softlink */
+    ASSERT_NE(0, dirops_plain2code(linkpath, UC_LINK, &temp3))
+	<< "Could not reference hardlink";
+    ASSERT_NE(0, dirops_code2plain(temp3, linkdir, UC_LINK, &temp3));
+
+    /* 5 - Check filebox file still exists */
+    ASSERT_NE(0, stat(filebox_path, &stat_buf))
+	<< "Filebox should not be deleted";
+}
+
 #if 0
 TEST(UC_DIROPS, SimpleFileCreation)
 {

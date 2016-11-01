@@ -25,12 +25,15 @@
 #define UC_DECRYPT    0x00000002
 #define UC_VERIFY     0x00000004
 
+#define UC_HARDLINK     0
+#define UC_SOFTLINK     1
+
 typedef uint32_t uc_crypto_op_t;
 
 typedef enum {
-    UCAFS_TYPE_UNKNOWN = 0,
-    UCAFS_TYPE_FILE,
-    UCAFS_TYPE_DIR,
-    UCAFS_TYPE_LINK
+    UC_FILE = 0x00000001,
+    UC_DIR = 0x00000002,
+    UC_LINK = 0x00000004,
+    UC_ANY = UC_FILE | UC_DIR | UC_LINK,
 } ucafs_entry_type;
 

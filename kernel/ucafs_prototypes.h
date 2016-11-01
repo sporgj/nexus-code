@@ -71,8 +71,9 @@ ucafs_plain2code(char * parent_path,
                  ucafs_entry_type type,
                  char ** dest);
 
-extern int
-UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp);
+int ucafs_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest);
+
+int ucafs_softlink(struct dentry *dp, char * target, char ** dest);
 
 extern int
 UCAFS_store(struct vcache * avc, struct vrequest * areq);
