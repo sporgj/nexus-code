@@ -71,6 +71,14 @@ typedef struct {
 } encoded_fname_t;
 
 typedef struct {
+    uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
+    uint8_t type; /* 0 for soft, 1 for hard */
+    uint8_t is_file;
+    encoded_fname_t meta_file;
+    char target_link[];
+} __attribute__((packed)) link_info_t;
+
+typedef struct {
     crypto_ekey_t ekey;
     crypto_ekey_t mkey;
     crypto_iv_t iv;
@@ -85,6 +93,7 @@ typedef struct {
 } __attribute__((packed)) dnode_header_t;
 
 typedef struct {
+    uint16_t link_count;
     uuid_t uuid;
     uint32_t chunk_count;
     uint32_t filelen;

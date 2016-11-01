@@ -68,11 +68,11 @@ static const char *
 struct_type_to_str(ucafs_entry_type type)
 {
     switch (type) {
-    case UCAFS_TYPE_FILE:
+    case UC_FILE:
         return "touch";
-    case UCAFS_TYPE_DIR:
+    case UC_DIR:
         return "mkdir";
-    case UCAFS_TYPE_LINK:
+    case UC_LINK:
         return "softlink";
     default:
         return "(unknown)";
@@ -152,32 +152,13 @@ SAFSX_rename(
 }
 
 afs_int32
-SAFSX_sillyrename(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * dirpath,
-    /*IN */ char * old_name,
-    /*IN */ char * new_name,
-    /*IN */ afs_int32 type,
-    /*OUT*/ char ** code_name)
-{
-    int ret = dirops_rename2(dirpath, old_name, new_name, type, code_name);
-    if (ret) {
-        *code_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("sillyrename: %s (%s -> %s)", old_name, new_name);
-    }
-
-    return ret;
-}
-
-afs_int32
 SAFSX_remove(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
     /*IN */ afs_int32 type,
     /*OUT*/ char ** code_name)
 {
-    const char * str = (type == UCAFS_TYPE_FILE) ? "rm" : "rmdir";
+    const char * str = (type == UC_FILE) ? "rm" : "rmdir";
     int ret = dirops_remove(fpath, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
@@ -194,7 +175,7 @@ SAFSX_hardlink(
     /*IN */ char * old_path,
     /*OUT*/ char ** code_name)
 {
-    int ret = dirops_hardlink(new_path, old_path, code_name);
+    int ret = dirops_hardlink(old_path, new_path, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
     } else {

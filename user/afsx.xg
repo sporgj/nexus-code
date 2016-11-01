@@ -59,14 +59,6 @@ rename(
     string new_shadow_name<AFSX_FNAME_MAX>
 ) = 135;
 
-sillyrename(
-    IN string dirpath<AFSX_PATH_MAX>,
-    string old_name<AFSX_FNAME_MAX>,
-    string new_name<AFSX_FNAME_MAX>,
-    afs_int32 type,
-    OUT string code_name<AFSX_FNAME_MAX>
-) = 139;
-
 hardlink(
     IN string new_path<AFSX_PATH_MAX>,
     string old_path<AFSX_PATH_MAX>,

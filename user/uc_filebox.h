@@ -32,7 +32,10 @@ filebox_from_file(const sds file_path);
  * @return a new filebox
  */
 uc_filebox_t *
-filebox_from_fbox(const uc_filebox_t * fbox);
+filebox_copy(const uc_filebox_t * fb);
+
+int
+filebox_equals(const uc_filebox_t * fb1, uc_filebox_t * fb2);
 
 /**
  * Deallocates the filebox from the heap
@@ -56,6 +59,10 @@ filebox_write(uc_filebox_t * fb, const char * path);
  */
 bool
 filebox_flush(uc_filebox_t * fb);
+
+int filebox_decr_link_count(uc_filebox_t * fb);
+
+int filebox_incr_link_count(uc_filebox_t * fb);
 
 /**
  * Returns the crypto context at the specific chunk id

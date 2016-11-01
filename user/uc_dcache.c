@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "third/hashmap.h"
+#include "third/slog.h"
 
 #include "uc_dirnode.h"
 #include "uc_encode.h"
@@ -85,6 +86,7 @@ dcache_traverse(const sds relative_dirpath)
     const encoded_fname_t * encoded_fname;
     bool found = false;
     ucafs_entry_type atype;
+    const link_info_t * link_info;
     uintptr_t ptr_val;
 
     // TODO check for null
@@ -94,10 +96,22 @@ dcache_traverse(const sds relative_dirpath)
 
     nch = strtok_r(c_rel_path, "/", &pch);
     while (nch) {
+        link_info = NULL;
         /* find the entry in the dirnode */
-        encoded_fname = dirnode_raw2enc(dn, nch, UCAFS_TYPE_DIR, &atype);
+        encoded_fname = dirnode_traverse(dn, nch, UC_DIR, &atype, &link_info);
         if (encoded_fname == NULL) {
             break;
+        }
+
+        if (link_info) {
+            if (link_info->type == UC_HARDLINK) {
+                slog(0, SLOG_ERROR, "can't traverse on hardlinks");
+                break;
+            } else {
+                /* we have to jump to a different dirnode here */
+                slog(0, SLOG_ERROR, "softlink traversal not supported yet");
+                break;
+            }
         }
 
         if ((encoded_name_str = encode_bin2str(encoded_fname)) == NULL) {
@@ -192,6 +206,7 @@ dcache_get_filebox(const char * path)
     uc_filebox_t * fb;
     uc_dirnode_t * dirnode = dcache_get(path);
     ucafs_entry_type atype;
+    const link_info_t * link_info = NULL;
 
     if (dirnode == NULL) {
         return NULL;
@@ -203,9 +218,14 @@ dcache_get_filebox(const char * path)
     }
 
     /* get the entry in the file */
-    codename = dirnode_raw2enc(dirnode, fname, UCAFS_TYPE_FILE, &atype);
+    codename = dirnode_traverse(dirnode, fname, UC_FILE, &atype, &link_info);
     if (codename == NULL) {
         goto out;
+    }
+
+    /* if we are loading a link, then the codename should point to its info */
+    if (link_info) {
+        codename = &link_info->meta_file;
     }
 
     temp = encode_bin2str(codename);

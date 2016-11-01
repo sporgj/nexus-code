@@ -29,6 +29,7 @@ filebox_new()
     }
 
     memset(&fb->header, 0, sizeof(fbox_header_t));
+    fb->header.link_count = 1;
     fb->header.chunk_count = 1;
     fb->protobuf = new fbox();
     fb->fbox_path = NULL;
@@ -79,6 +80,12 @@ filebox_free(uc_filebox_t * fb)
     }
 
     free(fb);
+}
+
+int
+filebox_equals(const uc_filebox_t * fb1, uc_filebox_t * fb2)
+{
+    return memcmp(&fb1->header, &fb2->header, sizeof(fbox_header_t)) == 0;
 }
 
 uc_filebox_t *
@@ -212,6 +219,16 @@ bool
 filebox_flush(uc_filebox_t * fb)
 {
     return fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
+}
+
+int filebox_decr_link_count(uc_filebox_t * fb)
+{
+    return --fb->header.link_count;
+}
+
+int filebox_incr_link_count(uc_filebox_t * fb)
+{
+    return ++fb->header.link_count;
 }
 
 crypto_context_t *

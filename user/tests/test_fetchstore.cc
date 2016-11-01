@@ -76,7 +76,7 @@ TEST(UC_FETCHSTORE, LocalTest)
     sds path = MK_PATH(fname);
 
     /* creating the default file */
-    ASSERT_EQ(0, dirops_new(path, UCAFS_TYPE_FILE, &test))
+    ASSERT_EQ(0, dirops_new(path, UC_FILE, &test))
         << "dirops_new failed";
 
     generate_stream();
@@ -100,7 +100,7 @@ TEST(UC_FETCHSTORE, LocalTest)
     ASSERT_EQ(0, memcmp(input_buffer, temp_buffer, FILE_LEN))
         << "Encryption did not work";
 
-    ASSERT_EQ(0, dirops_remove(path, UCAFS_TYPE_FILE, &test))
+    ASSERT_EQ(0, dirops_remove(path, UC_FILE, &test))
         << "dirops_remove failed";
 
     free(input_buffer);
@@ -120,7 +120,7 @@ TEST(UC_FETCHSTORE, OffsetTest)
     srand(time(NULL));
     offset = ((rand() % FILE_LEN) / 16) * 16;
 
-    ASSERT_EQ(0, dirops_new(path, UCAFS_TYPE_FILE, &test))
+    ASSERT_EQ(0, dirops_new(path, UC_FILE, &test))
         << "dirops_new failed";
 
     cout << "Running with offset = " << offset << endl;
@@ -146,7 +146,7 @@ TEST(UC_FETCHSTORE, OffsetTest)
                         FILE_LEN - offset))
         << "Encryption did not work";
 
-    ASSERT_EQ(0, dirops_remove(path, UCAFS_TYPE_FILE, &test))
+    ASSERT_EQ(0, dirops_remove(path, UC_FILE, &test))
         << "dirops_remove failed";
 
     free(input_buffer);
