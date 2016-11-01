@@ -24,11 +24,29 @@ dirnode_new()
     }
 
     memset(&obj->header, 0, sizeof(dnode_header_t));
-    uuid_generate_time_safe(obj->header.uuid);
+    uuid_generate_time_safe((uint8_t *)&obj->header.uuid);
     obj->protobuf = new dnode();
     obj->dnode_path = NULL;
 
     return obj;
+}
+
+void
+dirnode_set_parent(uc_dirnode_t * dirnode, const uc_dirnode_t * parent)
+{
+    memcmp(&dirnode->header.parent, &parent->header.uuid, sizeof(encoded_fname_t));
+}
+
+const encoded_fname_t *
+dirnode_get_parent(uc_dirnode_t * dirnode)
+{
+    return &dirnode->header.parent;
+}
+
+int
+dirnode_is_root(uc_dirnode_t * dirnode)
+{
+    return dirnode->header.is_root;
 }
 
 const sds
@@ -518,6 +536,7 @@ dirnode_rename(uc_dirnode_t * dn,
                const char * oldname,
                const char * newname,
                ucafs_entry_type type,
+               ucafs_entry_type *p_type,
                encoded_fname_t ** ptr_shadow1_bin,
                encoded_fname_t ** ptr_shadow2_bin,
                link_info_t ** pp_link_info1,
@@ -544,6 +563,7 @@ dirnode_rename(uc_dirnode_t * dn,
                                             *pp_link_info1);
         }
 
+        *p_type = atype;
         *ptr_shadow2_bin = shadow2_bin;
         return shadow2_bin == NULL ? -1 : 0;
     }

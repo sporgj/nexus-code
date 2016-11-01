@@ -18,6 +18,12 @@ dirnode_new();
 uc_dirnode_t *
 dirnode_default_dnode();
 
+void
+dirnode_set_parent(uc_dirnode_t * dn, const uc_dirnode_t * parent);
+
+const encoded_fname_t *
+dirnode_get_parent(uc_dirnode_t * dn);
+
 /**
  * Creates a new dirnode object from the path.
  * @param filepath is the absolute path to the file
@@ -114,6 +120,7 @@ dirnode_rename(uc_dirnode_t * dn,
                const char * oldname,
                const char * newname,
                ucafs_entry_type type,
+               ucafs_entry_type *p_type,
                encoded_fname_t ** pp_shadow1_bin,
                encoded_fname_t ** pp_shadow2_bin,
                link_info_t ** pp_link_info1,

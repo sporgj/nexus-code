@@ -52,6 +52,8 @@ dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
             goto out;
         }
 
+        dirnode_set_parent(dirnode1, dirnode);
+
         if (!dirnode_write(dirnode1, path1)) {
             slog(0, SLOG_ERROR, "Creating: '%s' dirnode failed", fpath);
             goto out;
@@ -138,11 +140,12 @@ dirops_move(const char * from_dir,
 {
     int error = AFSX_STATUS_NOOP;
     ucafs_entry_type atype;
-    uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL;
+    uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
     encoded_fname_t *shadow1_bin = NULL, *shadow2_bin = NULL;
     char *shadow1_str = NULL, *shadow2_str = NULL;
-    sds path1 = NULL, path2 = NULL;
+    sds path1 = NULL, path2 = NULL, path3 = NULL;
+    sds fpath1 = NULL, fpath2 = NULL;
 
     /* get the dirnode objects */
     dirnode1 = dcache_get_dir(from_dir);
@@ -156,8 +159,18 @@ dirops_move(const char * from_dir,
         return -1;
     }
 
+    // TODO remove entries from cache
+    fpath1 = do_make_path(from_dir, oldname);
+    fpath2 = do_make_path(to_dir, newname);
+
+    dcache_rm(fpath1);
+    dcache_rm(fpath2);
+
+    sdsfree(fpath1);
+    sdsfree(fpath2);
+
     if (dirnode_equals(dirnode1, dirnode2)) {
-        if (dirnode_rename(dirnode1, oldname, newname, type, &shadow1_bin,
+        if (dirnode_rename(dirnode1, oldname, newname, type, &atype, &shadow1_bin,
                            &shadow2_bin, &link_info1, &link_info2)) {
             slog(0, SLOG_ERROR, "dops_move - Could not rename (%s) %s -> %s",
                  from_dir, oldname, newname);
@@ -226,8 +239,24 @@ dirops_move(const char * from_dir,
             goto out;
         }
     } else {
-        slog(0, SLOG_WARN, "dops_move - renaming link (%s) %s -> %s", from_dir,
+        slog(0, SLOG_INFO, "dops_move - renaming link (%s) %s -> %s", from_dir,
              oldname, newname);
+    }
+
+    /* update the parent directory */
+    if (atype == UC_DIR) {
+        path3 = uc_get_dnode_path(path2);
+        if ((dirnode3 = dirnode_from_file(path3)) == NULL) {
+            slog(0, SLOG_INFO, "loading dirnode file failed(%s)", path3);
+            goto out;
+        }
+
+        dirnode_set_parent(dirnode3, dirnode2);
+
+        if (!dirnode_flush(dirnode3)) {
+            slog(0, SLOG_ERROR, "flushing dirnode (%s) failed", path3);
+            goto out;
+        }
     }
 
     // XXX what about the linking info.
@@ -241,6 +270,10 @@ dirops_move(const char * from_dir,
 out:
     dcache_put(dirnode1);
     dcache_put(dirnode2);
+
+    if (dirnode3) {
+        dirnode_free(dirnode3);
+    }
 
     if (shadow1_bin) {
         free(shadow1_bin);
@@ -306,6 +339,83 @@ out:
         sdsfree(path1);
     if (path2)
         sdsfree(path2);
+
+    return error;
+}
+
+int
+dirops_softlink(const char * target_path,
+                const char * link_path,
+                char ** shadow_name_dest)
+{
+    int error = AFSX_STATUS_NOOP, len, link_info_len;
+    link_info_t * link_info = NULL;
+    uc_dirnode_t * link_dnode = NULL;
+    encoded_fname_t * shadow_name2 = NULL;
+    ucafs_entry_type atype;
+    sds target_fname = NULL, link_fname = NULL;
+
+    /* 1 - get the respective dirnode */
+    if ((link_dnode = dcache_get(link_path)) == NULL) {
+        slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
+        return error;
+    }
+
+    /* 2 - Find the link to the file */
+    if ((link_fname = do_get_fname(link_path)) == NULL) {
+        slog(0, SLOG_ERROR, "getting fname (%s) FAILED", target_path);
+        goto out;
+    }
+
+    /* 3 - create the link in the dnode */
+    // for softlinks, we use the target path as it is resolved on
+    // each access.
+    len = strlen(target_path);
+    link_info_len = len + sizeof(link_info_t) + 1;
+    if ((link_info = (link_info_t *)calloc(1, link_info_len)) == NULL) {
+        slog(0, SLOG_ERROR, "allocation failed for link_info");
+        goto out;
+    }
+
+    link_info->total_len = link_info_len;
+    link_info->type = UC_SOFTLINK;
+    memset(&link_info->meta_file, 0, sizeof(link_info->meta_file));
+    /* the meta file is useless */
+    memcpy(&link_info->target_link, target_fname, len);
+
+    /* 5 - add it to the dirnode */
+    shadow_name2 = dirnode_add_link(link_dnode, link_fname, link_info);
+    if (shadow_name2 == NULL) {
+        slog(0, SLOG_ERROR, "adding link (%s) FAILED", link_path);
+        goto out;
+    }
+
+    if (!dirnode_flush(link_dnode)) {
+        slog(0, SLOG_ERROR, "saving dirnode (%s) FAILED", link_path);
+        goto out;
+    }
+
+    /* 7 - return the whole thing */
+    *shadow_name_dest = encode_bin2str(shadow_name2);
+    error = 0;
+out:
+    dcache_put(link_dnode);
+
+    if (target_fname) {
+        sdsfree(target_fname);
+    }
+
+    if (link_info) {
+        free(link_info);
+    }
+
+    if (shadow_name2) {
+        free(shadow_name2);
+    }
+
+    if (link_fname) {
+        sdsfree(link_fname);
+    }
 
     return error;
 }
@@ -556,6 +666,9 @@ dirops_remove(const char * fpath_raw,
         slog(0, SLOG_ERROR, "getting fname (%s) failed", fpath_raw);
         goto out;
     }
+
+    /* update the dcache */
+    dcache_rm(fpath_raw);
 
     /* delete and get the info */
     shadow_name = dirnode_rm(dirnode, fname, type, &atype, &link_info);

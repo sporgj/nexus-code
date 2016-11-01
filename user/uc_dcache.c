@@ -98,7 +98,7 @@ dcache_traverse(const sds relative_dirpath)
     while (nch) {
         link_info = NULL;
         /* find the entry in the dirnode */
-        encoded_fname = dirnode_traverse(dn, nch, UC_DIR, &atype, &link_info);
+        encoded_fname = dirnode_traverse(dn, nch, UC_ANY, &atype, &link_info);
         if (encoded_fname == NULL) {
             break;
         }
@@ -171,7 +171,7 @@ __dcache_path(const char * path, bool get_parent_path)
     }
 
     /* lookup in the dnode_cache to find the entry */
-    dirent_t * dirent = lookup_cache(relative_path);
+    dirent_t * dirent = NULL; //lookup_cache(relative_path);
     if (dirent) {
         dnode = dcache_resolve(dirent);
         // only free when we're not adding the entry to the dcache
@@ -201,7 +201,7 @@ uc_filebox_t *
 dcache_get_filebox(const char * path)
 {
     const encoded_fname_t * codename;
-    char * fname = NULL, * temp = NULL;
+    char *fname = NULL, *temp = NULL;
     sds fbox_path = NULL;
     uc_filebox_t * fb;
     uc_dirnode_t * dirnode = dcache_get(path);
@@ -225,7 +225,12 @@ dcache_get_filebox(const char * path)
 
     /* if we are loading a link, then the codename should point to its info */
     if (link_info) {
-        codename = &link_info->meta_file;
+        if (link_info->type == UC_HARDLINK) {
+            codename = &link_info->meta_file;
+        } else {
+            // we have to traverse here
+
+        }
     }
 
     temp = encode_bin2str(codename);

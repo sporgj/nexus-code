@@ -74,6 +74,7 @@ typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
     uint8_t type; /* 0 for soft, 1 for hard */
     uint8_t is_file;
+    // TODO change this to a union
     encoded_fname_t meta_file;
     char target_link[];
 } __attribute__((packed)) link_info_t;
@@ -86,7 +87,9 @@ typedef struct {
 } __attribute__((packed)) crypto_context_t;
 
 typedef struct {
-    uuid_t uuid;
+    encoded_fname_t uuid;
+    encoded_fname_t parent;
+    uint8_t is_root;
     uint32_t count;
     uint32_t protolen;
     crypto_context_t crypto_ctx;

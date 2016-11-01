@@ -30,6 +30,11 @@ dirops_hardlink(const char * new_path,
                 const char * old_path,
                 char ** encoded_name_dest);
 
+int
+dirops_softlink(const char * target_path,
+                const char * link_path,
+                char ** shadow_name_dest);
+
 /**
  * Returns the raw file name of an encoded path
  * @param encoded_name is the encoded file name
@@ -83,13 +88,6 @@ dirops_move1(const char * from_fpath,
              ucafs_entry_type type,
              char ** ptr_oldname,
              char ** ptr_newname);
-#if 0
-int
-dirops_rename(const char * from_path,
-              const char * to_path,
-              ucafs_entry_type type,
-              char ** raw_name_dest);
-#endif
 
 int
 dirops_rename2(const char * parent_path,

@@ -37,6 +37,16 @@ hexdump(uint8_t * data, uint32_t size)
 }
 
 sds
+do_make_path(const char * dirpath, const char * fname)
+{
+    sds result = sdsnew(dirpath);
+    sdscat(result, "/");
+    sdscat(result, fname);
+
+    return result;
+}
+
+sds
 do_get_fname(const char * fpath)
 {
     const char * result = fpath + strlen(fpath);
