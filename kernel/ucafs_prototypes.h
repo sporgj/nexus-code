@@ -4,10 +4,10 @@
 #include "ucafs_defs.h"
 
 extern int
-LINUX_AFSX_connect(void);
+ucafs_connect(void);
 
 extern int
-LINUX_AFSX_ping(void);
+ucafs_ping(void);
 
 extern int
 UCAFS_ignore_dentry(struct dentry * dp, char ** dest);
@@ -23,14 +23,29 @@ int
 ucafs_vnode_path(struct vcache * avc, char ** dest);
 
 /**
- * Creates a new file/dir in the dentry dp
- * @param dest is the encoded filename destination ptr
- * @param is_file is (AFSX_IS_DIR/AFSX_IS_FILE)
- * @param dp is the containing dentry
- * @return 0 on success
+ * Creates a new file/dir in the directory
+ * @param parent_vnode
+ * @param name
+ * @param type
+ * @param shadow_name_dest
  */
-extern int
-UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp);
+int
+ucafs_create(struct vcache * parent_vnode,
+             char * name,
+             ucafs_entry_type type,
+             char ** shadow_name_dest);
+
+int
+ucafs_find(char * parent_path,
+           char * shadow_name,
+           ucafs_entry_type,
+           char ** dest);
+
+int
+ucafs_lookup(struct vcache * parent_vnode,
+             char * name,
+             ucafs_entry_type type,
+             char ** shadow_name_dest);
 
 extern int
 UCAFS_remove(char ** dest, struct dentry * dp);

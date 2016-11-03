@@ -24,13 +24,13 @@ LIB_FLAGS= -L$(OPENAFS_LIB_PATH)
 RXLIBS = -lrx\
 	 -llwp
 
-GEN = afsx.cs.c afsx.h afsx_hdr.h
+GEN = afsx.cs.c afsx.h
 
 all: afsx.cs.c afsx.h ucafs_defs.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
 	$(RXGEN) -A -x -C -o $@ $^
 
-afsx.h: $(COMMONPATH)/afsx.xg afsx_hdr.h
+afsx.h: $(COMMONPATH)/afsx.xg ucafs_defs.h
 	$(RXGEN) -A -x -h -o $@ $<
 
 ucafs_defs.h: $(COMMONPATH)/ucafs_defs.h

@@ -13,7 +13,7 @@
 #include "afsx.h"
 
 extern struct rx_connection * conn;
-extern int AFSX_IS_CONNECTED;
+extern int UCAFS_IS_CONNECTED;
 
 typedef struct {
     int id;

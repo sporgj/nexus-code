@@ -18,6 +18,12 @@ dirops_new(const char * fpath,
            ucafs_entry_type type,
            char ** encoded_name_dest);
 
+int
+dirops_new1(const char * parent_dir,
+            const char * fname,
+            ucafs_entry_type type,
+            char ** shadow_name_dest);
+
 /**
  * Creates a hardlink between two paths.
  * @param new_path

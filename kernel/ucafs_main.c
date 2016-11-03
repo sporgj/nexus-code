@@ -1,4 +1,3 @@
-#ifdef AFS_SECURE
 #include "ucafs_kern.h"
 #include <linux/dcache.h>
 
@@ -10,10 +9,10 @@ static const int watch_dir_len[] = { sizeof(watch_dirs[0]) - 1 };
 
 struct rx_connection *conn = NULL, *ping_conn = NULL;
 
-int AFSX_IS_CONNECTED = 0;
+int UCAFS_IS_CONNECTED = 0;
 
 int
-LINUX_AFSX_connect()
+ucafs_connect(void)
 {
     u_long host;
     struct rx_securityClass * null_securityObject;
@@ -40,17 +39,17 @@ LINUX_AFSX_connect()
 }
 
 int
-LINUX_AFSX_ping(void)
+ucafs_ping(void)
 {
     int ret, dummy;
 
     /* lower the timeout, 2 */
     ret = AFSX_fversion(ping_conn, 0, &dummy);
 
-    dummy = AFSX_IS_CONNECTED;
-    AFSX_IS_CONNECTED = (ret == 0);
-    if (dummy != AFSX_IS_CONNECTED) {
-        printk(KERN_ERR "connected: %d, ret = %d\n", AFSX_IS_CONNECTED, ret);
+    dummy = UCAFS_IS_CONNECTED;
+    UCAFS_IS_CONNECTED = (ret == 0);
+    if (dummy != UCAFS_IS_CONNECTED) {
+        printk(KERN_ERR "connected: %d, ret = %d\n", UCAFS_IS_CONNECTED, ret);
     }
     return 0;
 }
@@ -186,36 +185,6 @@ ucafs_vnode_path(struct vcache * avc, char ** dest)
     return __is_vnode_ignored(avc, dest);
 }
 
-int
-UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
-{
-    int ret;
-    char * fpath;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    if (__is_dentry_ignored(dp, &fpath)) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    conn = __get_conn();
-
-    ret = AFSX_create(conn, fpath, type, dest);
-    if (ret) {
-        if (ret == AFSX_STATUS_ERROR) {
-            printk(KERN_ERR "error on file %s\n", fpath);
-        }
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    kfree(fpath);
-    return ret;
-}
 
 int
 UCAFS_find(char ** dest, char * fname, ucafs_entry_type type, char * dirpath)
@@ -224,7 +193,7 @@ UCAFS_find(char ** dest, char * fname, ucafs_entry_type type, char * dirpath)
     struct rx_connection * conn = NULL;
 
     *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
+    if (!UCAFS_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
     }
 
@@ -246,7 +215,7 @@ UCAFS_lookup(char ** dest, struct dentry * dp)
     struct rx_connection * conn = NULL;
 
     *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
+    if (!UCAFS_IS_CONNECTED) {
         return -1;
     }
 
@@ -277,7 +246,7 @@ UCAFS_remove(char ** dest, struct dentry * dp)
     struct rx_connection * conn = NULL;
 
     *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
+    if (!UCAFS_IS_CONNECTED) {
         return -1;
     }
 
@@ -303,7 +272,7 @@ UCAFS_hardlink(char ** dest, struct dentry * new_dp, struct dentry * to_dp)
     char *from_path = NULL, *to_path = NULL;
     struct rx_connection * conn = NULL;
 
-    if (!AFSX_IS_CONNECTED) {
+    if (!UCAFS_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
     }
 
@@ -330,5 +299,3 @@ out:
 
     return ret;
 }
-
-#endif

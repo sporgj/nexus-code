@@ -95,6 +95,23 @@ SAFSX_create(
     return ret;
 }
 
+afs_int32 SAFSX_create1(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * parent_dir,
+	/*IN */ char * name,
+	/*IN */ afs_int32 type,
+	/*OUT*/ char * *shadow_name_dest)
+{
+    int ret = dirops_new1(parent_dir, name, type, shadow_name_dest);
+    if (ret) {
+        *shadow_name_dest = EMPTY_STR_HEAP;
+    } else {
+        uinfo("%s: %s/%s ~> %s", struct_type_to_str(type), parent_dir, name,
+              *shadow_name_dest);
+    }
+    return ret;
+}
+
 afs_int32
 SAFSX_find(
     /*IN */ struct rx_call * z_call,

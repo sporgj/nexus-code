@@ -11,35 +11,33 @@
 #include "uc_utils.h"
 
 int
-dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
+dirops_new1(const char * parent_dir,
+            const char * fname,
+            ucafs_entry_type type,
+            char ** shadow_name_dest)
 {
     int error = -1; // TODO change this
-    char *fname = do_get_fname(fpath), *temp;
     uc_dirnode_t *dirnode = NULL, *dirnode1 = NULL;
     uc_filebox_t * filebox = NULL;
-    const encoded_fname_t * fname_code = NULL;
+    encoded_fname_t * fname_code = NULL;
+    char * temp = NULL;
     sds path1 = NULL;
 
-    if (fname == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
-        goto out;
-    }
-
     /* lets get the directory entry */
-    if ((dirnode = dcache_get(fpath)) == NULL) {
-        slog(0, SLOG_ERROR, "Error loading dirnode: %s", fpath);
-        goto out;
+    if ((dirnode = dcache_get_dir(parent_dir)) == NULL) {
+        slog(0, SLOG_ERROR, "Error loading dirnode: %s", parent_dir);
+        return error;
     }
 
     /* Get filename and add it to DirNode */
     if ((fname_code = dirnode_add(dirnode, fname, type)) == NULL) {
-        slog(0, SLOG_ERROR, "Add file operation failed: %s", fpath);
+        slog(0, SLOG_ERROR, "Add file operation failed: %s", parent_dir);
         goto out;
     }
 
     // 3 - Flush to disk
     if (!dirnode_flush(dirnode)) {
-        slog(0, SLOG_ERROR, "Flushing '%s' failed", fpath);
+        slog(0, SLOG_ERROR, "Flushing '%s' failed", parent_dir);
         goto out;
     }
 
@@ -48,19 +46,21 @@ dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
 
     if (type == UC_DIR) {
         if ((dirnode1 = dirnode_new()) == NULL) {
-            slog(0, SLOG_ERROR, "new dirnode failed: %s", fpath);
+            slog(0, SLOG_ERROR, "new dirnode failed: %s/%s", parent_dir, fname);
             goto out;
         }
 
         dirnode_set_parent(dirnode1, dirnode);
 
         if (!dirnode_write(dirnode1, path1)) {
-            slog(0, SLOG_ERROR, "Creating: '%s' dirnode failed", fpath);
+            slog(0, SLOG_ERROR, "Creating: '%s/%s' dirnode failed", parent_dir,
+                 fname);
             goto out;
         }
     } else if (type == UC_FILE) {
         if ((filebox = filebox_new()) == NULL) {
-            slog(0, SLOG_ERROR, "Creating '%s' filebox failed", fpath);
+            slog(0, SLOG_ERROR, "Creating '%s/%s' filebox failed", parent_dir,
+                 fname);
             goto out;
         }
 
@@ -71,7 +71,7 @@ dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
     }
 
     /* Set the encoded name */
-    *encoded_name_dest = temp;
+    *shadow_name_dest = temp;
     error = 0;
 out:
     /* TODO probably need to perform an additional check here concerning
@@ -82,15 +82,39 @@ out:
         dcache_put(dirnode);
     if (dirnode1)
         dcache_put(dirnode1);
-    if (fname)
-        sdsfree(fname);
     if (path1)
         sdsfree(path1);
     if (fname_code)
         free((void *)fname_code);
 
     return error;
+
 }
+
+int
+dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
+{
+    int error = -1;
+    sds fname = NULL, dir_path = NULL;
+
+    if ((fname = do_get_fname(fpath)) == NULL) {
+        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
+        return AFSX_STATUS_NOOP;
+    }
+
+    if ((dir_path = do_get_dir(fpath)) == NULL) {
+        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
+        sdsfree(fname);
+        return AFSX_STATUS_NOOP;
+    }
+
+    error = dirops_new1(dir_path, fname, type, encoded_name_dest);
+out:
+    sdsfree(fname);
+    sdsfree(dir_path);
+    return error;
+}
+
 
 int
 dirops_code2plain(char * encoded_name,
