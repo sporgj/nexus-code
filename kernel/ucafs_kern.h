@@ -42,6 +42,6 @@ ucafs_entry_type
 vnode_type(struct vcache * avc);
 
 ucafs_entry_type
-vnode_type(struct vcache * avc);
+uc_vnode_type(struct vcache * avc);
 
 #endif

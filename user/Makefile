@@ -64,7 +64,7 @@ libucafs.a: $(OBJS) libthird.a
 	@echo "ar => $@"
 
 uc_rpc.o: uc_rpc.c afsx.ss.c
-	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 
 %.o: %.cc %.h

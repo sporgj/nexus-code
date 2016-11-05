@@ -29,6 +29,9 @@ static inline void do_free(void ** p_ptr) {
 
 void hexdump(uint8_t *, uint32_t);
 
+char *
+do_absolute_path(const char * path);
+
 #ifdef __cplusplus
 }
 #endif

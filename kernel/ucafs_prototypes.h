@@ -47,14 +47,23 @@ ucafs_lookup(struct vcache * parent_vnode,
              ucafs_entry_type type,
              char ** shadow_name_dest);
 
-extern int
-UCAFS_remove(char ** dest, struct dentry * dp);
-
 int
-ucafs_remove2(char * parent_path,
-              char * file_name,
+ucafs_lookup1(char * parent_path,
+              char * plain_file_name,
               ucafs_entry_type type,
               char ** dest);
+
+int
+ucafs_remove2(struct vcache * vnode, char ** dest);
+
+int
+ucafs_remove1(struct vcache * parent_vnode,
+              char * name,
+              ucafs_entry_type type,
+              char ** dest);
+
+int
+ucafs_remove(char * fpath, ucafs_entry_type type, char ** dest);
 
 int
 ucafs_rename(struct vcache * from_vnode,

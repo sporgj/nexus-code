@@ -175,7 +175,7 @@ SAFSX_remove(
     /*IN */ afs_int32 type,
     /*OUT*/ char ** code_name)
 {
-    const char * str = (type == UC_FILE) ? "rm" : "rmdir";
+    const char * str = (type == UC_DIR) ? "rmdir" : "rm";
     int ret = dirops_remove(fpath, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;

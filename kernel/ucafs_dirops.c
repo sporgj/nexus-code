@@ -27,6 +27,7 @@ ucafs_create(struct vcache * parent_vnode,
     ret = AFSX_create1(uc_conn, path, name, type, shadow_name_dest);
     if (ret) {
         kfree(*shadow_name_dest);
+        *shadow_name_dest = NULL;
     }
 
     __put_conn(uc_conn);
@@ -103,12 +104,12 @@ ucafs_find(char * parent_path,
 
 int
 ucafs_lookup(struct vcache * parent_vnode,
-                 char * plain_file_name,
-                 ucafs_entry_type type,
-                 char ** dest)
+             char * plain_file_name,
+             ucafs_entry_type type,
+             char ** dest)
 {
     int ret, ignore;
-    char * fpath, * parent_path;
+    char *fpath, *parent_path;
     struct rx_connection * uc_conn;
 
     if (!UCAFS_IS_CONNECTED) {
@@ -133,6 +134,78 @@ ucafs_lookup(struct vcache * parent_vnode,
     kfree(fpath);
     kfree(parent_path);
 
+    return ret;
+}
+
+int
+ucafs_remove(char * fpath, ucafs_entry_type type, char ** dest)
+{
+    int ret;
+    struct rx_connection * uc_conn;
+
+    if (!UCAFS_IS_CONNECTED) {
+        return -1;
+    }
+
+    uc_conn = __get_conn();
+
+    *dest = NULL;
+    if ((ret = AFSX_remove(uc_conn, fpath, type, dest))) {
+        kfree(*dest);
+        *dest = NULL;
+    }
+
+    __put_conn(uc_conn);
+
+    return ret;
+}
+
+int
+ucafs_remove1(struct vcache * parent_vnode,
+              char * name,
+              ucafs_entry_type type,
+              char ** dest)
+{
+    int ret;
+    char * fpath, *parent_path;
+
+    if (!UCAFS_IS_CONNECTED) {
+        return -1;
+    }
+
+    if (ucafs_vnode_path(parent_vnode, &parent_path)) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    fpath = uc_mkpath(parent_path, name);
+
+    ret = ucafs_remove(fpath, type, dest);
+
+    kfree(fpath);
+
+    return ret;
+}
+
+int
+ucafs_remove2(struct vcache * vnode, char ** dest)
+{
+    int ret;
+    ucafs_entry_type type;
+    char * fpath;
+
+    if (!UCAFS_IS_CONNECTED) {
+        return -1;
+    }
+
+    if (ucafs_vnode_path(vnode, &fpath)) {
+        return AFSX_STATUS_NOOP;
+    }
+
+    type = uc_vnode_type(vnode);
+
+    ret = ucafs_remove(fpath, UC_ANY, dest);
+
+    kfree(fpath);
     return ret;
 }
 

@@ -89,6 +89,22 @@ __put_conn(struct rx_connection * c)
 }
 
 inline ucafs_entry_type
+uc_vnode_type(struct vcache * vnode)
+{
+    if (vnode == NULL) {
+        return UC_ANY;
+    }
+
+    switch(vType(vnode)) {
+        case VREG: return UC_FILE;
+        case VDIR: return UC_DIR;
+        case VLNK: return UC_LINK;
+    }
+
+    return UC_ANY;
+}
+
+inline ucafs_entry_type
 dentry_type(struct dentry * dentry)
 {
     if (d_is_file(dentry)) {
@@ -176,6 +192,10 @@ UCAFS_ignore_dentry(struct dentry * dp, char ** dest)
 inline int
 __is_vnode_ignored(struct vcache * avc, char ** dest)
 {
+    // if it's null, just ignore it
+    if (avc == NULL) {
+        return 1;
+    }
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
 }
 
@@ -183,59 +203,6 @@ inline int
 ucafs_vnode_path(struct vcache * avc, char ** dest)
 {
     return __is_vnode_ignored(avc, dest);
-}
-
-
-int
-UCAFS_find(char ** dest, char * fname, ucafs_entry_type type, char * dirpath)
-{
-    int ret;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!UCAFS_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    conn = __get_conn();
-
-    if ((ret = AFSX_find(conn, fname, dirpath, type, dest))) {
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    return ret;
-}
-
-int
-UCAFS_lookup(char ** dest, struct dentry * dp)
-{
-    int ret;
-    char * fpath;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!UCAFS_IS_CONNECTED) {
-        return -1;
-    }
-
-    if (dp->d_name.len > 100) {
-        return -1;
-    }
-
-    if (__is_dentry_ignored(dp, &fpath)) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    conn = __get_conn();
-
-    if ((ret = AFSX_lookup(conn, fpath, dentry_type(dp), dest))) {
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    kfree(fpath);
-    return ret;
 }
 
 int

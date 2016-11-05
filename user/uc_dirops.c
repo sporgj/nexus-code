@@ -88,7 +88,6 @@ out:
         free((void *)fname_code);
 
     return error;
-
 }
 
 int
@@ -714,7 +713,7 @@ dirops_remove(const char * fpath_raw,
         }
     } else {
         // delete a normal file or directory
-        __delete_metadata_file(shadow_name, type == UC_FILE);
+        __delete_metadata_file(shadow_name, atype == UC_FILE);
     }
 
     *encoded_fname_dest = encode_bin2str(shadow_name);
