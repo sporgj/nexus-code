@@ -79,13 +79,6 @@ ucafs_rename2(char * dirpath,
               char * newname,
               ucafs_entry_type type,
               char ** dest);
-
-extern int
-UCAFS_find(char ** dest,
-           char * fname,
-           ucafs_entry_type type,
-           char * parent_dir);
-
 extern int
 UCAFS_lookup(char ** dest, struct dentry * dp);
 

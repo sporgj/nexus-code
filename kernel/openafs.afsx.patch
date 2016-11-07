@@ -391,6 +391,91 @@ index 3e62781..de8e3d9 100644
      osi_dnlc_remove(adp, aname, tvc);
  
      if (code) {
+diff --git a/src/afs/VNOPS/afs_vnop_rename.c b/src/afs/VNOPS/afs_vnop_rename.c
+index 468555a..4447f6d 100644
+--- a/src/afs/VNOPS/afs_vnop_rename.c
++++ b/src/afs/VNOPS/afs_vnop_rename.c
+@@ -46,6 +46,9 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
+     struct AFSVolSync tsync;
+     struct rx_connection *rxconn;
+     XSTATS_DECLS;
++    /* ucafs code */
++    char * ucafs_name1 = NULL, * ucafs_name2 = NULL;
++    int is_ucafs_file = 0, ret;
+     AFS_STATCNT(afs_rename);
+     afs_Trace4(afs_iclSetp, CM_TRACE_RENAME, ICL_TYPE_POINTER, aodp,
+ 	       ICL_TYPE_STRING, aname1, ICL_TYPE_POINTER, andp,
+@@ -150,9 +153,18 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
+ 	    goto tagain;
+ 	}
+     }
++    /* ucafs code */
++    ret = ucafs_rename(aodp, aname1, andp, aname2, &ucafs_name1, &ucafs_name2);
++    if (ret == 0) {
++	is_ucafs_file = 1;
++    } else {
++	is_ucafs_file = 0;
++	ucafs_name1 = aname1;
++	ucafs_name2 = aname2;
++    }
+ 
+     if (code == 0)
+-	code = afs_dir_Lookup(tdc1, aname1, &fileFid.Fid);
++	code = afs_dir_Lookup(tdc1, ucafs_name1, &fileFid.Fid);
+     if (code) {
+ 	if (tdc1) {
+ 	    ReleaseWriteLock(&tdc1->lock);
+@@ -179,9 +191,9 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
+ 	    	code =
+ 		    RXAFS_Rename(rxconn,
+ 		    			(struct AFSFid *)&aodp->f.fid.Fid,
+-					aname1,
++					ucafs_name1,
+ 					(struct AFSFid *)&andp->f.fid.Fid,
+-					aname2,
++					ucafs_name2,
+ 					OutOldDirStatus,
+ 					OutNewDirStatus,
+ 					&tsync);
+@@ -274,21 +286,21 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
+ 	/* now really do the work */
+ 	if (doLocally) {
+ 	    /* first lookup the fid of the dude we're moving */
+-	    code = afs_dir_Lookup(tdc1, aname1, &fileFid.Fid);
++	    code = afs_dir_Lookup(tdc1, ucafs_name1, &fileFid.Fid);
+ 	    if (code == 0) {
+ 		/* delete the source */
+-		code = afs_dir_Delete(tdc1, aname1);
++		code = afs_dir_Delete(tdc1, ucafs_name1);
+ 	    }
+ 	    /* first see if target is there */
+ 	    if (code == 0
+-		&& afs_dir_Lookup(tdc2, aname2,
++		&& afs_dir_Lookup(tdc2, ucafs_name2,
+ 				  &unlinkFid.Fid) == 0) {
+ 		/* target already exists, and will be unlinked by server */
+-		code = afs_dir_Delete(tdc2, aname2);
++		code = afs_dir_Delete(tdc2, ucafs_name2);
+ 	    }
+ 	    if (code == 0) {
+ 		ObtainWriteLock(&afs_xdcache, 292);
+-		code = afs_dir_Create(tdc2, aname2, &fileFid.Fid);
++		code = afs_dir_Create(tdc2, ucafs_name2, &fileFid.Fid);
+ 		ReleaseWriteLock(&afs_xdcache);
+ 	    }
+ 	    if (code != 0) {
+@@ -441,6 +453,11 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
+   done:
+     osi_FreeSmallSpace(OutOldDirStatus);
+     osi_FreeSmallSpace(OutNewDirStatus);
++    /* ucafs code */
++    if (is_ucafs_file) {
++	kfree(ucafs_name1);
++	kfree(ucafs_name2);
++    }
+     return code;
+ }
+ 
 diff --git a/src/afs/afs_daemons.c b/src/afs/afs_daemons.c
 index e8b8f9d..521359e 100644
 --- a/src/afs/afs_daemons.c
