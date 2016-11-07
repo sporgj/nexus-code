@@ -128,6 +128,7 @@ filebox_from_file(const sds filepath)
             goto out;
         }
 
+#ifdef UCAFS_SGX
         /* decrypt the content with enclave */
         ecall_crypto_filebox(global_eid, &error, &header, buffer,
                             UC_DECRYPT);
@@ -135,6 +136,7 @@ filebox_from_file(const sds filepath)
             slog(0, SLOG_ERROR, "filebox - enclave encryption failed");
             goto out;
         }
+#endif
 
         if (!proto->ParseFromArray(buffer, header.protolen)) {
             slog(0, SLOG_ERROR, "filebox - parsing protobuf failed: %s",
@@ -173,7 +175,7 @@ filebox_write(uc_filebox_t * fb, const char * fpath)
     int error;
     bool ret = false;
     uint8_t * buffer = NULL;
-    size_t len = CRYPTO_CEIL_TO_BLKSIZE(fb->protobuf->ByteSize());
+    size_t len = fb->protobuf->ByteSize();
     FILE * fd;
 
     fd = fopen(fpath, "wb");
@@ -193,14 +195,16 @@ filebox_write(uc_filebox_t * fb, const char * fpath)
     }
 
     /* GetCachedSize returns the size computed from ByteSize() */
-    fb->header.protolen = fb->protobuf->GetCachedSize();
+    fb->header.protolen = len;
 
+#ifdef UCAFS_SGX
     ecall_crypto_filebox(global_eid, &error, &fb->header, buffer,
                          UC_ENCRYPT);
     if (error) {
         slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
         goto out;
     }
+#endif
 
     fwrite(&fb->header, sizeof(fbox_header_t), 1, fd);
     fwrite(buffer, fb->header.protolen, 1, fd);

@@ -88,7 +88,7 @@ dcache_traverse(const sds relative_dirpath)
     ucafs_entry_type atype;
     const link_info_t * link_info;
     uintptr_t ptr_val;
-    sds branch_path = NULL;
+    sds branch_path = NULL, temp_rel_path = NULL;
 
     // TODO check for null
     uc_dirnode_t * dn = dirnode_default_dnode();
@@ -109,11 +109,23 @@ dcache_traverse(const sds relative_dirpath)
                 slog(0, SLOG_ERROR, "can't traverse on hardlinks");
                 break;
             } else {
+                // FIXME memory leak here
+                if (link_info->target_link[0] == '/') {
+                    // append the two and return
+                    branch_path = sdsnew(link_info->target_link);
+                    branch_path = sdscat(branch_path, "/");
+                    branch_path = sdscat(branch_path, pch);
+                    // get the relative path
+                    temp_rel_path = uc_get_relative_path(branch_path);
+                    return dcache_traverse(temp_rel_path);
+                }
+
                 /* we have to jump to a different dirnode here */
                 // form the link path
                 branch_path = sdsnewlen(relative_dirpath, (pch - c_rel_path));
                 branch_path = sdscat(branch_path, "/");
                 branch_path = sdscat(branch_path, link_info->target_link);
+                branch_path = sdscat(branch_path, "/");
                 branch_path = sdscat(branch_path, pch);
 
                 // resolve the path

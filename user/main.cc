@@ -61,6 +61,7 @@ int main(int argc, char ** argv)
     uc_set_afs_home(afs_path, "sgx", true);
 
     /* initialize the enclave */
+#ifdef UCAFS_SGX
     sgx_launch_token_t token;
     ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
                              &global_eid, NULL);
@@ -76,6 +77,7 @@ int main(int argc, char ** argv)
     }
 
     cout << ". Loaded enclave" << endl;
+#endif
 
     dcache_init();
 

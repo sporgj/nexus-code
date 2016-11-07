@@ -44,6 +44,7 @@ do_absolute_path(const char * path)
     char *p, *fres;
     const char * q;
     char * resolved;
+    int first = 1;
 
     fres = resolved = malloc(MAXPATHLEN);
     if (resolved == NULL)
@@ -77,7 +78,7 @@ loop:
         if (path[1] == '.' && q - path == 2) {
             /* Trim the last component. */
             if (p != resolved)
-                while (*--p != '/')
+                while (*--p != '/' && p != resolved)
                     continue;
             path = q;
             goto loop;
@@ -92,11 +93,21 @@ loop:
         *p = '\0';
         goto out;
     }
-    p[0] = '/';
-    memcpy(&p[1], path, q - path);
-    p[1 + q - path] = '\0';
 
-    p += 1 + q - path;
+    if (first) {
+        memcpy(&p[0], path, q - path);
+        first = 0;
+        p[q - path] = '\0';
+
+        p += q - path;
+    } else {
+        p[0] = '/';
+        memcpy(&p[1], path, q - path);
+        p[1 + q - path] = '\0';
+
+        p += 1 + q - path;
+    }
+
     path = q;
     goto loop;
 out:

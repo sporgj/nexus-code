@@ -4,13 +4,19 @@ else
 	include build.mk
 endif
 
+ifeq ($(UCAFS_SGX), 1)
+       FLAGS := -DUCAFS_SGX
+endif
+
 KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
-FLAGS := #-fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
+FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 	-fno-builtin-free
+
+
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid

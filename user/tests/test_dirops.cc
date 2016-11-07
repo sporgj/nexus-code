@@ -240,7 +240,7 @@ TEST_F(TestDirops, SymLinkTest1)
 	<< "Link filebox cannot be null";
 
     /* 2 - Symlink the file */
-    ASSERT_EQ(0, dirops_symlink(fname, linkpath, &temp2))
+    ASSERT_EQ(0, dirops_symlink(linkpath, fname, &temp2))
 	<< "Symlinking failed";
 
     /* 3 - Access the symlink */
@@ -285,7 +285,7 @@ TEST_F(TestDirops, SymLinkTest2)
     ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp3));
 
     /* 2 -Symlink the directory */
-    ASSERT_EQ(0, dirops_symlink(linktget, dir3, &temp1))
+    ASSERT_EQ(0, dirops_symlink(dir3_path, linktget, &temp1))
 	<< "Symlinking failed";
 
     /* 3 - Access the symlink */

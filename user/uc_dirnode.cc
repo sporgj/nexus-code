@@ -128,12 +128,14 @@ dirnode_from_file(const sds filepath)
             goto out;
         }
 
+#ifdef UCAFS_SGX
         /* decrypt the content with enclave */
         ecall_crypto_dirnode(global_eid, &error, &header, buffer, UC_DECRYPT);
         if (error) {
             slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
             goto out;
         }
+#endif
 
         if (!_dnode->ParseFromArray(buffer, header.protolen)) {
             slog(0, SLOG_ERROR, "dirnode - parsing protobuf failed: %s",
@@ -172,7 +174,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     bool ret = false;
     int error;
     uint8_t * buffer = NULL;
-    size_t len = CRYPTO_CEIL_TO_BLKSIZE(dn->protobuf->ByteSize());
+    size_t len = dn->protobuf->ByteSize();
     FILE * fd;
 
     fd = fopen(fpath, "wb");
@@ -192,13 +194,15 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     }
 
     /* GetCachedSize returns the size computed from ByteSize() */
-    dn->header.protolen = dn->protobuf->GetCachedSize();
+    dn->header.protolen = len;
 
+#ifdef UCAFS_SGX
     ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer, UC_ENCRYPT);
     if (error) {
         slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
         goto out;
     }
+#endif
 
     fwrite(&dn->header, sizeof(dnode_header_t), 1, fd);
     fwrite(buffer, dn->header.protolen, 1, fd);
