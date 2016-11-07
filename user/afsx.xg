@@ -72,7 +72,7 @@ hardlink(
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 181;
 
-softlink(
+symlink(
     IN string old_path<AFSX_PATH_MAX>,
     string new_path<AFSX_PATH_MAX>,
     OUT string code_name<AFSX_FNAME_MAX>

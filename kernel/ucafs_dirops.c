@@ -247,7 +247,7 @@ out:
 }
 
 int
-ucafs_softlink(struct dentry * dp, char * target, char ** dest)
+ucafs_symlink(struct dentry * dp, char * target, char ** dest)
 {
     int ret;
     char * fpath;
@@ -264,7 +264,7 @@ ucafs_softlink(struct dentry * dp, char * target, char ** dest)
 
     conn = __get_conn();
 
-    ret = AFSX_softlink(conn, fpath, target, dest);
+    ret = AFSX_symlink(conn, fpath, target, dest);
     if (ret) {
         kfree(*dest);
         *dest = NULL;

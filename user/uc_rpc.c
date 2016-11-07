@@ -201,17 +201,17 @@ SAFSX_hardlink(
     return ret;
 }
 
-afs_int32 SAFSX_softlink(
+afs_int32 SAFSX_symlink(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * old_path,
 	/*IN */ char * new_path,
 	/*OUT*/ char * *code_name)
 {
-    int ret = dirops_softlink(old_path, new_path, code_name);
+    int ret = dirops_symlink(old_path, new_path, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
     } else {
-        uinfo("sotflink: %s (%s) ~> %s", new_path, *code_name, old_path);
+        uinfo("symlink: %s (%s) ~> %s", new_path, *code_name, old_path);
     }
     return ret;
 }

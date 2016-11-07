@@ -37,9 +37,9 @@ dirops_hardlink(const char * new_path,
                 char ** encoded_name_dest);
 
 int
-dirops_softlink(const char * target_path,
-                const char * link_path,
-                char ** shadow_name_dest);
+dirops_symlink(const char * target_path,
+               const char * link_path,
+               char ** shadow_name_dest);
 
 /**
  * Returns the raw file name of an encoded path

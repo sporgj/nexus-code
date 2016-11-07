@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..0f001f9 100644
+index 1b99c94..d059630 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -142,6 +142,41 @@ index 1b99c94..0f001f9 100644
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
+@@ -1722,6 +1789,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+     cred_t *credp = crref();
+     struct vattr *vattr = NULL;
+     const char *name = dp->d_name.name;
++    /* ucafs code */
++    int is_ucafs_file;
++    char * ucafs_name = NULL;
+ 
+     /* If afs_symlink returned the vnode, we could instantiate the
+      * dentry. Since it's not, we drop this one and do a new lookup.
+@@ -1734,10 +1804,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+ 	goto out;
+     }
+ 
+-    code = afs_symlink(VTOAFS(dip), (char *)name, vattr, (char *)target, NULL,
++    /* ucafs code */
++    if (ucafs_symlink(dp, target, &ucafs_name) == 0) {
++	is_ucafs_file = 1;
++    } else {
++	ucafs_name = (char *)name;
++	is_ucafs_file = 0;
++    }
++
++    code = afs_symlink(VTOAFS(dip), ucafs_name, vattr, (char *)target, NULL,
+ 			credp);
+     afs_DestroyAttr(vattr);
+ 
++    /* ucafs code */
++    if (is_ucafs_file) {
++	kfree(ucafs_name);
++    }
++
+ out:
+     AFS_GUNLOCK();
+     crfree(credp);
 diff --git a/src/afs/VNOPS/afs_vnop_create.c b/src/afs/VNOPS/afs_vnop_create.c
 index f33da96..4eef7dd 100644
 --- a/src/afs/VNOPS/afs_vnop_create.c
@@ -476,6 +511,20 @@ index 468555a..4447f6d 100644
      return code;
  }
  
+diff --git a/src/afs/VNOPS/afs_vnop_symlink.c b/src/afs/VNOPS/afs_vnop_symlink.c
+index bd22639..faeeac8 100644
+--- a/src/afs/VNOPS/afs_vnop_symlink.c
++++ b/src/afs/VNOPS/afs_vnop_symlink.c
+@@ -86,6 +86,9 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     struct afs_fakestat_state fakestate;
+     struct rx_connection *rxconn;
+     XSTATS_DECLS;
++    /* ucafs code */
++    char * ucafs_name = NULL;
++    int is_ucafs_name;
+     OSI_VC_CONVERT(adp);
+ 
+     AFS_STATCNT(afs_symlink);
 diff --git a/src/afs/afs_daemons.c b/src/afs/afs_daemons.c
 index e8b8f9d..521359e 100644
 --- a/src/afs/afs_daemons.c

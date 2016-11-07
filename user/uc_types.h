@@ -60,9 +60,7 @@ typedef struct {
 } crypto_mac_t;
 
 typedef struct {
-#ifdef __cplusplus
-    uint8_t raw[];
-#endif
+    uint8_t raw[0];
 } raw_fname_t;
 
 /* 128 bits */
@@ -73,10 +71,10 @@ typedef struct {
 typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
     uint8_t type; /* 0 for soft, 1 for hard */
-    uint8_t is_file;
-    // TODO change this to a union
-    encoded_fname_t meta_file;
-    char target_link[];
+    union {
+        encoded_fname_t meta_file;
+        char target_link[0];
+    };
 } __attribute__((packed)) link_info_t;
 
 typedef struct {

@@ -81,13 +81,14 @@ static uc_dirnode_t *
 dcache_traverse(const sds relative_dirpath)
 {
     char * encoded_name_str = NULL;
-    char *pch, *nch, *c_rel_path;
+    char *pch, *nch, *c_rel_path, *new_path;
     sds dnode_path = NULL;
     const encoded_fname_t * encoded_fname;
     bool found = false;
     ucafs_entry_type atype;
     const link_info_t * link_info;
     uintptr_t ptr_val;
+    sds branch_path = NULL;
 
     // TODO check for null
     uc_dirnode_t * dn = dirnode_default_dnode();
@@ -109,6 +110,19 @@ dcache_traverse(const sds relative_dirpath)
                 break;
             } else {
                 /* we have to jump to a different dirnode here */
+                // form the link path
+                branch_path = sdsnewlen(relative_dirpath, (pch - c_rel_path));
+                branch_path = sdscat(branch_path, "/");
+                branch_path = sdscat(branch_path, link_info->target_link);
+                branch_path = sdscat(branch_path, pch);
+
+                // resolve the path
+                new_path = do_absolute_path(branch_path);
+
+                // TODO LEAK HERE
+                // call traverse with the new path
+                return dcache_traverse(new_path);
+                
                 slog(0, SLOG_ERROR, "softlink traversal not supported yet");
                 break;
             }
@@ -142,15 +156,15 @@ dcache_traverse(const sds relative_dirpath)
         if (dn) {
             dirnode_free(dn);
         }
+    }
 
-        if (dnode_path) {
-            sdsfree(dnode_path);
-            dnode_path = NULL;
-        }
+    if (dnode_path) {
+        sdsfree(dnode_path);
+        dnode_path = NULL;
     }
 
     free(c_rel_path);
-    return found ? dn : NULL;
+    return dn;
 }
 
 /**
@@ -201,9 +215,9 @@ uc_filebox_t *
 dcache_get_filebox(const char * path)
 {
     const encoded_fname_t * codename;
-    char *fname = NULL, *temp = NULL;
-    sds fbox_path = NULL;
-    uc_filebox_t * fb;
+    char *fname = NULL, *temp = NULL, *temp2 = NULL; 
+    sds path_link = NULL, fbox_path = NULL;
+    uc_filebox_t * fb = NULL;
     uc_dirnode_t * dirnode = dcache_get(path);
     ucafs_entry_type atype;
     const link_info_t * link_info = NULL;
@@ -218,7 +232,7 @@ dcache_get_filebox(const char * path)
     }
 
     /* get the entry in the file */
-    codename = dirnode_traverse(dirnode, fname, UC_FILE, &atype, &link_info);
+    codename = dirnode_traverse(dirnode, fname, UC_ANY, &atype, &link_info);
     if (codename == NULL) {
         goto out;
     }
@@ -229,7 +243,23 @@ dcache_get_filebox(const char * path)
             codename = &link_info->meta_file;
         } else {
             // we have to traverse here
+            if (link_info->target_link[0] == '/') {
+                // we have an absolute path
+                // send request here
+                fb = dcache_get_filebox(link_info->target_link);
+                goto out;
+            } else {
+                // have an relative path
+                path_link = do_get_dir(path);
+                path_link = sdscat(path_link, "/");
+                path_link = sdscat(path_link, link_info->target_link);
+                temp2 = do_absolute_path(path_link);
 
+                fb = dcache_get_filebox(temp2);
+                sdsfree(path_link);
+                free(temp2);
+                goto out;
+            }
         }
     }
 
@@ -242,5 +272,6 @@ dcache_get_filebox(const char * path)
     sdsfree(fbox_path);
 out:
     dirnode_free(dirnode);
+    sdsfree(fname);
     return fb;
 }

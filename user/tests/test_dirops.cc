@@ -225,48 +225,78 @@ TEST_F(TestDirops, HardLinkTest3)
 	<< "fileboxes must equal one another";
 }
 
-TEST_F(TestDirops, SoftLinkTest1)
+TEST_F(TestDirops, SymLinkTest1)
 {
-    create_default_dnode();
-    const char * filename = "test.txt", * linkname = "test2.txt";
-    char * temp, * temp2, *temp3;
-    sds filepath = MK_PATH(filename), linkpath = MK_PATH(linkname),
-        filebox_path;
-    sds filedir = do_get_dir(filepath), linkdir = do_get_dir(linkpath);
-    struct stat stat_buf;
+    const char * fname = "test.txt", * lname = "test2.txt";
+    sds filepath = MK_PATH(fname), linkpath = MK_PATH(lname);
+    char * temp1, * temp2, * temp3;
+    uc_filebox_t * fb1, * fb2;
 
     /* 1 - Create the file */
-    ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp))
-	<< "dirops_new failed";
-    filebox_path = uc_get_dnode_path(temp);
+    ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp1))
+	<< "Creating new file failed";
 
-    /* 2 - hardlink the file */
-    ASSERT_EQ(0, dirops_softlink(filepath, linkpath, &temp2));
+    ASSERT_FALSE((fb1 = dcache_get_filebox(filepath)) == NULL)
+	<< "Link filebox cannot be null";
 
-    /* 3 - delete original file */
-    ASSERT_TRUE(dirops_remove(filepath, UC_FILE, &temp) == 0)
-	<< filepath << " could not be removed";
+    /* 2 - Symlink the file */
+    ASSERT_EQ(0, dirops_symlink(fname, linkpath, &temp2))
+	<< "Symlinking failed";
 
-    /* 4 - Access the hardlink */
+    /* 3 - Access the symlink */
     ASSERT_EQ(0, dirops_plain2code(linkpath, UC_LINK, &temp3))
-	<< "Could not reference hardlink";
-    ASSERT_EQ(0, dirops_code2plain(temp3, linkdir, UC_LINK, &temp3));
+	<< "Getting shadow name failed";
 
-    /* 5 - Check filebox file does not exist */
-    ASSERT_NE(0, stat(filebox_path, &stat_buf))
-	<< "Filebox should not be deleted";
+    ASSERT_STREQ(temp2, temp3) << "Dereferenced link incorrect";
 
-    /* 6 - Delete softlink */
-    ASSERT_EQ(0, dirops_remove(linkpath, UC_LINK, &temp)); 
+    /* 4 - Dereference the symlink */
+    ASSERT_FALSE((fb2 = dcache_get_filebox(linkpath)) == NULL)
+	<< "Link filebox cannot be null";
 
-    /* 7 - Access the softlink */
-    ASSERT_NE(0, dirops_plain2code(linkpath, UC_LINK, &temp3))
-	<< "Could not reference hardlink";
-    ASSERT_NE(0, dirops_code2plain(temp3, linkdir, UC_LINK, &temp3));
+    /* 5 - Make sure they're the same */
+    ASSERT_TRUE(filebox_equals(fb1, fb2)) << "Filebox should be equal";
 
-    /* 5 - Check filebox file still exists */
-    ASSERT_NE(0, stat(filebox_path, &stat_buf))
-	<< "Filebox should not be deleted";
+    /* 6 - Delete the original file */
+    ASSERT_EQ(0, dirops_remove(filepath, UC_FILE, &temp1))
+	<< "Removing file failed";
+
+    /* 7 - Dereference the symlink, expect NULL */
+    ASSERT_TRUE((fb2 = dcache_get_filebox(linkpath)) == NULL)
+	<< "Link filebox should be null";
+}
+
+TEST_F(TestDirops, SymLinkTest2)
+{
+    uc_filebox_t * fb1, * fb2;
+    const char *dir1 = "foo", *dir2 = "bar", *dir3 = "sun", *fname = "test.txt";
+    sds dir1_path = MK_PATH(dir1), dir2_path = MK_PATH(dir2),
+        dir3_path = MK_PATH(dir3);
+
+    sds filepath = do_make_path(dir2_path, fname),
+	linktget = do_make_path("..", dir2),
+	linkpath = do_make_path(dir3_path, fname);
+
+
+    char * temp1, * temp2, * temp3;
+
+    /* 1 - Create the regular directories */
+    ASSERT_EQ(0, dirops_new(dir1_path, UC_DIR, &temp1));
+    ASSERT_EQ(0, dirops_new(dir2_path, UC_DIR, &temp2));
+    ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp3));
+
+    /* 2 -Symlink the directory */
+    ASSERT_EQ(0, dirops_symlink(linktget, dir3, &temp1))
+	<< "Symlinking failed";
+
+    /* 3 - Access the symlink */
+    ASSERT_FALSE((fb1 = dcache_get_filebox(linkpath)) == NULL)
+	<< "Dereferencing cannot lead to null";
+
+    /* 4 - Access the file */
+    ASSERT_FALSE((fb2 = dcache_get_filebox(filepath)) == NULL);
+
+    /* 5 - Make sure they're the same */
+    ASSERT_TRUE(filebox_equals(fb1, fb2));
 }
 
 #if 0

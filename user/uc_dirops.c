@@ -256,7 +256,7 @@ dirops_move(const char * from_dir,
     path2 = uc_get_dnode_path(shadow2_str);
 
     /* move the metadata file */
-    if (type != UC_LINK) {
+    if (atype != UC_LINK) {
         if (rename(path1, path2)) {
             slog(0, SLOG_ERROR, "dops_move - renaming metadata file failed");
             goto out;
@@ -367,9 +367,9 @@ out:
 }
 
 int
-dirops_softlink(const char * target_path,
-                const char * link_path,
-                char ** shadow_name_dest)
+dirops_symlink(const char * link_path,
+               const char * target_path,
+               char ** shadow_name_dest)
 {
     int error = AFSX_STATUS_NOOP, len, link_info_len;
     link_info_t * link_info = NULL;
@@ -403,7 +403,6 @@ dirops_softlink(const char * target_path,
     link_info->total_len = link_info_len;
     link_info->type = UC_SOFTLINK;
     /* the meta file is useless */
-    memset(&link_info->meta_file, 0, sizeof(link_info->meta_file));
     memcpy(&link_info->target_link, target_path, len);
 
     /* 5 - add it to the dirnode */
@@ -496,7 +495,7 @@ dirops_hardlink(const char * target_path,
     }
 
     /* 4 - create the link in the dnode */
-    len = strlen(link_fname);
+    len = sizeof(encoded_fname_t);
     link_info_len = len + sizeof(link_info_t) + 1;
     if ((link_info = (link_info_t *)calloc(1, link_info_len)) == NULL) {
         slog(0, SLOG_ERROR, "allocation failed for link_info");
@@ -506,7 +505,6 @@ dirops_hardlink(const char * target_path,
     link_info->total_len = link_info_len;
     link_info->type = UC_HARDLINK;
     memcpy(&link_info->meta_file, shadow_name1, sizeof(encoded_fname_t));
-    memcpy(&link_info->target_link, target_fname, len);
 
     /* 5 - add it to the dirnode */
     shadow_name2
