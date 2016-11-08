@@ -21,14 +21,20 @@ store_read(ucafs_ctx_t * ctx,
            afs_uint32 size,
            afs_uint32 * bytesread)
 {
+    struct rx_connection * uc_conn;
     struct rx_call * uspace_call;
     afs_int32 nbytes;
     int ret = -1, moredata;
 
+    uc_conn = __get_conn();
+    if (uc_conn == NULL) {
+        return -1;
+    }
+
     // XXX check for the read return
     afs_osi_Read(tfile, -1, ctx->buffer, size);
 
-    uspace_call = rx_NewCall(conn);
+    uspace_call = rx_NewCall(uc_conn);
 
     /* open a read session */
     if (StartAFSX_readwrite_data(uspace_call, ctx->id, size)) {
@@ -52,6 +58,7 @@ store_read(ucafs_ctx_t * ctx,
 
     ret = 0;
 out:
+    __put_conn(uc_conn);
     EndAFSX_readwrite_data(uspace_call, &moredata);
     rx_EndCall(uspace_call, ret);
     return ret;
@@ -146,6 +153,8 @@ store_close(ucafs_ctx_t * ctx,
         RX_AFS_GLOCK();
 
         ctx->afs_call = NULL;
+
+        afs_PutConn(ctx->tc, ctx->rx_conn, 0);
     }
 
     /* if everything is ok, process the request */
@@ -256,6 +265,7 @@ store_init(struct vcache * avc,
     ctx->off = 0;
     ctx->afs_call = afs_call;
     ctx->rx_conn = rx_conn;
+    ctx->tc = tc;
     *pp_ctx = ctx;
 
     ret = 0;

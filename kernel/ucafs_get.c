@@ -33,10 +33,17 @@ _write(ucafs_ctx_t * ctx, uint32_t len, uint32_t * bytes_written)
 {
     uint32_t nbytes;
     int ret = -1, moredata = 0;
+    struct rx_connection * uc_conn;
     struct rx_call * uspace_call;
 
     // open a session with the daemon
-    uspace_call = rx_NewCall(conn);
+    uc_conn = __get_conn();
+    if (uc_conn == NULL) {
+        ERROR("__get_conn() returned NULL\n");
+        return -1;
+    }
+
+    uspace_call = rx_NewCall(uc_conn);
 
     // send it to uspace
     if (StartAFSX_readwrite_data(uspace_call, ctx->id, len)) {
@@ -60,6 +67,7 @@ _write(ucafs_ctx_t * ctx, uint32_t len, uint32_t * bytes_written)
 
     ret = 0;
 out1:
+    __put_conn(uc_conn);
     EndAFSX_readwrite_data(uspace_call, &moredata);
     rx_EndCall(uspace_call, 0);
     return ret;

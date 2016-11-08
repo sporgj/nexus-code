@@ -34,6 +34,7 @@ typedef struct {
     int32_t len;
     int32_t off;
     int32_t file_offset;
+    struct afs_conn * tc;
     struct rx_call * afs_call;
     struct rx_connection * rx_conn;
     struct vrequest * areq;
