@@ -264,7 +264,7 @@ out:
 }
 
 int
-UCAFS_store(struct vcache * avc, struct vrequest * areq)
+ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
 {
     int ret, chunk_no;
     ucafs_ctx_t * ctx = NULL;
@@ -274,7 +274,7 @@ UCAFS_store(struct vcache * avc, struct vrequest * areq)
     struct dcache * tdc = NULL;
     struct AFSFetchStatus outstatus;
 
-    if (!AFSX_IS_CONNECTED) {
+    if (!UCAFS_IS_CONNECTED) {
         return AFSX_STATUS_NOOP;
     }
 

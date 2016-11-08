@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..d059630 100644
+index 1b99c94..03b064d 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -35,7 +35,7 @@ index 1b99c94..d059630 100644
  
  	/* filldir returns -EINVAL when the buffer is full. */
  	{
-@@ -437,12 +449,39 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+@@ -437,12 +449,36 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
  	     * holding the GLOCK.
  	     */
  	    AFS_GUNLOCK();
@@ -63,9 +63,6 @@ index 1b99c94..d059630 100644
 +		}
 +	    }
 +skip:
-+	    printk(KERN_ERR "filldir: %s, len=%d, off=%d; %s, len=%d, off=%d\n",
-+		uc_name, uc_len, uc_offset,
-+		de->name, len, offset);
  #if defined(STRUCT_FILE_OPERATIONS_HAS_ITERATE)
  	    /* dir_emit returns a bool - true when it succeeds.
  	     * Inverse the result to fit with how we check "code" */
@@ -77,7 +74,7 @@ index 1b99c94..d059630 100644
  #endif
  	    AFS_GLOCK();
  	}
-@@ -450,6 +489,12 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+@@ -450,6 +486,12 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
  	if (code)
  	    break;
  	offset = dirpos + 1 + ((len + 16) >> 5);
@@ -90,7 +87,7 @@ index 1b99c94..d059630 100644
      }
      /* If filldir didn't fill in the last one this is still pointing to that
       * last attempt.
-@@ -475,6 +520,10 @@ out:
+@@ -475,6 +517,10 @@ out:
      afs_DestroyReq(treq);
  out1:
      AFS_GUNLOCK();
@@ -101,7 +98,7 @@ index 1b99c94..d059630 100644
      return code;
  }
  
-@@ -1613,6 +1662,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1613,6 +1659,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      cred_t *credp = crref();
      const char *name = newdp->d_name.name;
      struct inode *oldip = olddp->d_inode;
@@ -110,7 +107,7 @@ index 1b99c94..d059630 100644
  
      /* If afs_link returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1620,7 +1671,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1620,7 +1668,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      d_drop(newdp);
  
      AFS_GLOCK();
@@ -132,7 +129,7 @@ index 1b99c94..d059630 100644
  
      AFS_GUNLOCK();
      crfree(credp);
-@@ -1698,6 +1762,9 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
+@@ -1698,6 +1759,9 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
      const char *name = dp->d_name.name;
      struct vcache *tvc = VTOAFS(dp->d_inode);
  
@@ -142,7 +139,7 @@ index 1b99c94..d059630 100644
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
-@@ -1722,6 +1789,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1722,6 +1786,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
      cred_t *credp = crref();
      struct vattr *vattr = NULL;
      const char *name = dp->d_name.name;
@@ -152,7 +149,7 @@ index 1b99c94..d059630 100644
  
      /* If afs_symlink returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1734,10 +1804,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1734,10 +1801,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
  	goto out;
      }
  
@@ -525,6 +522,19 @@ index bd22639..faeeac8 100644
      OSI_VC_CONVERT(adp);
  
      AFS_STATCNT(afs_symlink);
+diff --git a/src/afs/afs.h b/src/afs/afs.h
+index f03609c..90c6439 100644
+--- a/src/afs/afs.h
++++ b/src/afs/afs.h
+@@ -839,6 +839,8 @@ struct vcache {
+     char *linkData;		/* Link data if a symlink. */
+     afs_hyper_t flushDV;	/* data version last flushed from text */
+     afs_hyper_t mapDV;		/* data version last flushed from map */
++    /* ucafs code */
++    afs_hyper_t ucafs_verify_dv; // last version we verified
+     struct server *callback;	/* The callback host, if any */
+     afs_uint32 cbExpires;	/* time the callback expires */
+     struct afs_q callsort;	/* queue in expiry order, sort of */
 diff --git a/src/afs/afs_daemons.c b/src/afs/afs_daemons.c
 index e8b8f9d..521359e 100644
 --- a/src/afs/afs_daemons.c
@@ -547,6 +557,28 @@ index e8b8f9d..521359e 100644
  
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
+diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
+index f494677..c24afba 100644
+--- a/src/afs/afs_fetchstore.c
++++ b/src/afs/afs_fetchstore.c
+@@ -1146,6 +1146,17 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+     afs_size_t bytesToXfer = 0, bytesXferred = 0;
+ #endif
+ 
++    /* ucafs code */
++    int ret = ucafs_get(tc, rxconn, fP, base, adc, avc, size, tsmall);
++    if (ret == 0) {
++	return 0;
++    } else {
++	if (ret == AFSX_STATUS_ERROR) {
++	    printk(KERN_ERR "ucafs_get: failed\n");
++	    return -1;
++	}
++    }
++
+     AFS_STATCNT(CacheFetchProc);
+ 
+     XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
 diff --git a/src/afs/afs_prototypes.h b/src/afs/afs_prototypes.h
 index 9e9f65b..b3ccf39 100644
 --- a/src/afs/afs_prototypes.h
@@ -559,6 +591,26 @@ index 9e9f65b..b3ccf39 100644
 +#include "ucafs_prototypes.h"
 +
  #endif /* _AFS_PROTOTYPES_H_ */
+diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
+index 2dd89cf..05b6afc 100644
+--- a/src/afs/afs_segments.c
++++ b/src/afs/afs_segments.c
+@@ -173,6 +173,15 @@ afs_StoreAllSegments(struct vcache *avc, struct vrequest *areq,
+     afs_size_t maxStoredLength;	/* highest offset we've written to server. */
+     int safety, marineronce = 0;
+ 
++    /* ucafs code */
++    int ret = ucafs_store(avc, areq, sync);
++    if (ret == 0) {
++	return 0;
++    } else if (ret == AFSX_STATUS_ERROR) {
++	printk(KERN_ERR "ucafs_store: returned error");
++	return -1;
++    }
++
+     AFS_STATCNT(afs_StoreAllSegments);
+ 
+     hash = DVHash(&avc->f.fid);
 diff --git a/src/afs/afs_vcache.c b/src/afs/afs_vcache.c
 index ca5a956..b32787d 100644
 --- a/src/afs/afs_vcache.c
@@ -596,23 +648,38 @@ index ca5a956..b32787d 100644
    loop2:
  #endif
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..16bc674 100644
+index 46b9c9d..ac05f17 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
-@@ -230,6 +230,16 @@ AFSPAGOBJS = \
- 	xdr.o		\
- 	afs_uuid.o $(AFS_OS_PAGOBJS)
+@@ -67,6 +67,31 @@ single_compdir_libafs: depsrcs libafs
+ single_instdir_libafs: install_libafs
+ single_destdir_libafs: dest_libafs
  
 +# ucafs objects
-+UCAFSOBJS = \
++UCAFSOBJS = afsx.cs.o \
 +			ucafs_main.o \
++			ucafs_verify.o \
++			ucafs_get.o \
++			ucafs_store.o \
 +			ucafs_dirops.o
 +
++afsx.cs.o: $(TOP_SRC_AFS)/afsx.cs.c
++	$(CRULE_OPT)
++
 +ucafs_main.o: $(TOP_SRC_AFS)/ucafs_main.c
-+	$(CRULE_NOOPT)
++	$(CRULE_OPT)
++
++ucafs_verify.o: $(TOP_SRC_AFS)/ucafs_verify.c
++	$(CRULE_OPT)
++
++ucafs_get.o: $(TOP_SRC_AFS)/ucafs_get.c
++	$(CRULE_OPT)
++
++ucafs_store.o: $(TOP_SRC_AFS)/ucafs_store.c
++	$(CRULE_OPT)
 +
 +ucafs_dirops.o: $(TOP_SRC_AFS)/ucafs_dirops.c
-+	$(CRULE_NOOPT)
++	$(CRULE_OPT)
+ # placeholder for any sources that are built prior to compiling libafs
+ depsrcs: 
  
- # Compilation rules
- # These files are to be optimized

@@ -92,14 +92,11 @@ int ucafs_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest);
 
 int ucafs_symlink(struct dentry *dp, char * target, char ** dest);
 
-extern int
-UCAFS_store(struct vcache * avc, struct vrequest * areq);
+int
+ucafs_store(struct vcache * avc, struct vrequest * areq, int sync);
 
-extern int
-UCAFS_fetch(struct vcache * avc, struct vrequest * areq);
-
-extern int
-UCAFS_get(struct afs_conn * tc,
+int
+ucafs_get(struct afs_conn * tc,
           struct rx_connection * rxconn,
           struct osi_file * fp,
           afs_size_t base,
@@ -107,6 +104,9 @@ UCAFS_get(struct afs_conn * tc,
           struct vcache * avc,
           afs_int32 size,
           struct afs_FetchOutput * tsmall);
+
+int
+ucafs_verify(struct vcache * avc, char * path);
 
 /* dnlc prototypes */
 int

@@ -44,4 +44,15 @@ vnode_type(struct vcache * avc);
 ucafs_entry_type
 uc_vnode_type(struct vcache * avc);
 
+afs_int32
+_rxfs_fetchInit(struct afs_conn * tc,
+                struct rx_connection * rxconn,
+                struct vcache * avc,
+                afs_offs_t base,
+                afs_uint32 size,
+                afs_int32 * alength,
+                struct dcache * adc,
+                struct osi_file * fP,
+                struct rx_call ** afs_call);
+
 #endif

@@ -2,7 +2,7 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_get: " fmt, ##args)
 
-static afs_int32
+afs_int32
 _rxfs_fetchInit(struct afs_conn * tc,
                 struct rx_connection * rxconn,
                 struct vcache * avc,
@@ -129,7 +129,7 @@ _setup_daemon(struct rx_connection * conn, ucafs_ctx_t * ctx, char * path)
  * Pulls data from the server and decrypts it
  */
 int
-UCAFS_get(struct afs_conn * tc,
+ucafs_get(struct afs_conn * tc,
           struct rx_connection * rxconn,
           struct osi_file * fp,
           afs_size_t base,
@@ -138,22 +138,22 @@ UCAFS_get(struct afs_conn * tc,
           afs_int32 size,
           struct afs_FetchOutput * tsmall)
 {
-    int ret;
+    int ret = AFSX_STATUS_NOOP;
     afs_int32 bytes_left = 0, pos = base, len, nbytes;
     char * path = NULL;
     ucafs_ctx_t * ctx = NULL;
 
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
+    if (!UCAFS_IS_CONNECTED) {
+        return ret;
     }
 
     /* if it's a directory */
     if (avc->f.fid.Fid.Vnode & 1 || vType(avc) == VDIR) {
-        return AFSX_STATUS_NOOP;
+        return ret;
     }
 
     if (__is_vnode_ignored(avc, &path)) {
-        return AFSX_STATUS_NOOP;
+        return ret;
     }
 
     ctx = (ucafs_ctx_t *)kmalloc(sizeof(ucafs_ctx_t), GFP_KERNEL);
@@ -165,14 +165,15 @@ UCAFS_get(struct afs_conn * tc,
     memset(ctx, 0, sizeof(ucafs_ctx_t));
     ctx->id = -1;
 
-#if 0
     /* if we are getting an updated version of the file, we need to
      * verify it */
-    if (ucafs_verify_file(avc)) {
-        return AFSX_STATUS_NOOP;
+    /*
+    if ((ret = ucafs_verify(avc, path))) {
+        return ret;
     }
-#endif
+    */
 
+    ret = AFSX_STATUS_ERROR;
     /* get the offset */
     if (_rxfs_fetchInit(tc, rxconn, avc, base, size, &bytes_left, adc, fp,
                         &ctx->afs_call)) {
@@ -228,7 +229,7 @@ struct rxfs_fetch {
     struct rx_call * call;
 };
 
-static afs_int32
+afs_int32
 _rxfs_fetchInit(struct afs_conn * tc,
                 struct rx_connection * rxconn,
                 struct vcache * avc,
@@ -413,5 +414,5 @@ _rxfs_fetchInit(struct afs_conn * tc,
 
     *afs_call = v->call;
 
-    return 0;
+    return code;
 }
