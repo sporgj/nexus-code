@@ -225,10 +225,6 @@ out:
     return ret;
 }
 
-struct rxfs_fetch {
-    struct rx_call * call;
-};
-
 afs_int32
 _rxfs_fetchInit(struct afs_conn * tc,
                 struct rx_connection * rxconn,
@@ -240,28 +236,23 @@ _rxfs_fetchInit(struct afs_conn * tc,
                 struct osi_file * fP,
                 struct rx_call ** afs_call)
 {
-    struct rxfs_fetch * v;
     int code = 0, code1 = 0;
 #ifdef AFS_64BIT_CLIENT
     afs_uint32 length_hi = 0;
 #endif
     afs_uint32 length = 0, bytes;
-
-    v = (struct rxfs_fetch *)osi_AllocSmallSpace(sizeof(struct rxfs_fetch));
-    if (!v)
-        osi_Panic("rxfs_fetchInit: osi_AllocSmallSpace returned NULL\n");
-    memset(v, 0, sizeof(struct rxfs_fetch));
+    struct rx_call * call;
 
     RX_AFS_GUNLOCK();
-    v->call = rx_NewCall(rxconn);
+    call = rx_NewCall(rxconn);
     RX_AFS_GLOCK();
-    if (v->call) {
+    if (call) {
 #ifdef AFS_64BIT_CLIENT
         afs_size_t length64;     /* as returned from server */
         if (!afs_serverHasNo64Bit(tc)) {
             afs_uint64 llbytes = size;
             RX_AFS_GUNLOCK();
-            code = StartRXAFS_FetchData64(v->call,
+            code = StartRXAFS_FetchData64(call,
                     (struct AFSFid *) &avc->f.fid.Fid,
                     base, llbytes);
             if (code != 0) {
@@ -269,16 +260,16 @@ _rxfs_fetchInit(struct afs_conn * tc,
                 afs_Trace2(afs_iclSetp, CM_TRACE_FETCH64CODE,
                         ICL_TYPE_POINTER, avc, ICL_TYPE_INT32, code);
             } else {
-                bytes = rx_Read(v->call, (char *)&length_hi, sizeof(afs_int32));
+                bytes = rx_Read(call, (char *)&length_hi, sizeof(afs_int32));
                 RX_AFS_GLOCK();
                 if (bytes == sizeof(afs_int32)) {
                     length_hi = ntohl(length_hi);
                 } else {
-                    code = rx_Error(v->call);
+                    code = rx_Error(call);
                     RX_AFS_GUNLOCK();
-                    code1 = rx_EndCall(v->call, code);
+                    code1 = rx_EndCall(call, code);
                     RX_AFS_GLOCK();
-                    v->call = NULL;
+                    call = NULL;
                 }
             }
         }
@@ -289,11 +280,11 @@ _rxfs_fetchInit(struct afs_conn * tc,
                 afs_uint32 pos;
                 pos = base;
                 RX_AFS_GUNLOCK();
-                if (!v->call)
-                    v->call = rx_NewCall(rxconn);
+                if (!call)
+                    call = rx_NewCall(rxconn);
                 code =
                     StartRXAFS_FetchData(
-                            v->call, (struct AFSFid*)&avc->f.fid.Fid,
+                            call, (struct AFSFid*)&avc->f.fid.Fid,
                             pos, size);
                 RX_AFS_GLOCK();
             }
@@ -301,15 +292,15 @@ _rxfs_fetchInit(struct afs_conn * tc,
         }
         if (!code) {
             RX_AFS_GUNLOCK();
-            bytes = rx_Read(v->call, (char *)&length, sizeof(afs_int32));
+            bytes = rx_Read(call, (char *)&length, sizeof(afs_int32));
             RX_AFS_GLOCK();
             if (bytes == sizeof(afs_int32))
                 length = ntohl(length);
             else {
                 RX_AFS_GUNLOCK();
-                code = rx_Error(v->call);
-                code1 = rx_EndCall(v->call, code);
-                v->call = NULL;
+                code = rx_Error(call);
+                code1 = rx_EndCall(call, code);
+                call = NULL;
                 length = 0;
                 RX_AFS_GLOCK();
             }
@@ -330,8 +321,8 @@ _rxfs_fetchInit(struct afs_conn * tc,
                             length_hi, length);
                 }
                 RX_AFS_GUNLOCK();
-                code = rx_EndCall(v->call, RX_PROTOCOL_ERROR);
-                v->call = NULL;
+                code = rx_EndCall(call, RX_PROTOCOL_ERROR);
+                call = NULL;
                 length = 0;
                 RX_AFS_GLOCK();
                 code = code != 0 ? code : EIO;
@@ -359,13 +350,13 @@ _rxfs_fetchInit(struct afs_conn * tc,
             *alength = length;
 #else /* AFS_64BIT_CLIENT */
         RX_AFS_GUNLOCK();
-        code = StartRXAFS_FetchData(v->call, (struct AFSFid *)&avc->f.fid.Fid,
+        code = StartRXAFS_FetchData(call, (struct AFSFid *)&avc->f.fid.Fid,
                 base, size);
         RX_AFS_GLOCK();
         if (code == 0) {
             RX_AFS_GUNLOCK();
             bytes =
-                rx_Read(v->call, (char *)&length, sizeof(afs_int32));
+                rx_Read(call, (char *)&length, sizeof(afs_int32));
             RX_AFS_GLOCK();
             if (bytes == sizeof(afs_int32)) {
                 *alength = ntohl(length);
@@ -376,9 +367,9 @@ _rxfs_fetchInit(struct afs_conn * tc,
                     *alength = 0;
                 }
             } else {
-                code = rx_Error(v->call);
-                code1 = rx_EndCall(v->call, code);
-                v->call = NULL;
+                code = rx_Error(call);
+                code1 = rx_EndCall(call, code);
+                call = NULL;
             }
         }
 #endif /* AFS_64BIT_CLIENT */
@@ -401,18 +392,18 @@ _rxfs_fetchInit(struct afs_conn * tc,
                     "happen! Aborting fetch request.\n",
                     (long)size, (long)*alength);
         }
-        code = rx_Error(v->call);
+        code = rx_Error(call);
         RX_AFS_GUNLOCK();
-        code1 = rx_EndCall(v->call, code);
+        code1 = rx_EndCall(call, code);
         RX_AFS_GLOCK();
-        v->call = NULL;
+        call = NULL;
         code = EIO;
     }
 
     if (!code && code1)
         code = code1;
 
-    *afs_call = v->call;
-
+    *afs_call = call;
+    
     return code;
 }

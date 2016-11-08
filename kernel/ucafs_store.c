@@ -338,51 +338,9 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         tdc = NULL;
     }
 
-#if 0
-    while (index != NULLIDX) {
-        if (afs_indexUnique[index] == avc->f.fid.Fid.Unique) {
-            /* get the tdc at that index */
-            tdc = afs_GetValidDSlot(index); // increments refcount
-            if (!tdc) {
-                ERROR("tdc null. path=%s, index=%d, chunk_no=%d", path, index,
-                      chunk_no);
-                goto out1;
-            }
-
-            ERROR("tdc. chunk=%d, index=%d\n", tdc->f.chunk, tdc->index);
-            // XXX check if the TDC has data
-            // XXX what about the avc->truncPos
-
-            ReleaseReadLock(&tdc->tlock);
-            /* if the fid matches, proceeed, else return the tdc */
-            if (FidCmp(&tdc->f.fid, &avc->f.fid) == 0) {
-                ObtainSharedLock(&tdc->lock, 6504);
-                if (storeproc(ctx, tdc, &nbytes)) {
-                    goto out2;
-                }
-
-                /* update the dcache entry */
-                UpgradeSToWLock(&tdc->lock, 6505);
-                tdc->f.states &= ~DWriting;
-                tdc->dflags |= DFEntryMod;
-                ReleaseWriteLock(&tdc->lock);
-
-                bytes_left -= nbytes;
-            }
-
-            afs_PutDCache(tdc);
-            tdc = NULL;
-        }
-
-        index = afs_dcnextTbl[index];
-        chunk_no++;
-    }
-#endif
-
     /* TODO: run afs_analyze here to make sure all the packets went through */
     UpgradeSToWLock(&avc->lock, 6506);
     avc->f.states &= ~CDirty;
-    ConvertWToSLock(&avc->lock);
 
     ret = 0;
 

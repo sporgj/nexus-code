@@ -18,6 +18,17 @@ extern int UCAFS_IS_CONNECTED;
 typedef struct {
     int id;
     uint8_t srv_64bit;
+    int tlen;
+    int current_offset;
+    void * buffer;
+    int buflen;
+    struct rx_connection * uc_conn;
+    struct rx_call * call;
+} uc_store_t;
+
+typedef struct {
+    int id;
+    uint8_t srv_64bit;
     int buflen;
     void * buffer;
     int32_t len;
