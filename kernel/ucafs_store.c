@@ -336,6 +336,18 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         }
 
         /* update the dcache entry */
+        ObtainWriteLock(&afs_xdcache, 6660);
+        if (afs_indexFlags[tdc->index] & IFDataMod) {
+            afs_indexFlags[tdc->index] &= ~IFDataMod;
+            afs_stats_cmperf.cacheCurrDirtyChunks--;
+            afs_indexFlags[tdc->index] &= ~IFDirtyPages;
+
+            if (sync & AFS_VMSYNC_INVAL) {
+                afs_indexFlags[tdc->index] &= ~IFAnyPages;
+            }
+        }
+        ReleaseWriteLock(&afs_xdcache);
+
         UpgradeSToWLock(&tdc->lock, 6505);
         tdc->f.states &= ~DWriting;
         tdc->dflags |= DFEntryMod;
