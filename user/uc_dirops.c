@@ -20,7 +20,7 @@ dirops_new1(const char * parent_dir,
     uc_dirnode_t *dirnode = NULL, *dirnode1 = NULL;
     uc_filebox_t * filebox = NULL;
     encoded_fname_t * fname_code = NULL;
-    char * temp = NULL;
+    char * metaname = NULL;
     sds path1 = NULL;
 
     /* lets get the directory entry */
@@ -41,8 +41,8 @@ dirops_new1(const char * parent_dir,
         goto out;
     }
 
-    temp = encode_bin2str(fname_code);
-    path1 = uc_get_dnode_path(temp);
+    metaname = metaname_bin2str(fname_code);
+    path1 = uc_get_dnode_path(metaname);
 
     if (type == UC_DIR) {
         if ((dirnode1 = dirnode_new()) == NULL) {
@@ -71,7 +71,7 @@ dirops_new1(const char * parent_dir,
     }
 
     /* Set the encoded name */
-    *shadow_name_dest = temp;
+    *shadow_name_dest = filename_bin2str(fname_code);
     error = 0;
 out:
     /* TODO probably need to perform an additional check here concerning
@@ -86,6 +86,8 @@ out:
         sdsfree(path1);
     if (fname_code)
         free((void *)fname_code);
+    if (metaname)
+        free(metaname);
 
     return error;
 }
@@ -127,7 +129,7 @@ dirops_code2plain(char * encoded_name,
     const char * result;
 
     /* 1 - Get the binary version */
-    if ((fname_code = encode_str2bin(encoded_name)) == NULL) {
+    if ((fname_code = filename_str2bin(encoded_name)) == NULL) {
         return -1;
     }
 
@@ -166,7 +168,8 @@ dirops_move(const char * from_dir,
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
     encoded_fname_t *shadow1_bin = NULL, *shadow2_bin = NULL;
-    char *shadow1_str = NULL, *shadow2_str = NULL;
+    char *shadow1_str = NULL, *shadow2_str = NULL, *metaname1 = NULL,
+         *metaname2 = NULL;
     sds path1 = NULL, path2 = NULL, path3 = NULL;
     sds fpath1 = NULL, fpath2 = NULL;
 
@@ -240,20 +243,22 @@ dirops_move(const char * from_dir,
     }
 
     /* now delete the structures on disk */
-    shadow1_str = encode_bin2str(shadow1_bin);
+    shadow1_str = filename_bin2str(shadow1_bin);
     if (shadow1_str == NULL) {
         slog(0, SLOG_ERROR, "dops_move - Could not convert shadowname to str");
         goto out;
     }
 
-    shadow2_str = encode_bin2str(shadow2_bin);
+    shadow2_str = filename_bin2str(shadow2_bin);
     if (shadow2_str == NULL) {
         slog(0, SLOG_ERROR, "dops_move - Could not convert shadowname to str");
         goto out;
     }
 
-    path1 = uc_get_dnode_path(shadow1_str);
-    path2 = uc_get_dnode_path(shadow2_str);
+    metaname1 = metaname_bin2str(shadow1_bin);
+    metaname2 = metaname_bin2str(shadow2_bin);
+    path1 = uc_get_dnode_path(metaname1);
+    path2 = uc_get_dnode_path(metaname2);
 
     /* move the metadata file */
     if (atype != UC_LINK) {
@@ -304,6 +309,14 @@ out:
 
     if (shadow2_bin) {
         free(shadow2_bin);
+    }
+
+    if (metaname1) {
+        free(metaname1);
+    }
+
+    if (metaname2) {
+        free(metaname2);
     }
 
     if (error && shadow1_str) {
@@ -418,7 +431,7 @@ dirops_symlink(const char * link_path,
     }
 
     /* 7 - return the whole thing */
-    *shadow_name_dest = encode_bin2str(shadow_name2);
+    *shadow_name_dest = metaname_bin2str(shadow_name2);
     error = 0;
 out:
     dcache_put(link_dnode);
@@ -528,7 +541,7 @@ dirops_hardlink(const char * target_path,
     }
 
     /* 7 - return the whole thing */
-    *shadow_name_dest = encode_bin2str(shadow_name2);
+    *shadow_name_dest = filename_bin2str(shadow_name2);
     error = 0;
 out:
     filebox_free(target_fbox);
@@ -583,7 +596,7 @@ dirops_plain2code(const char * fpath_raw,
         goto out;
     }
 
-    *encoded_fname_dest = encode_bin2str(fname_code);
+    *encoded_fname_dest = filename_bin2str(fname_code);
     error = 0;
 
 out:
@@ -603,14 +616,14 @@ __delete_metadata_file(const encoded_fname_t * shadowname_bin, int is_filebox)
     uc_filebox_t * filebox = NULL;
     sds metadata_path;
 
-    char * shadowname_str = encode_bin2str(shadowname_bin);
-    if (shadowname_str == NULL) {
+    char * metaname_str = metaname_bin2str(shadowname_bin);
+    if (metaname_str == NULL) {
         return -1;
     }
 
-    metadata_path = uc_get_dnode_path(shadowname_str);
+    metadata_path = uc_get_dnode_path(metaname_str);
     if (metadata_path == NULL) {
-        free(shadowname_str);
+        free(metaname_str);
         return -1;
     }
 
@@ -655,8 +668,8 @@ out:
         dirnode_free(dirnode);
     }
 
-    if (shadowname_str) {
-        free(shadowname_str);
+    if (metaname_str) {
+        free(metaname_str);
     }
 
     if (metadata_path) {
@@ -714,7 +727,7 @@ dirops_remove(const char * fpath_raw,
         __delete_metadata_file(shadow_name, atype == UC_FILE);
     }
 
-    *encoded_fname_dest = encode_bin2str(shadow_name);
+    *encoded_fname_dest = metaname_bin2str(shadow_name);
     error = 0;
 out:
     dcache_put(dirnode);
