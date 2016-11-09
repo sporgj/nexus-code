@@ -50,7 +50,7 @@ afsx.ss.o: afsx.ss.c
 afsx.ss.c: afsx.xg afsx.h
 	$(RXGEN) -A -x -S -o $@ $<
 
-afsx.h: afsx.xg afsx_hdr.h
+afsx.h: afsx.xg ucafs_defs.h
 	$(RXGEN) -A -x -h -o $@ $<
 
 third/libthird.a:
@@ -64,7 +64,7 @@ libucafs.a: $(OBJS) libthird.a
 	@echo "ar => $@"
 
 uc_rpc.o: uc_rpc.c afsx.ss.c
-	$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
+	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 
 %.o: %.cc %.h

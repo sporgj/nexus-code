@@ -14,6 +14,7 @@ extern "C" {
 #include <uc_dirops.h>
 #include <uc_sgx.h>
 #include <uc_uspace.h>
+#include <uc_utils.h>
 
 using namespace std;
 
@@ -41,7 +42,7 @@ static void
 create_default_dnode()
 {
     sds path = uc_main_dnode_fpath();
-    uinfo("Creating: %s", path);
+    //uinfo("Creating: %s", path);
     uc_dirnode_t * dnode = dirnode_new();
     if (!dirnode_write(dnode, path)) {
         uerror("Could not write: %s", path);
@@ -70,16 +71,20 @@ init_enclave()
         return -1;
     }
 
-    cout << "Loaded enclave" << endl;
+    // cout << "Loaded enclave" << endl;
 
     return 0;
+}
+
+static void setup_repo_path()
+{
+    uc_set_afs_home(TEST_REPO_DIR, NULL, false);
 }
 
 static void
 init_systems()
 {
-    uinfo("Initializing...");
-    uc_set_afs_home(TEST_REPO_DIR, NULL, false);
+    //uinfo("Initializing...");
     dcache_init();
     if (init_enclave()) {
         exit(-1);

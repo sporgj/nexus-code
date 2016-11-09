@@ -18,6 +18,29 @@ dirops_new(const char * fpath,
            ucafs_entry_type type,
            char ** encoded_name_dest);
 
+int
+dirops_new1(const char * parent_dir,
+            const char * fname,
+            ucafs_entry_type type,
+            char ** shadow_name_dest);
+
+/**
+ * Creates a hardlink between two paths.
+ * @param new_path
+ * @param old_path
+ * @param encoded_name_dest
+ * @return 0 on success
+ */
+int
+dirops_hardlink(const char * new_path,
+                const char * old_path,
+                char ** encoded_name_dest);
+
+int
+dirops_symlink(const char * target_path,
+               const char * link_path,
+               char ** shadow_name_dest);
+
 /**
  * Returns the raw file name of an encoded path
  * @param encoded_name is the encoded file name
@@ -56,12 +79,28 @@ int
 dirops_remove(const char * fpath_raw,
               ucafs_entry_type type,
               char ** encoded_fname_dest);
+int
+dirops_move(const char * from_dir,
+            const char * oldname,
+            const char * to_dir,
+            const char * newname,
+            ucafs_entry_type type,
+            char ** ptr_oldname,
+            char ** ptr_newname);
 
 int
-dirops_rename(const char * from_path,
-              const char * to_path,
-              ucafs_entry_type type,
-              char ** raw_name_dest);
+dirops_move1(const char * from_fpath,
+             const char * to_fpath,
+             ucafs_entry_type type,
+             char ** ptr_oldname,
+             char ** ptr_newname);
+
+int
+dirops_rename2(const char * parent_path,
+               const char * old_name,
+               const char * new_name,
+               ucafs_entry_type type,
+               char ** encoded_name_dest);
 #ifdef __cplusplus
 }
 #endif

@@ -3,8 +3,8 @@ include header.mk
 CC=gcc
 
 APP_PATH = ..
-OBJS = ecall_sgx.o\
-	   uc_enclave.o\
+OBJS = uc_ecalls.o\
+	   uc_crypto.o\
 	   elasticarray.o\
 	   elasticqueue.o\
 	   seqptrmap.o

@@ -18,6 +18,12 @@ dirnode_new();
 uc_dirnode_t *
 dirnode_default_dnode();
 
+void
+dirnode_set_parent(uc_dirnode_t * dn, const uc_dirnode_t * parent);
+
+const encoded_fname_t *
+dirnode_get_parent(uc_dirnode_t * dn);
+
 /**
  * Creates a new dirnode object from the path.
  * @param filepath is the absolute path to the file
@@ -53,33 +59,72 @@ dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2);
 bool
 dirnode_flush(uc_dirnode_t * dn);
 
-const encoded_fname_t *
-dirnode_add(uc_dirnode_t * dn, sds fname, ucafs_entry_type type);
+/**
+ * Used to add files and directories
+ * @see dinode_add_alias. Sets p_encoded_name and link_info to NULL
+ */
+encoded_fname_t *
+dirnode_add(uc_dirnode_t * dn, const char * fname, ucafs_entry_type type);
 
-const encoded_fname_t *
+encoded_fname_t *
+dirnode_add_link(uc_dirnode_t * dn,
+                 const char * fname,
+                 const link_info_t * link_info);
+
+/**
+ * Adding an entry to the dirnode
+ * @param dn is the dirnode object
+ * @param fname is the file name 
+ * @param type is the entry type
+ * @param p_encoded_name if the encoded name has been precomputed
+ * @param link_info
+ * @return the encoded name. Keep in mind if a p_encoded_name is passed, the
+ * variable returned would be of a different address and hence requires a 
+ * separate deallocation.
+ */
+encoded_fname_t *
 dirnode_add_alias(uc_dirnode_t * dn,
-                  sds fname,
+                  const char * fname,
                   ucafs_entry_type type,
-                  const encoded_fname_t * p_encoded_name);
+                  const encoded_fname_t * p_encoded_name,
+                  const link_info_t * p_link_info);
 
-const encoded_fname_t *
-dirnode_rm(uc_dirnode_t * dn, const sds realname, ucafs_entry_type type);
+encoded_fname_t *
+dirnode_rm(uc_dirnode_t * dn,
+           const char * realname,
+           ucafs_entry_type type,
+           ucafs_entry_type * p_type,
+           link_info_t ** pp_link_info);
 
 const char *
 dirnode_enc2raw(const uc_dirnode_t * dn,
                 const encoded_fname_t * encoded_name,
-                ucafs_entry_type type);
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type);
 
 const encoded_fname_t *
 dirnode_raw2enc(const uc_dirnode_t * dn,
                 const char * realname,
-                ucafs_entry_type type);
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type);
 
 const encoded_fname_t *
+dirnode_traverse(const uc_dirnode_t * dn,
+                 const char * realname,
+                 ucafs_entry_type type,
+                 ucafs_entry_type * p_type,
+                 const link_info_t ** pp_link_info);
+
+int
 dirnode_rename(uc_dirnode_t * dn,
-               const sds oldname,
-               const sds newname,
-               ucafs_entry_type type);
+               const char * oldname,
+               const char * newname,
+               ucafs_entry_type type,
+               ucafs_entry_type *p_type,
+               encoded_fname_t ** pp_shadow1_bin,
+               encoded_fname_t ** pp_shadow2_bin,
+               link_info_t ** pp_link_info1,
+               link_info_t ** pp_link_info2);
 
 #ifdef __cplusplus
 }

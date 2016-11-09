@@ -1,4 +1,3 @@
-#ifdef AFS_SECURE
 #include "ucafs_kern.h"
 #include <linux/dcache.h>
 
@@ -10,10 +9,10 @@ static const int watch_dir_len[] = { sizeof(watch_dirs[0]) - 1 };
 
 struct rx_connection *conn = NULL, *ping_conn = NULL;
 
-int AFSX_IS_CONNECTED = 0;
+int UCAFS_IS_CONNECTED = 0;
 
 int
-LINUX_AFSX_connect()
+ucafs_connect(void)
 {
     u_long host;
     struct rx_securityClass * null_securityObject;
@@ -40,19 +39,32 @@ LINUX_AFSX_connect()
 }
 
 int
-LINUX_AFSX_ping(void)
+ucafs_ping(void)
 {
     int ret, dummy;
 
     /* lower the timeout, 2 */
     ret = AFSX_fversion(ping_conn, 0, &dummy);
 
-    dummy = AFSX_IS_CONNECTED;
-    AFSX_IS_CONNECTED = (ret == 0);
-    if (dummy != AFSX_IS_CONNECTED) {
-        printk(KERN_ERR "connected: %d, ret = %d\n", AFSX_IS_CONNECTED, ret);
+    dummy = UCAFS_IS_CONNECTED;
+    UCAFS_IS_CONNECTED = (ret == 0);
+    if (dummy != UCAFS_IS_CONNECTED) {
+        printk(KERN_ERR "connected: %d, ret = %d\n", UCAFS_IS_CONNECTED, ret);
     }
     return 0;
+}
+
+char *
+uc_mkpath(const char * parent_path, const char * fname)
+{
+    int len1 = strlen(parent_path), len2 = strlen(fname);
+    char * rv = (char *)kmalloc(len1 + len2 + 2, GFP_KERNEL);
+    memcpy(rv, parent_path, len1);
+    rv[len1] = '/';
+    memcpy(rv + len1 + 1, fname, len2);
+    rv[len1 + len2 + 1] = '\0';
+
+    return rv;
 }
 
 struct rx_connection *
@@ -76,18 +88,40 @@ __put_conn(struct rx_connection * c)
     rx_PutConnection(c);
 }
 
-static inline ucafs_entry_type
+inline ucafs_entry_type
+uc_vnode_type(struct vcache * vnode)
+{
+    if (vnode == NULL) {
+        return UC_ANY;
+    }
+
+    switch(vType(vnode)) {
+        case VREG: return UC_FILE;
+        case VDIR: return UC_DIR;
+        case VLNK: return UC_LINK;
+    }
+
+    return UC_ANY;
+}
+
+inline ucafs_entry_type
 dentry_type(struct dentry * dentry)
 {
     if (d_is_file(dentry)) {
-        return UCAFS_TYPE_FILE;
+        return UC_FILE;
     } else if (d_is_dir(dentry)) {
-        return UCAFS_TYPE_DIR;
+        return UC_DIR;
     } else if (d_is_symlink(dentry)) {
-        return UCAFS_TYPE_LINK;
+        return UC_LINK;
     }
 
-    return UCAFS_TYPE_UNKNOWN;
+    return UC_ANY;
+}
+
+inline ucafs_entry_type
+vnode_type(struct vcache * avc)
+{
+    return dentry_type(d_find_alias(AFSTOV(avc)));
 }
 
 bool
@@ -110,15 +144,23 @@ __is_dentry_ignored(struct dentry * dentry, char ** dest)
     char *path, *curr_dir, *result;
     char buf[512];
 
-    // TODO cache the inode number
-    /*printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d dentry_name=%s",
+    /* TODO cache the inode number
+    printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d
+    dentry_name=%s",
            dentry->d_parent, dentry, dentry->d_iname, dentry->d_name.len,
-           dentry->d_name.name);*/
+           dentry->d_name.name); */
     path = dentry_path_raw(dentry, buf, sizeof(buf));
 
-    /*printk(KERN_ERR "path=%p\n", path);
+    if (IS_ERR_OR_NULL(path)) {
+        print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf,
+                       sizeof(buf), 1);
+        return 1;
+    }
+
+    /*
+    printk(KERN_ERR "path=%p\n", path);
     print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf),
-                   1);*/
+                   1); */
 
     for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
         curr_dir = watch_dirs[i];
@@ -150,153 +192,17 @@ UCAFS_ignore_dentry(struct dentry * dp, char ** dest)
 inline int
 __is_vnode_ignored(struct vcache * avc, char ** dest)
 {
+    // if it's null, just ignore it
+    if (avc == NULL) {
+        return 1;
+    }
+
     return __is_dentry_ignored(d_find_alias(AFSTOV(avc)), dest);
 }
 
-int
-UCAFS_create(char ** dest, ucafs_entry_type type, struct dentry * dp)
+inline int
+ucafs_vnode_path(struct vcache * avc, char ** dest)
 {
-    int ret;
-    char * fpath;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    if (__is_dentry_ignored(dp, &fpath)) {
-        return AFSX_STATUS_NOOP;
-    }
-    conn = __get_conn();
-
-    ret = AFSX_create(conn, fpath, type, dest);
-    if (ret) {
-        if (ret == AFSX_STATUS_ERROR) {
-            printk(KERN_ERR "error on file %s\n", fpath);
-        }
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    kfree(fpath);
-    return ret;
+    return __is_vnode_ignored(avc, dest);
 }
 
-int
-UCAFS_find(char ** dest, char * fname, ucafs_entry_type type, char * dirpath)
-{
-    int ret;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    conn = __get_conn();
-
-    if ((ret = AFSX_find(conn, fname, dirpath, type, dest))) {
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    return ret;
-}
-
-int
-UCAFS_lookup(char ** dest, struct dentry * dp)
-{
-    int ret;
-    char * fpath;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
-        return -1;
-    }
-
-    if (dp->d_name.len > 100) {
-        return -1;
-    }
-
-    if (__is_dentry_ignored(dp, &fpath)) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    conn = __get_conn();
-
-    if ((ret = AFSX_lookup(conn, fpath, dentry_type(dp), dest))) {
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    kfree(fpath);
-    return ret;
-}
-
-int
-UCAFS_remove(char ** dest, struct dentry * dp)
-{
-    int ret;
-    char * fpath;
-    struct rx_connection * conn = NULL;
-
-    *dest = NULL;
-    if (!AFSX_IS_CONNECTED) {
-        return -1;
-    }
-
-    if (__is_dentry_ignored(dp, &fpath)) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    conn = __get_conn();
-
-    if ((ret = AFSX_remove(conn, fpath, dentry_type(dp), dest))) {
-        *dest = NULL;
-    }
-
-    __put_conn(conn);
-    kfree(fpath);
-    return ret;
-}
-
-int
-UCAFS_rename(char ** dest, struct dentry * from_dp, struct dentry * to_dp)
-{
-    int ret = AFSX_STATUS_NOOP, ignore_from, ignore_to;
-    char *from_path = NULL, *to_path = NULL;
-    struct rx_connection * conn = NULL;
-
-    if (!AFSX_IS_CONNECTED) {
-        return AFSX_STATUS_NOOP;
-    }
-
-    ignore_from = __is_dentry_ignored(from_dp, &from_path);
-    ignore_to = __is_dentry_ignored(to_dp, &to_path);
-
-    printk(KERN_ERR "renaming: %s -> %s\n", from_path, to_path);
-
-    if (ignore_from && ignore_to) {
-        goto out;
-    }
-
-    conn = __get_conn();
-
-    *dest = NULL;
-    if ((ret
-         = AFSX_rename(conn, from_path, to_path, dentry_type(from_dp), dest))) {
-    }
-
-    __put_conn(conn);
-out:
-    if (from_path)
-        kfree(from_path);
-    if (to_path)
-        kfree(to_path);
-
-    return ret;
-}
-
-#endif

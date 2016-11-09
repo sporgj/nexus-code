@@ -2,13 +2,14 @@ syntax = "proto2";
 
 message dnode {
 
-    message fentry {
+    message dentry {
         required bytes encoded_name = 1;
         required bytes raw_name = 2;
+        optional bytes link_info = 3;
     }
 
     // all the entries
-    repeated fentry file = 1;
-    repeated fentry dir = 2;
-    repeated fentry link = 3;
+    repeated dentry file = 1;
+    repeated dentry dir = 2;
+    repeated dentry link = 3;
 }

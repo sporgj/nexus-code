@@ -5,6 +5,12 @@
 #include "uc_utils.h"
 
 #define N_SECURITY_OBJECTS 1
+bool_t
+xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
+{
+    // TODO no need to make the additional call_
+    return xdr_afs_uint32(xdrs, (afs_uint32 *)lp);
+}
 
 int
 setup_rx(int port)
@@ -58,22 +64,50 @@ SAFSX_fversion(
     return 0;
 }
 
+static const char *
+struct_type_to_str(ucafs_entry_type type)
+{
+    switch (type) {
+    case UC_FILE:
+        return "touch";
+    case UC_DIR:
+        return "mkdir";
+    case UC_LINK:
+        return "softlink";
+    default:
+        return "(unknown)";
+    }
+}
+
 afs_int32
 SAFSX_create(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * path,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** crypto_fname)
 {
     int ret = dirops_new(path, type, crypto_fname);
     if (ret) {
         *crypto_fname = EMPTY_STR_HEAP;
     } else {
-        uinfo("%s: %s ~> %s",
-              (type == UCAFS_TYPE_FILE
-                   ? "touch"
-                   : (type == UCAFS_TYPE_DIR ? "mkdir" : "link")),
-              path, *crypto_fname);
+        uinfo("%s: %s ~> %s", struct_type_to_str(type), path, *crypto_fname);
+    }
+    return ret;
+}
+
+afs_int32 SAFSX_create1(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * parent_dir,
+	/*IN */ char * name,
+	/*IN */ afs_int32 type,
+	/*OUT*/ char * *shadow_name_dest)
+{
+    int ret = dirops_new1(parent_dir, name, type, shadow_name_dest);
+    if (ret) {
+        *shadow_name_dest = EMPTY_STR_HEAP;
+    } else {
+        uinfo("%s: %s/%s ~> %s", struct_type_to_str(type), parent_dir, name,
+              *shadow_name_dest);
     }
     return ret;
 }
@@ -83,7 +117,7 @@ SAFSX_find(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fake_name,
     /*IN */ char * path,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** real_name)
 {
     int ret = dirops_code2plain(fake_name, path, type, real_name);
@@ -99,7 +133,7 @@ afs_int32
 SAFSX_lookup(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** fake_name)
 {
     int ret = dirops_plain2code(fpath, type, fake_name);
@@ -114,17 +148,21 @@ SAFSX_lookup(
 afs_int32
 SAFSX_rename(
     /*IN */ struct rx_call * z_call,
-    /*IN */ char * old_fpath,
-    /*IN */ char * new_path,
-    /*IN */ ucafs_entry_type type,
-    /*OUT*/ char ** code_name)
+    /*IN */ char * from_path,
+    /*IN */ char * oldname,
+    /*IN */ char * to_path,
+    /*IN */ char * newname,
+    /*IN */ afs_int32 type,
+    /*OUT*/ char ** old_shadow_name,
+    /*OUT*/ char ** new_shadow_name)
 {
-    int ret = dirops_rename(old_fpath, new_path, type, code_name);
+    int ret = dirops_move(from_path, oldname, to_path, newname, type,
+                          old_shadow_name, new_shadow_name);
     if (ret) {
-        *code_name = EMPTY_STR_HEAP;
-        uerror("Renaming '%s' -> '%s' FAILED", old_fpath, new_path);
+        *old_shadow_name = EMPTY_STR_HEAP;
+        *new_shadow_name = EMPTY_STR_HEAP;
     } else {
-        uinfo("Renamed '%s' -> '%s'", old_fpath, new_path);
+        uinfo("Renamed '%s' -> '%s'", oldname, newname);
     }
 
     return ret;
@@ -134,34 +172,65 @@ afs_int32
 SAFSX_remove(
     /*IN */ struct rx_call * z_call,
     /*IN */ char * fpath,
-    /*IN */ ucafs_entry_type type,
+    /*IN */ afs_int32 type,
     /*OUT*/ char ** code_name)
 {
-    const char * str = (type == UCAFS_TYPE_FILE) ? "rm" : "rmdir";
+    const char * str = (type == UC_DIR) ? "rmdir" : "rm";
     int ret = dirops_remove(fpath, type, code_name);
     if (ret) {
         *code_name = EMPTY_STR_HEAP;
-        uerror("%s FAILED: %s", str, fpath);
     } else {
         uinfo("%s: %s ~> %s", str, fpath, *code_name);
     }
     return ret;
 }
 
-#define RWOP_TO_STR(op) (op == UCAFS_WRITEOP ? "write" : "read")
+afs_int32
+SAFSX_hardlink(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ char * old_path,
+    /*IN */ char * new_path,
+    /*OUT*/ char ** code_name)
+{
+    int ret = dirops_hardlink(old_path, new_path, code_name);
+    if (ret) {
+        *code_name = EMPTY_STR_HEAP;
+    } else {
+        uinfo("hardlink: %s (%s) ~> %s", new_path, *code_name, old_path);
+    }
+    return ret;
+}
+
+afs_int32 SAFSX_symlink(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * old_path,
+	/*IN */ char * new_path,
+	/*OUT*/ char * *code_name)
+{
+    int ret = dirops_symlink(old_path, new_path, code_name);
+    if (ret) {
+        *code_name = EMPTY_STR_HEAP;
+    } else {
+        uinfo("symlink: %s (%s) ~> %s", new_path, *code_name, old_path);
+    }
+    return ret;
+}
+
+#define RWOP_TO_STR(op) (op == UC_ENCRYPT ? "write" : "read")
 afs_int32
 SAFSX_readwrite_start(
     /*IN */ struct rx_call * z_call,
     /*IN */ int op,
     /*IN */ char * fpath,
     /*IN */ afs_uint32 max_chunk_size,
+    /*IN */ afs_uint32 offset,
     /*IN */ afs_uint32 total_size,
     /*OUT*/ afs_int32 * id)
 {
     int ret;
     xfer_context_t * ctx;
 
-    ret = fileops_start(op, fpath, max_chunk_size, total_size, id);
+    ret = fileops_start(op, fpath, max_chunk_size, offset, total_size, id);
     if (ctx == NULL) {
         if (ret == -2) {
             uerror("rw: %s, enclave failed", fpath);
@@ -170,8 +239,8 @@ SAFSX_readwrite_start(
         return AFSX_STATUS_NOOP;
     }
 
-    uinfo("begin %s: %s (%u, %u) id=%d", RWOP_TO_STR(op), fpath, max_chunk_size,
-          total_size, *id);
+    uinfo("begin %s: %s (%u, %u, %u) id=%d", RWOP_TO_STR(op), fpath,
+          max_chunk_size, offset, total_size, *id);
 
     return AFSX_STATUS_SUCCESS;
 }

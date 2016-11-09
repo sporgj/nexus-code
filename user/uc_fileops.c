@@ -30,7 +30,8 @@ int
 fileops_start(int op,
               const char * fpath,
               uint32_t max_xfer_size,
-              uint32_t filelength,
+              int32_t position,
+              uint32_t total_len,
               int * p_id)
 {
     int ret = -1;
@@ -39,6 +40,16 @@ fileops_start(int op,
     xfer_context_t * xfer_ctx = NULL;
 
     *p_id = -2;
+
+    if (position % 16) {
+        slog(0, SLOG_ERROR, "fileops - invalid offset(%d)", position);
+        return ret;
+    }
+
+    if ((op & UC_ENCRYPT) && (op & UC_DECRYPT)) {
+        slog(0, SLOG_ERROR, "fileops - Can't try to encrypt and decrypt");
+        return ret;
+    }
 
     /* get the filebox object */
     if ((fb = dcache_get_filebox(fpath)) == NULL) {
@@ -63,7 +74,8 @@ fileops_start(int op,
     xfer_ctx->op = op;
     xfer_ctx->completed = 0;
     xfer_ctx->buflen = max_xfer_size;
-    xfer_ctx->raw_len = filelength;
+    xfer_ctx->position = position;
+    xfer_ctx->total_len = total_len;
     xfer_ctx->path = strdup(fpath);
 
     /* TODO: change the argument to the appropriate index */
@@ -72,24 +84,26 @@ fileops_start(int op,
         goto out;
     }
 
+#ifdef UCAFS_SGX
     ecall_init_crypto(global_eid, &ret, xfer_ctx, crypto_ctx);
     if (ret) {
         slog(0, SLOG_FATAL, "fileops - Enclave error on starting operation");
         goto out;
     }
+#endif
 
     /* TODO move this to an init function */
     if (xfer_context_array == NULL) {
         xfer_context_array = seqptrmap_init();
     }
 
-    if ((xfer_ctx->id = seqptrmap_add(xfer_context_array, xfer_ctx)) == -1) {
+    if ((xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx)) == -1) {
         // TODO delete context from enclave space
         slog(0, SLOG_ERROR, "fileops - Adding to list failed");
         goto out;
     }
 
-    *p_id = xfer_ctx->id;
+    *p_id = xfer_ctx->xfer_id;
     ret = 0;
 out:
     if (crypto_ctx) {
@@ -131,12 +145,14 @@ fileops_process_data(uint8_t ** buffer)
         = (xfer_context_t *)((uintptr_t)buffer
                              - offsetof(xfer_context_t, buffer));
 
+#ifdef UCAFS_SGX
     //hexdump(*buffer, MIN(xfer_ctx->valid_buflen, 32));
     ecall_crypt_data(global_eid, &ret, xfer_ctx);
     if (ret) {
         goto out;
     }
     //hexdump(*buffer, MIN(xfer_ctx->valid_buflen, 32));
+#endif
 
     xfer_ctx->completed += xfer_ctx->valid_buflen;
 out:
@@ -166,15 +182,17 @@ fileops_finish(int id)
         return ret;
     }
 
+#ifdef UCAFS_SGX
     /* now we can proceed with the crypto stuff */
     ecall_finish_crypto(global_eid, &ret, xfer_ctx, crypto_ctx);
     if (ret) {
         slog(0, SLOG_ERROR, "fileops - Crypto operation failed");
         goto out;
     }
+#endif
 
     /* save the filebox to disk */
-    if (xfer_ctx->op == UCAFS_WRITEOP) {
+    if (xfer_ctx->op == UC_ENCRYPT) {
         filebox_set_crypto(fb, 0, crypto_ctx);
         filebox_flush(fb);
         filebox_free(fb);

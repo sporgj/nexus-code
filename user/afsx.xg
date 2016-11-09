@@ -8,16 +8,7 @@ prefix S
 %#include <rx/rx.h>
 %#include <rx/rx_null.h>
 
-%#include "afsx_hdr.h"
-
-%#ifndef UCAFS_ENTRY_TYPE
-%#define UCAFS_ENTRY_TYPE
-%static bool_t xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
-%{
-%    // TODO no need to make the additional call_
-%    return xdr_afs_uint32(xdrs, (afs_uint32 *)lp);
-%}
-%#endif
+%#include "ucafs_defs.h"
 
 /* maximum number of requests to be handled silmutaneously */
 %#define AFSX_REQ_MAX           2
@@ -35,43 +26,66 @@ fversion(
 
 create(
     IN string path<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string crypto_fname<AFSX_FNAME_MAX>
 ) = 131;
+
+create1(
+    IN string parent_dir<AFSX_PATH_MAX>,
+    string name<AFSX_FNAME_MAX>,
+    afs_int32 type,
+    OUT string shadow_name_dest<AFSX_FNAME_MAX>
+) = 132;
 
 find(
     IN string fake_name<AFSX_FNAME_MAX>,
     string path<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string real_name<AFSX_FNAME_MAX>
-) = 132;
+) = 141;
 
 lookup(
     IN string fpath<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string fake_name<AFSX_FNAME_MAX>
-) = 133;
+) = 151;
 
 remove(
     IN string fpath<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    afs_int32 type,
     OUT string code_name<AFSX_FNAME_MAX>
-) = 134;
+) = 161;
 
 rename(
     IN string old_fpath<AFSX_PATH_MAX>,
+    string oldname<AFSX_FNAME_MAX>,
     string new_path<AFSX_PATH_MAX>,
-    ucafs_entry_type type,
+    string newname<AFSX_FNAME_MAX>,
+    afs_int32 type,
+    OUT string old_shadow_name<AFSX_FNAME_MAX>,
+    string new_shadow_name<AFSX_FNAME_MAX>
+) = 171;
+
+hardlink(
+    IN string old_path<AFSX_PATH_MAX>,
+    string new_path<AFSX_PATH_MAX>,
     OUT string code_name<AFSX_FNAME_MAX>
-) = 135;
+) = 181;
+
+symlink(
+    IN string old_path<AFSX_PATH_MAX>,
+    string new_path<AFSX_PATH_MAX>,
+    OUT string code_name<AFSX_FNAME_MAX>
+) = 191;
 
 readwrite_start(
     IN int op,
     string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_chunk_size,
+    afs_uint32 offset,
     afs_uint32 total_size,
     OUT afs_int32 * id
-) = 235;
+) = 201;
     
 readwrite_finish(
     IN afs_int32 id
