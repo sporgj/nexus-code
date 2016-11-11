@@ -42,11 +42,10 @@ fileops_process_data(uint8_t ** buffer);
 /**
  * Closes the file operation
  * @param id is the id of the file operation
- * @param code is the return from the finish operation
  * @return 0 on success
  */
 int
-fileops_finish(int id, int * code);
+fileops_finish(int id);
 
 #ifdef __cplusplus
 }
