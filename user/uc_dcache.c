@@ -140,7 +140,7 @@ dcache_traverse(const sds relative_dirpath)
             }
         }
 
-        if ((encoded_name_str = encode_bin2str(encoded_fname)) == NULL) {
+        if ((encoded_name_str = metaname_bin2str(encoded_fname)) == NULL) {
             break;
         }
 
@@ -275,7 +275,7 @@ dcache_get_filebox(const char * path)
         }
     }
 
-    temp = encode_bin2str(codename);
+    temp = metaname_bin2str(codename);
     fbox_path = uc_get_dnode_path(temp);
 
     fb = filebox_from_file(fbox_path);

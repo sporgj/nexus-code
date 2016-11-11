@@ -1,18 +1,14 @@
 #pragma once
 #include "uc_types.h"
 
-/**
- * Returns a string representation of a code
- * @param is the code
- * @return malloced string on success else NULL
- */
 char *
-encode_bin2str(const encoded_fname_t * code);
+metaname_bin2str(const encoded_fname_t * bin);
 
-/**
- * Converts string version of a filename to code type
- * @param encoded_filename is the filename
- * @return malloced stirng on success
- */
 encoded_fname_t *
-encode_str2bin(const char * encoded_filename);
+metaname_str2bin(const char * encoded_filename);
+
+char *
+filename_bin2str(const encoded_fname_t * bin);
+
+encoded_fname_t *
+filename_str2bin(const char * encoded_filename);

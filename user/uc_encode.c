@@ -167,38 +167,49 @@ out:
     return;
 }
 
-char *
-encode_bin2str(const encoded_fname_t * code)
+static size_t encoded_str_size = 0;
+
+static inline void
+compute_encoded_str_size()
+{
+    encoded_fname_t code;
+    if (encoded_str_size == 0) {
+        ecryptfs_encode_for_filename(NULL, &encoded_str_size, (uint8_t *)&code,
+                                     sizeof(encoded_fname_t));
+    }
+}
+
+static char *
+encode_bin2str(const encoded_fname_t * code, char * prefix, size_t prefix_len)
 {
     char * result = NULL;
     size_t sz;
 
-    // TODO optimize this, no need to call the function twice
-    ecryptfs_encode_for_filename((uint8_t *)result, &sz, (uint8_t *)code,
-                                 sizeof(encoded_fname_t));
-
-    if ((result = (char *)calloc(1, UCAFS_FNAME_PREFIX_LEN + sz + 1)) == NULL) {
+    compute_encoded_str_size();
+    result = (char *)malloc(prefix_len + encoded_str_size + 1);
+    if (result == NULL) {
         return NULL;
     }
 
-    memcpy(result, UCAFS_FNAME_PREFIX, UCAFS_FNAME_PREFIX_LEN);
-    ecryptfs_encode_for_filename((uint8_t *)result + UCAFS_FNAME_PREFIX_LEN,
-                                 &sz, (uint8_t *)code, sizeof(encoded_fname_t));
+    memcpy(result, prefix, prefix_len);
+    ecryptfs_encode_for_filename((uint8_t *)result + prefix_len, &sz,
+                                 (uint8_t *)code, sizeof(encoded_fname_t));
 
+    result[sz] = '\0';
     return result;
 }
 
-encoded_fname_t *
-encode_str2bin(const char * encoded_filename)
+static encoded_fname_t *
+encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
 {
     size_t src_sz = strlen(encoded_filename);
     size_t i, dst_sz;
     const char * _encoded_fname;
 
-    if (src_sz > UCAFS_FNAME_PREFIX_LEN) {
-        for (i = 0; i < UCAFS_FNAME_PREFIX_LEN; i++) {
+    if (src_sz > prefix_len) {
+        for (i = 0; i < prefix_len; i++) {
             // if it's not prefixed, don't even bother
-            if (encoded_filename[i] != UCAFS_FNAME_PREFIX[i]) {
+            if (encoded_filename[i] != prefix[i]) {
                 return NULL;
             }
         }
@@ -207,11 +218,15 @@ encode_str2bin(const char * encoded_filename)
         return NULL;
     }
 
-    _encoded_fname = encoded_filename + UCAFS_FNAME_PREFIX_LEN;
-    src_sz -= UCAFS_FNAME_PREFIX_LEN;
+    _encoded_fname = encoded_filename + prefix_len;
+    src_sz -= prefix_len;
 
     dst_sz = ecryptfs_max_decoded_size(src_sz);
-    encoded_fname_t * code = (encoded_fname_t *)calloc(1, dst_sz);
+    if (dst_sz != sizeof(encoded_fname_t)) {
+        return NULL;
+    }
+
+    encoded_fname_t * code = (encoded_fname_t *)malloc(sizeof(encoded_fname_t));
     if (code == NULL) {
         return NULL;
     }
@@ -220,4 +235,32 @@ encode_str2bin(const char * encoded_filename)
                                   (uint8_t *)_encoded_fname, src_sz);
 
     return code;
+}
+
+char *
+metaname_bin2str(const encoded_fname_t * bin)
+{
+    return encode_bin2str(bin, UC_METADATA_PREFIX,
+                          UC_PREFIX_LEN(UC_METADATA_PREFIX));
+}
+
+encoded_fname_t *
+metaname_str2bin(const char * str)
+{
+    return encode_str2bin(str, UC_METADATA_PREFIX,
+                          UC_PREFIX_LEN(UC_METADATA_PREFIX));
+}
+
+char *
+filename_bin2str(const encoded_fname_t * bin)
+{
+    return encode_bin2str(bin, UC_FILEDATA_PREFIX,
+                          UC_PREFIX_LEN(UC_FILEDATA_PREFIX));
+}
+
+encoded_fname_t *
+filename_str2bin(const char * str)
+{
+    return encode_str2bin(str, UC_FILEDATA_PREFIX,
+                          UC_PREFIX_LEN(UC_FILEDATA_PREFIX));
 }
