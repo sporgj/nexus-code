@@ -431,7 +431,7 @@ dirops_symlink(const char * link_path,
     }
 
     /* 7 - return the whole thing */
-    *shadow_name_dest = metaname_bin2str(shadow_name2);
+    *shadow_name_dest = filename_bin2str(shadow_name2);
     error = 0;
 out:
     dcache_put(link_dnode);
@@ -598,7 +598,6 @@ dirops_plain2code(const char * fpath_raw,
 
     *encoded_fname_dest = filename_bin2str(fname_code);
     error = 0;
-
 out:
     dcache_put(dirnode);
     if (fname)
@@ -727,7 +726,7 @@ dirops_remove(const char * fpath_raw,
         __delete_metadata_file(shadow_name, atype == UC_FILE);
     }
 
-    *encoded_fname_dest = metaname_bin2str(shadow_name);
+    *encoded_fname_dest = filename_bin2str(shadow_name);
     error = 0;
 out:
     dcache_put(dirnode);

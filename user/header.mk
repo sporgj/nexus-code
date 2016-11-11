@@ -8,6 +8,12 @@ ifeq ($(UCAFS_SGX), 1)
        FLAGS := -DUCAFS_SGX
 endif
 
+ifeq ($(UCAFS_DEV), 1)
+       FLAGS += -DUCAFS_DEV
+else
+       FLAGS += -UUCAFS_DEV
+endif
+
 KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs

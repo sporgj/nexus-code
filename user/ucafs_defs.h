@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef KERNEL
+#include "ucafs_gens.h"
+#endif
+
 #define AFSX_SERVER_PORT       9462
 #define AFSX_SERVICE_PORT      0
 #define AFSX_SERVICE_ID        4
@@ -12,6 +16,16 @@
 
 #define AFSX_FNAME_MAX         256
 #define AFSX_PATH_MAX       1024
+
+#ifdef UCAFS_DEV
+#define UC_AFS_PATH_KERN    "/xyz.vm/user/djoko"
+#define UC_AFS_PATH         "/afs" UC_AFS_PATH_KERN
+#else
+#define UC_AFS_PATH_KERN    "/maatta.sgx/user/bruyne"
+#define UC_AFS_PATH         "/afs" UC_AFS_PATH_KERN
+#endif
+
+#define UC_AFS_WATCH    "sgx"
 
 /* prefixes for the different file types */
 #define UC_METADATA_PREFIX "md"

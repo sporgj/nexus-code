@@ -6,7 +6,7 @@ include $(UCAFS_DIR)/sgx_defs.mk
 
 LIBS += $(App_Link_Flags) -lgtest -lgtest_main
 
-TESTS = test_dirops test_utils
+TESTS = test_dirops
 
 all: clean tests
 

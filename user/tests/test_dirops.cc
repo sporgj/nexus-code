@@ -49,8 +49,9 @@ TEST_F(TestDirops, FileCreation) {
 
     /* Asserting the filebox file was creating */
     struct stat stat_buf;
-    sds path2 = uc_get_dnode_path(test);
-    ASSERT_EQ(0, stat(path2, &stat_buf)) << "Filebox does not exist";
+    sds path2 = uc_get_dnode_path(file_to_meta(test));
+    ASSERT_EQ(0, stat(path2, &stat_buf))
+	<< "Filebox " << path2 << " does not exist";
 
     /* deleting the entry from the dirnode */
     ASSERT_TRUE(dirops_remove(path, UC_FILE, &test2) == 0)
@@ -95,12 +96,12 @@ TEST_F(TestDirops, FileRenaming1) {
     sdsfree(temp_path);
 
     /* verifying the old dnode path is not accessible */
-    temp_path = uc_get_dnode_path(temp1);
+    temp_path = uc_get_dnode_path(file_to_meta(temp1));
     ASSERT_NE(0, stat(temp_path, &stat_buf)) << temp_path
                                              << " should not exist";
     sdsfree(temp_path);
 
-    temp_path = uc_get_dnode_path(temp3);
+    temp_path = uc_get_dnode_path(file_to_meta(temp3));
     ASSERT_EQ(0, stat(temp_path, &stat_buf)) << temp_path
 	<< " filebox is not accessible";
     sdsfree(temp_path);
@@ -125,7 +126,7 @@ TEST_F(TestDirops, HardLinkTest1)
     /* 1 - Create the file */
     ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp))
 	<< "dirops_new failed";
-    filebox_path = uc_get_dnode_path(temp);
+    filebox_path = uc_get_dnode_path(file_to_meta(temp));
 
     /* 2 - hardlink the file */
     ASSERT_EQ(0, dirops_hardlink(filepath, linkpath, &temp2));
@@ -169,7 +170,7 @@ TEST_F(TestDirops, HardLinkTest2)
     /* 1 - Create the file */
     ASSERT_EQ(0, dirops_new(filepath, UC_FILE, &temp))
 	<< "dirops_new failed";
-    filebox_path = uc_get_dnode_path(temp);
+    filebox_path = uc_get_dnode_path(file_to_meta(temp));
 
     /* 2 - hardlink the file */
     ASSERT_EQ(0, dirops_hardlink(filepath, linkpath, &temp2));

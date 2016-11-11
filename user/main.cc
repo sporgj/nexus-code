@@ -24,7 +24,7 @@ sgx_enclave_id_t global_eid = 0;
 extern "C" int setup_rx(int);
 extern "C" void dcache_init();
 
-const char afs_path[] = "/afs/maatta.sgx/user/bruyne";
+const char afs_path[] = UC_AFS_PATH;
 static bool check_main_dir()
 {
     sds afsx_repo = uc_get_repo_path();
@@ -58,7 +58,7 @@ static bool check_main_dir()
 int main(int argc, char ** argv)
 {
     int ret, updated;
-    uc_set_afs_home(afs_path, "sgx", true);
+    uc_set_afs_home(afs_path, UC_AFS_WATCH, true);
 
     /* initialize the enclave */
 #ifdef UCAFS_SGX
@@ -81,6 +81,7 @@ int main(int argc, char ** argv)
 
     dcache_init();
 
+    cout << ":: Checking " << afs_path << "..." << endl;
     if (!check_main_dir()) {
         return -1;
     }

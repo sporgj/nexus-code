@@ -76,6 +76,24 @@ init_enclave()
     return 0;
 }
 
+static sds
+meta_to_file(const char * meta_shdw_name)
+{
+    sds rv = sdsnew(UC_FILEDATA_PREFIX);
+    rv = sdscat(rv, meta_shdw_name + UC_PREFIX_LEN(UC_METADATA_PREFIX));
+
+    return rv;
+}
+
+static sds
+file_to_meta(const char * file_shdw_name)
+{
+    sds rv = sdsnew(UC_METADATA_PREFIX);
+    rv = sdscat(rv, file_shdw_name + UC_PREFIX_LEN(UC_FILEDATA_PREFIX));
+
+    return rv;
+}
+
 static void setup_repo_path()
 {
     uc_set_afs_home(TEST_REPO_DIR, NULL, false);

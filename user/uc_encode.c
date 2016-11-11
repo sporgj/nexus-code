@@ -222,7 +222,7 @@ encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
     src_sz -= prefix_len;
 
     dst_sz = ecryptfs_max_decoded_size(src_sz);
-    if (dst_sz != sizeof(encoded_fname_t)) {
+    if (dst_sz < sizeof(encoded_fname_t)) {
         return NULL;
     }
 

@@ -2,11 +2,12 @@ COMMONPATH = ../user
 OPENAFS_PATH = ~/openafs
 OPENAFS_SRC = ~/openafs/src
 OPENAFS_SRC_AFS = $(OPENAFS_SRC)/afs
-CC := clang
+CC := gcc
 SRC = afsx.h \
       afsx.cs.c \
       ucafs_defs.h \
       ucafs_kern.h \
+      ucafs_gens.h \
       ucafs_prototypes.h \
       ucafs_get.c \
       ucafs_verify.c \
@@ -14,6 +15,13 @@ SRC = afsx.h \
       ucafs_dirops.c \
       ucafs_dnlc.c \
       ucafs_main.c
+
+include $(COMMONPATH)/build.mk
+ifeq ($(UCAFS_DEV), 1)
+      FLAGS := "\#define UCAFS_DEV"
+else
+      FLAGS := "\#undef UCAFS_DEV"
+endif
 
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
@@ -26,15 +34,18 @@ RXLIBS = -lrx\
 
 GEN = afsx.cs.c afsx.h
 
-all: afsx.cs.c afsx.h ucafs_defs.h
+all: afsx.cs.c afsx.h ucafs_defs.h ucafs_gens.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
 	$(RXGEN) -A -x -C -o $@ $^
 
 afsx.h: $(COMMONPATH)/afsx.xg ucafs_defs.h
 	$(RXGEN) -A -x -h -o $@ $<
 
+ucafs_gens.h: $(COMMONPATH)/build.mk
+	echo $(FLAGS) > $@
+
 ucafs_defs.h: $(COMMONPATH)/ucafs_defs.h
-	cp -u $^ $@
+	cp -u $< $@
 
 .PHONY: install
 install: all

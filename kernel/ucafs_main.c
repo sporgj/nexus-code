@@ -4,7 +4,7 @@
 static const char * afs_prefix = "/afs";
 static const uint32_t afs_prefix_len = 4;
 
-static char * watch_dirs[] = { "/maatta.sgx/user/bruyne/sgx" };
+static char * watch_dirs[] = { UC_AFS_PATH_KERN"/"UC_AFS_WATCH };
 static const int watch_dir_len[] = { sizeof(watch_dirs[0]) - 1 };
 
 struct rx_connection *conn = NULL, *ping_conn = NULL;
@@ -29,6 +29,8 @@ ucafs_connect(void)
 
     rx_SetConnDeadTime(conn, 5);
     rx_SetConnDeadTime(ping_conn, 2);
+
+    printk(KERN_ERR "watch: %s\n", watch_dirs[0]);
 
     if (conn == NULL || ping_conn == NULL) {
         /* maybe have a retry */
