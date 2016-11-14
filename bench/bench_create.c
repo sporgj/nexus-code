@@ -1,16 +1,15 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
 #define prefix_len 7
 
-char * get_random_prefix()
-{
-    char c, * buf;
+char *get_random_prefix() {
+    char c, *buf;
     int j = 0;
-    FILE * fd = fopen("/dev/urandom", "r");
+    FILE *fd = fopen("/dev/urandom", "r");
 
     if (fd == NULL) {
         printf("Error: opening /dev/urandom failed\n");
@@ -27,7 +26,7 @@ char * get_random_prefix()
         fread(&c, 1, 1, fd);
 
         if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) ||
-                (c >= 97  && c <= 122)) {
+            (c >= 97 && c <= 122)) {
             buf[j++] = c;
             i++;
         }
@@ -39,16 +38,15 @@ char * get_random_prefix()
     return buf;
 }
 
-char * get_format(size_t count)
-{
-    const char * format = "%%s%%0%dd";
+char *get_format(size_t count) {
+    const char *format = "%%s%%0%dd";
     int d = 0, len;
     while (count) {
         count /= 10;
         d++;
     }
 
-    char * buf = malloc((len = d + sizeof(format)));
+    char *buf = malloc((len = d + sizeof(format)));
     if (buf == NULL) {
         return NULL;
     }
@@ -58,26 +56,24 @@ char * get_format(size_t count)
 }
 
 #define TIMING_BUFLEN 25
-char * get_timing(size_t diff)
-{
-    double elapsed = diff/CLOCKS_PER_SEC;
-    char * rv = (char *)malloc(TIMING_BUFLEN);
+char *get_timing(size_t diff) {
+    double elapsed = (1000.0 * diff) / CLOCKS_PER_SEC;
+    char *rv = (char *)malloc(TIMING_BUFLEN);
     if (rv == NULL) {
         printf("! Allocation error on get_timing\n");
         return NULL;
     }
 
-    snprintf(rv, TIMING_BUFLEN, "%.6lf s", elapsed);
+    snprintf(rv, TIMING_BUFLEN, "%.6f ms", elapsed);
 
     return rv;
 }
 
-void create_files(size_t count)
-{
-    char * random_prefix = get_random_prefix();
+void create_files(size_t count) {
+    char *random_prefix = get_random_prefix();
     char name[prefix_len + 10];
-    char * format = get_format(count);
-    FILE * fp;
+    char *format = get_format(count);
+    FILE *fp;
     int i, j;
     clock_t start = clock(), diff;
 
@@ -101,7 +97,7 @@ clear:
         fclose(fp);
     }
 
-    char * diff_str = get_timing(diff);
+    char *diff_str = get_timing(diff);
     printf(":: Created %d files (%s)\n", i, diff_str);
     free(diff_str);
 
@@ -116,16 +112,21 @@ clear:
     printf(":: Deleted %d files\n", j);
 }
 
-int main(int argc, char ** argv)
-{
+int main(int argc, char **argv) {
     int x = 10;
     int num = 1;
 
-    for (int j = 0; j < num; j++) {
-        printf(" . %d files\n", x); 
-        create_files(x);
-        printf("\n");
-        x *= 10;
+    if (argc < 2) {
+        printf("Please specify the number of files\n");
+        return -1;
     }
+
+    if ((num = atoi(argv[1])) <= 0) {
+        printf("parsing '%s' failed\n", argv[1]);
+        return -1;
+    }
+
+    printf(":: Workload: %d files\n", num);
+    create_files(num);
     return 0;
 }
