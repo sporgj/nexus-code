@@ -66,13 +66,13 @@ typedef struct {
 /* 128 bits */
 typedef struct {
     uuid_t bin;
-} encoded_fname_t;
+} shadow_t;
 
 typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
     uint8_t type; /* 0 for soft, 1 for hard */
     union {
-        encoded_fname_t meta_file;
+        shadow_t meta_file;
         char target_link[0];
     };
 } __attribute__((packed)) link_info_t;
@@ -85,8 +85,8 @@ typedef struct {
 } __attribute__((packed)) crypto_context_t;
 
 typedef struct {
-    encoded_fname_t uuid;
-    encoded_fname_t parent;
+    shadow_t uuid;
+    shadow_t parent;
     uint8_t is_root;
     uint32_t count;
     uint32_t protolen;

@@ -34,10 +34,10 @@ dirnode_new()
 void
 dirnode_set_parent(uc_dirnode_t * dirnode, const uc_dirnode_t * parent)
 {
-    memcmp(&dirnode->header.parent, &parent->header.uuid, sizeof(encoded_fname_t));
+    memcmp(&dirnode->header.parent, &parent->header.uuid, sizeof(shadow_t));
 }
 
-const encoded_fname_t *
+const shadow_t *
 dirnode_get_parent(uc_dirnode_t * dirnode)
 {
     return &dirnode->header.parent;
@@ -224,14 +224,14 @@ dirnode_flush(uc_dirnode_t * dn)
     return dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
 }
 
-encoded_fname_t *
+shadow_t *
 dirnode_add_alias(uc_dirnode_t * dn,
                   const char * name,
                   ucafs_entry_type type,
-                  const encoded_fname_t * p_encoded_name,
+                  const shadow_t * p_encoded_name,
                   const link_info_t * link_info)
 {
-    encoded_fname_t * encoded_name;
+    shadow_t * encoded_name;
     dnode_dentry * dentry;
 
     if (type == UC_ANY) {
@@ -239,7 +239,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
         return NULL;
     }
 
-    encoded_name = (encoded_fname_t *)malloc(sizeof(encoded_fname_t));
+    encoded_name = (shadow_t *)malloc(sizeof(shadow_t));
     if (encoded_name == NULL) {
         return nullptr;
     }
@@ -259,12 +259,12 @@ dirnode_add_alias(uc_dirnode_t * dn,
     }
 
     if (p_encoded_name) {
-        memcpy(encoded_name, p_encoded_name, sizeof(encoded_fname_t));
+        memcpy(encoded_name, p_encoded_name, sizeof(shadow_t));
     } else {
         uuid_generate_time_safe(encoded_name->bin);
     }
 
-    dentry->set_encoded_name(encoded_name, sizeof(encoded_fname_t));
+    dentry->set_encoded_name(encoded_name, sizeof(shadow_t));
     dentry->set_raw_name(name);
 
     /* if we have link info */
@@ -277,13 +277,13 @@ dirnode_add_alias(uc_dirnode_t * dn,
     return encoded_name;
 }
 
-encoded_fname_t *
+shadow_t *
 dirnode_add(uc_dirnode_t * dn, const char * name, ucafs_entry_type type)
 {
     return dirnode_add_alias(dn, name, type, NULL, NULL);
 }
 
-encoded_fname_t *
+shadow_t *
 dirnode_add_link(uc_dirnode_t * dn,
                  const char * link_name,
                  const link_info_t * link_info)
@@ -291,14 +291,14 @@ dirnode_add_link(uc_dirnode_t * dn,
     return dirnode_add_alias(dn, link_name, UC_LINK, NULL, link_info);
 }
 
-encoded_fname_t *
+shadow_t *
 dirnode_rm(uc_dirnode_t * dn,
            const char * realname,
            ucafs_entry_type type,
            ucafs_entry_type * p_type,
            link_info_t ** pp_link_info)
 {
-    encoded_fname_t * result = NULL;
+    shadow_t * result = NULL;
     RepeatedPtrField<dnode_dentry> * dentry_list;
     int len, link_len;
     bool iterate;
@@ -333,7 +333,7 @@ retry:
         const string & str_entry = curr_dentry->raw_name();
         if (len == str_entry.size()
             && memcmp(realname, str_entry.data(), len) == 0) {
-            result = (encoded_fname_t *)malloc(sizeof(encoded_fname_t));
+            result = (shadow_t *)malloc(sizeof(shadow_t));
             if (result == NULL) {
                 return NULL;
             }
@@ -353,7 +353,7 @@ retry:
             }
 
             memcpy(result, curr_dentry->encoded_name().data(),
-                   sizeof(encoded_fname_t));
+                   sizeof(shadow_t));
 
             // delete from the list
             dentry_list->erase(curr_dentry);
@@ -386,7 +386,7 @@ retry:
 
 const char *
 dirnode_enc2raw(const uc_dirnode_t * dn,
-                const encoded_fname_t * encoded_name,
+                const shadow_t * encoded_name,
                 ucafs_entry_type type,
                 ucafs_entry_type * p_type)
 {
@@ -418,7 +418,7 @@ retry:
     auto curr_dentry = dentry_list->begin();
     while (curr_dentry != dentry_list->end()) {
         ret = memcmp(encoded_name, curr_dentry->encoded_name().data(),
-                     sizeof(encoded_fname_t));
+                     sizeof(shadow_t));
         if (ret == 0) {
             *p_type = type;
             return curr_dentry->raw_name().c_str();
@@ -446,7 +446,7 @@ retry:
     return NULL;
 }
 
-static const encoded_fname_t *
+static const shadow_t *
 __dirnode_raw2enc(const uc_dirnode_t * dn,
                 const char * realname,
                 ucafs_entry_type type,
@@ -454,7 +454,7 @@ __dirnode_raw2enc(const uc_dirnode_t * dn,
                 const link_info_t ** pp_link_info)
 {
     size_t len = strlen(realname);
-    encoded_fname_t * encoded;
+    shadow_t * encoded;
     const RepeatedPtrField<dnode_dentry> * dentry_list;
 
     bool iterate;
@@ -492,7 +492,7 @@ retry:
                 *pp_link_info = (link_info_t *)curr_dentry->link_info().data();
             }
 
-            return (encoded_fname_t *)curr_dentry->encoded_name().data();
+            return (shadow_t *)curr_dentry->encoded_name().data();
         }
         curr_dentry++;
     }
@@ -516,7 +516,7 @@ retry:
     return NULL;
 }
 
-const encoded_fname_t *
+const shadow_t *
 dirnode_raw2enc(const uc_dirnode_t * dn,
                 const char * realname,
                 ucafs_entry_type type,
@@ -525,7 +525,7 @@ dirnode_raw2enc(const uc_dirnode_t * dn,
     return __dirnode_raw2enc(dn, realname, type, p_type, NULL);
 }
 
-const encoded_fname_t *
+const shadow_t *
 dirnode_traverse(const uc_dirnode_t * dn,
                  const char * realname,
                  ucafs_entry_type type,
@@ -541,12 +541,12 @@ dirnode_rename(uc_dirnode_t * dn,
                const char * newname,
                ucafs_entry_type type,
                ucafs_entry_type *p_type,
-               encoded_fname_t ** ptr_shadow1_bin,
-               encoded_fname_t ** ptr_shadow2_bin,
+               shadow_t ** ptr_shadow1_bin,
+               shadow_t ** ptr_shadow2_bin,
                link_info_t ** pp_link_info1,
                link_info_t ** pp_link_info2)
 {
-    encoded_fname_t * shadow2_bin;
+    shadow_t * shadow2_bin;
     ucafs_entry_type atype, atype1;
 
     *ptr_shadow2_bin = NULL;

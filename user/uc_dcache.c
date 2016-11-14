@@ -83,7 +83,7 @@ dcache_traverse(const sds relative_dirpath)
     char * encoded_name_str = NULL;
     char *pch, *nch, *c_rel_path, *new_path;
     sds dnode_path = NULL;
-    const encoded_fname_t * encoded_fname;
+    const shadow_t * encoded_fname;
     bool found = false;
     ucafs_entry_type atype;
     const link_info_t * link_info;
@@ -226,7 +226,7 @@ dcache_get_dir(const char * path)
 uc_filebox_t *
 dcache_get_filebox(const char * path)
 {
-    const encoded_fname_t * codename;
+    const shadow_t * codename;
     char *fname = NULL, *temp = NULL, *temp2 = NULL; 
     sds path_link = NULL, fbox_path = NULL;
     uc_filebox_t * fb = NULL;

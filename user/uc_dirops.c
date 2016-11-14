@@ -19,7 +19,7 @@ dirops_new1(const char * parent_dir,
     int error = -1; // TODO change this
     uc_dirnode_t *dirnode = NULL, *dirnode1 = NULL;
     uc_filebox_t * filebox = NULL;
-    encoded_fname_t * fname_code = NULL;
+    shadow_t * fname_code = NULL;
     char * metaname = NULL;
     sds path1 = NULL;
 
@@ -124,7 +124,7 @@ dirops_code2plain(char * encoded_name,
                   char ** raw_name_dest)
 {
     int error = -1; // TODO
-    encoded_fname_t * fname_code = NULL;
+    shadow_t * fname_code = NULL;
     ucafs_entry_type atype;
     const char * result;
 
@@ -167,7 +167,7 @@ dirops_move(const char * from_dir,
     ucafs_entry_type atype;
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
-    encoded_fname_t *shadow1_bin = NULL, *shadow2_bin = NULL;
+    shadow_t *shadow1_bin = NULL, *shadow2_bin = NULL;
     char *shadow1_str = NULL, *shadow2_str = NULL, *metaname1 = NULL,
          *metaname2 = NULL;
     sds path1 = NULL, path2 = NULL, path3 = NULL;
@@ -387,7 +387,7 @@ dirops_symlink(const char * link_path,
     int error = AFSX_STATUS_NOOP, len, link_info_len;
     link_info_t * link_info = NULL;
     uc_dirnode_t * link_dnode = NULL;
-    encoded_fname_t * shadow_name2 = NULL;
+    shadow_t * shadow_name2 = NULL;
     ucafs_entry_type atype;
     sds target_fname = NULL, link_fname = NULL;
 
@@ -465,8 +465,8 @@ dirops_hardlink(const char * target_path,
     uc_filebox_t * target_fbox = NULL;
     uc_dirnode_t *target_dnode = NULL, *link_dnode = NULL;
     sds target_fname = NULL, link_fname = NULL;
-    const encoded_fname_t * shadow_name1 = NULL;
-    encoded_fname_t * shadow_name2 = NULL;
+    const shadow_t * shadow_name1 = NULL;
+    shadow_t * shadow_name2 = NULL;
     ucafs_entry_type atype;
     link_info_t * link_info = NULL;
 
@@ -508,7 +508,7 @@ dirops_hardlink(const char * target_path,
     }
 
     /* 4 - create the link in the dnode */
-    len = sizeof(encoded_fname_t);
+    len = sizeof(shadow_t);
     link_info_len = len + sizeof(link_info_t) + 1;
     if ((link_info = (link_info_t *)calloc(1, link_info_len)) == NULL) {
         slog(0, SLOG_ERROR, "allocation failed for link_info");
@@ -517,7 +517,7 @@ dirops_hardlink(const char * target_path,
 
     link_info->total_len = link_info_len;
     link_info->type = UC_HARDLINK;
-    memcpy(&link_info->meta_file, shadow_name1, sizeof(encoded_fname_t));
+    memcpy(&link_info->meta_file, shadow_name1, sizeof(shadow_t));
 
     /* 5 - add it to the dirnode */
     shadow_name2
@@ -574,7 +574,7 @@ dirops_plain2code(const char * fpath_raw,
 {
     int error = -1; // TODO
     sds fname = NULL;
-    const encoded_fname_t * fname_code = NULL;
+    const shadow_t * fname_code = NULL;
     ucafs_entry_type atype;
     sds dnode_path = NULL;
 
@@ -608,7 +608,7 @@ out:
 }
 
 static int
-__delete_metadata_file(const encoded_fname_t * shadowname_bin, int is_filebox)
+__delete_metadata_file(const shadow_t * shadowname_bin, int is_filebox)
 {
     int error = -1;
     uc_dirnode_t * dirnode = NULL;
@@ -685,7 +685,7 @@ dirops_remove(const char * fpath_raw,
 {
     int error = AFSX_STATUS_ERROR;
     link_info_t * link_info = NULL;
-    encoded_fname_t * shadow_name = NULL;
+    shadow_t * shadow_name = NULL;
     uc_dirnode_t * dirnode = NULL;
     sds fname = NULL, path = NULL;
     ucafs_entry_type atype;

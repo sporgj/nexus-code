@@ -2,13 +2,13 @@
 #include "uc_types.h"
 
 char *
-metaname_bin2str(const encoded_fname_t * bin);
+metaname_bin2str(const shadow_t * bin);
 
-encoded_fname_t *
+shadow_t *
 metaname_str2bin(const char * encoded_filename);
 
 char *
-filename_bin2str(const encoded_fname_t * bin);
+filename_bin2str(const shadow_t * bin);
 
-encoded_fname_t *
+shadow_t *
 filename_str2bin(const char * encoded_filename);
