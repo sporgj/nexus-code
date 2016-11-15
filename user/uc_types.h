@@ -101,3 +101,5 @@ typedef struct {
     uint32_t protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;
+
+struct uc_dentry;

@@ -18,14 +18,14 @@ KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs
 CXX = g++
-CC = gcc
+CC = clang-3.9
 FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 	-fno-builtin-free
 
 
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
-LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid
+LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv
 INCFLAGS = -I/usr/local/include
 
 OBJS = uc_dirnode.o\

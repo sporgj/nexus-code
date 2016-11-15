@@ -9,6 +9,8 @@ sds global_repo_path;
 
 bool global_env_is_afs;
 
+shadow_t uc_root_dirnode_shadow_name = {0};
+
 void uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs)
 {
     global_env_is_afs = is_afs;
@@ -48,7 +50,7 @@ static sds __relpath(const char * path, bool parent)
     int len, temp = strlen(global_home_path);
     const char * ptr1 = path, * ptr2 = global_home_path;
 
-    while (*ptr1 == *ptr2 && *ptr1 != '\0' && temp > 0) {
+    while (*ptr1 == *ptr2 && *ptr2 != '\0' && *ptr1 != '\0' && temp > 0) {
         ptr1++;
         ptr2++;
         temp--;

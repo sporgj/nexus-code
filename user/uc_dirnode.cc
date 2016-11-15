@@ -12,6 +12,7 @@ class dnode;
 struct dirnode {
     dnode_header_t header;
     dnode * protobuf;
+    const struct uc_dentry * dentry;
     sds dnode_path;
 };
 
@@ -27,6 +28,7 @@ dirnode_new()
     uuid_generate_time_safe((uint8_t *)&obj->header.uuid);
     obj->protobuf = new dnode();
     obj->dnode_path = NULL;
+    obj->dentry = NULL;
 
     return obj;
 }
@@ -41,6 +43,24 @@ const shadow_t *
 dirnode_get_parent(uc_dirnode_t * dirnode)
 {
     return &dirnode->header.parent;
+}
+
+void
+dirnode_set_dentry(uc_dirnode_t * dirnode, const struct uc_dentry * dentry)
+{
+    dirnode->dentry = dentry;
+}
+
+const struct uc_dentry *
+dirnode_get_dentry(uc_dirnode_t * dirnode)
+{
+    return dirnode->dentry;
+}
+
+void
+dirnode_clear_dentry(uc_dirnode_t * dirnode)
+{
+    dirnode->dentry = NULL;
 }
 
 int
@@ -152,7 +172,9 @@ dirnode_from_file(const sds filepath)
 
     obj->dnode_path = sdsdup(filepath);
     obj->protobuf = _dnode;
+    obj->dentry = NULL;
     memcpy(&obj->header, &header, sizeof(dnode_header_t));
+
     error = 0;
 out:
     if (error) {

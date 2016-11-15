@@ -2,6 +2,8 @@
 
 #include "third/sds.h"
 
+#include "uc_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,6 +17,8 @@ extern sds global_home_path;
 extern sds global_repo_path;
 
 extern bool global_env_is_afs;
+
+extern shadow_t uc_root_dirnode_shadow_name;
 
 /**
  * Sets the home path. Essentially, the directory where the metadata is stored

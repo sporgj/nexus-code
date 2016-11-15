@@ -1,4 +1,5 @@
 OBJS := hashmap.o slog.o sds.o seqptrmap.o elasticqueue.o elasticarray.o
+CC := gcc
 
 all: libthird.a
 

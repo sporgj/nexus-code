@@ -72,7 +72,7 @@ uc_rpc.o: uc_rpc.c afsx.ss.c
 	@echo "CXX <= $@"
 
 %.o: %.c %.h
-	@$(CC) $(CFLAGS) $(App_C_Flags) $(INCFLAGS) -c $< -o $@
+	@$(CC) -std=gnu11 $(CFLAGS) $(App_C_Flags) $(INCFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
 uc_dirnode.o: uc_dirnode.cc uc_dirnode.h dnode.pb.cc

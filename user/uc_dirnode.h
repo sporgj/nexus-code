@@ -24,6 +24,15 @@ dirnode_set_parent(uc_dirnode_t * dn, const uc_dirnode_t * parent);
 const shadow_t *
 dirnode_get_parent(uc_dirnode_t * dn);
 
+void
+dirnode_set_dentry(uc_dirnode_t * dirnode, const struct uc_dentry * dentry);
+
+const struct uc_dentry *
+dirnode_get_dentry(uc_dirnode_t * dirnode);
+
+void
+dirnode_clear_dentry(uc_dirnode_t * dirnode);
+
 /**
  * Creates a new dirnode object from the path.
  * @param filepath is the absolute path to the file
