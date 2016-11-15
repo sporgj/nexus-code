@@ -104,7 +104,9 @@ init_systems()
 {
     //uinfo("Initializing...");
     dcache_init();
+#ifdef UCAFS_SGX
     if (init_enclave()) {
         exit(-1);
     }
+#endif
 }

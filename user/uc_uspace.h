@@ -35,11 +35,15 @@ uc_main_dnode_fpath();
 sds
 uc_get_dnode_path(const char * fname);
 
+/**
+ * Derives the relative path with respect to the watch folder
+ * @param path is the full path
+ * @param is_dirpath if the path passed is the path to a parent folder
+ * @return the relative path, NULL if the prefix doesn't match the
+ * path to the watch folder
+ */
 sds
-uc_get_relative_parentpath(const char * path);
-
-sds
-uc_get_relative_path(const char * path);
+uc_derive_relpath(const char * fullpath, bool is_dirpath);
 
 #ifdef __cplusplus
 }

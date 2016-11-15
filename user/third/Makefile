@@ -7,4 +7,8 @@ libthird.a: $(OBJS)
 	ar cr $@ $^
 
 %.o: %.c
-	$(CC) -c $^ -o $@	
+	$(CC) -c $^ -o $@
+
+.PHONY: clean
+clean:
+	rm -rf *.o

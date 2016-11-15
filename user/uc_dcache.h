@@ -3,10 +3,7 @@
 #include "uc_filebox.h"
 
 uc_dirnode_t *
-dcache_get(const char * path);
-
-uc_dirnode_t *
-dcache_get_dir(const char * path);
+dcache_lookup(const char * path, bool dirpath);
 
 void
 dcache_put(uc_dirnode_t * dn);

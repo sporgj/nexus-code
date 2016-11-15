@@ -1,4 +1,7 @@
 #include <string.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "third/slog.h"
 
@@ -24,7 +27,7 @@ dirops_new1(const char * parent_dir,
     sds path1 = NULL;
 
     /* lets get the directory entry */
-    if ((dirnode = dcache_get_dir(parent_dir)) == NULL) {
+    if ((dirnode = dcache_lookup(parent_dir, true)) == NULL) {
         slog(0, SLOG_ERROR, "Error loading dirnode: %s", parent_dir);
         return error;
     }
@@ -81,7 +84,7 @@ out:
     if (dirnode)
         dcache_put(dirnode);
     if (dirnode1)
-        dcache_put(dirnode1);
+        dirnode_free(dirnode1);
     if (path1)
         sdsfree(path1);
     if (fname_code)
@@ -134,7 +137,7 @@ dirops_code2plain(char * encoded_name,
     }
 
     // 2 - Get the corresponding dirnode
-    uc_dirnode_t * dn = dcache_get_dir(dir_path);
+    uc_dirnode_t * dn = dcache_lookup(dir_path, true);
     if (dn == NULL) {
         goto out;
     }
@@ -174,12 +177,12 @@ dirops_move(const char * from_dir,
     sds fpath1 = NULL, fpath2 = NULL;
 
     /* get the dirnode objects */
-    dirnode1 = dcache_get_dir(from_dir);
+    dirnode1 = dcache_lookup(from_dir, true);
     if (dirnode1 == NULL) {
         return -1;
     }
 
-    dirnode2 = dcache_get_dir(to_dir);
+    dirnode2 = dcache_lookup(to_dir, true);
     if (dirnode2 == NULL) {
         dcache_put(dirnode1);
         return -1;
@@ -189,8 +192,8 @@ dirops_move(const char * from_dir,
     fpath1 = do_make_path(from_dir, oldname);
     fpath2 = do_make_path(to_dir, newname);
 
-    dcache_rm(fpath1);
-    dcache_rm(fpath2);
+    dcache_rm(dirnode1);
+    dcache_rm(dirnode2);
 
     sdsfree(fpath1);
     sdsfree(fpath2);
@@ -392,7 +395,7 @@ dirops_symlink(const char * link_path,
     sds target_fname = NULL, link_fname = NULL;
 
     /* 1 - get the respective dirnode */
-    if ((link_dnode = dcache_get(link_path)) == NULL) {
+    if ((link_dnode = dcache_lookup(link_path, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
         return error;
     }
@@ -476,13 +479,13 @@ dirops_hardlink(const char * target_path,
         return error;
     }
 
-    if ((target_dnode = dcache_get(target_path)) == NULL) {
+    if ((target_dnode = dcache_lookup(target_path, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", target_path);
         filebox_free(target_fbox);
         return error;
     }
 
-    if ((link_dnode = dcache_get(link_path)) == NULL) {
+    if ((link_dnode = dcache_lookup(link_path, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
         filebox_free(target_fbox);
         dcache_put(target_dnode);
@@ -579,7 +582,7 @@ dirops_plain2code(const char * fpath_raw,
     sds dnode_path = NULL;
 
     /* 1 - Get the corresponding dirnode */
-    uc_dirnode_t * dirnode = dcache_get(fpath_raw);
+    uc_dirnode_t * dirnode = dcache_lookup(fpath_raw, false);
     if (dirnode == NULL) {
         return error;
     }
@@ -690,7 +693,7 @@ dirops_remove(const char * fpath_raw,
     sds fname = NULL, path = NULL;
     ucafs_entry_type atype;
 
-    if ((dirnode = dcache_get(fpath_raw)) == NULL) {
+    if ((dirnode = dcache_lookup(fpath_raw, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", fpath_raw);
         return error;
     }
@@ -701,7 +704,7 @@ dirops_remove(const char * fpath_raw,
     }
 
     /* update the dcache */
-    dcache_rm(fpath_raw);
+    dcache_rm(dirnode);
 
     /* delete and get the info */
     shadow_name = dirnode_rm(dirnode, fname, type, &atype, &link_info);

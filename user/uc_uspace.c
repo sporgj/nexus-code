@@ -45,7 +45,7 @@ sds uc_get_dnode_path(const char * dnode_name)
     return path;
 }
 
-static sds __relpath(const char * path, bool parent)
+sds uc_derive_relpath(const char * path, bool is_dirpath)
 {
     int len, temp = strlen(global_home_path);
     const char * ptr1 = path, * ptr2 = global_home_path;
@@ -69,7 +69,7 @@ static sds __relpath(const char * path, bool parent)
 
     ptr2 = path + strlen(path);
 
-    if (parent) {
+    if (!is_dirpath) {
         while (*ptr2 != '/' && ptr2 != ptr1) {
             ptr2--;
         }
@@ -78,11 +78,4 @@ static sds __relpath(const char * path, bool parent)
     len = ptr2 - ptr1;
 
     return len > 0 ? sdsnewlen(ptr1, len) : sdsnew("");
-}
-
-sds uc_get_relative_path(const char * path) { return __relpath(path, false); }
-
-sds uc_get_relative_parentpath(const char * path)
-{
-    return __relpath(path, true);
 }
