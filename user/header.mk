@@ -26,6 +26,11 @@ FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
 LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv
+
+ifeq ($(UCAFS_PROFILER), 1)
+       LIBS += -lprofiler
+endif
+
 INCFLAGS = -I/usr/local/include
 
 OBJS = uc_dirnode.o\

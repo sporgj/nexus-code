@@ -40,10 +40,10 @@ struct uc_dentry {
 };
 
 static Hashmap * dcache_hashmap = NULL;
-
-static uv_mutex_t dcache_lock;
+static uv_mutex_t hashmap_lock;
 
 static struct uc_dentry * root_dentry = NULL;
+static uv_mutex_t dcache_lock;
 
 unsigned long
 crc32(const unsigned char * s, unsigned int len);
@@ -123,6 +123,7 @@ dcache_init()
     }
 
     dcache_hashmap = hashmapCreate(MAP_INIT_SIZE, hash_dentry, hash_is_equals);
+    uv_mutex_init(&hashmap_lock);
     uv_mutex_init(&dcache_lock);
 
     /* create our default dentry */
@@ -200,7 +201,12 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
     }
 
     /* add it to the hashmap */
+    // this is probably an overkill as 
     hashmapPut(dcache_hashmap, &dentry->key, dentry);
+
+    uv_mutex_lock(&hashmap_lock);
+    stats_total_cache_entries++;
+    uv_mutex_unlock(&hashmap_lock);
 }
 
 struct uc_dentry *
@@ -211,7 +217,7 @@ hash_lookup(struct uc_dentry * parent, const char * name)
     struct uc_dentry * dentry
         = (struct uc_dentry *)hashmapGet(dcache_hashmap, &v);
 
-    stats_cache_hits++;
+    stats_cache_lookups++;
     if (dentry && dentry->valid) {
         stats_cache_hits++;
         return dentry;

@@ -10,3 +10,6 @@ UCAFS_SGX := 1
 
 # are we running a development build
 UCAFS_DEV := 1
+
+# if to add the profiler
+UCAFS_PROFILER := 1
