@@ -55,6 +55,16 @@ struct uc_dentry *
 dcache_new(const char * name,
            const shadow_t * dirnode_name,
            const struct uc_dentry * parent);
+
+/* for statistics */
+uint64_t stats_total_cache_entries = 0;
+uint64_t stats_cache_hits = 0;
+uint64_t stats_cache_misses = 0;
+uint64_t stats_cache_lookups = 0;
+
+uv_timer_t stats_timer;
+uv_thread_t stats_thread;
+
 /*
  * Hashing function for a string
  * https://github.com/petewarden/c_hashmap/blob/master/hashmap.c
@@ -87,20 +97,39 @@ hash_is_equals(void * keyA, void * keyB)
     return da->parent == db->parent && strcmp(da->name, db->name) == 0;
 }
 
+void print_dcache_stats(uv_timer_t * handle)
+{
+    printf("\n------------------ DCACHE STATS -------------------");
+    printf("\n references: %lu, misses: %lu, hits: %lu", stats_cache_lookups,
+           stats_cache_misses, stats_cache_hits);
+    printf("\n---------------------------------------------------\n");
+}
+
+
+static void start_stats_thread()
+{
+    uv_loop_t * loop = uv_loop_new();
+    uv_loop_init(loop);
+    uv_timer_init(loop, &stats_timer);
+    uv_timer_start(&stats_timer, print_dcache_stats, 5000, 10000);
+    uv_run(loop, UV_RUN_DEFAULT);
+}
+
 void
 dcache_init()
 {
-    if (dcache_hashmap == NULL) {
-        dcache_hashmap
-            = hashmapCreate(MAP_INIT_SIZE, hash_dentry, hash_is_equals);
-        uv_mutex_init(&dcache_lock);
-
-        /* create our default dentry */
-        root_dentry = dcache_new("", &uc_root_dirnode_shadow_name, NULL);
-
-        /* hash the new entry */
-        dcache_add(root_dentry, NULL);
+    if (dcache_hashmap) {
+        return;
     }
+
+    dcache_hashmap = hashmapCreate(MAP_INIT_SIZE, hash_dentry, hash_is_equals);
+    uv_mutex_init(&dcache_lock);
+
+    /* create our default dentry */
+    root_dentry = dcache_new("", &uc_root_dirnode_shadow_name, NULL);
+    dcache_add(root_dentry, NULL);
+
+    uv_thread_create(&stats_thread, start_stats_thread, NULL);
 }
 
 struct uc_dentry *
@@ -175,14 +204,21 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
 }
 
 struct uc_dentry *
-cache_lookup(struct uc_dentry * parent, const char * name)
+hash_lookup(struct uc_dentry * parent, const char * name)
 {
     dcache_key_t v = {.parent = parent, .name = (const sds) name };
 
     struct uc_dentry * dentry
         = (struct uc_dentry *)hashmapGet(dcache_hashmap, &v);
 
-    return dentry ? (dentry->valid ? dentry : NULL) : NULL;
+    stats_cache_hits++;
+    if (dentry && dentry->valid) {
+        stats_cache_hits++;
+        return dentry;
+    }
+
+    stats_cache_misses++;
+    return NULL;
 }
 
 static struct uc_dentry *
@@ -210,7 +246,7 @@ traverse(struct uc_dentry * parent_dentry,
 
         /* first find it in the dcache children */
         path_str = sdscat(path_str, nch);
-        if ((dentry = cache_lookup(parent_dentry, nch))) {
+        if ((dentry = hash_lookup(parent_dentry, nch))) {
             /* let's jump to the next one */
             shadow_name = &dentry->dirnode_fname;
             goto next;
