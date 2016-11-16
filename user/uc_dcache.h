@@ -9,7 +9,7 @@ void
 dcache_put(uc_dirnode_t * dn);
 
 void
-dcache_rm(uc_dirnode_t * dn);
+dcache_rm(uc_dirnode_t * dn, const char * entry);
 
 uc_filebox_t *
 dcache_get_filebox(const char * path);

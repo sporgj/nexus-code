@@ -188,15 +188,10 @@ dirops_move(const char * from_dir,
         return -1;
     }
 
-    // TODO remove entries from cache
-    fpath1 = do_make_path(from_dir, oldname);
-    fpath2 = do_make_path(to_dir, newname);
-
-    dcache_rm(dirnode1);
-    dcache_rm(dirnode2);
-
-    sdsfree(fpath1);
-    sdsfree(fpath2);
+    // XXX future versions should check if the entries are 
+    // directories before removing them
+    dcache_rm(dirnode1, oldname);
+    dcache_rm(dirnode2, newname);
 
     if (dirnode_equals(dirnode1, dirnode2)) {
         if (dirnode_rename(dirnode1, oldname, newname, type, &atype, &shadow1_bin,
@@ -704,7 +699,7 @@ dirops_remove(const char * fpath_raw,
     }
 
     /* update the dcache */
-    dcache_rm(dirnode);
+    dcache_rm(dirnode, fname);
 
     /* delete and get the info */
     shadow_name = dirnode_rm(dirnode, fname, type, &atype, &link_info);

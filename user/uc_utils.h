@@ -32,6 +32,9 @@ void hexdump(uint8_t *, uint32_t);
 char *
 do_absolute_path(const char * path);
 
+int
+hash_string(const char * keystring);
+
 #ifdef __cplusplus
 }
 #endif
