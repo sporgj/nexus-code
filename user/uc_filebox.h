@@ -26,6 +26,9 @@ filebox_new();
 uc_filebox_t *
 filebox_from_file(const sds file_path);
 
+uc_filebox_t *
+filebox_from_shadow_name(const shadow_t * shdw_name);
+
 /**
  * Creates a filebox from an existing one
  * @param fbox is the filebox to copy from

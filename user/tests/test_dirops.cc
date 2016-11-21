@@ -269,13 +269,16 @@ TEST_F(TestDirops, SymLinkTest1)
 TEST_F(TestDirops, SymLinkTest2)
 {
     uc_filebox_t * fb1, * fb2;
-    const char *dir1 = "foo", *dir2 = "bar", *dir3 = "sun", *fname = "test.txt";
+    const char *dir1 = "foo", *dir2 = "bar", *dir3 = "bad", *dir4 = "good",
+               *fname = "test.txt";
     sds dir1_path = MK_PATH(dir1), dir2_path = MK_PATH(dir2),
-        dir3_path = MK_PATH(dir3);
+        dir3_path = MK_PATH(dir3), dir4_path = MK_PATH(dir4);
 
     sds filepath = do_make_path(dir2_path, fname),
 	linktget = do_make_path("..", dir2),
-	linkpath = do_make_path(dir3_path, fname);
+	linkpath = do_make_path(dir3_path, fname),
+	link2tget = do_make_path(".", dir2),
+	link2path = do_make_path(dir4_path, fname);
 
 
     char * temp1, * temp2, * temp3;
@@ -290,11 +293,15 @@ TEST_F(TestDirops, SymLinkTest2)
 	<< "Symlinking failed";
 
     /* 3 - Access the symlink */
-    ASSERT_FALSE((fb1 = dcache_get_filebox(linkpath)) == NULL)
+    ASSERT_TRUE((fb1 = dcache_get_filebox(linkpath)) == NULL)
 	<< "Dereferencing cannot lead to null";
 
     /* 4 - Access the file */
     ASSERT_FALSE((fb2 = dcache_get_filebox(filepath)) == NULL);
+
+    ASSERT_EQ(0, dirops_symlink(dir4_path, link2tget, &temp3));
+
+    ASSERT_FALSE((fb1 = dcache_get_filebox(link2path)) == NULL);
 
     /* 5 - Make sure they're the same */
     ASSERT_TRUE(filebox_equals(fb1, fb2));

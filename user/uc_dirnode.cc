@@ -1,4 +1,5 @@
 #include "uc_dirnode.h"
+#include "uc_encode.h"
 #include "uc_sgx.h"
 #include "uc_uspace.h"
 
@@ -17,7 +18,7 @@ struct dirnode {
 };
 
 uc_dirnode_t *
-dirnode_new()
+dirnode_new_alias(const shadow_t * id)
 {
     uc_dirnode_t * obj = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
     if (obj == NULL) {
@@ -25,12 +26,22 @@ dirnode_new()
     }
 
     memset(&obj->header, 0, sizeof(dnode_header_t));
-    uuid_generate_time_safe((uint8_t *)&obj->header.uuid);
+    if (id) {
+        memcpy(&obj->header.uuid, id, sizeof(shadow_t));
+    } else {
+        uuid_generate_time_safe((uint8_t *)&obj->header.uuid);
+    }
     obj->protobuf = new dnode();
     obj->dnode_path = NULL;
     obj->dentry = NULL;
 
     return obj;
+}
+
+uc_dirnode_t *
+dirnode_new()
+{
+    return dirnode_new_alias(NULL);
 }
 
 void
@@ -105,6 +116,17 @@ dirnode_default_dnode()
     dn = dirnode_from_file(path);
     sdsfree(path);
 
+    return dn;
+}
+
+uc_dirnode_t *
+dirnode_from_shadow_name(const shadow_t * shdw_name)
+{
+    char * temp = metaname_bin2str(shdw_name);
+    sds path_sds = uc_get_dnode_path(temp);
+    uc_dirnode_t * dn = dirnode_from_file(path_sds);
+    sdsfree(path_sds);
+    free(temp);
     return dn;
 }
 

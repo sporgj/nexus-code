@@ -7,9 +7,11 @@ extern "C" {
 
 #include "fbox.pb.h"
 
+#include "uc_encode.h"
 #include "uc_filebox.h"
 #include "uc_sgx.h"
 #include "uc_types.h"
+#include "uc_uspace.h"
 
 class fbox;
 
@@ -45,6 +47,19 @@ filebox_new()
     memset(&crypto_ctx, 0, sizeof(crypto_context_t));
     segment->set_crypto((char *)&crypto_ctx, sizeof(crypto_context_t));
 
+    return fb;
+}
+
+uc_filebox_t *
+filebox_from_shadow_name(const shadow_t * shdw_name)
+{
+    char * temp = metaname_bin2str(shdw_name);
+    sds fbox_path = uc_get_dnode_path(temp);
+
+    uc_filebox_t * fb = filebox_from_file(fbox_path);
+
+    free(temp);
+    sdsfree(fbox_path);
     return fb;
 }
 

@@ -48,7 +48,7 @@ dirops_new1(const char * parent_dir,
     path1 = uc_get_dnode_path(metaname);
 
     if (type == UC_DIR) {
-        if ((dirnode1 = dirnode_new()) == NULL) {
+        if ((dirnode1 = dirnode_new_alias(fname_code)) == NULL) {
             slog(0, SLOG_ERROR, "new dirnode failed: %s/%s", parent_dir, fname);
             goto out;
         }
@@ -196,14 +196,14 @@ dirops_move(const char * from_dir,
     if (dirnode_equals(dirnode1, dirnode2)) {
         if (dirnode_rename(dirnode1, oldname, newname, type, &atype, &shadow1_bin,
                            &shadow2_bin, &link_info1, &link_info2)) {
-            slog(0, SLOG_ERROR, "dops_move - Could not rename (%s) %s -> %s",
+            slog(0, SLOG_ERROR, "rename (%s) %s -> %s FAILED",
                  from_dir, oldname, newname);
             goto out;
         }
 
         /* now write out the dirnode object */
         if (!dirnode_flush(dirnode1)) {
-            slog(0, SLOG_ERROR, "dops_move - Could not flush dirnode (%s)",
+            slog(0, SLOG_ERROR, "flushing dirnode (%s) FAILED",
                  from_dir);
             goto out;
         }
@@ -211,7 +211,7 @@ dirops_move(const char * from_dir,
         /* get the shadow names */
         shadow1_bin = dirnode_rm(dirnode1, oldname, type, &atype, &link_info1);
         if (shadow1_bin == NULL) {
-            slog(0, SLOG_ERROR, "dirops_move - Could not find '%s' in dirnode",
+            slog(0, SLOG_ERROR, "finding '%s' failed",
                  oldname);
             goto out;
         }
@@ -221,35 +221,27 @@ dirops_move(const char * from_dir,
         shadow2_bin
             = dirnode_add_alias(dirnode2, newname, atype, NULL, link_info1);
         if (shadow2_bin == NULL) {
-            slog(0, SLOG_ERROR, "dops_move - Could not add '%s' to dirnode",
-                 newname);
+            slog(0, SLOG_ERROR, "adding '%s' to dirnode FAILED", newname);
             goto out;
         }
 
         /* write the dirnode object */
         if (!dirnode_flush(dirnode1)) {
-            slog(0, SLOG_ERROR, "dops_move - Could not flush dirnode (%s)",
-                 from_dir);
+            slog(0, SLOG_ERROR, "flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
 
         if (!dirnode_flush(dirnode2)) {
-            slog(0, SLOG_ERROR, "dops_move - Could not flush dirnode (%s)",
-                 to_dir);
+            slog(0, SLOG_ERROR, "flushing dirnode (%s)", to_dir);
             goto out;
         }
     }
 
     /* now delete the structures on disk */
     shadow1_str = filename_bin2str(shadow1_bin);
-    if (shadow1_str == NULL) {
-        slog(0, SLOG_ERROR, "dops_move - Could not convert shadowname to str");
-        goto out;
-    }
-
     shadow2_str = filename_bin2str(shadow2_bin);
-    if (shadow2_str == NULL) {
-        slog(0, SLOG_ERROR, "dops_move - Could not convert shadowname to str");
+    if (shadow1_str == NULL || shadow2_str == NULL) {
+        slog(0, SLOG_ERROR, "converting shadowname to str");
         goto out;
     }
 
@@ -261,11 +253,11 @@ dirops_move(const char * from_dir,
     /* move the metadata file */
     if (atype != UC_LINK) {
         if (rename(path1, path2)) {
-            slog(0, SLOG_ERROR, "dops_move - renaming metadata file failed");
+            slog(0, SLOG_ERROR, "renaming metadata file failed");
             goto out;
         }
     } else {
-        slog(0, SLOG_INFO, "dops_move - renaming link (%s) %s -> %s", from_dir,
+        slog(0, SLOG_INFO, "renaming link (%s) %s -> %s", from_dir,
              oldname, newname);
     }
 
@@ -296,10 +288,6 @@ dirops_move(const char * from_dir,
 out:
     dcache_put(dirnode1);
     dcache_put(dirnode2);
-
-    if (dirnode3) {
-        dirnode_free(dirnode3);
-    }
 
     if (shadow1_bin) {
         free(shadow1_bin);

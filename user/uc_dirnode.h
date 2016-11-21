@@ -15,6 +15,14 @@ typedef struct dirnode uc_dirnode_t;
 uc_dirnode_t *
 dirnode_new();
 
+/**
+ * Generates a new dirnode object with a pregenerated name
+ * @param id is the ID of the dirnode, NULL if you want the ID randomly
+ * generated
+ */
+uc_dirnode_t *
+dirnode_new_alias(const shadow_t * id);
+
 uc_dirnode_t *
 dirnode_default_dnode();
 
@@ -40,6 +48,9 @@ dirnode_clear_dentry(uc_dirnode_t * dirnode);
  */
 uc_dirnode_t *
 dirnode_from_file(const sds file_path);
+
+uc_dirnode_t *
+dirnode_from_shadow_name(const shadow_t * shdw_name);
 
 void
 dirnode_free(uc_dirnode_t * dirnode);
