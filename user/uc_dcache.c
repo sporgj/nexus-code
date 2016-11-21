@@ -152,9 +152,9 @@ dcache_free(struct uc_dentry * dentry)
         ptr_entry = SLIST_FIRST(&dentry->children);
 
         dcache_free(ptr_entry->dentry);
-        free(ptr_entry);
 
         SLIST_REMOVE_HEAD(&dentry->children, next_dptr);
+        free(ptr_entry);
     }
     uv_mutex_unlock(&dentry->c_lock);
 
@@ -164,6 +164,7 @@ dcache_free(struct uc_dentry * dentry)
     uv_mutex_unlock(&hashmap_lock);
 
     memset(dentry, 0, sizeof(struct uc_dentry));
+    free(dentry);
 }
 
 void
@@ -467,13 +468,31 @@ dcache_put(uc_dirnode_t * dn)
 void
 dcache_rm(uc_dirnode_t * dn, const char * entry)
 {
-    const struct uc_dentry * parent = dirnode_get_dentry(dn);
+    struct uc_dentry * parent = (struct uc_dentry *)dirnode_get_dentry(dn);
     struct uc_dentry * child;
+    dcache_item_t *prev = NULL, *curr, *next;
 
     // remove the entry
     if (parent) {
         child = hash_lookup(parent, entry);
         if (child) {
+            // find the child in the list
+            SLIST_FOREACH_SAFE(curr, &parent->children, next_dptr, next) {
+                if (curr->dentry == child) {
+                    /* free the memory */
+                    if (prev == NULL) {
+                        // we are the head
+                        SLIST_REMOVE_HEAD(&parent->children, next_dptr);
+                    } else {
+                        SLIST_REMOVE_AFTER(prev, next_dptr);
+                    }
+                    free(curr);
+                    break;
+                }
+                prev = curr;
+            }
+
+            // now delete the child
             dcache_free(child);
         }
     }
