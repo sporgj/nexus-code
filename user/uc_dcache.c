@@ -20,6 +20,7 @@ typedef atomic_int ref_t;
 
 typedef struct {
     const struct uc_dentry * parent;
+    int * p_hashval;
     sds name;
 } dcache_key_t;
 
@@ -163,6 +164,7 @@ dcache_free(struct uc_dentry * dentry)
     stats_total_cache_entries--;
     uv_mutex_unlock(&hashmap_lock);
 
+    sdsfree(dentry->key.name);
     memset(dentry, 0, sizeof(struct uc_dentry));
     free(dentry);
 }
@@ -186,7 +188,9 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
     }
 
     /* add it to the hashmap */
-    hashmapPut(dcache_hashmap, &dentry->key, dentry);
+    /* TODO hashmapPut returns the exisiting hash value if we have a 
+     * matching entry */
+    hashmapPut(dcache_hashmap, &dentry->key, dentry, &dentry->key.p_hashval);
 
     uv_mutex_lock(&hashmap_lock);
     stats_total_cache_entries++;
@@ -466,34 +470,33 @@ dcache_put(uc_dirnode_t * dn)
  * Uses the dirnode's dentry to find the entry in the hash and remove it
  */
 void
-dcache_rm(uc_dirnode_t * dn, const char * entry)
+dcache_rm(uc_dirnode_t * dn, const char * entry_name)
 {
     struct uc_dentry * parent = (struct uc_dentry *)dirnode_get_dentry(dn);
     struct uc_dentry * child;
     dcache_item_t *prev = NULL, *curr, *next;
+    dcache_key_t temp_key = {.parent = parent, .name = (const sds)entry_name };
+    int hash_val = hashmapHashKey(dcache_hashmap, &temp_key);
 
-    // remove the entry
+    // remove the entry from the parent
     if (parent) {
-        child = hash_lookup(parent, entry);
-        if (child) {
-            // find the child in the list
-            SLIST_FOREACH_SAFE(curr, &parent->children, next_dptr, next) {
-                if (curr->dentry == child) {
-                    /* free the memory */
-                    if (prev == NULL) {
-                        // we are the head
-                        SLIST_REMOVE_HEAD(&parent->children, next_dptr);
-                    } else {
-                        SLIST_REMOVE_AFTER(prev, next_dptr);
-                    }
-                    free(curr);
-                    break;
+        SLIST_FOREACH_SAFE(curr, &parent->children, next_dptr, next) {
+            child = curr->dentry;
+            /* perform a hash comparison for a fast check */
+            if (hash_val == *child->key.p_hashval
+                && strcmp(entry_name, child->key.name) == 0) {
+                /* free the memory */
+                if (prev == NULL) {
+                    SLIST_REMOVE_HEAD(&parent->children, next_dptr);
+                } else {
+                    SLIST_REMOVE_AFTER(prev, next_dptr);
                 }
-                prev = curr;
-            }
 
-            // now delete the child
-            dcache_free(child);
+                dcache_free(child);
+                free(curr);
+                break;
+            }
+            prev = curr;
         }
     }
 }

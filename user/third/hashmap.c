@@ -97,6 +97,10 @@ static inline int hashKey(Hashmap* map, void* key) {
     return h;
 }
 
+int hashmapHashKey(Hashmap * map, void * key) {
+    return hashKey(map, key);
+}
+
 size_t hashmapSize(Hashmap* map) {
     return map->size;
 }
@@ -196,7 +200,7 @@ static inline bool equalKeys(void* keyA, int hashA, void* keyB, int hashB,
     return equals(keyA, keyB);
 }
 
-void* hashmapPut(Hashmap* map, void* key, void* value) {
+void* hashmapPut(Hashmap* map, void* key, void* value, int ** hashval) {
     int hash = hashKey(map, key);
     size_t index = calculateIndex(map->bucketCount, hash);
     Entry** p = &(map->buckets[index]);
@@ -211,12 +215,15 @@ void* hashmapPut(Hashmap* map, void* key, void* value) {
             }
             map->size++;
             expandIfNecessary(map);
+            current = *p;
+            *hashval = &current->hash;
             return NULL;
         }
         // Replace existing entry.
         if (equalKeys(current->key, current->hash, key, hash, map->equals)) {
             void* oldValue = current->value;
             current->value = value;
+            *hashval = &current->hash;
             return oldValue;
         }
         // Move to next entry.

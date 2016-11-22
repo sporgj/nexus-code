@@ -231,7 +231,8 @@ int
 hash_string(const char * keystring)
 {
     unsigned long key = crc32((unsigned char *)(keystring), strlen(keystring));
-
+    return key;
+#if 0
     /* Robert Jenkins' 32 bit Mix Function */
     key += (key << 12);
     key ^= (key >> 22);
@@ -244,4 +245,5 @@ hash_string(const char * keystring)
 
     /* Knuth's Multiplicative Method */
     return (key >> 3) * 2654435761;
+#endif
 }

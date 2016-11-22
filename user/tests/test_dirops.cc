@@ -70,6 +70,30 @@ TEST_F(TestDirops, FileCreation) {
     sdsfree(path2);
 }
 
+TEST_F(TestDirops, FileCreationMemTest) {
+    const char *dname1 = "foo", *dname2 = "bar";
+    char *temp1, *temp2;
+
+    sds path1 = MK_PATH(dname1), path2 = do_make_path(path1, dname2);
+
+    HeapProfilerStart("create");
+    for (size_t i = 0; i < 1000; i++) {
+	ASSERT_EQ(0, dirops_new(path1, UC_DIR, &temp1));
+	free(temp1);
+
+	ASSERT_EQ(0, dirops_new(path2, UC_DIR, &temp2));
+	free(temp2);
+
+	ASSERT_EQ(0, dirops_remove(path2, UC_DIR, &temp2));
+	free(temp2);
+
+	ASSERT_EQ(0, dirops_remove(path1, UC_DIR, &temp2));
+	free(temp2);
+    }
+    HeapProfilerDump("done now");
+    HeapProfilerStop();
+}
+
 TEST_F(TestDirops, FileRenaming1) {
     const char * fname1 = "test1.txt", * fname2 = "test2.txt";
     sds path1 = MK_PATH(fname1), path2 = MK_PATH(fname2), temp_path = NULL;

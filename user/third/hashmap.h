@@ -50,7 +50,7 @@ int hashmapHash(void* key, size_t keySize);
  * If memory allocation fails, this function returns NULL, the map's size
  * does not increase, and errno is set to ENOMEM.
  */
-void* hashmapPut(Hashmap* map, void* key, void* value);
+void* hashmapPut(Hashmap* map, void* key, void* value, int ** p_hashval);
 /**
  * Gets a value from the map. Returns NULL if no entry for the given key is
  * found or if the value itself is NULL.
@@ -118,6 +118,10 @@ size_t hashmapCurrentCapacity(Hashmap* map);
  * Counts the number of entry collisions.
  */
 size_t hashmapCountCollisions(Hashmap* map);
+/**
+ * Computes the hash of the key
+ */
+int hashmapHashKey(Hashmap * map, void * key);
 #ifdef __cplusplus
 }
 #endif
