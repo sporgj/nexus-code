@@ -9,6 +9,18 @@
 #include <time.h>
 #include <unistd.h>
 
+static unsigned long next = 1;
+
+/* RAND_MAX assumed to be 32767 */
+int myrand(void) {
+    next = next * 1103515245 + 12345;
+    return((unsigned)(next/65536) % 32768);
+}
+
+void mysrand(unsigned int seed) {
+    next = seed;
+}
+
 static int get_mult(char c) {
     switch (c) {
         case 'k':
@@ -33,7 +45,7 @@ typedef enum { WRITE, READ } io_op_t;
 
 inline clock_t file_io(io_op_t op, char* fname, int64_t total_size) {
     FILE* fd;
-    char c = '1';
+    char c, c1;
     clock_t diff = clock();
     size_t temp;
 
@@ -43,16 +55,24 @@ inline clock_t file_io(io_op_t op, char* fname, int64_t total_size) {
         exit(-1);
     }
 
+    mysrand(6503);
     for (int64_t j = 0; j < total_size; j++) {
+        c = myrand();
         if (op == WRITE) {
             temp = fwrite(&c, sizeof(uint8_t), 1, fd);
         } else {
-            temp = fread(&c, sizeof(uint8_t), 1, fd);
+            temp = fread(&c1, sizeof(uint8_t), 1, fd);
+            if (c1 != c) {
+                printf("read error. exp=%d, act=%d\n", c, c1);
+                remove(fname);
+                exit(-1);
+            }
         }
 
         if (temp != sizeof(uint8_t)) {
             printf("I/O error, %s returned %zu\n",
                    (op == WRITE ? "fwrite" : "fread"), temp);
+            remove(fname);
             exit(-1);
         }
     }
