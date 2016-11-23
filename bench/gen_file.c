@@ -91,7 +91,7 @@ static void gen_file(int64_t total_size, int repeat) {
     avg_read = (((double)total_read) / repeat) / CLOCKS_PER_SEC;
     avg_write = (((double)total_write) / repeat) / CLOCKS_PER_SEC;
 
-    printf("avg_read(s) = %lf avg_delete(s) = %lf\n", avg_read, avg_write);
+    printf("avg_read(s) = %lf \t avg_write(s) = %lf\n", avg_read, avg_write);
 }
 
 int main(int argc, char** argv) {
@@ -130,7 +130,6 @@ int main(int argc, char** argv) {
     // now if we are in AFS
     str = getcwd(buffer, sizeof(buffer));
     if (strstr(str, "/afs") == str) {
-        printf("%s\n", buffer);
         printf("Detected AFS env\n");
         is_afs_env = 1;
     }
