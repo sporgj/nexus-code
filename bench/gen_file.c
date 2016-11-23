@@ -2,14 +2,14 @@
  * Generates random file of random size
  * @author Judicael Djoko
  */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 static int get_mult(char c) {
-    switch(c) {
+    switch (c) {
         case 'k':
         case 'K':
             return 1 << 10;
@@ -23,52 +23,65 @@ static int get_mult(char c) {
     return 0;
 }
 
-static void usage(char * prog) {
+static void usage(char* prog) {
     printf("usage: %s size{K,M,G} [repeat]\n", prog);
 }
 
-static void gen_file(int64_t total_size, int repeat)
-{
-    char fname[20], c = '1';
-    FILE * fd;
-    snprintf(fname, sizeof(fname), "file.%d", (int)getpid());
-    clock_t diff, total_create = 0, total_delete = 0;
-    double avg_create, avg_delete;
+typedef enum { WRITE, READ } io_op_t;
 
-    for (int i = 0; i < repeat; i++) {
-        fd = fopen(fname, "wb");
-        if (fd == NULL) {
-            printf("error: could not open file '%s'\n", fname);
-            return;
-        }
+inline clock_t file_io(io_op_t op, char* fname, int64_t total_size) {
+    FILE* fd;
+    char c = '1';
+    clock_t diff = clock();
+    size_t temp;
 
-        diff = clock();
-        for (int64_t j = 0; j < total_size; j++) {
-            fwrite(&c, sizeof(uint8_t), 1, fd);
-        }
-
-        fsync(fileno(fd));
-        fclose(fd);
-        diff = clock() - diff;
-        total_create += diff;
-
-        diff = clock();
-        remove(fname);
-        diff = clock() - diff;
-        total_delete += diff;
+    fd = fopen(fname, (op == WRITE ? "wb+" : "rb"));
+    if (fd == NULL) {
+        printf("error: could not open file '%s'\n", fname);
+        exit(-1);
     }
 
-    avg_create = (((double)total_create)/repeat)/CLOCKS_PER_SEC;
-    avg_delete = (((double)total_delete)/repeat)/CLOCKS_PER_SEC;
+    for (int64_t j = 0; j < total_size; j++) {
+        if (op == WRITE) {
+            temp = fwrite(&c, sizeof(uint8_t), 1, fd);
+        } else {
+            temp = fread(&c, sizeof(uint8_t), 1, fd);
+        }
 
-    printf("avg_create = %lfs, avg_delete = %lfs\n", avg_create, avg_delete); 
+        if (temp != sizeof(uint8_t)) {
+            printf("I/O error, %s returned %zu\n",
+                   (op == WRITE ? "fwrite" : "fread"), temp);
+            exit(-1);
+        }
+    }
+
+    fsync(fileno(fd));
+    fclose(fd);
+    return clock() - diff;
 }
 
-int main(int argc, char ** argv)
-{
+static void gen_file(int64_t total_size, int repeat) {
+    char fname[20];
+    clock_t diff, total_write = 0, total_read = 0;
+    double avg_read, avg_write;
+
+    snprintf(fname, sizeof(fname), "file.%d", (int)getpid());
+    for (int i = 0; i < repeat; i++) {
+        total_write += file_io(WRITE, fname, total_size);
+        total_read += file_io(READ, fname, total_size);
+        remove(fname);
+    }
+
+    avg_read = (((double)total_read) / repeat) / CLOCKS_PER_SEC;
+    avg_write = (((double)total_write) / repeat) / CLOCKS_PER_SEC;
+
+    printf("avg_read(s) = %lf avg_delete(s) = %lf\n", avg_read, avg_write);
+}
+
+int main(int argc, char** argv) {
     int multiplier = 1, file_size = 0, stop_bool = 0, repeat = 1;
     int64_t total_size;
-    char * p_c, *p_g, c;
+    char *p_c, *p_g, c;
 
     if (argc < 2) {
         usage(argv[0]);
@@ -99,7 +112,8 @@ int main(int argc, char ** argv)
 
     *p_g = '\0';
     total_size = multiplier * file_size;
-    printf("Running test: size = %ld bytes (%s), repeat = %d\n", total_size, argv[1], repeat);
+    printf("Running test: size = %ld bytes (%s), repeat = %d\n", total_size,
+           argv[1], repeat);
 
     gen_file(total_size, repeat);
 
