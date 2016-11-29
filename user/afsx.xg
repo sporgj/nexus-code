@@ -10,6 +10,8 @@ prefix S
 
 %#include "ucafs_defs.h"
 
+%extern bool_t xdr_uc_fbox(XDR *, uc_fbox_t *);
+
 /* maximum number of requests to be handled silmutaneously */
 %#define AFSX_REQ_MAX           2
 /* minimum number of requests to be handled immediately */
@@ -96,3 +98,22 @@ readwrite_data(
     afs_uint32 size,
     OUT int * moredata
 ) split = 237;
+
+fetchstore_start(
+    IN int op,
+    string fpath<AFSX_PATH_MAX>,
+    afs_uint32 max_xfer_size,
+    afs_uint32 file_offset,
+    afs_uint32 file_size,
+    OUT afs_int32 * xfer_id,
+    struct uc_fbox * fbox
+) = 369;
+
+fetchstore_finish(
+    IN afs_int32 id
+) = 419;
+
+fetchstore_data(
+    IN afs_int32 id,
+    afs_uint32 size
+) split = 507;

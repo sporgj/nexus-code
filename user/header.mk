@@ -18,7 +18,7 @@ KERNSRC_PATH = ../kernel
 
 PROGRAM = ucafs
 CXX = g++
-CC = clang-3.9
+CC = gcc
 FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 	-fno-builtin-free
 
@@ -39,6 +39,7 @@ OBJS = uc_dirnode.o\
        uc_dcache.o\
        uc_uspace.o\
        uc_encode.o\
+       uc_fetchstore.o\
        uc_fileops.o\
        uc_utils.o\
        fbox.pb.o\

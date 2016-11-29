@@ -1,22 +1,6 @@
 #pragma once
 #include <stdint.h>
-#ifndef UCPRIV_ENCLAVE
-#include <uuid/uuid.h>
-#else
-typedef struct {
-    uint8_t bin[16];
-} uuid_t;
-#endif
 #include "ucafs_defs.h"
-
-#define GLOBAL_MAGIC 0x20160811
-
-#define CRYPTO_AES_KEY_SIZE 16
-#define CRYPTO_AES_KEY_SIZE_BITS CRYPTO_AES_KEY_SIZE << 3
-#define CRYPTO_CRYPTO_BLK_SIZE 16
-#define CRYPTO_MAC_KEY_SIZE 16
-#define CRYPTO_MAC_KEY_SIZE_BITS 16
-#define CRYPTO_MAC_DIGEST_SIZE 32
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
@@ -48,25 +32,8 @@ typedef struct {
 } xfer_context_t;
 
 typedef struct {
-    uint8_t bytes[16];
-} crypto_iv_t;
-
-typedef struct {
-    uint8_t ekey[CRYPTO_AES_KEY_SIZE];
-} crypto_ekey_t;
-
-typedef struct {
-    uint8_t bytes[CRYPTO_MAC_DIGEST_SIZE];
-} crypto_mac_t;
-
-typedef struct {
     uint8_t raw[0];
 } raw_fname_t;
-
-/* 128 bits */
-typedef struct {
-    uuid_t bin;
-} shadow_t;
 
 typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
@@ -76,13 +43,6 @@ typedef struct {
         char target_link[0];
     };
 } __attribute__((packed)) link_info_t;
-
-typedef struct {
-    crypto_ekey_t ekey;
-    crypto_ekey_t mkey;
-    crypto_iv_t iv;
-    crypto_mac_t mac;
-} __attribute__((packed)) crypto_context_t;
 
 typedef struct {
     shadow_t uuid;

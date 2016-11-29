@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..03b064d 100644
+index 1b99c94..0f44b2c 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -98,7 +98,29 @@ index 1b99c94..03b064d 100644
      return code;
  }
  
-@@ -1613,6 +1659,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1064,6 +1110,12 @@ iattr2vattr(struct vattr *vattrp, struct iattr *iattrp)
+ void
+ vattr2inode(struct inode *ip, struct vattr *vp)
+ {
++    /* ucafs code */
++    int size = vp->va_size;
++    if (AFSTOV(ip)->is_ucafs_file && size > 0) {
++	size -= UCAFS_FBOX_PADDING;
++    }
++
+     ip->i_ino = vp->va_nodeid;
+ #ifdef HAVE_LINUX_SET_NLINK
+     set_nlink(ip, vp->va_nlink);
+@@ -1081,7 +1133,7 @@ vattr2inode(struct inode *ip, struct vattr *vp)
+     ip->i_mode = vp->va_mode;
+     ip->i_uid = afs_make_kuid(vp->va_uid);
+     ip->i_gid = afs_make_kgid(vp->va_gid);
+-    i_size_write(ip, vp->va_size);
++    i_size_write(ip, vp->size);
+     ip->i_atime.tv_sec = vp->va_atime.tv_sec;
+     ip->i_atime.tv_nsec = 0;
+     ip->i_mtime.tv_sec = vp->va_mtime.tv_sec;
+@@ -1613,6 +1665,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      cred_t *credp = crref();
      const char *name = newdp->d_name.name;
      struct inode *oldip = olddp->d_inode;
@@ -107,7 +129,7 @@ index 1b99c94..03b064d 100644
  
      /* If afs_link returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1620,7 +1668,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1620,7 +1674,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      d_drop(newdp);
  
      AFS_GLOCK();
@@ -129,7 +151,7 @@ index 1b99c94..03b064d 100644
  
      AFS_GUNLOCK();
      crfree(credp);
-@@ -1698,6 +1759,9 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
+@@ -1698,6 +1765,9 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
      const char *name = dp->d_name.name;
      struct vcache *tvc = VTOAFS(dp->d_inode);
  
@@ -139,7 +161,7 @@ index 1b99c94..03b064d 100644
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
-@@ -1722,6 +1786,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1722,6 +1792,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
      cred_t *credp = crref();
      struct vattr *vattr = NULL;
      const char *name = dp->d_name.name;
@@ -149,7 +171,7 @@ index 1b99c94..03b064d 100644
  
      /* If afs_symlink returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1734,10 +1801,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1734,10 +1807,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
  	goto out;
      }
  
@@ -333,7 +355,7 @@ index 33455cb..39ada89 100644
  	    /* This dir contains more than . and .., thus it can't be
  	     * deleted.
 diff --git a/src/afs/VNOPS/afs_vnop_lookup.c b/src/afs/VNOPS/afs_vnop_lookup.c
-index d8205b6..61efac4 100644
+index d8205b6..c1361ec 100644
 --- a/src/afs/VNOPS/afs_vnop_lookup.c
 +++ b/src/afs/VNOPS/afs_vnop_lookup.c
 @@ -1390,6 +1390,10 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
@@ -381,6 +403,15 @@ index d8205b6..61efac4 100644
  	tname = sysState.name;
  
  	ReleaseReadLock(&tdc->lock);
+@@ -1794,6 +1812,8 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
+ 	tvc->f.parent.vnode = adp->f.fid.Fid.Vnode;
+ 	tvc->f.parent.unique = adp->f.fid.Fid.Unique;
+ 	tvc->f.states &= ~CBulkStat;
++	/* ucafs code */
++	tvc->is_ucafs_file = is_ucafs_file;
+ 
+ 	if (afs_fakestat_enable == 2 && tvc->mvstat == 1) {
+ 	    ObtainSharedLock(&tvc->lock, 680);
 diff --git a/src/afs/VNOPS/afs_vnop_remove.c b/src/afs/VNOPS/afs_vnop_remove.c
 index 3e62781..de8e3d9 100644
 --- a/src/afs/VNOPS/afs_vnop_remove.c
@@ -523,7 +554,7 @@ index bd22639..faeeac8 100644
  
      AFS_STATCNT(afs_symlink);
 diff --git a/src/afs/afs.h b/src/afs/afs.h
-index f03609c..90c6439 100644
+index f03609c..610d6f2 100644
 --- a/src/afs/afs.h
 +++ b/src/afs/afs.h
 @@ -839,6 +839,8 @@ struct vcache {
@@ -531,7 +562,7 @@ index f03609c..90c6439 100644
      afs_hyper_t flushDV;	/* data version last flushed from text */
      afs_hyper_t mapDV;		/* data version last flushed from map */
 +    /* ucafs code */
-+    afs_hyper_t ucafs_verify_dv; // last version we verified
++    int is_ucafs_file; // last version we verified
      struct server *callback;	/* The callback host, if any */
      afs_uint32 cbExpires;	/* time the callback expires */
      struct afs_q callsort;	/* queue in expiry order, sort of */
@@ -612,10 +643,20 @@ index 2dd89cf..05b6afc 100644
  
      hash = DVHash(&avc->f.fid);
 diff --git a/src/afs/afs_vcache.c b/src/afs/afs_vcache.c
-index ca5a956..b32787d 100644
+index ca5a956..aa6b1f5 100644
 --- a/src/afs/afs_vcache.c
 +++ b/src/afs/afs_vcache.c
-@@ -1928,6 +1928,9 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
+@@ -861,6 +861,9 @@ afs_PrePopulateVCache(struct vcache *avc, struct VenusFid *afid,
+     avc->callback = serverp;         /* to minimize chance that clear
+ 				      * request is lost */
+ 
++    /* ucafs code */
++    avc->is_ucafs_file = 0;
++
+ #if defined(AFS_CACHE_BYPASS)
+     avc->cachingStates = 0;
+     avc->cachingTransitions = 0;
+@@ -1928,6 +1931,9 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
      struct server *serverp = 0;
      afs_int32 origCBs;
      afs_int32 retry;
@@ -625,7 +666,7 @@ index ca5a956..b32787d 100644
  
      AFS_STATCNT(afs_GetVCache);
      if (cached)
-@@ -1975,10 +1978,21 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
+@@ -1975,10 +1981,21 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
  	/* printf("Network is down in afs_LookupVcache\n"); */
          code = ENETDOWN;
      } else
@@ -648,10 +689,10 @@ index ca5a956..b32787d 100644
    loop2:
  #endif
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..ac05f17 100644
+index 46b9c9d..94cef2c 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
-@@ -67,6 +67,31 @@ single_compdir_libafs: depsrcs libafs
+@@ -67,10 +67,35 @@ single_compdir_libafs: depsrcs libafs
  single_instdir_libafs: install_libafs
  single_destdir_libafs: dest_libafs
  
@@ -683,3 +724,8 @@ index 46b9c9d..ac05f17 100644
  # placeholder for any sources that are built prior to compiling libafs
  depsrcs: 
  
+-AFSAOBJS = \
++AFSAOBJS = $(UCAFSOBJS)\
+ 	afs_atomlist.o \
+ 	afs_lhash.o \
+ 	afs_analyze.o \

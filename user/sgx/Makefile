@@ -4,6 +4,7 @@ CC=gcc
 
 APP_PATH = ..
 OBJS = uc_ecalls.o\
+	   uc_sgx_fetchstore.o\
 	   uc_crypto.o\
 	   elasticarray.o\
 	   elasticqueue.o\

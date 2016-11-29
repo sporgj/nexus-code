@@ -12,19 +12,29 @@
 #include "ucafs_prototypes.h"
 #include "afsx.h"
 
+#define UCAFS_DEFAULT_XFER_SIZE PAGE_SIZE
+#define UCAFS_ALLOC_XFER_BUFFER (void *)__get_free_page(GFP_KERNEL)
+
 extern struct rx_connection * conn;
 extern int UCAFS_IS_CONNECTED;
 
 typedef struct {
     int id;
+    int off;
     uint8_t srv_64bit;
-    int tlen;
-    int current_offset;
+    int total_len;
+    int real_len;
     void * buffer;
     int buflen;
+    char * path;
+    uc_fbox_t fbox;
+    struct vcache * avc;
     struct rx_connection * uc_conn;
-    struct rx_call * call;
-} uc_store_t;
+    /* fileserver stuff */
+    struct afs_conn * tc;
+    struct rx_connection * rx_conn;
+    struct rx_call * afs_call;
+} store_context_t;
 
 typedef struct {
     int id;

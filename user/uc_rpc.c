@@ -1,6 +1,7 @@
 #include "afsx.h"
 #include "cdefs.h"
 #include "uc_dirops.h"
+#include "uc_fetchstore.h"
 #include "uc_fileops.h"
 #include "uc_utils.h"
 
@@ -286,4 +287,70 @@ SAFSX_readwrite_data(
     ret = 0;
 out:
     return ret;
+}
+
+afs_int32 SAFSX_fetchstore_start(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ int op,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint32 max_xfer_size,
+	/*IN */ afs_uint32 file_offset,
+	/*IN */ afs_uint32 file_size,
+	/*OUT*/ afs_int32 * xfer_id,
+	/*OUT*/ uc_fbox_t * fbox)
+{
+    int ret = fetchstore_start(op, fpath, max_xfer_size, file_offset, file_size,
+            xfer_id, fbox);
+    if (ret == 0) {
+        uinfo("%s (id = %d): %s (%u, %u, %u)", RWOP_TO_STR(op), *xfer_id, fpath,
+                file_offset, max_xfer_size, file_size);
+    }
+
+    return ret;
+}
+
+afs_int32 SAFSX_fetchstore_finish(
+        /*IN */ struct rx_call * z_call,
+        /*IN */ afs_int32 id)
+{
+    return fetchstore_finish(id);
+}
+
+afs_int32
+SAFSX_fetchstore_data(
+    /*IN */ struct rx_call * z_call,
+    /*IN */ afs_int32 id,
+    /*IN */ afs_uint32 size)
+{
+    int ret = AFSX_STATUS_ERROR;
+    afs_uint32 abytes;
+
+    uint8_t ** buf = fetchstore_get_buffer(id, size);
+    if (buf == NULL) {
+        goto out;
+    }
+
+    if ((abytes = rx_Read(z_call, *buf, size)) != size) {
+        uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
+               rx_Error(z_call));
+        goto out;
+    }
+
+    // TODO check return
+    fetchstore_process_data(buf);
+
+    if ((abytes = rx_Write(z_call, *buf, size)) != size) {
+        uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
+               abytes, rx_Error(z_call));
+        goto out;
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+int xdr_uc_fbox(XDR * x, struct uc_fbox * fbox)
+{
+    return xdr_opaque(x, (uint8_t *)fbox, sizeof(uc_fbox_t));
 }
