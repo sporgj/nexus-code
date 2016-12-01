@@ -106,6 +106,9 @@ ucafs_get(struct afs_conn * tc,
           struct afs_FetchOutput * tsmall);
 
 int
+ucafs_fbox(struct vcache * avc, uc_fbox_t ** p_fbox);
+
+int
 ucafs_verify(struct vcache * avc, char * path);
 
 /* dnlc prototypes */

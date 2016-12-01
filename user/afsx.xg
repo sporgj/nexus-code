@@ -106,7 +106,8 @@ fetchstore_start(
     afs_uint32 file_offset,
     afs_uint32 file_size,
     OUT afs_int32 * xfer_id,
-    struct uc_fbox * fbox
+    afs_uint32 * fbox_len,
+    afs_uint32 * total_len
 ) = 369;
 
 fetchstore_finish(

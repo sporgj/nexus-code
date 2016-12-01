@@ -297,10 +297,11 @@ afs_int32 SAFSX_fetchstore_start(
 	/*IN */ afs_uint32 file_offset,
 	/*IN */ afs_uint32 file_size,
 	/*OUT*/ afs_int32 * xfer_id,
-	/*OUT*/ uc_fbox_t * fbox)
+    /*OUT*/ afs_uint32 * fbox_len,
+	/*OUT*/ afs_uint32 * total_len)
 {
     int ret = fetchstore_start(op, fpath, max_xfer_size, file_offset, file_size,
-            xfer_id, fbox);
+                               xfer_id, fbox_len, total_len);
     if (ret == 0) {
         uinfo("%s (id = %d): %s (%u, %u, %u)", RWOP_TO_STR(op), *xfer_id, fpath,
                 file_offset, max_xfer_size, file_size);
@@ -336,8 +337,10 @@ SAFSX_fetchstore_data(
         goto out;
     }
 
-    // TODO check return
-    fetchstore_process_data(buf);
+    if (fetchstore_process_data(buf)) {
+        uerror("(id = %d) error processing data :( terminating everything", id);
+        goto out;
+    }
 
     if ((abytes = rx_Write(z_call, *buf, size)) != size) {
         uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
@@ -348,9 +351,4 @@ SAFSX_fetchstore_data(
     ret = 0;
 out:
     return ret;
-}
-
-int xdr_uc_fbox(XDR * x, struct uc_fbox * fbox)
-{
-    return xdr_opaque(x, (uint8_t *)fbox, sizeof(uc_fbox_t));
 }

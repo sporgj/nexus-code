@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..0f44b2c 100644
+index 1b99c94..8e188d8 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -98,29 +98,35 @@ index 1b99c94..0f44b2c 100644
      return code;
  }
  
-@@ -1064,6 +1110,12 @@ iattr2vattr(struct vattr *vattrp, struct iattr *iattrp)
+@@ -1064,6 +1110,18 @@ iattr2vattr(struct vattr *vattrp, struct iattr *iattrp)
  void
  vattr2inode(struct inode *ip, struct vattr *vp)
  {
 +    /* ucafs code */
 +    int size = vp->va_size;
-+    if (AFSTOV(ip)->is_ucafs_file && size > 0) {
-+	size -= UCAFS_FBOX_PADDING;
++    uc_fbox_t * fbox = NULL;
++    struct vcache * avc = VTOAFS(ip);
++
++    if (avc->is_ucafs_file && size > 0) {
++        if (ucafs_fbox(avc, &fbox) == 0) {
++	    size = fbox->file_size;
++	    kfree(fbox);
++	}
 +    }
 +
      ip->i_ino = vp->va_nodeid;
  #ifdef HAVE_LINUX_SET_NLINK
      set_nlink(ip, vp->va_nlink);
-@@ -1081,7 +1133,7 @@ vattr2inode(struct inode *ip, struct vattr *vp)
+@@ -1081,7 +1139,7 @@ vattr2inode(struct inode *ip, struct vattr *vp)
      ip->i_mode = vp->va_mode;
      ip->i_uid = afs_make_kuid(vp->va_uid);
      ip->i_gid = afs_make_kgid(vp->va_gid);
 -    i_size_write(ip, vp->va_size);
-+    i_size_write(ip, vp->size);
++    i_size_write(ip, size);
      ip->i_atime.tv_sec = vp->va_atime.tv_sec;
      ip->i_atime.tv_nsec = 0;
      ip->i_mtime.tv_sec = vp->va_mtime.tv_sec;
-@@ -1613,6 +1665,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1613,6 +1671,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      cred_t *credp = crref();
      const char *name = newdp->d_name.name;
      struct inode *oldip = olddp->d_inode;
@@ -129,7 +135,7 @@ index 1b99c94..0f44b2c 100644
  
      /* If afs_link returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1620,7 +1674,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1620,7 +1680,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      d_drop(newdp);
  
      AFS_GLOCK();
@@ -151,7 +157,7 @@ index 1b99c94..0f44b2c 100644
  
      AFS_GUNLOCK();
      crfree(credp);
-@@ -1698,6 +1765,9 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
+@@ -1698,6 +1771,9 @@ afs_linux_unlink(struct inode *dip, struct dentry *dp)
      const char *name = dp->d_name.name;
      struct vcache *tvc = VTOAFS(dp->d_inode);
  
@@ -161,7 +167,7 @@ index 1b99c94..0f44b2c 100644
      if (VREFCOUNT(tvc) > 1 && tvc->opens > 0
  				&& !(tvc->f.states & CUnlinked)) {
  
-@@ -1722,6 +1792,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1722,6 +1798,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
      cred_t *credp = crref();
      struct vattr *vattr = NULL;
      const char *name = dp->d_name.name;
@@ -171,13 +177,13 @@ index 1b99c94..0f44b2c 100644
  
      /* If afs_symlink returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1734,10 +1807,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1734,10 +1813,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
  	goto out;
      }
  
 -    code = afs_symlink(VTOAFS(dip), (char *)name, vattr, (char *)target, NULL,
 +    /* ucafs code */
-+    if (ucafs_symlink(dp, target, &ucafs_name) == 0) {
++    if (ucafs_symlink(dp, (char *)target, &ucafs_name) == 0) {
 +	is_ucafs_file = 1;
 +    } else {
 +	ucafs_name = (char *)name;
@@ -539,20 +545,6 @@ index 468555a..4447f6d 100644
      return code;
  }
  
-diff --git a/src/afs/VNOPS/afs_vnop_symlink.c b/src/afs/VNOPS/afs_vnop_symlink.c
-index bd22639..faeeac8 100644
---- a/src/afs/VNOPS/afs_vnop_symlink.c
-+++ b/src/afs/VNOPS/afs_vnop_symlink.c
-@@ -86,6 +86,9 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
-     struct afs_fakestat_state fakestate;
-     struct rx_connection *rxconn;
-     XSTATS_DECLS;
-+    /* ucafs code */
-+    char * ucafs_name = NULL;
-+    int is_ucafs_name;
-     OSI_VC_CONVERT(adp);
- 
-     AFS_STATCNT(afs_symlink);
 diff --git a/src/afs/afs.h b/src/afs/afs.h
 index f03609c..610d6f2 100644
 --- a/src/afs/afs.h
@@ -589,13 +581,14 @@ index e8b8f9d..521359e 100644
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..c24afba 100644
+index f494677..d640871 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
-@@ -1146,6 +1146,17 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1146,6 +1146,19 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      afs_size_t bytesToXfer = 0, bytesXferred = 0;
  #endif
  
++#if 0
 +    /* ucafs code */
 +    int ret = ucafs_get(tc, rxconn, fP, base, adc, avc, size, tsmall);
 +    if (ret == 0) {
@@ -606,6 +599,7 @@ index f494677..c24afba 100644
 +	    return -1;
 +	}
 +    }
++#endif
 +
      AFS_STATCNT(CacheFetchProc);
  
@@ -689,7 +683,7 @@ index ca5a956..aa6b1f5 100644
    loop2:
  #endif
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..94cef2c 100644
+index 46b9c9d..99faede 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
 @@ -67,10 +67,35 @@ single_compdir_libafs: depsrcs libafs
@@ -699,7 +693,7 @@ index 46b9c9d..94cef2c 100644
 +# ucafs objects
 +UCAFSOBJS = afsx.cs.o \
 +			ucafs_main.o \
-+			ucafs_verify.o \
++			ucafs_fbox.o \
 +			ucafs_get.o \
 +			ucafs_store.o \
 +			ucafs_dirops.o
@@ -710,7 +704,7 @@ index 46b9c9d..94cef2c 100644
 +ucafs_main.o: $(TOP_SRC_AFS)/ucafs_main.c
 +	$(CRULE_OPT)
 +
-+ucafs_verify.o: $(TOP_SRC_AFS)/ucafs_verify.c
++ucafs_fbox.o: $(TOP_SRC_AFS)/ucafs_fbox.c
 +	$(CRULE_OPT)
 +
 +ucafs_get.o: $(TOP_SRC_AFS)/ucafs_get.c

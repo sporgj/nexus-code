@@ -12,8 +12,9 @@
 #include "ucafs_prototypes.h"
 #include "afsx.h"
 
-#define UCAFS_DEFAULT_XFER_SIZE PAGE_SIZE
-#define UCAFS_ALLOC_XFER_BUFFER (void *)__get_free_page(GFP_KERNEL)
+#define DEFAULT_XFER_SIZE PAGE_SIZE
+#define ALLOC_XFER_BUFFER (void *)__get_free_page(GFP_KERNEL)
+#define FREE_XFER_BUFFER(ptr) __free_page(ptr)
 
 extern struct rx_connection * conn;
 extern int UCAFS_IS_CONNECTED;
@@ -21,13 +22,13 @@ extern int UCAFS_IS_CONNECTED;
 typedef struct {
     int id;
     int off;
-    uint8_t srv_64bit;
+    int srv_64bit;
     int total_len;
     int real_len;
-    void * buffer;
+    int fbox_len;
     int buflen;
+    void * buffer;
     char * path;
-    uc_fbox_t fbox;
     struct vcache * avc;
     struct rx_connection * uc_conn;
     /* fileserver stuff */
@@ -38,7 +39,7 @@ typedef struct {
 
 typedef struct {
     int id;
-    uint8_t srv_64bit;
+    int srv_64bit;
     int buflen;
     void * buffer;
     int32_t len;
@@ -66,15 +67,20 @@ vnode_type(struct vcache * avc);
 ucafs_entry_type
 uc_vnode_type(struct vcache * avc);
 
-afs_int32
-_rxfs_fetchInit(struct afs_conn * tc,
-                struct rx_connection * rxconn,
-                struct vcache * avc,
-                afs_offs_t base,
-                afs_uint32 size,
-                afs_int32 * alength,
-                struct dcache * adc,
-                struct osi_file * fP,
-                struct rx_call ** afs_call);
+int
+_ucafs_init_fetch(struct afs_conn * tc,
+                  struct rx_connection * rxconn,
+                  struct vcache * avc,
+                  afs_offs_t base,
+                  afs_uint32 size,
+                  afs_int32 * alength,
+                  int * srv_64bit,
+                  struct rx_call ** afs_call);
+
+int
+_ucafs_end_fetch(struct rx_call * afs_call,
+                 struct afs_FetchOutput * o,
+                 int srv_64bit,
+                 int error);
 
 #endif

@@ -13,12 +13,8 @@ store_cleanup(store_context_t * ctx,
               struct AFSFetchStatus * out,
               struct vrequest * areq,
               int ret);
-
-bool_t
-xdr_uc_fbox(XDR * x, struct uc_fbox * fbox)
-{
-    return xdr_opaque(x, (char *)fbox, sizeof(uc_fbox_t));
-}
+static int
+store_fbox(store_context_t * ctx);
 
 /**
  * Reads from the file on disk, sends over RPC and rereads response
@@ -31,8 +27,6 @@ xdr_uc_fbox(XDR * x, struct uc_fbox * fbox)
  */
 static int
 store_read(store_context_t * ctx,
-           struct osi_file * tfile,
-           afs_uint32 offset,
            afs_uint32 size,
            afs_uint32 * bytesread)
 {
@@ -45,9 +39,6 @@ store_read(store_context_t * ctx,
     if (uc_conn == NULL) {
         return -1;
     }
-
-    // XXX check for the read return
-    afs_osi_Read(tfile, -1, ctx->buffer, size);
 
     uspace_call = rx_NewCall(uc_conn);
 
@@ -115,7 +106,11 @@ storeproc(store_context_t * ctx, struct dcache * tdc, afs_int32 * transferred)
 
     while (size > 0) {
         tlen = (size > ctx->buflen) ? ctx->buflen : size;
-        if (store_read(ctx, tfile, pos, tlen, &nbytes)) {
+
+        // XXX check for the read return
+        afs_osi_Read(tfile, -1, ctx->buffer, tlen);
+
+        if (store_read(ctx, tlen, &nbytes)) {
             goto out;
         }
 
@@ -183,10 +178,8 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
 
     ret = EIO;
     /* 3 - Now send the fbox data to the fileserver */
-    nbytes = rx_Write(ctx->afs_call, (char *)&ctx->fbox, sizeof(uc_fbox_t));
-    if (nbytes != sizeof(uc_fbox_t)) {
-        ERROR("afs_server exp=%d, act=%d\n", (int)sizeof(uc_fbox_t),
-              (int)nbytes);
+    if (store_fbox(ctx)) {
+        ERROR("sending fbox failed");
         goto out1;
     }
 
@@ -259,6 +252,34 @@ out:
 }
 
 /**
+ * Saves the fbox into the context
+ */
+static int
+store_fbox(store_context_t * ctx)
+{
+    int ret = -1;
+    int32_t len = ctx->fbox_len, size, nbytes;
+
+    while (len > 0) {
+        size = MIN(ctx->buflen, len);
+
+        if (store_read(ctx, size, &nbytes)) {
+            goto out;
+        }
+
+        if (store_write(ctx, nbytes, &nbytes)) {
+            goto out;
+        }
+
+        len -= size;
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+/**
  * Sets up the connection with the userspace.
  * @param ctx
  * @return 0 on success.
@@ -271,20 +292,19 @@ store_init_ucafs(store_context_t * ctx)
     ctx->uc_conn = __get_conn();
 
     ret = AFSX_fetchstore_start(ctx->uc_conn, UCAFS_STORE, ctx->path,
-                                UCAFS_DEFAULT_XFER_SIZE, 0, len, &ctx->id,
-                                &ctx->fbox);
+                                DEFAULT_XFER_SIZE, 0, len, &ctx->id,
+                                &ctx->fbox_len, &ctx->total_len);
 
     if (ret == 0) {
         /* allocate the required buffer */
-        ctx->buflen = UCAFS_DEFAULT_XFER_SIZE;
-        ctx->buffer = UCAFS_ALLOC_XFER_BUFFER;
+        ctx->buflen = DEFAULT_XFER_SIZE;
+        ctx->buffer = ALLOC_XFER_BUFFER;
         if (ctx->buffer == NULL) {
             ERROR("allocating buffer failed\n");
             ret = -1;
         }
 
         ctx->real_len = len;
-        ctx->total_len = len + sizeof(uc_fbox_t);
     }
 
     return ret;
@@ -362,7 +382,7 @@ store_cleanup(store_context_t * ctx,
 
     /* free all the pointer stuff in our store context */
     if (ctx->buffer) {
-        __free_page(ctx->buffer);
+        FREE_XFER_BUFFER(ctx->buffer);
     }
 
     if (ctx->id != -1) {

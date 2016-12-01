@@ -29,6 +29,8 @@ typedef struct {
     int32_t position;
     uint32_t total_len;
     char * path;
+    int fbox_xfer;
+    uc_fbox_t * fbox;
 } xfer_context_t;
 
 typedef struct {

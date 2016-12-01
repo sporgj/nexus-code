@@ -48,9 +48,6 @@ typedef uint32_t uc_crypto_op_t;
 #define UCAFS_STORE     UC_ENCRYPT
 #define UCAFS_FETCH     UC_DECRYPT
 
-#define UCAFS_DEFAULT_XFER_SIZE PAGE_SIZE
-#define UCAFS_ALLOC_XFER_BUFFER __get_free_page(GFP_KERNEL)
-
 #define UC_HARDLINK     0
 #define UC_SOFTLINK     1
 
@@ -95,9 +92,12 @@ typedef struct {
 #define UCAFS_FBOX_MAGIC 0xfb015213
 typedef struct uc_fbox {
     uint32_t magic;
-    shadow_t uuid;
     uint16_t chunk_count;
+    uint32_t chunk_size;
     uint32_t file_size;
     uint16_t fbox_len; /* offset to start reading the file data */
-    crypto_context_t crypto_ctx;
+    crypto_context_t chunk0;
+    crypto_context_t chunks[0];
 } __attribute__((packed)) uc_fbox_t;
+
+#define FBOX_HEADER_LEN offsetof(uc_fbox_t, chunks)

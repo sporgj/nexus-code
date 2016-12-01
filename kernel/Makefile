@@ -10,7 +10,7 @@ SRC = afsx.h \
       ucafs_gens.h \
       ucafs_prototypes.h \
       ucafs_get.c \
-      ucafs_verify.c \
+      ucafs_fbox.c \
       ucafs_store.c \
       ucafs_dirops.c \
       ucafs_dnlc.c \
