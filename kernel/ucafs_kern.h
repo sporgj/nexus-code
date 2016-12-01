@@ -35,7 +35,7 @@ typedef struct {
     struct afs_conn * tc;
     struct rx_connection * rx_conn;
     struct rx_call * afs_call;
-} store_context_t;
+} store_context_t, fetch_context_t;
 
 typedef struct {
     int id;
