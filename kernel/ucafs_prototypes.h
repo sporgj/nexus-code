@@ -96,14 +96,14 @@ int
 ucafs_store(struct vcache * avc, struct vrequest * areq, int sync);
 
 int
-ucafs_get(struct afs_conn * tc,
-          struct rx_connection * rxconn,
-          struct osi_file * fp,
-          afs_size_t base,
-          struct dcache * adc,
-          struct vcache * avc,
-          afs_int32 size,
-          struct afs_FetchOutput * tsmall);
+ucafs_fetch(struct afs_conn * tc,
+            struct rx_connection * rxconn,
+            struct osi_file * fp,
+            afs_size_t base,
+            struct dcache * adc,
+            struct vcache * avc,
+            afs_int32 size,
+            struct afs_FetchOutput * tsmall);
 
 int
 ucafs_fbox(struct vcache * avc, uc_fbox_t ** p_fbox);

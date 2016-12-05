@@ -323,10 +323,10 @@ SAFSX_fetchstore_data(
     /*IN */ afs_int32 id,
     /*IN */ afs_uint32 size)
 {
-    int ret = AFSX_STATUS_ERROR;
+    int ret = AFSX_STATUS_ERROR, op;
     afs_uint32 abytes;
 
-    uint8_t ** buf = fetchstore_get_buffer(id, size);
+    uint8_t ** buf = fetchstore_get_buffer(id, size, &op);
     if (buf == NULL) {
         goto out;
     }
@@ -346,6 +346,48 @@ SAFSX_fetchstore_data(
         uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
                abytes, rx_Error(z_call));
         goto out;
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+afs_int32 SAFSX_fetchstore_fbox(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ afs_int32 id,
+    /*IN */ afs_int32 fbox_op,
+	/*IN */ afs_uint32 size)
+{
+    int ret = AFSX_STATUS_ERROR, op;
+    afs_uint32 abytes;
+
+    uint8_t ** buf = fetchstore_get_buffer(id, size, &op);
+    if (buf == NULL) {
+        goto out;
+    }
+
+    /* read data on store */
+    if (op == UCAFS_FBOX_READ) {
+        if ((abytes = rx_Read(z_call, *buf, size)) != size) {
+            uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
+                   rx_Error(z_call));
+            goto out;
+        }
+    }
+
+    if (fetchstore_process_fbox(buf)) {
+        uerror("(id = %d) error processing data :( terminating everything", id);
+        goto out;
+    }
+
+    /* write data on store */
+    if (op == UCAFS_FBOX_WRITE) {
+        if ((abytes = rx_Write(z_call, *buf, size)) != size) {
+            uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
+                    abytes, rx_Error(z_call));
+            goto out;
+        }
     }
 
     ret = 0;

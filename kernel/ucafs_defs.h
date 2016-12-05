@@ -89,6 +89,9 @@ typedef struct {
     uuid_t bin;
 } shadow_t;
 
+#define UCAFS_FBOX_READ     0
+#define UCAFS_FBOX_WRITE    1
+
 #define UCAFS_FBOX_MAGIC 0xfb015213
 typedef struct uc_fbox {
     uint32_t magic;
@@ -101,3 +104,4 @@ typedef struct uc_fbox {
 } __attribute__((packed)) uc_fbox_t;
 
 #define FBOX_HEADER_LEN offsetof(uc_fbox_t, chunks)
+#define UCAFS_GET_REAL_FILE_SIZE(len) len - sizeof(uc_fbox_t)

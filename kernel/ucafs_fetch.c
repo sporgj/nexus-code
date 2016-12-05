@@ -3,217 +3,209 @@
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_get: " fmt, ##args)
 
 static int
-fetch_read(fetch_context_t * ctx, uint32_t len, uint32_t * bytes_read)
+_fetch_cleanup(fetch_context_t * fetch_ctx,
+               struct afs_FetchOutput * tsmall,
+               int code)
 {
-    uint32_t nbytes;
-
-    if ((nbytes = rx_Read(ctx->afs_call, ctx->buffer, len)) != len) {
-        ERROR("reading from afs_server: exp=%u, act=%u\n", len, nbytes);
-        *bytes_read = nbytes;
-        return -1;
+    int ret = 0;
+    if (fetch_ctx == NULL) {
+	ERROR("Fetch context is NULL\n");
+	return -1;
     }
 
-    *bytes_read = nbytes;
-    return 0;
-}
-
-static int
-fetch_write(fetch_context_t * ctx, uint32_t len, uint32_t * bytes_written)
-{
-    uint32_t nbytes;
-    int ret = -1, moredata = 0;
-    struct rx_connection * uc_conn;
-    struct rx_call * uspace_call;
-
-    // open a session with the daemon
-    uc_conn = __get_conn();
-    if (uc_conn == NULL) {
-        ERROR("__get_conn() returned NULL\n");
-        return -1;
+    if (fetch_ctx->id >= 0) {
+	AFSX_fetchstore_finish(fetch_ctx->uc_conn, fetch_ctx->id);
+	__put_conn(fetch_ctx->uc_conn);
     }
 
-    uspace_call = rx_NewCall(uc_conn);
-
-    // send it to uspace
-    if (StartAFSX_readwrite_data(uspace_call, ctx->id, len)) {
-        ERROR("StartAFSX_upload_file failed");
-        goto out1;
+    if (fetch_ctx->buffer) {
+	FREE_XFER_BUFFER(fetch_ctx->buffer);
     }
 
-    // copy the bytes over
-    if ((nbytes = rx_Write(uspace_call, ctx->buffer, len)) != len) {
-        ERROR("send error: exp=%d, act=%u\n", len, nbytes);
-        goto out1;
+    if (fetch_ctx->afs_call) {
+        ret = _ucafs_end_fetch(fetch_ctx->afs_call, tsmall,
+                               fetch_ctx->srv_64bit, code);
     }
 
-    // read back the decrypted stream
-    if ((nbytes = rx_Read(uspace_call, ctx->buffer, len)) != len) {
-        ERROR("recv error: exp=%d, act=%u\n", len, nbytes);
-        goto out1;
-    }
-
-    *bytes_written = nbytes;
-
-    ret = 0;
-out1:
-    __put_conn(uc_conn);
-    EndAFSX_readwrite_data(uspace_call, &moredata);
-    rx_EndCall(uspace_call, 0);
     return ret;
 }
 
 static int
-fetchproc(fetch_context_t * ctx, struct dcache * tdc, afs_int32 * transferred)
+_fetch_parse_fbox(fetch_context_t * fetch_ctx,
+                  struct vcache * avc,
+                  struct afs_conn * tc,
+                  struct rx_connection * rxconn,
+                  afs_size_t base,
+		  uc_fbox_t ** p_fbox)
 {
-    int ret, len, pos = 0, nbytes, size = tdc->f.chunkBytes;
-    struct osi_file * tfile = afs_CFileOpen(&tdc->f.inode);
-    if (unlikely(tfile == NULL)) {
-	ERROR("opening tdc failed: chunk = %d\n", tdc->f.chunk);
+    int ret = -1, len = avc->f.m.Length, cursor, abytes, srv_64bit,
+        size = 0x7fffffff;
+    struct afs_FetchOutput output;
+    struct rx_call * acall = NULL;
+    uc_fbox_t * fbox = *p_fbox;
+
+    /* FIXME: We can't rely on avc->f.m.Length to get the file size.
+     * There is a chance this could be rigged */
+
+    /* we are first going to try with the known length */
+    cursor = UCAFS_GET_REAL_FILE_SIZE(len);
+
+    if (_ucafs_init_fetch(tc, rxconn, avc, cursor, size, &abytes, &srv_64bit,
+                          &acall)) {
+        ERROR("initializing with server failed\n");
+	goto out;
+    }
+
+    /* now, lets parse the fbox information */
+    if (_ucafs_read_fbox(acall, abytes, p_fbox)) {
+	goto out;
+    }
+
+    ERROR("fbox length: %d, file_size: %d\n", fbox->fbox_len, fbox->file_size);
+    fetch_ctx->real_len = fbox->file_size;
+    fetch_ctx->total_len = fbox->file_size + fbox->fbox_len;
+    fetch_ctx->fbox_len = fbox->fbox_len;
+    
+    ret = 0;
+out:
+    if (acall) {
+	_ucafs_end_fetch(acall, &output, srv_64bit, 0);
+    }
+
+    return ret;
+}
+
+static int
+_fetch_init_ucafs(fetch_context_t * ctx)
+{
+    int ret;
+    afs_uint32 len = ctx->real_len;
+    ctx->uc_conn = __get_conn();
+
+    ret = AFSX_fetchstore_start(ctx->uc_conn, UCAFS_FETCH, ctx->path,
+                                DEFAULT_XFER_SIZE, 0, len, &ctx->id,
+                                &ctx->fbox_len, &ctx->total_len);
+
+    if (ret) {
+	ERROR("Initializing uspace failed\n");
+	return ret;
+    }
+
+    ctx->buflen = DEFAULT_XFER_SIZE;
+    ctx->buffer = ALLOC_XFER_BUFFER;
+    if (ctx->buffer == NULL) {
+	ERROR("allocating buffer failed\n");
 	return -1;
     }
 
-    while (size > 0) {
-	len = MIN(ctx->buflen, size);
+    return 0;
+}
 
-	/* read from the server */
-	if (fetch_read(ctx, len, &nbytes)) {
+static int
+_fetch_send_fbox(fetch_context_t * fetch_ctx, uc_fbox_t * fbox)
+{
+    int ret = -1;
+    int32_t len = fetch_ctx->fbox_len, size, nbytes;
+    struct rx_connection * uc_conn = fetch_ctx->uc_conn;
+    struct rx_call * uc_call = NULL;
+    uint8_t * buffer = (uint8_t *)fbox;
+
+    while (len > 0) {
+	size = MIN(fetch_ctx->buflen, len);
+	if ((uc_call = rx_NewCall(uc_conn)) == NULL) {
+	    ERROR("store_fbox rx_NewCall returned NULL\n");
 	    goto out;
 	}
 
-	/* send for decryption */
-	if (fetch_write(ctx, nbytes, nbytes)) {
-	    goto out;
-	}
+        if (StartAFSX_fetchstore_fbox(uc_call, fetch_ctx->id, UCAFS_FBOX_WRITE,
+                                      size)) {
+            ERROR("StartAFSX_fbox failed\n");
+            goto out;
+        }
 
-	afs_osi_Write(tfile, -1, ctx->buffer, len);
+        if ((nbytes = rx_Write(uc_call, buffer, size)) != size) {
+            ERROR("fbox recv error: exp=%d, act=%d\n", size, nbytes);
+            goto out;
+        }
 
-	pos += len;
-	size -= len;
+        EndAFSX_fetchstore_fbox(uc_call);
+        rx_EndCall(uc_call, 0);
+        uc_call = NULL;
+
+        len -= size;
+	buffer += size;
     }
 
     ret = 0;
 out:
-    osi_UFSClose(tfile);
+    if (uc_call) {
+        EndAFSX_fetchstore_fbox(uc_call);
+        rx_EndCall(uc_call, 0);
+    }
 
-    *transferred = pos;
     return ret;
 }
 
 int
-ucafs_fetch(struct vcache * avc)
+ucafs_fetch(struct afs_conn * tc,
+            struct rx_connection * rxconn,
+            struct osi_file * fp,
+            afs_size_t base,
+            struct dcache * adc,
+            struct vcache * avc,
+            afs_int32 size,
+            struct afs_FetchOutput * tsmall)
 {
     int ret = AFSX_STATUS_NOOP;
-    afs_int32 bytes_left = 0, pos = base, len, nbytes;
     char * path = NULL;
-    ucafs_ctx_t * ctx = NULL;
+    fetch_context_t * fetch_ctx = NULL;
+    uc_fbox_t * fbox = NULL;
 
-    if (!UCAFS_IS_CONNECTED) {
-        return ret;
-    }
-
-    /* if it's a directory */
-    if (avc->f.fid.Fid.Vnode & 1 || vType(avc) == VDIR) {
-        return ret;
+    if (!UCAFS_IS_CONNECTED || vType(avc) == VDIR) {
+	return ret;
     }
 
     if (__is_vnode_ignored(avc, &path)) {
-        return ret;
+	return ret;
     }
 
-    /* allocate the context */
-    ctx = (ucafs_ctx_t *)kmalloc(sizeof(ucafs_ctx_t), GFP_KERNEL);
-    if (ctx == NULL) {
-        ERROR("Could not allocate context\n");
-        goto out;
-    }
-    ctx->id = -1;
-
-    fetch_init_ucafs(ctx);
-
-    ret = AFSX_STATUS_ERROR;
-    /* get the offset */
-    if (_ucafs_init_fetch(tc, rxconn, avc, base, size, &bytes_left,
-                          &ctx->srv_64bit, &ctx->afs_call)) {
-        ERROR("talking to fserver failed\n");
-        goto out;
+    /* create the context */
+    fetch_ctx = (fetch_context_t *)kzalloc(sizeof(fetch_context_t), GFP_KERNEL);
+    if (fetch_ctx == NULL) {
+	ERROR("allocation error on fetch context");
+	return AFSX_STATUS_ERROR;
     }
 
-    /* lets fetch our fbox */
-    if (fetch_setup_fbox(ctx)) {
-	ERROR("fbox_setup failed\n");
+    fetch_ctx->id = -1;
+    fetch_ctx->path = path;
+
+    /* 1 - Initialize the userspace RPC call */
+    if (_fetch_parse_fbox(fetch_ctx, avc, tc, rxconn, base, &fbox)) {
+        ERROR("there was an error in parsing fbox");
+	ret = AFSX_STATUS_NOOP;
 	goto out;
     }
 
-out1:
-    fetch_cleanup(ctx);
-
-out:
-    kfree(path);
-    if (ctx) {
-	kfree(ctx);
-    }
-
-    return ret;
-}
-
-static int
-fetch_init_ucafs(fetch_context_t * ctx)
-{
-    int ret;
-    afs_uint32 len = ctx->avc->f.m.Length;
-    ctx->uc_conn = __get_conn();
-
-    ret = AFSX_fetchstore_start(ctx->uc_conn, UCAFS_STORE, ctx->path,
-                                DEFAULT_XFER_SIZE, 0, len, &ctx->id,
-                                &ctx->fbox_len, &ctx->total_len);
-
-    if (ret == 0) {
-        ctx->buflen = DEFAULT_XFER_SIZE;
-        ctx->buffer = ALLOC_XFER_BUFFER;
-        if (ctx->buffer == NULL) {
-            ERROR("allocating buffer failed\n");
-            return -1;
-        }
-
-        ctx->real_len = len;
-    }
-
-    return 0;
-}
-
-static int
-fetch_setup_fbox(fetch_context_t * ctx)
-{
-    int ret, len, size, nbytes;
-    uc_fbox_t * fbox = NULL;
-
-    // first, lets read the fbox
-    if (_ucafs_read_fbox(ctx->acall, ctx->total_len, &fbox)) {
-	ERROR("Reading fbox failed");
+    /* 2 - Initialize userspace */
+    if (_fetch_init_ucafs(fetch_ctx)) {
 	goto out;
     }
 
-    ctx->real_len = fbox->file_size;
-    len = ctx->fbox_len;
-
-    /* start writing to userspace */
-    while (len > 0) {
-	size = MIN(ctx->buflen, len);
-
-	if (fetch_read(ctx, size, &nbytes)) {
-	    goto out;
-	}
-
-	if (fetch_write(ctx, nbytes, &nbytes)) {
-	    goto out;
-	}
-
-	len -= size;
+    /* 3 - Send the filebox */
+    if (_fetch_send_fbox(fetch_ctx, fbox)) {
+	goto out;
     }
+
+    goto out;
 
     ret = 0;
+out1:
+    _fetch_cleanup(fetch_ctx, tsmall, ret);
 out:
+    kfree(fetch_ctx);
+    kfree(path);
     if (fbox) {
+	ERROR("fbox_len=%d, file_len=%d\n", fbox->fbox_len, fbox->file_size);
 	kfree(fbox);
     }
     return ret;

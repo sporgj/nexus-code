@@ -35,10 +35,7 @@ store_read(store_context_t * ctx,
     afs_int32 nbytes;
     int ret = -1;
 
-    uc_conn = __get_conn();
-    if (uc_conn == NULL) {
-        return -1;
-    }
+    uc_conn = ctx->uc_conn;
 
     uspace_call = rx_NewCall(uc_conn);
 
@@ -64,7 +61,6 @@ store_read(store_context_t * ctx,
 
     ret = 0;
 out:
-    __put_conn(uc_conn);
     EndAFSX_fetchstore_data(uspace_call);
     rx_EndCall(uspace_call, ret);
     return ret;
@@ -177,12 +173,6 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
     }
 
     ret = EIO;
-    /* 3 - Now send the fbox data to the fileserver */
-    if (store_fbox(ctx)) {
-        ERROR("sending fbox failed");
-        goto out1;
-    }
-
     chunk_no = 0;
     bytes_left = ctx->real_len;
     while (bytes_left > 0) {
@@ -225,6 +215,12 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         tdc = NULL;
     }
 
+    /* 3 - Now send the fbox data to the fileserver */
+    if (store_fbox(ctx)) {
+        ERROR("sending fbox failed");
+        goto out1;
+    }
+
     /* TODO: run afs_analyze here to make sure all the packets went through */
     UpgradeSToWLock(&avc->lock, 6506);
     avc->f.states &= ~CDirty;
@@ -259,13 +255,30 @@ store_fbox(store_context_t * ctx)
 {
     int ret = -1;
     int32_t len = ctx->fbox_len, size, nbytes;
+    struct rx_connection * uc_conn = ctx->uc_conn;
+    struct rx_call * uc_call = NULL;
 
     while (len > 0) {
         size = MIN(ctx->buflen, len);
-
-        if (store_read(ctx, size, &nbytes)) {
+        if ((uc_call = rx_NewCall(uc_conn)) == NULL) {
+            ERROR("store_fbox rx_NewCall returned NULL\n");
             goto out;
         }
+
+        if (StartAFSX_fetchstore_fbox(uc_call, ctx->id, UCAFS_FBOX_READ,
+                                      size)) {
+            ERROR("StartAFSX_fbox failed\n");
+            goto out;
+        }
+
+        if ((nbytes = rx_Read(uc_call, ctx->buffer, size)) != size) {
+            ERROR("fbox recv error: exp=%d, act=%d\n", size, nbytes);
+            goto out;
+        }
+
+        EndAFSX_fetchstore_fbox(uc_call);
+        rx_EndCall(uc_call, 0);
+        uc_call = NULL;
 
         if (store_write(ctx, nbytes, &nbytes)) {
             goto out;
@@ -276,6 +289,10 @@ store_fbox(store_context_t * ctx)
 
     ret = 0;
 out:
+    if (uc_call) {
+        EndAFSX_fetchstore_fbox(uc_call);
+        rx_EndCall(uc_call, 0);
+    }
     return ret;
 }
 

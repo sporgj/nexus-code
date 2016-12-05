@@ -18,7 +18,7 @@ fetchstore_start(int op,
  * @reutrn NULL if id is invalid or valid_buflen > buffer_size
  */
 uint8_t **
-fetchstore_get_buffer(int id, size_t valid_buflen);
+fetchstore_get_buffer(int id, size_t valid_buflen, int * op);
 
 /**
  * Processes the transfer
@@ -27,6 +27,14 @@ fetchstore_get_buffer(int id, size_t valid_buflen);
  */
 int
 fetchstore_process_data(uint8_t ** buffer);
+
+/**
+ * Copies the buffer in/out. do fetchstore_get_buffer() first
+ * @param buffer
+ * @return 0 on succes
+ */
+int
+fetchstore_process_fbox(uint8_t ** buffer);
 
 /**
  * Closes the file operation

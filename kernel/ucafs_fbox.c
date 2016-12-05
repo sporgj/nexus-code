@@ -5,19 +5,20 @@
 #undef DEBUG
 #define DEBUG(fmt, args...) printk(KERN_ERR "ucafs_fbox (debug): " fmt, ##args)
 
-static int
+int
 _ucafs_read_fbox(struct rx_call * acall, afs_int32 length, uc_fbox_t ** p_fbox)
 {
-    int code, nbytes, abytes, pos, srv_64bit;
+    int code, nbytes, abytes, pos;
     uc_fbox_t temp_fbox, *fbox = NULL;
 
-    if (length <= sizeof(temp_fbox)) {
+    if (length < sizeof(temp_fbox)) {
         goto done;
     }
 
     /* we can now start reading */
     nbytes = rx_Read(acall, (char *)&temp_fbox, FBOX_HEADER_LEN);
     if (nbytes != FBOX_HEADER_LEN) {
+        ERROR("error reading from fserver\n");
         code = -1;
         goto done;
     }
@@ -26,8 +27,7 @@ _ucafs_read_fbox(struct rx_call * acall, afs_int32 length, uc_fbox_t ** p_fbox)
         goto done;
     }
 
-    if (fbox == NULL
-        && (fbox = kmalloc(temp_fbox.fbox_len, GFP_KERNEL)) == NULL) {
+    if ((fbox = kmalloc(temp_fbox.fbox_len, GFP_KERNEL)) == NULL) {
         /* XXX should we have a flag to stop the loop?
          * An allocation error is not the RPC's fault */
         ERROR("allocating fbox failed\n");
@@ -39,6 +39,7 @@ _ucafs_read_fbox(struct rx_call * acall, afs_int32 length, uc_fbox_t ** p_fbox)
     /* do we have to read more ? */
     pos = nbytes;
     nbytes = temp_fbox.fbox_len - nbytes;
+    DEBUG("nbytes=%d, %p\n", nbytes, p_fbox);
     if (nbytes > 0) {
         if ((abytes = rx_Read(acall, (char *)(fbox + pos), nbytes)) != nbytes) {
             code = -1;
@@ -55,7 +56,7 @@ done:
         fbox = NULL;
     }
 
-    p_fbox = fbox;
+    *p_fbox = fbox;
     return code;
 }
 
@@ -69,7 +70,7 @@ done:
 int
 ucafs_fbox(struct vcache * avc, uc_fbox_t ** p_fbox)
 {
-    int ret = AFSX_STATUS_NOOP, code = 0;
+    int ret = AFSX_STATUS_NOOP, code = 0, srv_64bit;
     struct afs_conn * tc = NULL;
     struct rx_connection * rxconn = NULL;
     struct rx_call * acall = NULL;
@@ -107,9 +108,10 @@ ucafs_fbox(struct vcache * avc, uc_fbox_t ** p_fbox)
             goto done;
         }
 
-        code = _ucafs_read_fbox(acall, p_fbox);
+        code = _ucafs_read_fbox(acall, length, p_fbox);
 
         /* lets free the afs call */
+done:
         code = _ucafs_end_fetch(acall, &tsmall, srv_64bit, code);
         acall = NULL;
     } while (afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,

@@ -145,7 +145,7 @@ out:
     return ret;
 }
 
-uint8_t ** fetchstore_get_buffer(int id, size_t valid_buflen)
+uint8_t ** fetchstore_get_buffer(int id, size_t valid_buflen, int * op)
 {
     xfer_context_t * xfer_ctx = seqptrmap_get(xfer_context_array, id);
     if (xfer_ctx == NULL) {
@@ -160,44 +160,16 @@ uint8_t ** fetchstore_get_buffer(int id, size_t valid_buflen)
     }
 
     xfer_ctx->valid_buflen = valid_buflen;
+    *op = xfer_ctx->op;
     return (uint8_t **)&xfer_ctx->buffer;
 }
 
 int fetchstore_process_data(uint8_t ** buffer)
 {
     int ret = 0, len;
-    uc_fbox_t * fbox;
     xfer_context_t * xfer_ctx
         = (xfer_context_t *)((uintptr_t)buffer
                              - offsetof(xfer_context_t, buffer));
-    fbox = xfer_ctx->fbox;
-
-    len = fbox->fbox_len - xfer_ctx->fbox_xfer;
-    if (len > 0) {
-        len = MIN(len, xfer_ctx->valid_buflen);
-
-        /* copy the across the buffer */
-        if (xfer_ctx->op == UCAFS_STORE) {
-            memcpy(xfer_ctx->buffer, ((uint8_t *)fbox) + xfer_ctx->fbox_xfer,
-                   len);
-        } else {
-            memcpy(((uint8_t *)fbox) + xfer_ctx->fbox_xfer, xfer_ctx->buffer,
-                   len);
-        }
-
-        /* if we are done, lets initialize enclave space */
-        xfer_ctx->fbox_xfer += len;
-        if (xfer_ctx->fbox_xfer >= fbox->fbox_len
-            && xfer_ctx->op == UCAFS_FETCH) {
-#ifdef UCAFS_SGX
-            ecall_xfer_start(global_eid, &ret, xfer_ctx);
-            if (ret) {
-                slog(0, SLOG_FATAL, "enclave failed");
-            }
-#endif
-        }
-        goto out;
-    }
 
 #ifdef UCAFS_SGX
     ecall_xfer_crypto(global_eid, &ret, xfer_ctx);
@@ -215,6 +187,53 @@ out:
         fetchstore_finish(xfer_ctx->xfer_id);
     }
 
+    return ret;
+}
+
+int fetchstore_process_fbox(uint8_t ** buffer)
+{
+    int ret = -1, bytes_left, len;
+    uc_fbox_t * fbox;
+    uint8_t * fbox_buffer;
+    xfer_context_t * xfer_ctx
+        = (xfer_context_t *)((uintptr_t)buffer
+                             - offsetof(xfer_context_t, buffer));
+    fbox = xfer_ctx->fbox;
+
+    bytes_left = fbox->fbox_len - xfer_ctx->fbox_xfer;
+    if (bytes_left <= 0) {
+        slog(0, SLOG_FATAL, "trying to read beyond fbox");
+        goto out;
+    }
+
+    len = MIN(bytes_left, xfer_ctx->valid_buflen);
+    fbox_buffer = ((uint8_t *) fbox) + xfer_ctx->fbox_xfer;
+
+    xfer_ctx->fbox_xfer += len;
+
+    if (xfer_ctx->op == UCAFS_STORE) {
+        memcpy(xfer_ctx->buffer, fbox_buffer, len);
+    } else {
+        memcpy(fbox_buffer, xfer_ctx->buffer, len);
+
+        // if we have exceeded the maximum, time to instantiate
+        if (xfer_ctx->fbox_xfer >= fbox->fbox_len) {
+#ifdef UCAFS_SGX
+            ecall_xfer_start(global_eid, &ret, xfer_ctx);
+            if (ret) {
+                slog(0, SLOG_FATAL, "enclave failed");
+                goto out;
+            }
+#endif
+        }
+    }
+
+    ret = 0;
+out:
+    if (ret) {
+        // XXX is this necessary? Just because one fails?
+        fetchstore_finish(xfer_ctx->xfer_id);
+    }
     return ret;
 }
 

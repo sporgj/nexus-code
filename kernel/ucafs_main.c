@@ -146,6 +146,10 @@ __is_dentry_ignored(struct dentry * dentry, char ** dest)
     char *path, *curr_dir, *result;
     char buf[512];
 
+    if (dentry == NULL) {
+        return 1;
+    }
+
     /* TODO cache the inode number
     printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d
     dentry_name=%s",

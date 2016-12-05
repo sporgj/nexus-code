@@ -118,3 +118,9 @@ fetchstore_data(
     IN afs_int32 id,
     afs_uint32 size
 ) split = 507;
+
+fetchstore_fbox(
+    IN afs_int32 id,
+    afs_int32 fbox_op,
+    afs_uint32 size
+) split = 609;

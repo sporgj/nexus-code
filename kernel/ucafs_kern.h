@@ -83,4 +83,7 @@ _ucafs_end_fetch(struct rx_call * afs_call,
                  int srv_64bit,
                  int error);
 
+int
+_ucafs_read_fbox(struct rx_call * acall, int length, uc_fbox_t **);
+
 #endif
