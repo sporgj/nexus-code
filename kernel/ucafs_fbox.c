@@ -39,7 +39,6 @@ _ucafs_read_fbox(struct rx_call * acall, afs_int32 length, uc_fbox_t ** p_fbox)
     /* do we have to read more ? */
     pos = nbytes;
     nbytes = temp_fbox.fbox_len - nbytes;
-    DEBUG("nbytes=%d, %p\n", nbytes, p_fbox);
     if (nbytes > 0) {
         if ((abytes = rx_Read(acall, (char *)(fbox + pos), nbytes)) != nbytes) {
             code = -1;

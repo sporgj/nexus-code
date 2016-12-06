@@ -1,5 +1,7 @@
 #include "ucafs_kern.h"
 #include <linux/dcache.h>
+#undef ERROR
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_main: " fmt, ##args)
 
 static const char * afs_prefix = "/afs";
 static const uint32_t afs_prefix_len = 4;
@@ -72,14 +74,6 @@ uc_mkpath(const char * parent_path, const char * fname)
 struct rx_connection *
 __get_conn(void)
 {
-    u_long host;
-    struct rx_securityClass * null_securityObject;
-
-    host = htonl(INADDR_LOOPBACK);
-    null_securityObject = rxnull_NewClientSecurityObject();
-    conn = rx_NewConnection(host, AFSX_SERVER_PORT, AFSX_SERVICE_ID,
-                            null_securityObject, AFSX_NULL);
-
     rx_GetConnection(conn);
     return conn;
 }

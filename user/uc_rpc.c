@@ -367,11 +367,10 @@ afs_int32 SAFSX_fetchstore_fbox(
         goto out;
     }
 
-    /* read data on store */
-    if (op == UCAFS_FBOX_READ) {
+    if (fbox_op == UCAFS_FBOX_WRITE) {
         if ((abytes = rx_Read(z_call, *buf, size)) != size) {
-            uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
-                   rx_Error(z_call));
+            uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
+                    abytes, rx_Error(z_call));
             goto out;
         }
     }
@@ -381,11 +380,10 @@ afs_int32 SAFSX_fetchstore_fbox(
         goto out;
     }
 
-    /* write data on store */
-    if (op == UCAFS_FBOX_WRITE) {
+    if (fbox_op == UCAFS_FBOX_READ) {
         if ((abytes = rx_Write(z_call, *buf, size)) != size) {
-            uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
-                    abytes, rx_Error(z_call));
+            uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
+                   rx_Error(z_call));
             goto out;
         }
     }

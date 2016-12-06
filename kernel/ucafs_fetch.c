@@ -1,6 +1,6 @@
 #include "ucafs_kern.h"
 #undef ERROR
-#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_get: " fmt, ##args)
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_fetch: " fmt, ##args)
 
 static int
 _fetch_cleanup(fetch_context_t * fetch_ctx,
@@ -35,24 +35,33 @@ _fetch_parse_fbox(fetch_context_t * fetch_ctx,
                   struct vcache * avc,
                   struct afs_conn * tc,
                   struct rx_connection * rxconn,
-                  afs_size_t base,
 		  uc_fbox_t ** p_fbox)
 {
-    int ret = -1, len = avc->f.m.Length, cursor, abytes, srv_64bit,
-        size = 0x7fffffff;
-    struct afs_FetchOutput output;
+    int ret = -1, abytes, srv_64bit, size = 0x7fffffff;
+    afs_uint32 len, cursor;
+    struct afs_FetchOutput o;
     struct rx_call * acall = NULL;
-    uc_fbox_t * fbox = *p_fbox;
+    uc_fbox_t * fbox = NULL;
 
-    /* FIXME: We can't rely on avc->f.m.Length to get the file size.
-     * There is a chance this could be rigged */
+    /*
+    ret = RXAFS_FetchStatus(rxconn, &avc->f.fid.Fid, &o.OutStatus, &o.CallBack,
+            &o.tsync);
+
+    if ((len = o.OutStatus.Length) < sizeof(uc_fbox_t)) {
+        goto out;
+    }
+    */
+
+    len = avc->f.m.Length;
 
     /* we are first going to try with the known length */
     cursor = UCAFS_GET_REAL_FILE_SIZE(len);
+    ERROR("len=%d, cursor=%d\n", (int)len, (int)cursor);
 
-    if (_ucafs_init_fetch(tc, rxconn, avc, cursor, size, &abytes, &srv_64bit,
-                          &acall)) {
-        ERROR("initializing with server failed\n");
+    ret = _ucafs_init_fetch(tc, rxconn, avc, cursor, size, &abytes, &srv_64bit,
+                            &acall);
+    if (ret) {
+        ERROR("initializing with server failed (%d)\n", ret);
 	goto out;
     }
 
@@ -61,15 +70,15 @@ _fetch_parse_fbox(fetch_context_t * fetch_ctx,
 	goto out;
     }
 
-    ERROR("fbox length: %d, file_size: %d\n", fbox->fbox_len, fbox->file_size);
+    fbox = *p_fbox;
     fetch_ctx->real_len = fbox->file_size;
     fetch_ctx->total_len = fbox->file_size + fbox->fbox_len;
     fetch_ctx->fbox_len = fbox->fbox_len;
-    
+
     ret = 0;
 out:
     if (acall) {
-	_ucafs_end_fetch(acall, &output, srv_64bit, 0);
+	_ucafs_end_fetch(acall, &o, srv_64bit, 0);
     }
 
     return ret;
@@ -147,6 +156,63 @@ out:
 }
 
 int
+_fetch_read(fetch_context_t * fetch_ctx, uint32_t len, uint32_t * bytes_read)
+{
+    uint32_t nbytes; 
+    RX_AFS_GUNLOCK();
+    nbytes = rx_Read(fetch_ctx->afs_call, fetch_ctx->buffer, len);
+    RX_AFS_GLOCK();
+    if (nbytes != len) {
+        ERROR("reading from fserver error. exp=%u, act=%u\n", len, nbytes);
+        return -1;
+    }
+
+    *bytes_read = nbytes;
+    return 0;
+}
+
+static int
+_fetch_write(fetch_context_t * fetch_ctx, uint32_t len, uint32_t * bytes_written)
+{
+    uint32_t nbytes;
+    int ret = -1;
+    struct rx_connection * uc_conn;
+    struct rx_call * uspace_call;
+
+    // open a session with the daemon
+    uc_conn = fetch_ctx->uc_conn;
+    uspace_call = rx_NewCall(uc_conn);
+
+    // send it to uspace
+    if (StartAFSX_fetchstore_data(uspace_call, fetch_ctx->id, len)) {
+        ERROR("StartAFSX_upload_file failed");
+        goto out1;
+    }
+
+    // copy the bytes over
+    RX_AFS_GUNLOCK();
+    if ((nbytes = rx_Write(uspace_call, fetch_ctx->buffer, len)) != len) {
+        ERROR("send error: exp=%d, act=%u\n", len, nbytes);
+        goto out1;
+    }
+
+    // read back the decrypted stream
+    if ((nbytes = rx_Read(uspace_call, fetch_ctx->buffer, len)) != len) {
+        ERROR("recv error: exp=%d, act=%u\n", len, nbytes);
+        goto out1;
+    }
+    RX_AFS_GLOCK();
+
+    *bytes_written = nbytes;
+
+    ret = 0;
+out1:
+    EndAFSX_fetchstore_data(uspace_call);
+    rx_EndCall(uspace_call, 0);
+    return ret;
+}
+
+int
 ucafs_fetch(struct afs_conn * tc,
             struct rx_connection * rxconn,
             struct osi_file * fp,
@@ -156,7 +222,8 @@ ucafs_fetch(struct afs_conn * tc,
             afs_int32 size,
             struct afs_FetchOutput * tsmall)
 {
-    int ret = AFSX_STATUS_NOOP;
+    int ret = AFSX_STATUS_NOOP, bytes_left, pos;
+    uint32_t len, nbytes, abytes, start, end;
     char * path = NULL;
     fetch_context_t * fetch_ctx = NULL;
     uc_fbox_t * fbox = NULL;
@@ -180,8 +247,7 @@ ucafs_fetch(struct afs_conn * tc,
     fetch_ctx->path = path;
 
     /* 1 - Initialize the userspace RPC call */
-    if (_fetch_parse_fbox(fetch_ctx, avc, tc, rxconn, base, &fbox)) {
-        ERROR("there was an error in parsing fbox");
+    if (_fetch_parse_fbox(fetch_ctx, avc, tc, rxconn, &fbox)) {
 	ret = AFSX_STATUS_NOOP;
 	goto out;
     }
@@ -196,7 +262,43 @@ ucafs_fetch(struct afs_conn * tc,
 	goto out;
     }
 
-    goto out;
+    /* 4 - Lets start downloading data */
+    ret = _ucafs_init_fetch(tc, rxconn, avc, 0, size, &abytes,
+                            &fetch_ctx->srv_64bit, &fetch_ctx->afs_call);
+    if (ret != 0) {
+        ERROR("could start fserver. code=%d\n", ret);
+        goto out;
+    }
+
+    start = AFS_CHUNKTOBASE(adc->f.chunk), end = start + AFS_CHUNKSIZE(base);
+    bytes_left = fetch_ctx->real_len;
+    pos = fp->offset = 0;
+    adc->validPos = pos;
+
+    while (bytes_left > 0) {
+        len = MIN(bytes_left, fetch_ctx->buflen);
+
+        // download from the server inside the buffer
+        if (_fetch_read(fetch_ctx, len, &nbytes)) {
+            goto out1;
+        }
+
+        if (_fetch_write(fetch_ctx, len, &nbytes)) {
+            goto out1;
+        }
+
+        /* if we are within the TDC limits, write to the file */
+        if (pos >= start && pos < end) {
+            afs_osi_Write(fp, -1, fetch_ctx->buffer, nbytes);
+        }
+
+        bytes_left -= len;
+        pos += len;
+    }
+
+    adc->validPos = pos;
+    /* someone might be waiting on us */
+    afs_osi_Wakeup(&adc->validPos);
 
     ret = 0;
 out1:
@@ -205,7 +307,6 @@ out:
     kfree(fetch_ctx);
     kfree(path);
     if (fbox) {
-	ERROR("fbox_len=%d, file_len=%d\n", fbox->fbox_len, fbox->file_size);
 	kfree(fbox);
     }
     return ret;

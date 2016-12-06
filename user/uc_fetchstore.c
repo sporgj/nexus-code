@@ -65,6 +65,11 @@ fetchstore_start(int op,
         return ret;
     }
 
+    /* TODO move this to an init function */
+    if (xfer_context_array == NULL) {
+        xfer_context_array = seqptrmap_init();
+    }
+
     /* If not found, we don't have access to this file. */
     shdw_name = dirnode_raw2enc(dirnode, fname_sds, UC_ANY, &atype);
     if (shdw_name == NULL) {
@@ -92,28 +97,22 @@ fetchstore_start(int op,
     xfer_ctx->total_len = file_size;
     xfer_ctx->path = strdup(fpath);
 
-    if (op == UCAFS_STORE) {
-        xfer_ctx->fbox = fbox = calloc(1, sizeof(uc_fbox_t));
-        if (fbox == NULL) {
-            slog(0, SLOG_FATAL, "alloating fbox (%s) failed", fpath);
-            goto out;
-        }
+    xfer_ctx->fbox = fbox = calloc(1, sizeof(uc_fbox_t));
+    if (fbox == NULL) {
+        slog(0, SLOG_FATAL, "alloating fbox (%s) failed", fpath);
+        goto out;
+    }
 
+    fbox->fbox_len = sizeof(uc_fbox_t);
+
+    if (op == UCAFS_STORE) {
         /* setup the fbox */
         fbox->magic = UCAFS_FBOX_MAGIC;
         // XXX change here for multichunking
         fbox->chunk_count = 1;
         fbox->chunk_size = file_size;
         fbox->file_size = file_size;
-        fbox->fbox_len = sizeof(uc_fbox_t);
-    }
 
-    /* TODO move this to an init function */
-    if (xfer_context_array == NULL) {
-        xfer_context_array = seqptrmap_init();
-    }
-
-    if (xfer_ctx->op == UCAFS_STORE) {
 #ifdef UCAFS_SGX
         ecall_xfer_start(global_eid, &ret, xfer_ctx);
         if (ret) {
