@@ -13,7 +13,6 @@ SRC = afsx.h \
       ucafs_fbox.c \
       ucafs_store.c \
       ucafs_dirops.c \
-      ucafs_dnlc.c \
       ucafs_main.c
 
 include $(COMMONPATH)/build.mk
@@ -32,7 +31,7 @@ LIB_FLAGS= -L$(OPENAFS_LIB_PATH)
 RXLIBS = -lrx\
 	 -llwp
 
-GEN = afsx.cs.c afsx.h
+GEN = afsx.cs.c afsx.h ucafs_gens.h ucafs_defs.h
 
 all: afsx.cs.c afsx.h ucafs_defs.h ucafs_gens.h
 afsx.cs.c: $(COMMONPATH)/afsx.xg
@@ -53,7 +52,7 @@ install: all
 
 .PHONY: rm
 rm:
-	rm $(GEN)
+	rm -f $(GEN)
 
 .PHONY: clean
 clean: rm
