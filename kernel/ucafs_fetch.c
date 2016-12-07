@@ -35,6 +35,7 @@ _fetch_parse_fbox(fetch_context_t * fetch_ctx,
                   struct vcache * avc,
                   struct afs_conn * tc,
                   struct rx_connection * rxconn,
+                  struct afs_FetchOutput * tsmall,
 		  uc_fbox_t ** p_fbox)
 {
     int ret = -1, abytes, srv_64bit, size = 0x7fffffff;
@@ -43,16 +44,12 @@ _fetch_parse_fbox(fetch_context_t * fetch_ctx,
     struct rx_call * acall = NULL;
     uc_fbox_t * fbox = NULL;
 
-    /*
-    ret = RXAFS_FetchStatus(rxconn, &avc->f.fid.Fid, &o.OutStatus, &o.CallBack,
-            &o.tsync);
+    ret = RXAFS_FetchStatus(rxconn, &avc->f.fid.Fid, &tsmall->OutStatus,
+                            &tsmall->CallBack, &tsmall->tsync);
 
-    if ((len = o.OutStatus.Length) < sizeof(uc_fbox_t)) {
+    if ((len = tsmall->OutStatus.Length) < sizeof(uc_fbox_t)) {
         goto out;
     }
-    */
-
-    len = avc->f.m.Length;
 
     /* we are first going to try with the known length */
     cursor = UCAFS_GET_REAL_FILE_SIZE(len);
@@ -227,6 +224,7 @@ ucafs_fetch(struct afs_conn * tc,
     char * path = NULL;
     fetch_context_t * fetch_ctx = NULL;
     uc_fbox_t * fbox = NULL;
+    struct afs_FetchOutput o;
 
     if (!UCAFS_IS_CONNECTED || vType(avc) == VDIR) {
 	return ret;
@@ -247,19 +245,20 @@ ucafs_fetch(struct afs_conn * tc,
     fetch_ctx->path = path;
 
     /* 1 - Initialize the userspace RPC call */
-    if (_fetch_parse_fbox(fetch_ctx, avc, tc, rxconn, &fbox)) {
+    if (_fetch_parse_fbox(fetch_ctx, avc, tc, rxconn, tsmall, &fbox)) {
 	ret = AFSX_STATUS_NOOP;
 	goto out;
     }
 
+    ret = AFSX_STATUS_ERROR;
     /* 2 - Initialize userspace */
     if (_fetch_init_ucafs(fetch_ctx)) {
-	goto out;
+	goto out1;
     }
 
     /* 3 - Send the filebox */
     if (_fetch_send_fbox(fetch_ctx, fbox)) {
-	goto out;
+	goto out1;
     }
 
     /* 4 - Lets start downloading data */
@@ -267,13 +266,13 @@ ucafs_fetch(struct afs_conn * tc,
                             &fetch_ctx->srv_64bit, &fetch_ctx->afs_call);
     if (ret != 0) {
         ERROR("could start fserver. code=%d\n", ret);
-        goto out;
+        goto out1;
     }
 
-    start = AFS_CHUNKTOBASE(adc->f.chunk), end = start + AFS_CHUNKSIZE(base);
+    start = base, end = start + AFS_CHUNKSIZE(base);
     bytes_left = fetch_ctx->real_len;
     pos = fp->offset = 0;
-    adc->validPos = pos;
+    adc->validPos = base;
 
     while (bytes_left > 0) {
         len = MIN(bytes_left, fetch_ctx->buflen);
@@ -287,22 +286,23 @@ ucafs_fetch(struct afs_conn * tc,
             goto out1;
         }
 
+        bytes_left -= nbytes;
+        pos += nbytes;
+
         /* if we are within the TDC limits, write to the file */
         if (pos >= start && pos < end) {
-            afs_osi_Write(fp, -1, fetch_ctx->buffer, nbytes);
+            abytes = afs_osi_Write(fp, -1, fetch_ctx->buffer, nbytes);
+            adc->validPos = pos;
+            /* someone might be waiting on us */
+            afs_osi_Wakeup(&adc->validPos);
         }
-
-        bytes_left -= len;
-        pos += len;
     }
 
-    adc->validPos = pos;
-    /* someone might be waiting on us */
-    afs_osi_Wakeup(&adc->validPos);
-
+    avc->is_ucafs_file = 1;
     ret = 0;
 out1:
-    _fetch_cleanup(fetch_ctx, tsmall, ret);
+    _fetch_cleanup(fetch_ctx, &o, ret);
+    
 out:
     kfree(fetch_ctx);
     kfree(path);

@@ -1,5 +1,5 @@
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..69d9a8d 100644
+index 1b99c94..b3daefa 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -98,30 +98,7 @@ index 1b99c94..69d9a8d 100644
      return code;
  }
  
-@@ -1064,6 +1110,13 @@ iattr2vattr(struct vattr *vattrp, struct iattr *iattrp)
- void
- vattr2inode(struct inode *ip, struct vattr *vp)
- {
-+    afs_size_t size = vp->va_size;
-+    struct vcache * avc = VTOAFS(ip);
-+    /* avc->f.m.Length is updated by the ucafs fetch procedure */
-+    if (avc->is_ucafs_file && size > sizeof(uc_fbox_t)) {
-+	size -= sizeof(uc_fbox_t);
-+    }
-+
-     ip->i_ino = vp->va_nodeid;
- #ifdef HAVE_LINUX_SET_NLINK
-     set_nlink(ip, vp->va_nlink);
-@@ -1081,7 +1134,7 @@ vattr2inode(struct inode *ip, struct vattr *vp)
-     ip->i_mode = vp->va_mode;
-     ip->i_uid = afs_make_kuid(vp->va_uid);
-     ip->i_gid = afs_make_kgid(vp->va_gid);
--    i_size_write(ip, vp->va_size);
-+    i_size_write(ip, size);
-     ip->i_atime.tv_sec = vp->va_atime.tv_sec;
-     ip->i_atime.tv_nsec = 0;
-     ip->i_mtime.tv_sec = vp->va_mtime.tv_sec;
-@@ -1613,6 +1666,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1613,6 +1659,8 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      cred_t *credp = crref();
      const char *name = newdp->d_name.name;
      struct inode *oldip = olddp->d_inode;
@@ -130,7 +107,7 @@ index 1b99c94..69d9a8d 100644
  
      /* If afs_link returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1620,7 +1675,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1620,7 +1668,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      d_drop(newdp);
  
      AFS_GLOCK();
@@ -152,7 +129,7 @@ index 1b99c94..69d9a8d 100644
  
      AFS_GUNLOCK();
      crfree(credp);
-@@ -1722,6 +1790,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1722,6 +1783,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
      cred_t *credp = crref();
      struct vattr *vattr = NULL;
      const char *name = dp->d_name.name;
@@ -162,7 +139,7 @@ index 1b99c94..69d9a8d 100644
  
      /* If afs_symlink returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1734,10 +1805,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1734,10 +1798,23 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
  	goto out;
      }
  
@@ -565,8 +542,24 @@ index e8b8f9d..521359e 100644
  
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
+diff --git a/src/afs/afs_dcache.c b/src/afs/afs_dcache.c
+index 7c46617..ed8d44b 100644
+--- a/src/afs/afs_dcache.c
++++ b/src/afs/afs_dcache.c
+@@ -2510,6 +2510,11 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
+ 	    setVcacheStatus = 1;
+ 	hset64(tdc->f.versionNo, tsmall->OutStatus.dataVersionHigh,
+ 	       tsmall->OutStatus.DataVersion);
++	afs_Trace3(afs_iclSetp, CM_TRACE_VERSIONNO,
++		ICL_TYPE_INT64, ICL_HANDLE_OFFSET(Position),
++		ICL_TYPE_HYPER, &avc->f.m.DataVersion,
++		ICL_TYPE_HYPER, &tdc->f.versionNo);
++
+ 	tdc->dflags |= DFEntryMod;
+ 	afs_indexFlags[tdc->index] |= IFEverUsed;
+ 	ConvertWToSLock(&tdc->lock);
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..149219b 100644
+index f494677..21844b2 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
 @@ -1146,6 +1146,17 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
@@ -579,7 +572,7 @@ index f494677..149219b 100644
 +	return 0;
 +    } else {
 +	if (ret == AFSX_STATUS_ERROR) {
-+	    printk(KERN_ERR "ucafs_get: failed\n");
++	    printk(KERN_ERR "ucafs_fetch: failed\n");
 +	    return -1;
 +	}
 +    }
@@ -620,7 +613,7 @@ index 2dd89cf..05b6afc 100644
  
      hash = DVHash(&avc->f.fid);
 diff --git a/src/afs/afs_vcache.c b/src/afs/afs_vcache.c
-index ca5a956..aa6b1f5 100644
+index ca5a956..47f9048 100644
 --- a/src/afs/afs_vcache.c
 +++ b/src/afs/afs_vcache.c
 @@ -861,6 +861,9 @@ afs_PrePopulateVCache(struct vcache *avc, struct VenusFid *afid,
@@ -633,7 +626,17 @@ index ca5a956..aa6b1f5 100644
  #if defined(AFS_CACHE_BYPASS)
      avc->cachingStates = 0;
      avc->cachingTransitions = 0;
-@@ -1928,6 +1931,9 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
+@@ -1512,6 +1515,9 @@ afs_ProcessFS(struct vcache *avc,
+ #else /* AFS_64BIT_CLIENT */
+     length = astat->Length;
+ #endif /* AFS_64BIT_CLIENT */
++    if (avc->is_ucafs_file && length > sizeof(uc_fbox_t)) {
++	length -= sizeof(uc_fbox_t);
++    }
+     /* WARNING: afs_DoBulkStat uses the Length field to store a sequence
+      * number for each bulk status request. Under no circumstances
+      * should afs_DoBulkStat store a sequence number if the new
+@@ -1928,6 +1934,9 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
      struct server *serverp = 0;
      afs_int32 origCBs;
      afs_int32 retry;
@@ -643,7 +646,7 @@ index ca5a956..aa6b1f5 100644
  
      AFS_STATCNT(afs_GetVCache);
      if (cached)
-@@ -1975,10 +1981,21 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
+@@ -1975,10 +1984,21 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
  	/* printf("Network is down in afs_LookupVcache\n"); */
          code = ENETDOWN;
      } else
