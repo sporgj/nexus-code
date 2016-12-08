@@ -24,6 +24,16 @@ enclave {
 
         public int ecall_xfer_finish([in] xfer_context_t * xfer_ctx,
                 [in, out] crypto_mac_t * dest_mac);
+
+
+        /* store operations */
+        public int ecall_store_init([in, out] xfer_context_t * xfer_ctx);
+
+        public int ecall_store_start([in, out] xfer_context_t * xfer_ctx);
+
+        public int ecall_store_crypto([in, out] xfer_context_t * xfer_ctx);
+
+        public int ecall_store_finish([in, out] xfer_context_t * xfer_ctx);
     };
 
 };

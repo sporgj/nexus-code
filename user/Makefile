@@ -71,7 +71,7 @@ uc_rpc.o: uc_rpc.c afsx.ss.c
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
-%.o: %.c %.h
+%.o: %.c
 	@$(CC) -std=gnu11 $(CFLAGS) $(App_C_Flags) $(INCFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 

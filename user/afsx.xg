@@ -124,3 +124,27 @@ fetchstore_fbox(
     afs_int32 fbox_op,
     afs_uint32 size
 ) split = 609;
+
+store_start(
+    IN string fpath<AFSX_PATH_MAX>,
+    afs_uint32 max_xfer_size,
+    afs_uint32 file_size,
+    afs_int32 old_fbox_len,
+    OUT afs_int32 * xfer_id,
+    afs_uint32 new_fbox_len
+) =  707;
+
+store_fbox(
+    IN afs_int32 xfer_id,
+    int inout,
+    afs_uint32 size
+) split = 708;
+
+store_data(
+    IN afs_int32 xfer_id,
+    afs_uint32 size
+) split = 709;
+
+store_finish(
+    IN afs_int32 xfer_id
+) = 710;

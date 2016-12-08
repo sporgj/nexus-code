@@ -392,3 +392,39 @@ afs_int32 SAFSX_fetchstore_fbox(
 out:
     return ret;
 }
+
+afs_int32 SAFSX_store_start(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ char * fpath,
+	/*IN */ afs_uint32 max_xfer_size,
+	/*IN */ afs_uint32 file_size,
+	/*IN */ afs_int32 old_fbox_len,
+	/*OUT*/ afs_int32 * xfer_id,
+	/*OUT*/ afs_uint32 new_fbox_len)
+{
+    return 0;
+}
+
+afs_int32 SAFSX_store_fbox(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ afs_int32 xfer_id,
+	/*IN */ int inout,
+	/*IN */ afs_uint32 size)
+{
+    return 0;
+}
+
+afs_int32 SAFSX_store_data(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ afs_int32 xfer_id,
+	/*IN */ afs_uint32 size)
+{
+    return 0;
+}
+
+afs_int32 SAFSX_store_finish(
+	/*IN */ struct rx_call *z_call,
+	/*IN */ afs_int32 xfer_id)
+{
+    return 0;
+}

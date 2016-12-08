@@ -4,163 +4,88 @@
 #include "uc_test.h"
 #include "uc_utils.h"
 
-#include <uc_fileops.h>
+#include <uc_fetchstore.h>
 #include <uc_sgx.h>
 
 #include <sys/param.h>
 
-#define FILE_LEN 1024
-#define CHUNK_LEN 16 + 1
+int xfer_size_test[] = {16, 512, 4096};
+int file_size_test[] = {107, 32, 567, 34};
 
-static uint8_t *input_buffer, *output_buffer, *temp_buffer;
-
-static void
-generate_stream()
-{
-    uinfo("Generating stream...");
-
-    input_buffer = (uint8_t *)malloc(FILE_LEN);
-    ASSERT_TRUE(input_buffer != NULL) << "Malloc failed";
-
-    temp_buffer = (uint8_t *)malloc(FILE_LEN);
-    ASSERT_TRUE(temp_buffer != NULL) << "Malloc failed";
-
-    output_buffer = (uint8_t *)malloc(FILE_LEN);
-    ASSERT_TRUE(output_buffer != NULL) << "Malloc failed";
-
-    /* generate the random stream */
-    srand(time(0));
-    for (size_t i = 0; i < FILE_LEN; i++) {
-        input_buffer[i] = rand() % UINT8_MAX;
+void fill_buffer(char * buffer, int len) {
+    for (size_t i = 0; i < len; i++) {
+        buffer[i] = rand() % CHAR_MAX;
     }
 }
 
-static void
-run_fetch_store(int op,
-                sds path,
-                uint8_t * p_input,
-                uint8_t * p_output,
-                int blen,
-                int offset)
+TEST(UC_FETCHSTORE, SanityTest)
 {
-    int ret, xfer_id;
-    uint8_t ** buf;
-    size_t len, bytes_left = blen;
+    int ret, bytes_left, len, total_len, xfer_id, new_fbox_len,
+        file_size = file_size_test[0], xfer_buflen = xfer_size_test[0];
+    char *temp, *input, *p_input, *output, *p_output;
+    uint8_t **buf;
+    sds path = MK_PATH("file.txt");
+    srand(time(NULL));
 
-    /* start encryption */
-    ASSERT_EQ(0, fileops_start(op, path, CHUNK_LEN, offset, blen, &xfer_id))
-        << "fileops_start failed";
+    /* create our file */
+    ASSERT_EQ(0, dirops_new(path, UC_FILE, &temp)) << "dirops_new failed";
 
-    uinfo("%s...", op == UC_ENCRYPT ? "Uploading" : "Downloading");
-    for (size_t i = 0; i < blen; i += CHUNK_LEN) {
-        len = MIN(bytes_left, CHUNK_LEN);
+    /* initalize the store */
+    ASSERT_EQ(0, store_start(path, xfer_buflen, 0, file_size, 0, &xfer_id,
+                             &new_fbox_len));
 
-        buf = fileops_get_buffer(xfer_id, len);
-        ASSERT_TRUE(buf != NULL) << "fileops_get_context failed";
+    /* start create variables */
+    total_len = new_fbox_len + file_size;
+    ASSERT_FALSE((input = (char *)malloc(file_size)) == NULL);
+    ASSERT_FALSE((output = (char *)malloc(total_len)) == NULL);
 
-        /* this portion is done by rpc.c */
-        memcpy(*buf, p_input + offset + i, len);
-        ASSERT_EQ(0, fileops_process_data(buf));
-        memcpy(p_output + offset + i, *buf, len);
+    cout << "filelen = " << file_size << ", total_len = " << total_len << endl;
+
+    fill_buffer(input, file_size);
+
+    /* now store the data */
+    p_input = input, p_output = output;
+    bytes_left = file_size;
+    while (bytes_left > 0) {
+        len = MIN(xfer_buflen, bytes_left);
+
+        ASSERT_FALSE((buf = store_get_buffer(xfer_id, len)) == NULL);
+
+        // now copy the data
+        memcpy(*buf, p_input, len);
+
+        ASSERT_EQ(0, store_data(buf));
+
+        memcpy(p_output, *buf, len);
 
         bytes_left -= len;
+        p_input += len;
+        p_output += len;
     }
-    ASSERT_EQ(0, fileops_finish(xfer_id));
-}
 
-TEST(UC_FETCHSTORE, LocalTest)
-{
-    int ret;
-    char * test;
-    const char * fname = "test.txt";
-    sds path = MK_PATH(fname);
+    /* now lets retrieve our fbox data */
+    bytes_left = new_fbox_len;
+    cout << "Copying fbox. len = " << bytes_left << endl;
+    while (bytes_left > 0) {
+        len = MIN(xfer_buflen, bytes_left);
 
-    /* creating the default file */
-    ASSERT_EQ(0, dirops_new(path, UC_FILE, &test))
-        << "dirops_new failed";
+        ASSERT_EQ(0, store_fbox(UCAFS_FBOX_READ, buf));
 
-    generate_stream();
-    run_fetch_store(UC_ENCRYPT, path, input_buffer, output_buffer, FILE_LEN, 0);
-    run_fetch_store(UC_DECRYPT, path, output_buffer, temp_buffer, FILE_LEN, 0);
+        memcpy(p_output, *buf, len);
 
-    printf("\n");
-    uinfo("Input..");
-    hexdump(input_buffer, MIN(FILE_LEN, 32));
+        bytes_left -= len;
+        p_output += len;
+    }
 
-    printf("\n");
-    uinfo("Output..");
-    hexdump(output_buffer, MIN(FILE_LEN, 32));
-
-    printf("\n");
-    uinfo("Ttemp...");
-    hexdump(temp_buffer, MIN(FILE_LEN, 32));
-
-    printf("\n");
-
-    ASSERT_EQ(0, memcmp(input_buffer, temp_buffer, FILE_LEN))
-        << "Encryption did not work";
-
-    ASSERT_EQ(0, dirops_remove(path, UC_FILE, &test))
-        << "dirops_remove failed";
-
-    free(input_buffer);
-    free(output_buffer);
-    free(temp_buffer);
-
-    sdsfree(path);
-}
-
-TEST(UC_FETCHSTORE, OffsetTest)
-{
-    int ret, offset;
-    char * test;
-    const char * fname = "test.txt";
-    sds path = MK_PATH(fname);
-
-    srand(time(NULL));
-    offset = ((rand() % FILE_LEN) / 16) * 16;
-
-    ASSERT_EQ(0, dirops_new(path, UC_FILE, &test))
-        << "dirops_new failed";
-
-    cout << "Running with offset = " << offset << endl;
-    generate_stream();
-
-    printf("\n");
-    uinfo("Input..");
-    hexdump(input_buffer, MIN(FILE_LEN, 32));
-    run_fetch_store(UC_ENCRYPT, path, input_buffer, output_buffer, FILE_LEN, 0);
-
-    printf("\n");
-    uinfo("Output..");
-    hexdump(output_buffer, MIN(FILE_LEN, 32));
-
-    run_fetch_store(UC_DECRYPT, path, output_buffer, temp_buffer,
-                    FILE_LEN - offset, offset);
-
-    printf("\n");
-    uinfo("Temp...");
-    hexdump(temp_buffer, MIN(FILE_LEN, 32));
-
-    ASSERT_EQ(0, memcmp(input_buffer + offset, temp_buffer + offset,
-                        FILE_LEN - offset))
-        << "Encryption did not work";
-
-    ASSERT_EQ(0, dirops_remove(path, UC_FILE, &test))
-        << "dirops_remove failed";
-
-    free(input_buffer);
-    free(output_buffer);
-    free(temp_buffer);
-
-    sdsfree(path);
+    ASSERT_EQ(0, store_finish(xfer_id));
 }
 
 int
 main(int argc, char ** argv)
 {
-    init_systems();
+    setup_repo_path();
     create_default_dnode();
+    init_systems();
 
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

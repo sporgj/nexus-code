@@ -55,12 +55,12 @@ fetchstore_start(int op,
     }
 
     if ((fname_sds = do_get_fname(fpath)) == NULL) {
-        slog(0, SLOG_ERROR, "can't retrieve fname '%s'");
+        slog(0, SLOG_ERROR, "can't retrieve fname '%s'", fpath);
         return ret;
     }
 
     if ((dirnode = dcache_lookup(fpath, false)) == NULL) {
-        slog(0, SLOG_ERROR, "dirnode '%s' not found");
+        slog(0, SLOG_ERROR, "dirnode '%s' not found", fpath);
         sdsfree(fname_sds);
         return ret;
     }

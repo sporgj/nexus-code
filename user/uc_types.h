@@ -20,8 +20,9 @@ typedef enum {
 typedef struct {
     int xfer_id;
     int enclave_crypto_id;
-    int seg_id;
-    uc_crypto_op_t op;
+    int chunk_num; // chunk number for the current store
+    uc_crypto_op_t op; // DEPRECATED
+    uc_xfer_op_t xfer_op; // UCAFS_FETCH/UCAFS_STORE
     char * buffer;
     uint32_t buflen;
     uint32_t valid_buflen; // how much "good" data can be read from the buffer
@@ -30,6 +31,8 @@ typedef struct {
     uint32_t total_len;
     char * path;
     int fbox_xfer;
+    int fbox_rd;
+    int fbox_wr;
     uc_fbox_t * fbox;
 } xfer_context_t;
 
