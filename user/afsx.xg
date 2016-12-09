@@ -88,7 +88,7 @@ readwrite_start(
     afs_uint32 total_size,
     OUT afs_int32 * id
 ) = 201;
-    
+
 readwrite_finish(
     IN afs_int32 id
 ) = 236;
@@ -131,7 +131,7 @@ store_start(
     afs_uint32 file_size,
     afs_int32 old_fbox_len,
     OUT afs_int32 * xfer_id,
-    afs_uint32 new_fbox_len
+    afs_uint32 * new_fbox_len
 ) =  707;
 
 store_fbox(
