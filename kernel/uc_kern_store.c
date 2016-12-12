@@ -67,204 +67,115 @@ out:
     return ret;
 }
 
-static int
-ucafs_store_chunk(store_context_t * ctx,
-                  afs_size_t chunk_base,
-                  afs_size_t tdc_base,
-                  struct dcache * tdc,
-                  int ratio,
-                  size_t i,
-                  struct dcache ** dcList,
-                  struct vrequest * areq)
-{
-    int ret = -1, bytes_left, tdc_size, nbytes, len, chunk_len;
-    int flen = ctx->avc->f.m.Length, tlen; // TODO what about truncPos?
-    size_t j = i;
-    struct osi_file * file;
-
-    ret = AFSX_store_start(ctx->uc_conn, ctx->path, DEFAULT_XFER_SIZE, 0, flen,
-                           &ctx->id, &ctx->fbox_len);
-    if (ret) {
-        ERROR("AFSX_store_start error ret=%d\n", ret);
-        goto out;
-    }
-
-    ctx->total_len = tlen = flen + ctx->fbox_len;
-    chunk_len = MIN(UCAFS_CHUNK_SIZE, tlen - chunk_base);
-
-    ret = store_init_fserv(ctx, chunk_base, chunk_len, UCAFS_CHUNK_SIZE, areq);
-    if (ret) {
-        ERROR("init_fserv error ret=%d\n", ret);
-        goto out;
-    }
-
-    /* start storing the file */
-    while (chunk_len > 0) {
-        file = afs_CFileOpen(&tdc->f.inode);
-        if (file == NULL) {
-            ERROR("opening tdc chunk=%d\n", tdc->f.chunk);
-            return -1;
-        }
-
-        tdc_size = tdc->f.chunkBytes;
-        bytes_left = MIN(chunk_len, tdc_size);
-        while (bytes_left > 0) {
-            // send data to be encrypted
-            len = MIN(bytes_left, ctx->buflen);
-
-            // XXX check for return varible
-            afs_osi_Read(file, -1, ctx->buffer, len);
-
-            if (store_read(ctx, len, &nbytes)) {
-                goto out;
-            }
-
-            if (store_write(ctx->afs_call, ctx->buffer, nbytes, &nbytes)) {
-                goto out;
-            }
-
-            bytes_left -= len;
-            chunk_len -= len;
-            tdc_len -= len;
-        }
-
-        osi_UFSClose(file);
-
-        if (tdc_len == 0) {
-            // then we have to set the tdc as saved
-            if (afs_indexFlags[tdc->index] & IFDataMod) {
-                afs_indexFlags[tdc->index] &= ~IFDataMod;
-                afs_stats_cmperf.cacheCurrDirtyChunks--;
-                afs_indexFlags[tdc->index] &= ~IFDirtyPages;
-                if (sync & AFS_VMSYNC_INVAL) {
-                    // mark entry as having no pages, now reclaimable
-                    afs_indexFlags[tdc->index] &= ~IFAnyPages;
-                }
-            }
-
-            UpgradeSToWLock(&tdc->lock, 628);
-            tdc->f.states &= ~DWriting;
-            tdc->dflags |= DFEntryMod;
-            ReleaseWriteLock(&tdc->lock);
-            afs_PutDCache(tdc);
-            dclist[j] = NULL;
-        }
-
-        /* if we have more tdc entries to go */
-        if (chunk_len > 0) {
-            // we have to read the next tdc entry
-            if ((tdc = dcList[++j]) == NULL) {
-                ERROR("there is no next tdc");
-                goto out;
-            }
-        }
-    }
-
-    ret = 0;
-out:
-    if (ctx->id != -1) {
-        AFSX_store_end(ctx->uc_conn, ctx->id);
-    }
-
-    return ret;
-}
-
-/**
- * This receives a call from afs_StoreAllSegments
- */
-int
-ucafs_store_chunk(store_context_t * context,
-                  struct dcache ** dcList,
-                  struct vcache * avc,
-                  struct vrequest * areq,
-                  int sync,
-                  afs_size_t first,
-                  afs_hyper_t * anewDV,
-                  afs_size_t * amaxStoredLength)
-{
-    int ret = -1;
-    afs_size_t base, chunk_base;
-    size_t i;
+typedef struct dcache_item {
+    bool inuse;
+    bool is_dirty;
+    int chunk_no;
+    int pos;
+    int tdc_len;
+    int consumed;
     struct dcache * tdc;
-    store_context_t * ctx = NULL;
-    char * path = NULL;
+} dcache_item_t;
 
-    if (!UCAFS_IS_CONNECTED || __is_vnode_ignored(avc, &path)) {
-        return AFSX_STATUS_NOOP;
-    }
+static int
+ucafs_storesegment(dcache_item_t * dclist,
+                   int first,
+                   int len,
+                   struct vcache * avc,
+                   struct vrequest * areq,
+                   int sync,
+                   char * path,
+                   afs_hyper_t * new_dv,
+                   size_t * nbytes,
+                   size_t * tdc_seen)
+{
+    int ret, j, tdc_start, tdc_end, pos_start, pos_end, curr, is_dirty;
+    int tdc_count, tdc_left, bytes_left, chunk_len = UCAFS_CHUNK_SIZE;
+    struct dcache_item * d_item;
+    struct dcache * tdc;
 
-    ctx = (store_context_t *)kzalloc(sizeof(store_context_t), GFP_KERNEL);
-    if (ctx == NULL) {
-        kfree(path);
-        return AFSX_STATUS_NOOP;
-    }
+    /* get the index of the first element */
+    pos_start = dclist[first].pos + dclist[first].consumed;
+    pos_end = pos_start + chunk_len;
 
-    ctx->id = -1;
-    ctx->avc = avc;
-    ctx->path = path;
-    ctx->uc_conn = __get_conn();
-    ctx->buflen = DEFAULT_XFER_SIZE;
-    if ((ctx->buffer = ALLOC_XFER_BUFFER) == NULL) {
-        ERROR("allocating buffer failed\n");
-        goto out;
-    }
+    /* loop through the tdc entries and see if there's anyone to save to disk */
+    is_dirty = 0;
+    curr = first;
+    for (j = 0; j < len; j++) {
+        d_item = &dclist[curr];
+        tdc_start = d_item->pos;
+        tdc_end = tdc_start + d_item->tdc_len;
 
-    ret = AFSX_STATUS_ERROR;
-
-    /**
-     * lets start gathering the tdc entries
-     */
-    for (i = 0; i < high;) {
-        if ((tdc = dcList[j])) {
-            // find the corresponding chunk
-            base = AFS_CHUNKTOBASE(tdc->f.chunk);
-
-            // get the start of our chunk to compute
-            chunk_base = UCAFS_BASEOFFSET(base);
-
-            ucafs_storesegment(chunk_base, tdc, i, dcList, areq);
+        /* check if we can start storing */
+        if ((tdc_start >= pos_start && tdc_start < pos_end)
+            || (tdc_end >= pos_start && tdc_end < pos_end)) {
+            if (d_item->is_dirty) {
+                is_dirty = 1;
+                break;
+            }
+        } else {
+            // we are out of range, lets leave
+            break;
         }
+
+        curr = (curr + 1) % len;
     }
 
+    /* now, if we have any saved tdc entries, lets save it */
+    if (is_dirty) {
+        // TODO initialize context here
+    }
+
+    /* iterate through the cache entries and start saving them */
+    curr = first;
+    tdc_count = 0;
+    for (j = 0; j < len; j++) {
+        d_item = &dclist[curr];
+        tdc = d_item->tdc;
+
+        tdc_start = d_item->pos;
+        tdc_end = tdc_start + d_item->tdc_len;
+
+        // XXX have this whole conditional as a flag
+        if ((tdc_start >= pos_start && tdc_start < pos_end)
+            || (tdc_end >= pos_start && tdc_end < pos_end)) {
+            tdc_left = d_item->tdc_len - d_item->consumed;
+            bytes_left = MIN(tdc_left, chunk_len);
+
+            // TODO call routine here
+
+            d_item->consumed += bytes_left;
+            chunk_len -= bytes_left;
+
+            // TODO if the tdc is completely stored, update AFS stuff here
+        } else {
+            break;
+        }
+
+        tdc_count++;
+        curr = (curr + 1) % len;
+    }
+
+    *tdc_seen = tdc_count;
     ret = 0;
 out:
-    kfree(path);
-    FREE_XFER_BUFFER(ctx->buffer);
-    kfree(ctx);
     return ret;
 }
 
 int
-ucafs_kern_store(struct vcache * avc, struct vrequest * areq, int sync)
+ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
 {
-    int ret, hash, dirty_chunks, ratio, count, i, stored_bool = 0;
+    int ret, abyte, afs_chunks, dirty_chunks, count, i, k, first,
+        try_next_chunk, bytes_left;
     afs_hyper_t old_dv, new_dv;
-    afs_size_t nbytes, first;
-    store_context_t * context;
-    struct dcache ** dclist = NULL;
+    size_t max_tdc_per_segment, max_segment_per_tdc, nbytes, tdc_seen;
+    struct dcache * tdc;
+    dcache_item_t *dclist = NULL, *dc_entry;
+    char * path;
 
     if (!UCAFS_IS_CONNECTED || __is_vnode_ignored(avc, &path)) {
         return AFSX_STATUS_NOOP;
     }
-
-    context = (store_context_t *)kzalloc(sizeof(store_context_t), GFP_KERNEL);
-    if (context == NULL) {
-        ERROR("allocation failed");
-        return AFSX_STATUS_ERROR;
-    }
-
-    context->id = -1;
-    context->avc = avc;
-    context->path = path;
-    context->uc_conn = __get_conn();
-    context->buflen = DEFAULT_XFER_SIZE;
-    if ((context->buffer = ALLOC_XFER_BUFFER) == NULL) {
-        ERROR("allocating buffer failed\n");
-        goto out;
-    }
-
-    /* lets start processing the tdc entries */
-    hash = DVHash(&avc->f.fid);
 
     /* lets flush all the data */
     osi_VM_StoreAllSegments(avc);
@@ -272,86 +183,140 @@ ucafs_kern_store(struct vcache * avc, struct vrequest * areq, int sync)
         return ENETDOWN;
     }
 
+    /* store the old data versions */
     hset(old_dv, avc->f.m.DataVersion);
     hset(new_dv, avc->f.m.DataVersion);
 
-    ConvertWToSLock(&avc->lock);
+    /* compute the sizes of our chunks */
+    max_tdc_per_segment = CHUNK_RATIO(AFS_LOGCHUNK, UCAFS_CHUNK_LOG);
+    max_segment_per_tdc = CHUNK_RATIO(UCAFS_CHUNK_LOG, AFS_LOGCHUNK);
 
-    ratio = UCAFS_COMPUTE_TDC_CHUNK_RATIO;
-    dclist = (struct dcache **)kzalloc(ratio * sizeof(struct dcache *),
-                                       GFP_KERNEL);
+    /* allocate our list */
+    dclist = (dcache_item_t *)kzalloc(
+        max_tdc_per_segment * sizeof(dcache_item_t), GFP_KERNEL);
     if (dclist == NULL) {
-        ERROR("allocating dcache list failed\n");
+        ERROR("allocation failed for dcache_items\n");
         goto out;
     }
 
-    index = afs_dvhashTbl[hash];
-    do {
-        ObtainWriteLock(&afs_xdcache, 459);
-        dirty_chunks = 0;
+    dirty_chunks = i = count = first = abyte = 0;
+    bytes_left = avc->f.m.Length;
+    afs_chunks = AFS_CHUNK(bytes_left) + 1;
 
-        for (j = 0; index != NULLIDX;) {
-            if (afs_indexUnique[index] == avc->f.fid.Fid.Unique) {
-                if (afs_indexFlags[index] & IFDataMod) {
-                    dirty_chunks++;
-                }
+    ConvertWToSLock(&avc->lock);
 
-                tdc = afs_GetValidDSlot(index);
-                if (!tdc) {
-                    ReleaseWriteLock(&afs_xdcache);
-                    goto out1;
-                }
-                ReleaseReadLock(&tdc->tlock);
+    /* iterate through the tdc list */
+    while (afs_chunks) {
+        /* get the TDC entry */
+        tdc = afs_FindDCache(avc, abyte);
+        if (!tdc) {
+            break;
+        }
 
-                if (!FidCmp(&tdc->f.fid, &avc->f.fid)) {
-                    if (dclist[i]) {
-                        first = (first + 1) % ratio;
-                        if (afs_indexFlags[dclist[i]->index] & IFDataMod) {
-                            dirty_chunks--;
-                        }
-                        afs_PutDCache(dclist[i]);
-                    } else if (count == 0) {
-                        first = 0;
+        afs_PutDCache(tdc);
+
+        /* if they have the same file ID */
+        dc_entry = &dclist[i];
+        if (dc_entry->inuse) {
+            // we are replacing an existing entry
+            if (dc_entry->is_dirty) {
+                dc_entry->is_dirty = 0;
+                dirty_chunks--;
+            }
+
+            if (i == first) {
+                first = (first + 1) % max_tdc_per_segment;
+            }
+        }
+
+        dc_entry->inuse = 1;
+        dc_entry->tdc = tdc;
+        dc_entry->pos = AFS_CHUNKTOBASE(tdc->f.chunk);
+        dc_entry->consumed = 0;
+        dc_entry->chunk_no = tdc->f.chunk;
+        // XXX Unsure on if to take the xdcache here since we are reading from
+        // the index flags table. Looked at afs_ObtainDCacheForWriting, it seems
+        // once the tdc write lock is held, this variable can be examined
+
+        ObtainWriteLock(&tdc->lock, 8760);
+        if (afs_indexFlags[tdc->index] & IFDataMod) {
+            dirty_chunks++;
+            dc_entry->is_dirty = 1;
+        }
+
+        dc_entry->tdc_len = tdc->f.chunkBytes;
+        ReleaseWriteLock(&tdc->lock);
+
+        // increment our variables
+        i = (i + 1) % max_tdc_per_segment;
+        count = (count < max_tdc_per_segment) ? count + 1 : count;
+
+        /* now process if we have a sufficient number of tdc
+         * entries gathered */
+        if (count >= max_tdc_per_segment && dirty_chunks) {
+            tdc_seen = 0;
+next_chunk:
+            try_next_chunk = 1;
+
+            ret = ucafs_storesegment(dclist, first, count, avc, areq, sync,
+                                     path, &new_dv, &nbytes, &tdc_seen);
+            if (ret) {
+                ERROR("chunk_store failed ret = %d", ret);
+                goto out1;
+            }
+
+            bytes_left -= nbytes;
+
+            /* for each tdc seen, lets rid of those we stored fully */
+            for (k = 0; k < tdc_seen; k++) {
+                dc_entry = &dclist[first];
+
+                if (dc_entry->consumed == dc_entry->tdc_len) {
+                    // clear the entry and move the first
+                    if (dc_entry->is_dirty) {
+                        dc_entry->is_dirty = 0;
+                        dirty_chunks--;
                     }
 
-                    dclist[i] = tdc;
-                    i = (i + 1) % ratio;
-                    count++;
-                }
+                    dc_entry->inuse = 0;
 
-                /* now process if we have a sufficient number of tdc
-                 * entries gathered */
-                if (count >= ratio && dirty_chunks) {
-                    ret = ucafs_store_chunk(context, dclist, avc, areq, sync,
-                                            first, &new_dv, &nbytes);
-                    if (ret) {
-						ERROR("chunk_store failed ret = %d", ret);
-                        goto out;
-                    }
-					stored_bool = 1;
+                    try_next_chunk = 0;
+                    count--;
+
+                    first = (first + 1) % max_tdc_per_segment;
                 }
             }
 
-			index = afs_dvnextTbl[index];
+            /* if the tdc is not fully consumed, that means we might have
+             * another chunk to process */
+            if (try_next_chunk) {
+                goto next_chunk;
+            }
         }
 
-        /* if our number of tdc entries is not filled */
-		if (stored_bool && dirty_chunks) {
-            ret = ucafs_store_chunk(context, dclist, avc, areq, sync,
-                                            first, &new_dv, &nbytes);
+        afs_chunks--;
+        abyte += AFS_CHUNKSIZE(0);
+    }
 
-			if (ret) {
-				ERROR("chunk_store failed ret = %d", ret);
-				goto out;
-			}
-		}
+    /* stores the last chunk */
+    if (dirty_chunks) {
+        ret = ucafs_storesegment(dclist, first, count, avc, areq, sync, path,
+                                 &new_dv, &nbytes, &tdc_seen);
+        if (ret) {
+            ERROR("chunk_store failed ret = %d", ret);
+            goto out1;
+        }
 
-        ReleaseWriteLock(&afs_xdcache);
-    } while (1);
+        bytes_left -= nbytes;
+    }
 
     ret = 0;
+out1:
+    UpgradeSToWLock(&avc->lock, 629);
 out:
-    return ret;
+    kfree(path);
+    kfree(dclist);
+    return AFSX_STATUS_NOOP;
 }
 
 static int

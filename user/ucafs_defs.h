@@ -94,7 +94,7 @@ typedef struct {
 #define UCAFS_FBOX_WRITE 1
 
 #define UCAFS_CHUNK_LOG 20
-#define UCAFS_CHUNK_SIZE 1 << UCAFS_CHUNK_LOG
+#define UCAFS_CHUNK_SIZE (1 << UCAFS_CHUNK_LOG)
 
 #define UCAFS_FBOX_MAGIC 0xfb015213
 #define UCAFS_FBOX_HEADER                                                      \
@@ -115,16 +115,16 @@ typedef struct uc_fbox {
     crypto_context_t chunks[1];
 } __attribute__((packed)) uc_fbox_t;
 
-#define FBOX_HEADER_LEN sizeof(uc_fbox_header_t);
+#define FBOX_HEADER_LEN sizeof(uc_fbox_header_t)
 #define UCAFS_GET_REAL_FILE_SIZE(len) len - sizeof(uc_fbox_t)
 
 
 static inline int
 FBOX_CHUNK_NUM(int offset)
 {
-    return (offset < UCAFS_CHUNK_SIZE)
-        ? 0
-        : 1 + ((offset - UCAFS_CHUNK_SIZE) >> UCAFS_CHUNK_LOG);
+    return ((offset < UCAFS_CHUNK_SIZE)
+                ? 0
+                : 1 + ((offset - UCAFS_CHUNK_SIZE) >> UCAFS_CHUNK_LOG));
 }
 
 static inline int
@@ -139,3 +139,9 @@ FBOX_SIZE(int file_size) {
         + FBOX_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
 }
 
+static inline size_t
+CHUNK_RATIO(int numerator_log, int denomintor_log)
+{
+    int ratio = numerator_log - denomintor_log;
+    return ratio <= 0 ? 2 : (1 << ratio) + 1;
+}

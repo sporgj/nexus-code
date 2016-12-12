@@ -11,7 +11,7 @@ SRC = afsx.h \
       ucafs_prototypes.h \
       ucafs_fetch.c \
       ucafs_fbox.c \
-      ucafs_store.c \
+      uc_kern_store.c \
       ucafs_dirops.c \
       ucafs_main.c
 

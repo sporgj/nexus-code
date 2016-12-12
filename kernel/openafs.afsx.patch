@@ -559,13 +559,14 @@ index 7c46617..ed8d44b 100644
  	afs_indexFlags[tdc->index] |= IFEverUsed;
  	ConvertWToSLock(&tdc->lock);
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..21844b2 100644
+index f494677..3e1842a 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
-@@ -1146,6 +1146,17 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1146,6 +1146,19 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      afs_size_t bytesToXfer = 0, bytesXferred = 0;
  #endif
  
++#if 0
 +    /* ucafs code */
 +    int ret = ucafs_fetch(tc, rxconn, fP, base, adc, avc, size, tsmall);
 +    if (ret == 0) {
@@ -576,6 +577,7 @@ index f494677..21844b2 100644
 +	    return -1;
 +	}
 +    }
++#endif
 +
      AFS_STATCNT(CacheFetchProc);
  
@@ -669,7 +671,7 @@ index ca5a956..47f9048 100644
    loop2:
  #endif
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..a217d1c 100644
+index 46b9c9d..bdd02b3 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
 @@ -67,10 +67,35 @@ single_compdir_libafs: depsrcs libafs
@@ -681,7 +683,7 @@ index 46b9c9d..a217d1c 100644
 +			ucafs_main.o \
 +			ucafs_fbox.o \
 +			ucafs_fetch.o \
-+			ucafs_store.o \
++			uc_kern_store.o \
 +			ucafs_dirops.o
 +
 +afsx.cs.o: $(TOP_SRC_AFS)/afsx.cs.c
@@ -696,7 +698,7 @@ index 46b9c9d..a217d1c 100644
 +ucafs_fetch.o: $(TOP_SRC_AFS)/ucafs_fetch.c
 +	$(CRULE_OPT)
 +
-+ucafs_store.o: $(TOP_SRC_AFS)/ucafs_store.c
++uc_kern_store.o: $(TOP_SRC_AFS)/uc_kern_store.c
 +	$(CRULE_OPT)
 +
 +ucafs_dirops.o: $(TOP_SRC_AFS)/ucafs_dirops.c
