@@ -80,51 +80,6 @@ symlink(
     OUT string code_name<AFSX_FNAME_MAX>
 ) = 191;
 
-readwrite_start(
-    IN int op,
-    string fpath<AFSX_PATH_MAX>,
-    afs_uint32 max_chunk_size,
-    afs_uint32 offset,
-    afs_uint32 total_size,
-    OUT afs_int32 * id
-) = 201;
-
-readwrite_finish(
-    IN afs_int32 id
-) = 236;
-
-readwrite_data(
-    IN afs_int32 id,
-    afs_uint32 size,
-    OUT int * moredata
-) split = 237;
-
-fetchstore_start(
-    IN int op,
-    string fpath<AFSX_PATH_MAX>,
-    afs_uint32 max_xfer_size,
-    afs_uint32 file_offset,
-    afs_uint32 file_size,
-    OUT afs_int32 * xfer_id,
-    afs_uint32 * fbox_len,
-    afs_uint32 * total_len
-) = 369;
-
-fetchstore_finish(
-    IN afs_int32 id
-) = 419;
-
-fetchstore_data(
-    IN afs_int32 id,
-    afs_uint32 size
-) split = 507;
-
-fetchstore_fbox(
-    IN afs_int32 id,
-    afs_int32 fbox_op,
-    afs_uint32 size
-) split = 609;
-
 store_start(
     IN string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_xfer_size,

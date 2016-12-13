@@ -26,6 +26,14 @@ filebox_new();
 uc_filebox_t *
 filebox_from_file(const sds file_path);
 
+/**
+ * Just like the above function, but specify a hint for the fbox
+ * buffer size. Useful when you call from the xfer_context.
+ * if the size_hint < uc_fbox_header_t.fbox_len, it will be ignored
+ */
+uc_filebox_t *
+filebox_from_file2(const sds file_path, size_t size_hint);
+
 uc_filebox_t *
 filebox_from_shadow_name(const shadow_t * shdw_name);
 

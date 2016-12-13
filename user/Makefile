@@ -79,7 +79,7 @@ uc_dirnode.o: uc_dirnode.cc uc_dirnode.h dnode.pb.cc
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
-uc_filebox.o: uc_filebox.cc uc_filebox.h fbox.pb.cc
+uc_filebox.o: uc_filebox.c uc_filebox.h
 	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 

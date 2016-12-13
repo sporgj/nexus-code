@@ -99,10 +99,12 @@ typedef struct {
 #define UCAFS_FBOX_MAGIC 0xfb015213
 #define UCAFS_FBOX_HEADER                                                      \
     uint32_t magic;                                                            \
+    uint8_t link_count;                                                        \
     uint16_t chunk_count;                                                      \
     uint32_t chunk_size;                                                       \
     uint32_t file_size;                                                        \
     uint16_t fbox_len;                                                         \
+    uuid_t uuid;                                                               \
     crypto_ekey_t fbox_mkey;                                                   \
     crypto_mac_t fbox_mac;
 
@@ -117,7 +119,7 @@ typedef struct uc_fbox {
 
 #define FBOX_HEADER_LEN sizeof(uc_fbox_header_t)
 #define UCAFS_GET_REAL_FILE_SIZE(len) len - sizeof(uc_fbox_t)
-
+#define FBOX_DEFAULT_LEN sizeof(uc_fbox_t)
 
 static inline int
 FBOX_CHUNK_NUM(int offset)

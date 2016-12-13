@@ -39,11 +39,8 @@ OBJS = uc_dirnode.o\
        uc_dcache.o\
        uc_uspace.o\
        uc_encode.o\
-       uc_fetchstore.o\
        uc_store.o\
-       uc_fileops.o\
        uc_utils.o\
-       fbox.pb.o\
        dnode.pb.o
 
 TESTS := test_dirops
