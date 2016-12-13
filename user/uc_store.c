@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -32,7 +33,10 @@ free_xfer_context(xfer_context_t * xfer_ctx)
         free(xfer_ctx->fbox);
     }
 
-    sdsfree(xfer_ctx->path);
+    if (xfer_ctx->path) {
+        free(xfer_ctx->path);
+    }
+
     free(xfer_ctx);
 }
 
@@ -116,9 +120,15 @@ store_start(char * fpath,
         slog(0, SLOG_ERROR, "Enclave error");
         goto out;
     }
+
+    ecall_store_start(global_eid, &ret, xfer_ctx);
+    if (ret) {
+        slog(0, SLOG_FATAL, "enclave error");
+        goto out;
+    }
 #endif
 
-    *new_fbox_len = fbox->fbox_len;
+    *new_fbox_len = 0; //fbox->fbox_len;
     *xfer_id = xfer_ctx->xfer_id;
     ret = 0;
 out:
@@ -153,6 +163,7 @@ store_get_buffer(int id, size_t valid_buflen)
         return NULL;
     }
 
+    xfer_ctx->valid_buflen = valid_buflen;
     return (uint8_t **)&xfer_ctx->buffer;
 }
 
@@ -212,7 +223,7 @@ store_data(uint8_t ** buffer)
                              - offsetof(xfer_context_t, buffer));
 
 #ifdef UCAFS_SGX
-    ecall_store_start(global_eid, &ret, xfer_ctx);
+    ecall_store_crypto(global_eid, &ret, xfer_ctx);
     if (ret) {
         slog(0, SLOG_FATAL, "enclave error");
         goto out;

@@ -615,7 +615,7 @@ index 2dd89cf..05b6afc 100644
  
      hash = DVHash(&avc->f.fid);
 diff --git a/src/afs/afs_vcache.c b/src/afs/afs_vcache.c
-index ca5a956..47f9048 100644
+index ca5a956..aa6b1f5 100644
 --- a/src/afs/afs_vcache.c
 +++ b/src/afs/afs_vcache.c
 @@ -861,6 +861,9 @@ afs_PrePopulateVCache(struct vcache *avc, struct VenusFid *afid,
@@ -628,17 +628,7 @@ index ca5a956..47f9048 100644
  #if defined(AFS_CACHE_BYPASS)
      avc->cachingStates = 0;
      avc->cachingTransitions = 0;
-@@ -1512,6 +1515,9 @@ afs_ProcessFS(struct vcache *avc,
- #else /* AFS_64BIT_CLIENT */
-     length = astat->Length;
- #endif /* AFS_64BIT_CLIENT */
-+    if (avc->is_ucafs_file && length > sizeof(uc_fbox_t)) {
-+	length -= sizeof(uc_fbox_t);
-+    }
-     /* WARNING: afs_DoBulkStat uses the Length field to store a sequence
-      * number for each bulk status request. Under no circumstances
-      * should afs_DoBulkStat store a sequence number if the new
-@@ -1928,6 +1934,9 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
+@@ -1928,6 +1931,9 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
      struct server *serverp = 0;
      afs_int32 origCBs;
      afs_int32 retry;
@@ -648,7 +638,7 @@ index ca5a956..47f9048 100644
  
      AFS_STATCNT(afs_GetVCache);
      if (cached)
-@@ -1975,10 +1984,21 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
+@@ -1975,10 +1981,21 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
  	/* printf("Network is down in afs_LookupVcache\n"); */
          code = ENETDOWN;
      } else

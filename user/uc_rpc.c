@@ -397,12 +397,21 @@ afs_int32 SAFSX_store_start(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_xfer_size,
+	/*IN */ afs_uint32 offset,
+    /*IN */ afs_uint32 chunk_len,
 	/*IN */ afs_uint32 file_size,
-	/*IN */ afs_int32 old_fbox_len,
+	/*IN */ afs_uint32 old_fbox_len,
 	/*OUT*/ afs_int32 * xfer_id,
-	/*OUT*/ afs_uint32 new_fbox_len)
+	/*OUT*/ afs_uint32 * new_fbox_len)
 {
-    return 0;
+    int ret = store_start(fpath, max_xfer_size, offset, file_size, old_fbox_len,
+            xfer_id, new_fbox_len);
+    if (ret == 0) {
+        uinfo("store id=%d [len = %d, offset=%d, file_size=%d]", *xfer_id,
+                (int) chunk_len, (int) offset, (int) file_size);
+    }
+
+    return ret;
 }
 
 afs_int32 SAFSX_store_fbox(
@@ -419,12 +428,39 @@ afs_int32 SAFSX_store_data(
 	/*IN */ afs_int32 xfer_id,
 	/*IN */ afs_uint32 size)
 {
-    return 0;
+    int ret = AFSX_STATUS_ERROR, op;
+    afs_uint32 abytes;
+
+    uint8_t ** buf = store_get_buffer(xfer_id, size);
+    if (buf == NULL) {
+        goto out;
+    }
+
+    if ((abytes = rx_Read(z_call, *buf, size)) != size) {
+        uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
+                abytes, rx_Error(z_call));
+        goto out;
+    }
+
+    if (store_data(buf)) {
+        uerror("(id = %d) error processing data :(", xfer_id);
+        goto out;
+    }
+
+    if ((abytes = rx_Write(z_call, *buf, size)) != size) {
+        uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
+                rx_Error(z_call));
+        goto out;
+    }
+
+    ret = 0;
+out:
+    return ret;
 }
 
 afs_int32 SAFSX_store_finish(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ afs_int32 xfer_id)
 {
-    return 0;
+    return store_finish(xfer_id);
 }

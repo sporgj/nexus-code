@@ -128,8 +128,10 @@ fetchstore_fbox(
 store_start(
     IN string fpath<AFSX_PATH_MAX>,
     afs_uint32 max_xfer_size,
+    afs_uint32 offset,
+    afs_uint32 chunk_len,
     afs_uint32 file_size,
-    afs_int32 old_fbox_len,
+    afs_uint32 old_fbox_len,
     OUT afs_int32 * xfer_id,
     afs_uint32 * new_fbox_len
 ) =  707;
