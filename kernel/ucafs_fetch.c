@@ -155,7 +155,7 @@ out:
 int
 _fetch_read(fetch_context_t * fetch_ctx, uint32_t len, uint32_t * bytes_read)
 {
-    uint32_t nbytes; 
+    uint32_t nbytes;
     RX_AFS_GUNLOCK();
     nbytes = rx_Read(fetch_ctx->afs_call, fetch_ctx->buffer, len);
     RX_AFS_GLOCK();

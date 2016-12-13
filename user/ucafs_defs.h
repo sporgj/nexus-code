@@ -122,6 +122,15 @@ typedef struct uc_fbox {
 #define FBOX_DEFAULT_LEN sizeof(uc_fbox_t)
 
 static inline int
+FBOX_CHUNK_BASE(int offset)
+{
+    return ((offset < afs_FirstCSize)
+                ? 0
+                : (((offset - afs_FirstCSize) & ~(afs_OtherCSize - 1))
+                   + afs_FirstCSize));
+}
+
+static inline int
 FBOX_CHUNK_NUM(int offset)
 {
     return ((offset < UCAFS_CHUNK_SIZE)

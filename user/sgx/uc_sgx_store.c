@@ -27,7 +27,7 @@ free_enclave_context(enclave_context_t * context)
 }
 
 int
-ecall_store_init(xfer_context_t * xfer_ctx)
+ecall_fetchstore_init(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_CRYPTO;
     enclave_context_t __SECRET * context = NULL;
@@ -79,7 +79,7 @@ out:
 }
 
 int
-ecall_store_start(xfer_context_t * xfer_ctx)
+ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, file_size = xfer_ctx->total_len;
     uc_fbox_header_t * fbox_hdr;
@@ -122,7 +122,7 @@ ecall_store_start(xfer_context_t * xfer_ctx)
 }
 
 int
-ecall_store_crypto(xfer_context_t * xfer_ctx)
+ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, nbytes, bytes_left;
     crypto_context_t * crypto_ctx;
@@ -151,10 +151,17 @@ ecall_store_crypto(xfer_context_t * xfer_ctx)
         nbytes = MIN(bytes_left, E_CRYPTO_BUFFER_LEN);
         memcpy(p_in, p_buf, nbytes);
 
-        mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
+        if (context->xfer_op == UC_ENCRYPT) {
+            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
                               p_out);
+        }
 
 	mbedtls_md_hmac_update(hmac_ctx, p_in, nbytes);
+
+        if (context->xfer_op == UC_DECRYPT) {
+            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
+                              p_out);
+        }
 
         memcpy(p_buf, p_out, nbytes);
 
@@ -165,7 +172,7 @@ ecall_store_crypto(xfer_context_t * xfer_ctx)
     return E_SUCCESS;
 }
 
-int ecall_store_finish(xfer_context_t * xfer_ctx)
+int ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, len, bytes_left;
     crypto_context_t * crypto_ctx, * dest_crypto_ctx;
@@ -196,12 +203,20 @@ int ecall_store_finish(xfer_context_t * xfer_ctx)
 
     memcpy(&context->fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
     dest_crypto_ctx = &xfer_ctx->fbox->chunks[context->chunk_num];
-    memcpy(dest_crypto_ctx, crypto_ctx, sizeof(crypto_context_t));
+
+    if (context->xfer_op == UCAFS_FETCH) {
+        error = E_SUCCESS;
+        memcpy(dest_crypto_ctx, crypto_ctx, sizeof(crypto_context_t));
+    } else {
+        error = memcmp(mac, &dest_crypto_ctx->mac, sizeof(crypto_mac_t))
+            ? E_ERROR_ERROR
+            : E_SUCCESS;
+    }
 
     aes_ctx = &context->aes_ctx;
     hmac_ctx = &context->hmac_ctx;
 
     seqptrmap_delete(xfer_context_map, xfer_ctx->enclave_crypto_id);
     free_enclave_context(context);
-    return E_SUCCESS;
+    return error;
 }

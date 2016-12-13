@@ -217,8 +217,9 @@ afs_int32 SAFSX_symlink(
     return ret;
 }
 
-afs_int32 SAFSX_store_start(
+afs_int32 SAFSX_fetchstore_start(
 	/*IN */ struct rx_call *z_call,
+    /*IN */ afs_int32 op,
 	/*IN */ char * fpath,
 	/*IN */ afs_uint32 max_xfer_size,
 	/*IN */ afs_uint32 offset,
@@ -228,8 +229,8 @@ afs_int32 SAFSX_store_start(
 	/*OUT*/ afs_int32 * xfer_id,
 	/*OUT*/ afs_uint32 * new_fbox_len)
 {
-    int ret = store_start(fpath, max_xfer_size, offset, file_size, old_fbox_len,
-            xfer_id, new_fbox_len);
+    int ret = fetchstore_start(op, fpath, max_xfer_size, offset, file_size,
+                               old_fbox_len, xfer_id, new_fbox_len);
     if (ret == 0) {
         uinfo("store id=%d [len = %d, offset=%d, file_size=%d]", *xfer_id,
                 (int) chunk_len, (int) offset, (int) file_size);
@@ -238,7 +239,7 @@ afs_int32 SAFSX_store_start(
     return ret;
 }
 
-afs_int32 SAFSX_store_fbox(
+afs_int32 SAFSX_fetchstore_fbox(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ afs_int32 xfer_id,
 	/*IN */ int inout,
@@ -247,7 +248,7 @@ afs_int32 SAFSX_store_fbox(
     return 0;
 }
 
-afs_int32 SAFSX_store_data(
+afs_int32 SAFSX_fetchstore_data(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ afs_int32 xfer_id,
 	/*IN */ afs_uint32 size)
@@ -255,7 +256,7 @@ afs_int32 SAFSX_store_data(
     int ret = AFSX_STATUS_ERROR, op;
     afs_uint32 abytes;
 
-    uint8_t ** buf = store_get_buffer(xfer_id, size);
+    uint8_t ** buf = fetchstore_get_buffer(xfer_id, size);
     if (buf == NULL) {
         goto out;
     }
@@ -266,7 +267,7 @@ afs_int32 SAFSX_store_data(
         goto out;
     }
 
-    if (store_data(buf)) {
+    if (fetchstore_data(buf)) {
         uerror("(id = %d) error processing data :(", xfer_id);
         goto out;
     }
@@ -282,9 +283,9 @@ out:
     return ret;
 }
 
-afs_int32 SAFSX_store_finish(
+afs_int32 SAFSX_fetchstore_finish(
 	/*IN */ struct rx_call *z_call,
 	/*IN */ afs_int32 xfer_id)
 {
-    return store_finish(xfer_id);
+    return fetchstore_finish(xfer_id);
 }

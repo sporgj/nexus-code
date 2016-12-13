@@ -19,13 +19,13 @@ enclave {
                 [user_check] uint8_t * data, uc_crypto_op_t op);
 
         /* store operations */
-        public int ecall_store_init([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_fetchstore_init([in, out] xfer_context_t * xfer_ctx);
 
-        public int ecall_store_start([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_fetchstore_start([in, out] xfer_context_t * xfer_ctx);
 
-        public int ecall_store_crypto([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_fetchstore_crypto([in, out] xfer_context_t * xfer_ctx);
 
-        public int ecall_store_finish([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_fetchstore_finish([in, out] xfer_context_t * xfer_ctx);
     };
 
 };

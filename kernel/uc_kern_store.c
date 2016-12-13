@@ -74,7 +74,7 @@ store_clean_context(store_context_t * context,
     struct AFSVolSync tsync;
 
     if (context->id != -1) {
-        AFSX_store_finish(context->uc_conn, context->id);
+        AFSX_fetchstore_finish(context->uc_conn, context->id);
     }
 
     context->id = -1;
@@ -248,9 +248,9 @@ ucafs_storesegment(store_context_t * context,
 
     /* now, if we have any saved tdc entries, lets save it */
     if (is_dirty) {
-        ret = AFSX_store_start(context->uc_conn, context->path,
-                               DEFAULT_XFER_SIZE, pos_start, chunk_len, flen, 0,
-                               &context->id, &context->fbox_len);
+        ret = AFSX_fetchstore_start(
+            context->uc_conn, UCAFS_STORE, context->path, DEFAULT_XFER_SIZE,
+            pos_start, chunk_len, flen, 0, &context->id, &context->fbox_len);
         if (ret) {
             ERROR("initializing daemon failed ret=%d\n", ret);
             goto out;
