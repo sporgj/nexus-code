@@ -29,8 +29,8 @@ free_xfer_context(xfer_context_t * xfer_ctx)
         free(xfer_ctx->buffer);
     }
 
-    if (xfer_ctx->fbox) {
-        free(xfer_ctx->fbox);
+    if (xfer_ctx->filebox) {
+        filebox_free(xfer_ctx->filebox);
     }
 
     if (xfer_ctx->path) {
@@ -51,16 +51,16 @@ store_start(char * fpath,
 {
     int ret = -1;
     sds fname_sds = NULL;
-    uc_fbox_t * fbox;
     xfer_context_t * xfer_ctx = NULL;
     const shadow_t * shdw_name;
-    uc_dirnode_t * dirnode;
+    uc_filebox_t * filebox;
     ucafs_entry_type atype;
     int chunk_count;
 
     /* lets find the dirnode object first */
-    if ((dirnode = dcache_lookup(fpath, false)) == NULL) {
-        slog(0, SLOG_ERROR, "finding dirnode failed: '%s'", fpath);
+    filebox = dcache_get_filebox(fpath, FBOX_SIZE(file_size));
+    if (filebox == NULL) {
+        slog(0, SLOG_ERROR, "finding filebox failed: '%s'", fpath);
         return ret;
     }
 
@@ -89,18 +89,8 @@ store_start(char * fpath,
     xfer_ctx->position = offset;
     xfer_ctx->total_len = file_size;
     xfer_ctx->path = strdup(fpath);
-
-    // TODO integrate old_fbox_len
-    xfer_ctx->fbox = fbox = calloc(1, FBOX_SIZE(file_size));
-    if (fbox == NULL) {
-        slog(0, SLOG_FATAL, "alloating fbox (%s) failed", fpath);
-        goto out;
-    }
-
-    fbox->chunk_count = FBOX_CHUNK_COUNT(file_size);
-    fbox->chunk_size = UCAFS_CHUNK_SIZE;
-    fbox->fbox_len = FBOX_SIZE(file_size);
-    fbox->file_size = file_size;
+    xfer_ctx->fbox = filebox_fbox(filebox);
+    xfer_ctx->filebox = filebox;
 
     /* TODO move this to an init function */
     if (xfer_context_array == NULL) {
@@ -141,7 +131,6 @@ out:
         free_xfer_context(xfer_ctx);
     }
 
-    dcache_put(dirnode);
     return ret;
 }
 
@@ -242,7 +231,7 @@ out:
 int
 store_finish(int id)
 {
-    int ret = 0;
+    int ret = -1;
     xfer_context_t * xfer_ctx
         = (xfer_context_t *)seqptrmap_get(xfer_context_array, id);
     if (xfer_ctx == NULL) {
@@ -255,9 +244,17 @@ store_finish(int id)
     if (ret) {
         slog(0, SLOG_ERROR, "enclave reports error");
         // TODO have proper handling here
+        goto out;
     }
 #endif
 
+    if (!filebox_flush(xfer_ctx->filebox)) {
+        slog(0, SLOG_ERROR, "committing the filebox to disk failed");
+        goto out;
+    }
+
+    ret = 0;
+out:
     free_xfer_context(xfer_ctx);
     return ret;
 }

@@ -457,7 +457,7 @@ dirops_hardlink(const char * target_path,
     link_info_t * link_info = NULL;
 
     /* 1 - Get the dirnodes for both link and target */
-    if ((target_fbox = dcache_get_filebox(target_path)) == NULL) {
+    if ((target_fbox = dcache_get_filebox(target_path, 0)) == NULL) {
         slog(0, SLOG_ERROR, "filebox (%s) not found", target_path);
         return error;
     }

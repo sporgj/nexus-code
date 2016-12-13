@@ -34,8 +34,18 @@ filebox_from_file(const sds file_path);
 uc_filebox_t *
 filebox_from_file2(const sds file_path, size_t size_hint);
 
+uc_fbox_t *
+filebox_fbox(uc_filebox_t * filebox);
+
+/**
+ * Resolves the shadow name into a path and opens the filebox file
+ */
 uc_filebox_t *
 filebox_from_shadow_name(const shadow_t * shdw_name);
+
+uc_filebox_t *
+filebox_from_shadow_name2(const shadow_t * shdw_name, size_t hint);
+
 
 /**
  * Creates a filebox from an existing one

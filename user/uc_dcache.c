@@ -390,7 +390,7 @@ done:
 }
 
 uc_filebox_t *
-dcache_get_filebox(const char * path)
+dcache_get_filebox(const char * path, size_t hint)
 {
     const shadow_t * codename;
     char *fname = NULL, *temp = NULL, *temp2 = NULL;
@@ -424,7 +424,7 @@ dcache_get_filebox(const char * path)
             if (link_info->target_link[0] == '/') {
                 // we have an absolute path
                 // send request here
-                fb = dcache_get_filebox(link_info->target_link);
+                fb = dcache_get_filebox(link_info->target_link, hint);
                 goto out;
             } else {
                 // have an relative path
@@ -433,7 +433,7 @@ dcache_get_filebox(const char * path)
                 path_link = sdscat(path_link, link_info->target_link);
                 temp2 = do_absolute_path(path_link);
 
-                fb = dcache_get_filebox(temp2);
+                fb = dcache_get_filebox(temp2, hint);
                 sdsfree(path_link);
                 free(temp2);
                 goto out;
@@ -441,7 +441,7 @@ dcache_get_filebox(const char * path)
         }
     }
 
-    fb = filebox_from_shadow_name(codename);
+    fb = filebox_from_shadow_name2(codename, hint);
 out:
     dirnode_free(dirnode);
     sdsfree(fname);

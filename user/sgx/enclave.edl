@@ -9,7 +9,7 @@ enclave {
 
         public int ecall_crypt_data([in, out] xfer_context_t * f_ctx);
 
-        public int ecall_finish_crypto([in] xfer_context_t * f_ctx, 
+        public int ecall_finish_crypto([in] xfer_context_t * f_ctx,
                 [user_check] crypto_context_t * fcrypto);
 
         public int ecall_crypto_dirnode([in, out]dnode_header_t * header,
@@ -17,14 +17,6 @@ enclave {
 
         public int ecall_crypto_filebox([in, out]fbox_header_t * header,
                 [user_check] uint8_t * data, uc_crypto_op_t op);
-        
-        public int ecall_xfer_start([in, out]xfer_context_t * xfer_ctx);
-
-        public int ecall_xfer_crypto([in, out] xfer_context_t * f_ctx);
-
-        public int ecall_xfer_finish([in] xfer_context_t * xfer_ctx,
-                [in, out] crypto_mac_t * dest_mac);
-
 
         /* store operations */
         public int ecall_store_init([in, out] xfer_context_t * xfer_ctx);

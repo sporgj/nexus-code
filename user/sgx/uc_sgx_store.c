@@ -81,7 +81,7 @@ out:
 int
 ecall_store_start(xfer_context_t * xfer_ctx)
 {
-    int error = E_ERROR_ERROR;
+    int error = E_ERROR_ERROR, file_size = xfer_ctx->total_len;
     uc_fbox_header_t * fbox_hdr;
     crypto_context_t * crypto_ctx;
     enclave_context_t * context;
@@ -97,6 +97,10 @@ ecall_store_start(xfer_context_t * xfer_ctx)
     /* copy the fbox information */
     fbox_hdr = &context->fbox_hdr;
     memcpy(fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
+    fbox_hdr->chunk_count = FBOX_CHUNK_COUNT(file_size);
+    fbox_hdr->chunk_size = UCAFS_CHUNK_SIZE;
+    fbox_hdr->fbox_len = FBOX_SIZE(file_size);
+    fbox_hdr->file_size = file_size;
 
     // TODO instantiate crypto data for fbox here
 
@@ -190,6 +194,7 @@ int ecall_store_finish(xfer_context_t * xfer_ctx)
     enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
     enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
 
+    memcpy(&context->fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
     dest_crypto_ctx = &xfer_ctx->fbox->chunks[context->chunk_num];
     memcpy(dest_crypto_ctx, crypto_ctx, sizeof(crypto_context_t));
 

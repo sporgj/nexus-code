@@ -4,7 +4,7 @@ TEST_ENV := 1
 include $(UCAFS_DIR)/header.mk
 include $(UCAFS_DIR)/sgx_defs.mk
 
-LIBS += $(App_Link_Flags) -lgtest -lgtest_main -ltcmalloc
+LIBS += $(App_Link_Flags) -lgtest -lgtest_main
 
 TESTS = test_fetchstore test_dirops test_dcache
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "ucafs_defs.h"
+#include "uc_filebox.h"
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
@@ -34,6 +35,7 @@ typedef struct {
     int fbox_rd;
     int fbox_wr;
     uc_fbox_t * fbox;
+    uc_filebox_t * filebox;
 } xfer_context_t;
 
 typedef struct {

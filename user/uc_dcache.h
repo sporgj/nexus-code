@@ -12,4 +12,4 @@ void
 dcache_rm(uc_dirnode_t * dn, const char * entry);
 
 uc_filebox_t *
-dcache_get_filebox(const char * path);
+dcache_get_filebox(const char * path, size_t hint);
