@@ -103,6 +103,48 @@ fetch_cleanup(fetch_context_t * context,
     return ret;
 }
 
+static int
+fetch_chunk(store_context_t * context,
+            int start_offset,
+            int chunk_len,
+            int curr_pos,
+            int base,
+            int end,
+            struct dcache * adc,
+            struct osi_file * fp,
+            uint32_t * bytes_done)
+{
+    int ret, bytes_left = chunk_len, size, base, pos = curr_pos;
+    *bytes_done = 0;
+
+    while (bytes_left > 0) {
+        size = MIN(bytes_left, context->buflen);
+
+        if (fetch_read(context, size, &nbytes)) {
+            goto out;
+        }
+
+        if (fetch_write(context, size, &nbytes)) {
+            goto out;
+        }
+
+        *bytes_done += size;
+        pos += size;
+        byte_left -= size;
+
+        if (pos >= base && pos < end) {
+            afs_osi_Write(fp, -1, context->buffer, nbytes);
+            // write to the file
+            adc->validPos = pos;
+            afs_osi_Wakeup(&adc->validPos);
+        }
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
 int
 ucafs_fetch(struct afs_conn * tc,
             struct rx_connection * rxconn,
@@ -173,24 +215,10 @@ ucafs_fetch(struct afs_conn * tc,
     end = start_pos + AFS_CHUNKTOSIZE(adc->f.chunk);
     adc->validPos = base;
     while (bytes_left > 0) {
-        size = MIN(bytes_left, context->buflen);
-
-        if (fetch_read(context, size, &nbytes)) {
-            goto out;
-        }
-
-        if (fetch_write(context, size, &nbytes)) {
-            goto out;
-        }
+        // if (fetch_chunk(context, pos
 
         pos += nbytes;
         bytes_left -= nbytes;
-        if (pos >= base && pos < end) {
-            afs_osi_Write(fp, -1, context->buffer, nbytes);
-            // write to the file
-            adc->validPos = pos;
-            afs_osi_Wakeup(&adc->validPos);
-        }
     }
 
     avc->is_ucafs_file = 1;
