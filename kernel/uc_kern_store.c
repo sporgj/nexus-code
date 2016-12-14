@@ -134,7 +134,7 @@ store_read(store_context_t * ctx, afs_uint32 size, afs_uint32 * bytesread)
     uspace_call = rx_NewCall(uc_conn);
 
     /* open a read session */
-    if (StartAFSX_store_data(uspace_call, ctx->id, size)) {
+    if (StartAFSX_fetchstore_data(uspace_call, ctx->id, size)) {
         ERROR("StartAFSX_upload_file failed\n");
         goto out;
     }
@@ -155,7 +155,7 @@ store_read(store_context_t * ctx, afs_uint32 size, afs_uint32 * bytesread)
 
     ret = 0;
 out:
-    EndAFSX_store_data(uspace_call);
+    EndAFSX_fetchstore_data(uspace_call);
     rx_EndCall(uspace_call, ret);
     return ret;
 }

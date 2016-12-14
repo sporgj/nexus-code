@@ -124,10 +124,10 @@ typedef struct uc_fbox {
 static inline int
 FBOX_CHUNK_BASE(int offset)
 {
-    return ((offset < afs_FirstCSize)
+    return ((offset < UCAFS_CHUNK_SIZE)
                 ? 0
-                : (((offset - afs_FirstCSize) & ~(afs_OtherCSize - 1))
-                   + afs_FirstCSize));
+                : (((offset - UCAFS_CHUNK_SIZE) & ~(UCAFS_CHUNK_SIZE - 1))
+                   + UCAFS_CHUNK_SIZE));
 }
 
 static inline int
