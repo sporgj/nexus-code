@@ -217,6 +217,7 @@ afs_int32 SAFSX_symlink(
     return ret;
 }
 
+#define OP2STR(x) x == UCAFS_FETCH ? "fetch" : "store"
 afs_int32 SAFSX_fetchstore_start(
 	/*IN */ struct rx_call *z_call,
     /*IN */ afs_int32 op,
@@ -232,8 +233,8 @@ afs_int32 SAFSX_fetchstore_start(
     int ret = fetchstore_start(op, fpath, max_xfer_size, offset, file_size,
                                old_fbox_len, xfer_id, new_fbox_len);
     if (ret == 0) {
-        uinfo("store id=%d [len = %d, offset=%d, file_size=%d]", *xfer_id,
-                (int) chunk_len, (int) offset, (int) file_size);
+        uinfo("%s id=%d [len = %d, offset=%d, file_size=%d]", OP2STR(op),
+              *xfer_id, (int)chunk_len, (int)offset, (int)file_size);
     }
 
     return ret;

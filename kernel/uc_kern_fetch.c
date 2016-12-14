@@ -14,6 +14,8 @@ fetch_read(fetch_context_t * context, uint32_t len, uint32_t * bytes_read)
         return -1;
     }
 
+
+
     *bytes_read = nbytes;
     return 0;
 }
@@ -61,6 +63,8 @@ static int
 fetch_init_daemon(fetch_context_t * context, int start, int size)
 {
     int ret = -1, tlen = context->total_len, dummy;
+
+    ERROR("start=%d size=%d tlen=%d\n", start, size, tlen);
 
     ret = AFSX_fetchstore_start(context->uc_conn, UCAFS_FETCH, context->path,
                                 DEFAULT_XFER_SIZE, start, size, tlen, 0,
@@ -135,12 +139,15 @@ ucafs_fetch(struct afs_conn * tc,
         goto out;
     }
 
+    context->buflen = DEFAULT_XFER_SIZE;
+
     context->id = -1;
     context->path = path;
     context->uc_conn = __get_conn();
     context->avc = avc;
     context->tc = tc;
     context->rx_conn = rxconn;
+    context->total_len = avc->f.m.Length;
 
     start_pos = FBOX_CHUNK_BASE(base);
     end_pos = FBOX_CHUNK_BASE(base + size) + UCAFS_CHUNK_SIZE;
@@ -160,10 +167,13 @@ ucafs_fetch(struct afs_conn * tc,
         goto out;
     }
 
+    ERROR("total length=%d\n", context->total_len);
+
     /* lets begin the data transfer */
     fp->offset = 0;
     pos = start_pos;
     end = start_pos + AFS_CHUNKTOSIZE(adc->f.chunk);
+    adc->validPos = base;
     while (bytes_left > 0) {
         size = MIN(bytes_left, context->buflen);
 
@@ -171,10 +181,12 @@ ucafs_fetch(struct afs_conn * tc,
             goto out;
         }
 
-        if (fetch_write(context, nbytes, &nbytes)) {
+        if (fetch_write(context, size, &nbytes)) {
             goto out;
         }
 
+        pos += nbytes;
+        bytes_left -= nbytes;
         if (pos >= base && pos < end) {
             afs_osi_Write(fp, -1, context->buffer, nbytes);
             // write to the file
@@ -182,8 +194,7 @@ ucafs_fetch(struct afs_conn * tc,
             afs_osi_Wakeup(&adc->validPos);
         }
 
-        pos += nbytes;
-        bytes_left -= nbytes;
+        break;
     }
 
     avc->is_ucafs_file = 1;

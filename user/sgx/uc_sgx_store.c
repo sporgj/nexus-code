@@ -151,14 +151,14 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
         nbytes = MIN(bytes_left, E_CRYPTO_BUFFER_LEN);
         memcpy(p_in, p_buf, nbytes);
 
-        if (context->xfer_op == UC_ENCRYPT) {
+        if (context->xfer_op == UCAFS_STORE) {
             mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
                               p_out);
         }
 
 	mbedtls_md_hmac_update(hmac_ctx, p_in, nbytes);
 
-        if (context->xfer_op == UC_DECRYPT) {
+        if (context->xfer_op == UCAFS_FETCH) {
             mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
                               p_out);
         }
@@ -201,10 +201,10 @@ int ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
     enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
     enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
 
-    memcpy(&context->fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
+    memcpy(xfer_ctx->fbox, &context->fbox_hdr, sizeof(uc_fbox_header_t));
     dest_crypto_ctx = &xfer_ctx->fbox->chunks[context->chunk_num];
 
-    if (context->xfer_op == UCAFS_FETCH) {
+    if (context->xfer_op == UCAFS_STORE) {
         error = E_SUCCESS;
         memcpy(dest_crypto_ctx, crypto_ctx, sizeof(crypto_context_t));
     } else {
