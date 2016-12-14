@@ -499,6 +499,9 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
     ret = 0;
 out1:
     UpgradeSToWLock(&avc->lock, 629);
+    if (ret == 0) {
+        avc->f.states &= ~CDirty;
+    }
 
     /* put back all the tdc entries still in use */
     if (ret) {
