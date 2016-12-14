@@ -87,9 +87,10 @@ fetchstore_start(uc_xfer_op_t op,
     xfer_ctx->xfer_op = op;
     xfer_ctx->completed = 0;
     xfer_ctx->buflen = max_xfer_size;
-    xfer_ctx->position = offset;
+    xfer_ctx->offset = offset;
     xfer_ctx->total_len = file_size;
     xfer_ctx->path = strdup(fpath);
+    xfer_ctx->chunk_num = FBOX_CHUNK_NUM(offset);
     xfer_ctx->fbox = filebox_fbox(filebox);
     xfer_ctx->filebox = filebox;
 

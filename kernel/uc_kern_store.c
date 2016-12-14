@@ -216,7 +216,8 @@ ucafs_storesegment(store_context_t * context,
     struct AFSFetchStatus output;
 
 #define INTERVALS_OVERLAP(x1, x2, a1, a2)                                      \
-    ((x1 >= a1 && x1 < a2) || (x2 >= a1 && x2 < a2))
+    ((x1 >= a1 && x1 < a2) || (x2 > a1 && x2 <= a2))                           \
+        || ((a1 >= x1 && a1 < x2) || (a2 > x1 && a2 <= x2))
 
     /* get the index of the first element */
     pos_start = dclist[first].pos + dclist[first].consumed;
@@ -268,7 +269,7 @@ ucafs_storesegment(store_context_t * context,
     /* iterate through the cache entries and start saving them */
     curr = first;
     tdc_count = 0;
-    for (j = 0; j < len; j++) {
+    for (j = 0; chunk_len > 0 && j < len; j++) {
         d_item = &dclist[curr];
         tdc = d_item->tdc;
 
@@ -383,7 +384,7 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
     context->rx_conn = rx_conn;
 
     /* compute the sizes of our chunks */
-    max_tdc_per_segment = CHUNK_RATIO(AFS_LOGCHUNK, UCAFS_CHUNK_LOG);
+    max_tdc_per_segment = CHUNK_RATIO(UCAFS_CHUNK_LOG, AFS_LOGCHUNK);
 
     /* allocate our list */
     dclist = (dcache_item_t *)kzalloc(
@@ -448,7 +449,6 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
             tdc_seen = 0;
         next_chunk:
             try_next_chunk = 1;
-
             ret = ucafs_storesegment(context, dclist, first, count, avc, areq,
                                      sync, path, &new_dv, &nbytes, &tdc_seen);
             if (ret) {

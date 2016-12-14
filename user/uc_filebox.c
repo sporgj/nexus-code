@@ -118,14 +118,14 @@ filebox_from_file2(const sds filepath, size_t size_hint)
 
     /* now detect how much data to allocate */
     len = MAX(size_hint, header.fbox_len);
-    if ((fbox = (uc_fbox_t *)malloc(header.fbox_len)) == NULL) {
-        slog(0, SLOG_FATAL, "allocation failed. len=%u", header.fbox_len);
+    if ((fbox = (uc_fbox_t *)malloc(len)) == NULL) {
+        slog(0, SLOG_FATAL, "allocation failed. len=%u", len);
         goto out;
     }
 
     memcpy(fbox, &header, sizeof(uc_fbox_header_t));
     buffer = ((uint8_t *)fbox) + sizeof(uc_fbox_header_t);
-    len -= sizeof(uc_fbox_header_t);
+    len = header.fbox_len - sizeof(uc_fbox_header_t);
 
     if ((nbytes = fread(buffer, 1, len, fd)) != len) {
         slog(0, SLOG_ERROR, "reading fbox failed exp=%d, nbytes=%d", len,

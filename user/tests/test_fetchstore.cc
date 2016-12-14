@@ -29,17 +29,26 @@ perform_crypto(uc_xfer_op_t op,
                uint8_t * p_input,
                uint8_t * p_output)
 {
-    int xfer_id, new_fbox_len, bytes_left, len;
+    int xfer_id, new_fbox_len, bytes_left, len, chunk_len, nbytes;
     uint8_t **buf;
 
+    chunk_len = bytes_left = file_size;
+
+next_chunk:
+    if (op == UCAFS_STORE) {
+        bytes_left = MIN(chunk_len, UCAFS_CHUNK_SIZE);
+    }
+
     /* initalize the store */
-    ASSERT_EQ(0, fetchstore_start(op, path, xfer_buflen, 0, file_size,
+    ASSERT_EQ(0, fetchstore_start(op, path, xfer_buflen, offset, file_size,
                                   0, &xfer_id, &new_fbox_len));
 
-    printf("%s: len=%d, buflen=%d\n", (op == UCAFS_STORE ? "store" : "fetch"),
-           file_size, xfer_buflen);
+    printf("%s: len=%d, buflen=%d, bytes_left=%d, offset=%d\n",
+           (op == UCAFS_STORE ? "store" : "fetch"), file_size, xfer_buflen,
+           chunk_len, offset);
+
+    nbytes = 0;
     /* now store the data */
-    bytes_left = file_size;
     while (bytes_left > 0) {
         len = MIN(xfer_buflen, bytes_left);
 
@@ -52,12 +61,21 @@ perform_crypto(uc_xfer_op_t op,
 
         memcpy(p_output, *buf, len);
 
+        nbytes += len;
         bytes_left -= len;
         p_input += len;
         p_output += len;
     }
 
     ASSERT_EQ(0, fetchstore_finish(xfer_id));
+
+    if (op == UCAFS_STORE) {
+        offset += nbytes;
+        chunk_len -= nbytes;
+        if (chunk_len > 0) {
+            goto next_chunk;
+        }
+    }
 }
 
 TEST(UC_FETCHSTORE, SanityTest)

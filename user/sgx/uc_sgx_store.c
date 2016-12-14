@@ -7,6 +7,7 @@ typedef struct {
     uc_xfer_op_t xfer_op;
     int chunk_num;
     size_t pos;
+    size_t offset;
     crypto_iv_t _iv;
     crypto_context_t curr_crypto_ctx;
     mbedtls_aes_context aes_ctx;
@@ -48,6 +49,7 @@ ecall_fetchstore_init(xfer_context_t * xfer_ctx)
 
     context->xfer_op = xfer_ctx->xfer_op;
     context->chunk_num = xfer_ctx->chunk_num;
+    context->offset = xfer_ctx->offset;
 
     /* initialize the crypto contexts */
     aes_ctx = &context->aes_ctx;
@@ -78,6 +80,45 @@ out:
     return error;
 }
 
+static int
+update_crypto_ctx(enclave_context_t * context,
+                  xfer_context_t * xfer_ctx,
+                  int chunk_num)
+{
+    mbedtls_aes_context * aes_ctx;
+    mbedtls_md_context_t * hmac_ctx;
+    if (chunk_num >= context->fbox_hdr.chunk_count) {
+        return -1;
+    }
+
+    crypto_context_t * crypto_ctx = &context->curr_crypto_ctx;
+    if (context->xfer_op == UCAFS_STORE) {
+        sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
+    } else {
+        memcpy(crypto_ctx, &xfer_ctx->fbox->chunks[chunk_num],
+               sizeof(crypto_context_t));
+        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+    }
+
+    memcpy(&context->_iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
+
+    /* initialize the crypto stuff here */
+    aes_ctx = &context->aes_ctx;
+    hmac_ctx = &context->hmac_ctx;
+
+    mbedtls_md_free(hmac_ctx);
+
+    // implicity calls init & free
+    mbedtls_aes_setkey_enc(aes_ctx, (uint8_t *)&crypto_ctx->ekey,
+                           CRYPTO_AES_KEY_SIZE_BITS);
+    mbedtls_md_hmac_starts(hmac_ctx, (uint8_t *)&crypto_ctx->mkey,
+                           sizeof(crypto_ekey_t));
+
+    context->chunk_num = chunk_num;
+    return 0;
+}
+
 int
 ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 {
@@ -85,8 +126,6 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
     uc_fbox_header_t * fbox_hdr;
     crypto_context_t * crypto_ctx;
     enclave_context_t * context;
-    mbedtls_aes_context * aes_ctx;
-    mbedtls_md_context_t * hmac_ctx;
 
     context = (enclave_context_t *)seqptrmap_get(xfer_context_map,
                                                  xfer_ctx->enclave_crypto_id);
@@ -103,36 +142,16 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
     fbox_hdr->file_size = file_size;
 
     // TODO instantiate crypto data for fbox here
+    update_crypto_ctx(context, xfer_ctx, context->chunk_num);
 
-    /* generate the crypto data */
-    crypto_ctx = &context->curr_crypto_ctx;
-    if (context->xfer_op == UCAFS_STORE) {
-        sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
-    } else {
-        memcpy(crypto_ctx, &xfer_ctx->fbox->chunks[context->chunk_num],
-               sizeof(crypto_context_t));
-        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
-    }
-
-    memcpy(&context->_iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
-
-    /* initialize the crypto stuff here */
-    aes_ctx = &context->aes_ctx;
-    hmac_ctx = &context->hmac_ctx;
-
-    mbedtls_aes_setkey_enc(aes_ctx, (uint8_t *)&crypto_ctx->ekey,
-                           CRYPTO_AES_KEY_SIZE_BITS);
-    mbedtls_md_hmac_starts(hmac_ctx, (uint8_t *)&crypto_ctx->mkey,
-                           sizeof(crypto_ekey_t));
-
+    /* generate the crypto data */;
     return E_SUCCESS;
 }
 
 int
 ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
 {
-    int error = E_ERROR_ERROR, nbytes, bytes_left;
+    int error = E_ERROR_ERROR, nbytes, bytes_left, chunk_num;
     crypto_context_t * crypto_ctx;
     enclave_context_t * context;
     uint8_t *p_in, *p_out, *p_buf, *nonce;
@@ -169,6 +188,12 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
         if (context->xfer_op == UCAFS_FETCH) {
             mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes,
                                   nonce, p_in, p_out);
+
+            context->offset += nbytes;
+            chunk_num = FBOX_CHUNK_NUM(context->offset);
+            if (chunk_num != context->chunk_num) {
+                update_crypto_ctx(context, xfer_ctx, chunk_num);
+            }
         }
 
         memcpy(p_buf, p_out, nbytes);
