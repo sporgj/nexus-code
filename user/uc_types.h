@@ -22,7 +22,6 @@ typedef struct {
     int xfer_id;
     int enclave_crypto_id;
     int chunk_num; // chunk number for the current store
-    uc_crypto_op_t op; // DEPRECATED
     uc_xfer_op_t xfer_op; // UCAFS_FETCH/UCAFS_STORE
     char * buffer;
     uint32_t buflen;

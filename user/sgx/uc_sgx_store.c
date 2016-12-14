@@ -106,7 +106,15 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 
     /* generate the crypto data */
     crypto_ctx = &context->curr_crypto_ctx;
-    sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
+    if (context->xfer_op == UCAFS_STORE) {
+        sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
+    } else {
+        memcpy(crypto_ctx, &xfer_ctx->fbox->chunks[context->chunk_num],
+               sizeof(crypto_context_t));
+        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+    }
+
     memcpy(&context->_iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
 
     /* initialize the crypto stuff here */
@@ -152,15 +160,15 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
         memcpy(p_in, p_buf, nbytes);
 
         if (context->xfer_op == UCAFS_STORE) {
-            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
-                              p_out);
+            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes,
+                                  nonce, p_in, p_out);
         }
 
-	mbedtls_md_hmac_update(hmac_ctx, p_in, nbytes);
+        mbedtls_md_hmac_update(hmac_ctx, p_in, nbytes);
 
         if (context->xfer_op == UCAFS_FETCH) {
-            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes, nonce, p_in,
-                              p_out);
+            mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes,
+                                  nonce, p_in, p_out);
         }
 
         memcpy(p_buf, p_out, nbytes);
@@ -172,10 +180,11 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
     return E_SUCCESS;
 }
 
-int ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
+int
+ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, len, bytes_left;
-    crypto_context_t * crypto_ctx, * dest_crypto_ctx;
+    crypto_context_t *crypto_ctx, *dest_crypto_ctx;
     enclave_context_t * context;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;

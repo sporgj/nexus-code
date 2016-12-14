@@ -9,52 +9,46 @@
 
 #include <sys/param.h>
 
-int xfer_size_test[] = {16, 512, 4096};
-int file_size_test[] = {107, 32, 567, 34};
+int xfer_size_test[] = { 16, 512, 4096 };
+int file_size_test[] = { 107, 32, 567, 34 };
 
-void fill_buffer(char * buffer, int len) {
+void
+fill_buffer(uint8_t * buffer, int len)
+{
     for (size_t i = 0; i < len; i++) {
         buffer[i] = rand() % CHAR_MAX;
     }
 }
 
-TEST(UC_FETCHSTORE, SanityTest)
+void
+perform_crypto(uc_xfer_op_t op,
+               char * path,
+               int xfer_buflen,
+               int offset,
+               int file_size,
+               uint8_t * p_input,
+               uint8_t * p_output)
 {
-    int ret, bytes_left, len, total_len, xfer_id, new_fbox_len,
-        file_size = file_size_test[0], xfer_buflen = xfer_size_test[0];
-    char *temp, *input, *p_input, *output, *p_output;
+    int xfer_id, new_fbox_len, bytes_left, len;
     uint8_t **buf;
-    sds path = MK_PATH("file.txt");
-    srand(time(NULL));
-
-    /* create our file */
-    ASSERT_EQ(0, dirops_new(path, UC_FILE, &temp)) << "dirops_new failed";
 
     /* initalize the store */
-    ASSERT_EQ(0, store_start(path, xfer_buflen, 0, file_size, 0, &xfer_id,
-                             &new_fbox_len));
+    ASSERT_EQ(0, fetchstore_start(op, path, xfer_buflen, 0, file_size,
+                                  0, &xfer_id, &new_fbox_len));
 
-    /* start create variables */
-    total_len = new_fbox_len + file_size;
-    ASSERT_FALSE((input = (char *)malloc(file_size)) == NULL);
-    ASSERT_FALSE((output = (char *)malloc(total_len)) == NULL);
-
-    cout << "filelen = " << file_size << ", total_len = " << total_len << endl;
-
-    fill_buffer(input, file_size);
-
+    printf("%s: len=%d, buflen=%d\n", (op == UCAFS_STORE ? "store" : "fetch"),
+           file_size, xfer_buflen);
     /* now store the data */
-    p_input = input, p_output = output;
     bytes_left = file_size;
     while (bytes_left > 0) {
         len = MIN(xfer_buflen, bytes_left);
 
-        ASSERT_FALSE((buf = store_get_buffer(xfer_id, len)) == NULL);
+        ASSERT_FALSE((buf = fetchstore_get_buffer(xfer_id, len)) == NULL);
 
         // now copy the data
         memcpy(*buf, p_input, len);
 
-        ASSERT_EQ(0, store_data(buf));
+        ASSERT_EQ(0, fetchstore_data(buf));
 
         memcpy(p_output, *buf, len);
 
@@ -63,21 +57,38 @@ TEST(UC_FETCHSTORE, SanityTest)
         p_output += len;
     }
 
-    /* now lets retrieve our fbox data */
-    bytes_left = new_fbox_len;
-    cout << "Copying fbox. len = " << bytes_left << endl;
-    while (bytes_left > 0) {
-        len = MIN(xfer_buflen, bytes_left);
+    ASSERT_EQ(0, fetchstore_finish(xfer_id));
+}
 
-        ASSERT_EQ(0, store_fbox(UCAFS_FBOX_READ, buf));
+TEST(UC_FETCHSTORE, SanityTest)
+{
+    int file_size = file_size_test[0], xfer_buflen = xfer_size_test[0];
+    uint8_t **buf, *temp, *input, *output;
+    char * test;
+    sds path = MK_PATH("file.txt");
+    srand(time(NULL));
 
-        memcpy(p_output, *buf, len);
+    /* create our file */
+    ASSERT_EQ(0, dirops_new(path, UC_FILE, &test)) << "dirops_new failed";
 
-        bytes_left -= len;
-        p_output += len;
-    }
+    /* start create variables */
+    ASSERT_FALSE((input = (uint8_t *)malloc(file_size)) == NULL);
+    ASSERT_FALSE((output = (uint8_t *)malloc(file_size)) == NULL);
+    ASSERT_FALSE((temp = (uint8_t *)malloc(file_size)) == NULL);
 
-    ASSERT_EQ(0, store_finish(xfer_id));
+    fill_buffer(input, file_size);
+
+    perform_crypto(UCAFS_STORE, path, xfer_buflen, 0, file_size, input, output);
+    perform_crypto(UCAFS_FETCH, path, xfer_buflen, 0, file_size, output, temp);
+
+    uinfo("input");
+    hexdump(input, MIN(32, file_size));
+
+    uinfo("output");
+    hexdump(output, MIN(32, file_size));
+
+    uinfo("temp");
+    hexdump(temp, MIN(32, file_size));
 }
 
 int

@@ -84,7 +84,7 @@ fetchstore_start(uc_xfer_op_t op,
     }
 
     xfer_ctx->xfer_id = -1;
-    xfer_ctx->op = op;
+    xfer_ctx->xfer_op = op;
     xfer_ctx->completed = 0;
     xfer_ctx->buflen = max_xfer_size;
     xfer_ctx->position = offset;

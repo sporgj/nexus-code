@@ -167,8 +167,6 @@ ucafs_fetch(struct afs_conn * tc,
         goto out;
     }
 
-    ERROR("total length=%d\n", context->total_len);
-
     /* lets begin the data transfer */
     fp->offset = 0;
     pos = start_pos;
@@ -193,8 +191,6 @@ ucafs_fetch(struct afs_conn * tc,
             adc->validPos = pos;
             afs_osi_Wakeup(&adc->validPos);
         }
-
-        break;
     }
 
     avc->is_ucafs_file = 1;

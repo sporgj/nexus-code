@@ -45,9 +45,10 @@ typedef struct {
 #define UC_VERIFY 0x00000004
 typedef uint32_t uc_crypto_op_t;
 
-#define UCAFS_STORE UC_ENCRYPT
-#define UCAFS_FETCH UC_DECRYPT
-typedef uint16_t uc_xfer_op_t; // UCAFS_FETCH/UCAFS_STORE
+typedef enum {
+    UCAFS_STORE = UC_ENCRYPT,
+    UCAFS_FETCH = UC_DECRYPT
+} uc_xfer_op_t;
 
 #define UC_HARDLINK 0
 #define UC_SOFTLINK 1
