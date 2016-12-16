@@ -6,7 +6,7 @@ OPENAFS_INC := $(OPENAFS_PATH)/include
 OPENAFS_SRC := $(OPENAFS_PATH)/src
 OPENAFS_LIB := $(OPENAFS_PATH)/lib
 
-OBJS := uc_rpc.o afsx.ss.o enclave_u.o $(OBJS)
+OBJS := uc_mod.o enclave_u.o $(OBJS)
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
 RXINC := -I$(OPENAFS_INC)
@@ -32,26 +32,9 @@ enclave_u.o: enclave_u.c
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC <= $^"
 
-afsx.cs.o: afsx.cs.c afsx.h
-	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
-	@echo "CC <= $@"
-
-afsx.cs.c: afsx.xg
-	$(RXGEN) -A -x -C -o $@ $<
-
 ucafs: main.cc libucafs.a
-	@$(CXX) $(CPPFLAGS) $^ $(LIBS) $(RXLIBS) $(App_Link_Flags) -o $@
+	@$(CXX) $(CPPFLAGS) $^ $(LIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
-
-afsx.ss.o: afsx.ss.c
-	@$(CC) $(CFLAGS) $(RXINC) -c $< -o $@
-	@echo "CC <= $@"
-
-afsx.ss.c: afsx.xg afsx.h
-	$(RXGEN) -A -x -S -o $@ $<
-
-afsx.h: afsx.xg ucafs_defs.h
-	$(RXGEN) -A -x -h -o $@ $<
 
 third/libthird.a:
 	make -C third/
@@ -63,7 +46,7 @@ libucafs.a: $(OBJS) libthird.a
 	@ar cr $@ $(OBJS) third/*.o
 	@echo "ar => $@"
 
-uc_rpc.o: uc_rpc.c afsx.ss.c
+uc_mod.o: uc_mod.c
 	@$(CC) $(CFLAGS) -Wno-pointer-sign $(RXINC) -c $< -o $@
 	@echo "CC <= $@"
 

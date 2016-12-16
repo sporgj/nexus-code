@@ -19,9 +19,11 @@
 
 using namespace std;
 
+FILE * global_mod_fid = NULL;
+
 sgx_enclave_id_t global_eid = 0;
 
-extern "C" int setup_rx(int);
+extern "C" int setup_mod();
 extern "C" void dcache_init();
 
 const char afs_path[] = UC_AFS_PATH;
@@ -85,7 +87,15 @@ int main(int argc, char ** argv)
     if (!check_main_dir()) {
         return -1;
     }
-    setup_rx(0);
+
+    if (setup_mod()) {
+        cout << " ! Could not access module" << endl;
+        return -1;
+    }
+
+    cout << "Done..." << endl;
+
+    while(1);
 
     return 0;
 }
