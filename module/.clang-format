@@ -1,0 +1,10 @@
+{
+    BasedOnStyle: "LLVM",
+    IndentWidth: 4,
+    BreakBeforeBraces: Linux,
+    PointerAlignment: "Middle",
+    ColumnLimit: "80",
+    AlwaysBreakAfterReturnType: "TopLevel",
+    AlignAfterOpenBracket: "Align",
+    BinPackParameters: "false"
+}
