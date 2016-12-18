@@ -10,7 +10,10 @@
 #include <linux/seq_file.h>
 #include <linux/types.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 
+#include "rx/xdr.h"
+#include "rx/xdr_prototypes.h"
 #include "afs/ucafs_header.h"
 
 #define UCKERN_NBR_DEVS 1
@@ -35,3 +38,6 @@ struct ucafs_mod {
 };
 
 extern struct ucafs_mod * dev;
+
+int
+ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp);

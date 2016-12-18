@@ -7,10 +7,14 @@
 #include <stdint.h>
 #endif
 
+#define UCAFS_PATH_MAX PAGE_SIZE
+#define UCAFS_FNAME_MAX 256
+
 typedef uint16_t mid_t;
 
 typedef enum {
-    UCAFS_MSG_PING
+    UCAFS_MSG_PING,
+    UCAFS_MSG_FILLDIR
 } uc_msg_type_t;
 
 typedef struct {
@@ -18,6 +22,7 @@ typedef struct {
     uint16_t msg_id; /* the ID of the message */
     uint16_t ack_id; /* the message it responds to */
     uint32_t len; /* the length of the payload */
+    int32_t status; /* status from the call, set by return */
     char payload[0];
 } ucrpc_msg_t;
 

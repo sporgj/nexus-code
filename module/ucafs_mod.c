@@ -64,7 +64,6 @@ ucafs_m_poll(struct file * fp, poll_table * wait)
 static ssize_t
 ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 {
-    ucrpc_msg_t * msg;
     size_t len;
 
     if (mutex_lock_interruptible(&dev->mut)) {
@@ -85,8 +84,8 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
     }
 
     /* we can ship data to userspace */
+    len = dev->outb_mlen;
     msg = (ucrpc_msg_t *)dev->outb;
-    len = MSG_SIZE(msg);
     count = min(count, dev->avail_read);
 
     if (copy_to_user(buf, dev->outb + (len - dev->avail_read), count)) {
@@ -94,7 +93,7 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
         return -EFAULT;
     }
 
-    printk(KERN_INFO "wrote %zu bytes, msg_id=%d\n", count, msg->msg_id);
+    printk(KERN_INFO "wrote %zu bytes, msg_id=%d\n", count);
 
     /* update the pointer */
     dev->avail_read -= count;
@@ -142,6 +141,76 @@ ucafs_m_write(struct file * fp,
     mutex_unlock(&dev->mut);
     wake_up_interruptible(&dev->kq);
     return count;
+}
+
+int
+ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
+{
+    mid_t id;
+    XDR * rsp;
+    ucrpc_msg_t * msg;
+    int err = -1, msg_len = (xdrs->x_private - xdrs->x_base);
+
+    if (dev->daemon_pid == 0) {
+        mutex_unlock(&dev->mut);
+        return -1;
+    }
+
+    /* send the message */
+    msg = (ucrpc_msg_t *)dev->outb;
+    msg->type = type;
+    msg->msg_id = id = ucrpc__genid();
+    msg->len = msg_len;
+    dev->avail_read += MSG_SIZE(msg);
+    dev->msg_len = MSG_SIZE(msg);
+
+    while (1) {
+        DEFINE_WAIT(wait);
+        if (dev->daemon_pid == 0) {
+            printk(KERN_ERR "process is offline :(");
+            break;
+        }
+
+        mutex_unlock(&dev->mut);
+        wake_up_interruptible(&dev->rq);
+
+        /* sleep the kernel thread */
+        prepare_to_wait(&dev->kq, &wait, TASK_INTERRUPTIBLE);
+
+        if (dev->avail_write == dev->buffersize) {
+            schedule();
+        }
+
+        finish_wait(&dev->kq, &wait);
+
+        /* now read the buffer */
+        if (mutex_lock_interruptible(&dev->mut)) {
+            printk(KERN_ERR "mutex_lock_interruptible failed\n");
+            return -1;
+        }
+
+        msg = (ucrpc_msg_t *)dev->inb;
+        if (msg->ack_id == id) {
+            dev->avail_write += MSG_SIZE(msg);
+
+            /* then allocate space and set the response */
+            if ((rsp = kmalloc(msg->len, GFP_KERNEL)) == NULL) {
+                *pp_rsp = NULL;
+                printk(KERN_ERR "allocation error\n");
+                goto out;
+            }
+
+            memcpy(rsp, &msg->payload, msg->len);
+            *pp_rsp = rsp;
+
+            err = 0;
+            break;
+        }
+    }
+
+out:
+    mutex_unlock(&dev->mut);
+    return err;
 }
 
 static int

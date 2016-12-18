@@ -1,4 +1,4 @@
-OBJS := hashmap.o slog.o sds.o seqptrmap.o elasticqueue.o elasticarray.o
+OBJS := hashmap.o slog.o sds.o seqptrmap.o elasticqueue.o elasticarray.o xdr.o xdr_mem.o
 CC := gcc
 
 all: libthird.a

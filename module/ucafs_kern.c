@@ -1,74 +1,101 @@
 #include "ucafs_mod.h"
+#include <linux/random.h>
 
-int
-send_request(ucrpc_msg_t * req, ucrpc_msg_t ** rsp)
+#undef ERROR
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_kern: " fmt, ##args)
+
+inline caddr_t
+READPTR_LOCK(void)
 {
-    mid_t id = req->msg_id;
-    ucrpc_msg_t * msg;
-    int err = -1, msg_len = MSG_SIZE(req);
-
-    /* get the read buffer */
     if (mutex_lock_interruptible(&dev->mut)) {
-        printk(KERN_ERR "mutex_lock_interruptible failed\n");
-        return -1;
+        ERROR("locking mutex failed\n");
+        return 0;
     }
 
-    if (dev->daemon_pid == 0) {
-        mutex_unlock(&dev->mut);
-        return -1;
-    }
+    /* clear the message at that pointer */
+    memset(dev->outb, 0, sizeof(ucrpc_msg_t));
+    return (caddr_t)((char *)dev->outb + sizeof(ucrpc_msg_t));
+}
 
-    /* send the message */
-    memcpy(dev->outb, req, msg_len);
-    dev->avail_read += msg_len;
-
-    while (1) {
-        DEFINE_WAIT(wait);
-        if (dev->daemon_pid == 0) {
-            printk(KERN_ERR "process is offline :(");
-            break;
-        }
-
-        mutex_unlock(&dev->mut);
-        wake_up_interruptible(&dev->rq);
-
-        /* sleep the kernel thread */
-        prepare_to_wait(&dev->kq, &wait, TASK_INTERRUPTIBLE);
-
-        if (dev->avail_write == dev->buffersize) {
-            schedule();
-        }
-
-        finish_wait(&dev->kq, &wait);
-
-        /* now read the buffer */
-        if (mutex_lock_interruptible(&dev->mut)) {
-            printk(KERN_ERR "mutex_lock_interruptible failed\n");
-            return -1;
-        }
-
-        msg = (ucrpc_msg_t *)dev->inb;
-        if (msg->ack_id == id) {
-            dev->avail_write += MSG_SIZE(msg);
-            err = 0;
-            break;
-        }
-    }
-
+inline void
+READPTR_UNLOCK(void)
+{
     mutex_unlock(&dev->mut);
-    return err;
+}
+
+// hold READPTR_LOCK()
+inline size_t
+READPTR_BUFLEN(void)
+{
+    return (dev->buffersize - dev->avail_read - sizeof(ucrpc_msg_t));
 }
 
 void
 ucafs_kern_ping(void)
 {
-    ucrpc_msg_t *rsp, msg = {.type = UCAFS_MSG_PING,
-                             .msg_id = ucrpc__genid(),
-                             .ack_id = 0,
-                             .len = 0};
-    if (send_request(&msg, &rsp)) {
-        printk(KERN_ERR "error with the request\n");
+    int err, num = get_random_int();
+    XDR xdrs, * rsp = NULL;
+    caddr_t payload;
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        return;
     }
 
-    printk(KERN_INFO "Got response\n");
+    /* create the XDR object */
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_int(&xdrs, &num)) {
+        ERROR("xdr_int failed\n");
+        goto out;
+    }
+
+    /* send eveything */
+    if (ucafs_mod_send(UCAFS_MSG_PING, &xdrs, &rsp)) {
+        printk(KERN_INFO "filldir failure\n");
+        goto out;
+    }
+
+    printk(KERN_INFO "Got a response\n");
+
+    err = 0;
+out:
+    if (rsp) {
+        kfree(rsp);
+    }
+}
+
+int
+ucafs_kern_filldir(char * parent_dir, char * shadow_name, char ** real_name)
+{
+    int err;
+    XDR xdrs, * rsp = NULL;
+    caddr_t payload;
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        return -1;
+    }
+
+    /* create the XDR object */
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!(xdr_string(&xdrs, &parent_dir, UCAFS_PATH_MAX)) ||
+        !(xdr_string(&xdrs, &shadow_name, UCAFS_FNAME_MAX))) {
+        ERROR("xdr filldir failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    /* send eveything */
+    if (ucafs_mod_send(UCAFS_MSG_FILLDIR, &xdrs, &rsp)) {
+        printk(KERN_INFO "filldir failure\n");
+        goto out;
+    }
+
+    printk(KERN_INFO "Got a response\n");
+
+    err = 0;
+out:
+    if (rsp) {
+        kfree(rsp);
+    }
+
+    return err;
 }
