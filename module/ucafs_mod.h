@@ -24,7 +24,7 @@
 
 /* private stuff */
 struct ucafs_mod {
-    wait_queue_head_t kq, uq;
+    wait_queue_head_t kq, rq, wq;
     uint8_t *buffer, *end;
     size_t buffersize;
     char *outb, *inb;

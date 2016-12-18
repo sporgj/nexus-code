@@ -61,20 +61,6 @@ ucafs_m_poll(struct file * fp, poll_table * wait)
 }
 #endif
 
-static int
-ucafs_p_show(struct seq_file * sf, void * v)
-{
-    if (dev->daemon_pid) {
-        seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon_pid);
-        seq_printf(sf, "avail_read=%zu, avail_write=%zu\n", dev->avail_read,
-                   dev->avail_write);
-    } else {
-        seq_printf(sf, "daemon offline :(\n");
-    }
-
-    return 0;
-}
-
 static ssize_t
 ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 {
@@ -88,7 +74,7 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
     while (dev->avail_read == 0) {
         mutex_unlock(&dev->mut);
         // the current process waits
-        if (wait_event_interruptible(dev->uq, dev->avail_read == 0)) {
+        if (wait_event_interruptible(dev->rq, dev->avail_read > 0)) {
             return -ERESTARTSYS;
         }
 
@@ -100,7 +86,7 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 
     /* we can ship data to userspace */
     msg = (ucrpc_msg_t *)dev->outb;
-    len = UCRPC_TLEN(msg);
+    len = MSG_SIZE(msg);
     count = min(count, dev->avail_read);
 
     if (copy_to_user(buf, dev->outb + (len - dev->avail_read), count)) {
@@ -108,12 +94,69 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
         return -EFAULT;
     }
 
+    printk(KERN_INFO "wrote %zu bytes, msg_id=%d\n", count, msg->msg_id);
+
     /* update the pointer */
     dev->avail_read -= count;
     // TODO zero the buffer
 
     mutex_unlock(&dev->mut);
     return count;
+}
+
+static ssize_t
+ucafs_m_write(struct file * fp,
+              const char __user * buf,
+              size_t count,
+              loff_t * f_pos)
+{
+    ucrpc_msg_t * p_msg;
+    if (mutex_lock_interruptible(&dev->mut)) {
+        return -ERESTARTSYS;
+    }
+
+    while (dev->avail_write == 0) {
+        mutex_unlock(&dev->mut);
+
+        if (wait_event_interruptible(dev->wq, dev->avail_write > 0)) {
+            return -ERESTARTSYS;
+        }
+
+        if (mutex_lock_interruptible(&dev->mut)) {
+            return -ERESTARTSYS;
+        }
+    }
+
+    /* copy the message in full */
+    if (copy_from_user(dev->inb, buf, count)) {
+        mutex_unlock(&dev->mut);
+        return -EFAULT;
+    }
+
+    p_msg = (ucrpc_msg_t *)dev->inb;
+
+    printk(KERN_INFO "read %zu bytes, ack_id=%d\n", count, p_msg->ack_id);
+
+    dev->avail_write -= count;
+
+    mutex_unlock(&dev->mut);
+    wake_up_interruptible(&dev->kq);
+    return count;
+}
+
+static int
+ucafs_p_show(struct seq_file * sf, void * v)
+{
+    if (dev->daemon_pid) {
+        seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon_pid);
+    } else {
+        seq_printf(sf, "daemon offline :(\n");
+    }
+
+    seq_printf(sf, "avail_read=%zu, avail_write=%zu\n", dev->avail_read,
+               dev->avail_write);
+
+    return 0;
 }
 
 static int
@@ -125,6 +168,7 @@ ucafs_p_open(struct inode * inode, struct file * file)
 const struct file_operations ucafs_mod_fops = {.owner = THIS_MODULE,
                                                .open = ucafs_m_open,
                                                .release = ucafs_m_release,
+                                               .write = ucafs_m_write,
                                                .read = ucafs_m_read};
 
 const struct file_operations ucafs_proc_fops = {.open = ucafs_p_open,
@@ -151,7 +195,8 @@ ucafs_mod_init(void)
     /* lets now initialize the data structures */
     memset(dev, 0, sizeof(struct ucafs_mod));
     init_waitqueue_head(&dev->kq);
-    init_waitqueue_head(&dev->uq);
+    init_waitqueue_head(&dev->rq);
+    init_waitqueue_head(&dev->wq);
     mutex_init(&dev->mut);
 
     if ((dev->buffer = UCMOD_BUFFER_ALLOC()) == NULL) {
