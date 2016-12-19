@@ -86,17 +86,21 @@ typedef int16_t afs_int16;
 typedef uint16_t afs_uint16;
 typedef int32_t afs_int32;
 typedef uint32_t afs_uint32;
+typedef int64_t afs_int64;
+typedef uint64_t afs_uint64;
 
 /*      @(#)xdr.h 1.1 86/02/03 SMI      */
-static void * osi_alloc(size_t sz)
+static char * osi_alloc(afs_int32 sz)
 {
     return malloc(sz);
 }
 
-static osi_free(void * ptr, size_t sz)
+static int osi_free(char * ptr, afs_int32 sz)
 {
     free(ptr);
+    return 0;
 }
+
 
 /*
  * xdr.h, External Data Representation Serialization Routines.

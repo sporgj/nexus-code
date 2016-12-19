@@ -4,6 +4,7 @@
 #include <uv.h>
 
 #include "third/xdr.h"
+#include "third/xdr_prototypes.h"
 
 #include "ucafs_header.h"
 #include "cdefs.h"
@@ -30,7 +31,6 @@ static int
 uc_rpc_ping(XDR * xdrs, XDR ** rsp)
 {
     int l;
-    xdrs->x_op = XDR_DECODE;
 
     *rsp = NULL;
 
@@ -42,6 +42,35 @@ uc_rpc_ping(XDR * xdrs, XDR ** rsp)
     uinfo("ping: magic = %d", l);
 
     return 0;
+}
+
+static int
+uc_rpc_create(XDR * xdrs, XDR ** rsp)
+{
+    int ret;
+    ucafs_entry_type type;
+    char * parent_dir = NULL, * name = NULL;
+
+    if (!xdr_string(xdrs, &parent_dir, UCAFS_PATH_MAX) ||
+            !xdr_string(xdrs, &name, UCAFS_FNAME_MAX) ||
+            !xdr_int(xdrs, (int *)&type)) {
+        uerror("uc_rpc_create error decoding message");
+        goto out;
+    }
+
+    uinfo("create: %s %s", parent_dir, name);
+
+    ret = 0;
+out:
+    if (parent_dir) {
+        free(parent_dir);
+    }
+
+    if (name) {
+        free(parent_dir);
+    }
+
+    return ret;
 }
 
 typedef struct xdr_data {
@@ -79,6 +108,8 @@ setup_mod()
                 break;
             }
 
+            xdr_out = NULL;
+
             fread(xdr_d->data, 1, msg->len, ucafs_mod_fid);
             xdrmem_create(&xdr_d->xdrs, xdr_d->data, msg->len, XDR_DECODE);
 
@@ -86,6 +117,8 @@ setup_mod()
             case UCAFS_MSG_PING:
                 uc_rpc_ping(&xdr_d->xdrs, &xdr_out);
                 break;
+            case UCAFS_MSG_CREATE:
+                uc_rpc_create(&xdr_d->xdrs, &xdr_out);
             default:
                 break;
             }

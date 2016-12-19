@@ -84,8 +84,7 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
     }
 
     /* we can ship data to userspace */
-    len = dev->outb_mlen;
-    msg = (ucrpc_msg_t *)dev->outb;
+    len = dev->msg_len;
     count = min(count, dev->avail_read);
 
     if (copy_to_user(buf, dev->outb + (len - dev->avail_read), count)) {
@@ -93,7 +92,7 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
         return -EFAULT;
     }
 
-    printk(KERN_INFO "wrote %zu bytes, msg_id=%d\n", count);
+    printk(KERN_INFO "wrote %zu bytes\n", count);
 
     /* update the pointer */
     dev->avail_read -= count;

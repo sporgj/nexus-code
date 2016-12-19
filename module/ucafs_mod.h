@@ -11,10 +11,18 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/types.h>
+#include <linux/string.h>
+#include <linux/dcache.h>
 
 #include "rx/xdr.h"
 #include "rx/xdr_prototypes.h"
 #include "afs/ucafs_header.h"
+
+#include <afsconfig.h>
+#include "afs/param.h"
+#include "afs/sysincludes.h"
+#include "afsincludes.h"
 
 #define UCKERN_NBR_DEVS 1
 #define UCKERN_PIPE_BUFFER PAGE_SIZE
@@ -31,7 +39,7 @@ struct ucafs_mod {
     uint8_t *buffer, *end;
     size_t buffersize;
     char *outb, *inb;
-    size_t avail_read, avail_write;
+    size_t avail_read, avail_write, msg_len;
     pid_t daemon_pid;
     struct mutex mut;
     struct cdev cdev;
