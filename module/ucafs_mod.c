@@ -142,11 +142,17 @@ ucafs_m_write(struct file * fp,
     return count;
 }
 
+typedef struct {
+    XDR xdrs;
+    char data[0];
+} xdr_data_t;
+
 int
 ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
 {
     mid_t id;
     XDR * rsp;
+    xdr_data_t * rsp_data;
     ucrpc_msg_t * msg;
     int err = -1, msg_len = (xdrs->x_private - xdrs->x_base);
 
@@ -192,14 +198,20 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
         if (msg->ack_id == id) {
             dev->avail_write += MSG_SIZE(msg);
 
-            /* then allocate space and set the response */
-            if ((rsp = kmalloc(msg->len, GFP_KERNEL)) == NULL) {
+            /* allocate the response data */
+            rsp_data = kmalloc(sizeof(xdr_data_t) + msg->len, GFP_KERNEL);
+            if (rsp_data == NULL) {
+                *p_err = msg->status;
                 *pp_rsp = NULL;
-                printk(KERN_ERR "allocation error\n");
+                ERROR("allocation error\n");
                 goto out;
             }
 
-            memcpy(rsp, &msg->payload, msg->len);
+            /* instantiate everything */
+            memcpy(rsp_data->data, &msg->payload, msg->len);
+            xdrmem_create(&rsp_data->xdrs, rsp_data->data, msg->len, XDR_DECODE);
+
+            *p_err = msg->status;
             *pp_rsp = rsp;
 
             err = 0;

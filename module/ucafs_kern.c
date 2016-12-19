@@ -214,7 +214,7 @@ ucafs_kern_create(struct vcache * avc,
                   ucafs_entry_type type,
                   char ** shadow_name)
 {
-    int ret;
+    int ret, err;
     XDR xdrs, *rsp = NULL;
     caddr_t payload;
     char * path;
@@ -239,6 +239,9 @@ ucafs_kern_create(struct vcache * avc,
     if (ucafs_mod_send(UCAFS_MSG_CREATE, &xdrs, &rsp)) {
         goto out;
     }
+
+    /* read the response */
+    // TODO
 
     ret = 0;
 out:

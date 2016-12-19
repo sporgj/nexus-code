@@ -3,11 +3,12 @@
 
 #include <uv.h>
 
+#include "third/log.h"
 #include "third/xdr.h"
 #include "third/xdr_prototypes.h"
 
-#include "ucafs_header.h"
 #include "cdefs.h"
+#include "ucafs_header.h"
 
 #define UCAFS_MOD_FILE "/dev/ucafs_mod"
 
@@ -28,37 +29,46 @@ ucrpc__genid(void)
 }
 
 static int
-uc_rpc_ping(XDR * xdrs, XDR ** rsp)
+uc_rpc_ping(XDR * xdrs, XDR * rsp)
 {
     int l;
-
-    *rsp = NULL;
 
     if (!xdr_int(xdrs, &l)) {
         uerror("Could not decode message");
         return -1;
     }
 
-    uinfo("ping: magic = %d", l);
+    log_info("[ping] magic = %d", l);
 
     return 0;
 }
 
 static int
-uc_rpc_create(XDR * xdrs, XDR ** rsp)
+uc_rpc_create(XDR * xdrs, XDR * rsp)
 {
     int ret;
     ucafs_entry_type type;
-    char * parent_dir = NULL, * name = NULL;
+    char *parent_dir = NULL, *name = NULL, *shdw_name = NULL;
 
-    if (!xdr_string(xdrs, &parent_dir, UCAFS_PATH_MAX) ||
-            !xdr_string(xdrs, &name, UCAFS_FNAME_MAX) ||
-            !xdr_int(xdrs, (int *)&type)) {
+    if (!xdr_string(xdrs, &parent_dir, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &name, UCAFS_FNAME_MAX)
+        || !xdr_int(xdrs, (int *)&type)) {
         uerror("uc_rpc_create error decoding message");
         goto out;
     }
 
-    uinfo("create: %s %s", parent_dir, name);
+    if (dirops_new1(parent_dir, name, &shdw_name)) {
+        log_error("[create] %s/%s FAILED", parent_dir, name);
+        goto out;
+    }
+
+    log_info("[create] %s/%s -> %s", parent_dir, name, shdw_name);
+
+    /* now start encoding the response */
+    if (!xdr_string(rsp, &shdw_name, UCAFS_FNAME_MAX)) {
+        uerror("ERROR encoding create response");
+        goto out;
+    }
 
     ret = 0;
 out:
@@ -67,7 +77,11 @@ out:
     }
 
     if (name) {
-        free(parent_dir);
+        free(name);
+    }
+
+    if (shdw_name) {
+        free(shdw_name);
     }
 
     return ret;
@@ -78,15 +92,25 @@ typedef struct xdr_data {
     uint8_t data[0];
 } xdr_data_t;
 
+typedef struct xdr_rsp {
+    XDR xdrs;
+    ucrpc_msg_t msg;
+    uint8_t data[0];
+} xdr_rsp_t;
+
+#define MAX_XDR_SIZE1 128
+#define XDR_RSP_SIZE(sz) sz - sizeof(XDR) - sizeof(ucrpc_msg_t)
+
 int
 setup_mod()
 {
-    int len;
+    int len, status;
     char * data_buf;
     size_t nbytes;
-    xdr_data_t * xdr_d = NULL;
-    XDR * xdr_out = NULL;
-    ucrpc_msg_t m, *msg = &m, rsp;
+    xdr_data_t * x_data = NULL;
+    xdr_rsp_t * x_rsp = NULL;
+    XDR *xdr_r, *xdr_d;
+    ucrpc_msg_t m, *msg = &m, *rsp;
 
     uv_mutex_init(&mut_msg_counter);
 
@@ -103,39 +127,53 @@ setup_mod()
     while (1) {
         nbytes = fread(msg, 1, sizeof(ucrpc_msg_t), ucafs_mod_fid);
         if (nbytes == sizeof(ucrpc_msg_t)) {
-            if ((xdr_d = malloc(sizeof(xdr_data_t) + msg->len)) == NULL) {
+            if ((x_data = malloc(sizeof(xdr_data_t) + msg->len)) == NULL) {
                 uerror("allocation failed... abort now");
                 break;
             }
 
-            xdr_out = NULL;
+            if ((x_rsp = malloc(sizeof(MAX_XDR_SIZE1))) == NULL) {
+                uerror("allocating response.. failed");
+                break;
+            }
 
-            fread(xdr_d->data, 1, msg->len, ucafs_mod_fid);
-            xdrmem_create(&xdr_d->xdrs, xdr_d->data, msg->len, XDR_DECODE);
+            /* read the data on the wire */
+            fread(x_data->data, 1, msg->len, ucafs_mod_fid);
 
+            /* create our XDR data */
+            xdrmem_create(&x_data->xdrs, x_data->data, msg->len, XDR_DECODE);
+            xdrmem_create(&x_rsp->xdrs, x_rsp->data,
+                          XDR_RSP_SIZE(MAX_XDR_SIZE1), XDR_ENCODE);
+
+            /* dispatch to the corresponding function */
+            xdr_d = &x_data->xdrs;
+            xdr_r = &x_rsp->xdrs;
             switch (msg->type) {
             case UCAFS_MSG_PING:
-                uc_rpc_ping(&xdr_d->xdrs, &xdr_out);
+                status = uc_rpc_ping(xdr_d, xdr_r);
                 break;
             case UCAFS_MSG_CREATE:
-                uc_rpc_create(&xdr_d->xdrs, &xdr_out);
+                status = uc_rpc_create(xdr_d, xdr_r);
+                break;
             default:
                 break;
             }
 
-            if (xdr_out == NULL) {
-                /* just respond with an empty message */
-                rsp = (ucrpc_msg_t){.msg_id = ucrpc__genid(),
-                                    .ack_id = msg->msg_id,
-                                    .len = 0 };
-                len = MSG_SIZE(&rsp);
-                nbytes = fwrite(&rsp, 1, len, ucafs_mod_fid);
-            } else {
-                // TODO
-            }
+            /* send the response */
+            rsp = &x_rsp->msg;
+            nbytes = xdr_r->x_private - xdr_r->x_base;
+            *rsp = (ucrpc_msg_t){.msg_id = ucrpc__genid(),
+                                 .ack_id = msg->msg_id,
+                                 .len = nbytes,
+                                 .status = status };
+            len = MSG_SIZE(rsp);
 
-            uinfo("responded, wrote=%zu bytes", nbytes);
-            free(xdr_d);
+            /* send the whole thing */
+            nbytes = fwrite(rsp, 1, len, ucafs_mod_fid);
+
+            uinfo("responded, wrote=%zu bytes, msg_len = %d", nbytes, len);
+            free(x_data);
+            free(x_rsp);
         }
     }
 
