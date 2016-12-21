@@ -95,8 +95,6 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
         return -EFAULT;
     }
 
-    printk(KERN_INFO "wrote %zu bytes\n", count);
-
     /* update the pointer */
     dev->avail_read -= count;
     // TODO zero the buffer
@@ -133,8 +131,6 @@ ucafs_m_write(struct file * fp,
         return -EFAULT;
     }
 
-    printk(KERN_INFO "read %zu bytes\n", count);
-
     dev->avail_write -= count;
 
     mutex_unlock(&dev->mut);
@@ -142,16 +138,14 @@ ucafs_m_write(struct file * fp,
     return count;
 }
 
-typedef struct {
-    XDR xdrs;
-    char data[0];
-} xdr_data_t;
-
 int
-ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp, int * p_err)
+ucafs_mod_send(uc_msg_type_t type,
+               XDR * xdrs,
+               reply_data_t ** pp_reply,
+               int * p_err)
 {
     mid_t id;
-    xdr_data_t * rsp_data;
+    reply_data_t * p_reply;
     ucrpc_msg_t * msg;
     int err = -1, msg_len = (xdrs->x_private - xdrs->x_base);
     *p_err = -1;
@@ -202,20 +196,20 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp, int * p_err)
             dev->avail_write += MSG_SIZE(msg);
 
             /* allocate the response data */
-            rsp_data = kmalloc(sizeof(xdr_data_t) + msg->len + 1, GFP_KERNEL);
-            if (rsp_data == NULL) {
+            p_reply = kmalloc(sizeof(reply_data_t) + msg->len + 1, GFP_KERNEL);
+            if (p_reply == NULL) {
                 *p_err = msg->status;
-                *pp_rsp = NULL;
+                *pp_reply = NULL;
                 ERROR("allocation error\n");
                 goto out;
             }
 
             /* instantiate everything */
-            memcpy(rsp_data->data, &msg->payload, msg->len);
-            xdrmem_create(&rsp_data->xdrs, rsp_data->data, msg->len, XDR_DECODE);
+            memcpy(p_reply->data, msg->payload, msg->len);
+            xdrmem_create(&p_reply->xdrs, p_reply->data, msg->len, XDR_DECODE);
 
             *p_err = msg->status;
-            *pp_rsp = &rsp_data->xdrs;
+            *pp_reply = p_reply;
 
             err = 0;
             break;

@@ -47,10 +47,18 @@ struct ucafs_mod {
     struct cdev cdev;
 };
 
-#define UCAFS_IS_OFFLINE                                                       \
-    (dev->daemon == NULL || task_is_stopped_or_traced(dev->daemon))
+typedef struct {
+    XDR xdrs;
+    char data[0];
+} reply_data_t;
 
 extern struct ucafs_mod * dev;
 
+#define UCAFS_IS_OFFLINE                                                       \
+    (dev->daemon == NULL || task_is_stopped_or_traced(dev->daemon))
+
 int
-ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp, int * p_code);
+ucafs_mod_send(uc_msg_type_t type,
+               XDR * xdrs,
+               reply_data_t ** pp_rsp,
+               int * p_code);

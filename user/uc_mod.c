@@ -99,6 +99,15 @@ setup_mod()
             case UCAFS_MSG_REMOVE:
                 status = uc_rpc_dirops(msg->type, xdr_in, xdr_out);
                 break;
+            case UCAFS_MSG_SYMLINK:
+                status = uc_rpc_symlink(xdr_in, xdr_out);
+                break;
+            case UCAFS_MSG_HARDLINK:
+                status = uc_rpc_hardlink(xdr_in, xdr_out);
+                break;
+            case UCAFS_MSG_RENAME:
+                status = uc_rpc_rename(xdr_in, xdr_out);
+                break;
             default:
                 break;
             }
@@ -115,8 +124,8 @@ setup_mod()
             /* send the whole thing */
             nbytes = fwrite(rsp, 1, len, ucafs_mod_fid);
 
-            log_debug("{ uc_mod } status=%d in=(%zu, %d), out=(%zu, %d)", status,
-                      MSG_SIZE(msg), msg->len, nbytes, rsp->len);
+            /* log_debug("{ uc_mod } status=%d in=(%zu, %d), out=(%zu, %d)",
+               status, MSG_SIZE(msg), msg->len, nbytes, rsp->len); */
             free(x_data);
             free(x_rsp);
 

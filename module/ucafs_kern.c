@@ -141,7 +141,8 @@ ucafs_kern_ping(void)
 {
     static int num = 0;
     int err, code;
-    XDR xdrs, *rsp = NULL;
+    XDR xdrs;
+    reply_data_t * reply = NULL;
     caddr_t payload;
 
     if ((payload = READPTR_LOCK()) == 0) {
@@ -159,15 +160,15 @@ ucafs_kern_ping(void)
     num++;
 
     /* send eveything */
-    if (ucafs_mod_send(UCAFS_MSG_PING, &xdrs, &rsp, &code) || code) {
+    if (ucafs_mod_send(UCAFS_MSG_PING, &xdrs, &reply, &code) || code) {
         num--;
         goto out;
     }
 
     err = 0;
 out:
-    if (rsp) {
-        kfree(rsp);
+    if (reply) {
+        kfree(reply);
     }
 }
 
@@ -179,7 +180,8 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
                          char ** shadow_name)
 {
     int ret = -1, code;
-    XDR xdrs, *rsp = NULL;
+    XDR xdrs, *xdr_reply;
+    reply_data_t * reply = NULL;
     caddr_t payload;
     char * path;
 
@@ -200,12 +202,13 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
         goto out;
     }
 
-    if (ucafs_mod_send(msg_type, &xdrs, &rsp, &code) || code) {
+    if (ucafs_mod_send(msg_type, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
     /* read the response */
-    if (!xdr_string(rsp, shadow_name, UCAFS_FNAME_MAX)) {
+    xdr_reply = &reply->xdrs;
+    if (!xdr_string(xdr_reply, shadow_name, UCAFS_FNAME_MAX)) {
         ERROR("parsing shadow_name failed");
         goto out;
     }
@@ -214,8 +217,8 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
 out:
     kfree(path);
 
-    if (rsp) {
-        kfree(rsp);
+    if (reply) {
+        kfree(reply);
     }
 
     return ret;
@@ -252,23 +255,110 @@ ucafs_kern_remove(struct vcache * avc,
 }
 
 int
-ucafs_kern_symlink(struct vcache * avc,
-                   char * name,
-                   ucafs_entry_type type,
-                   char ** shadow_name)
+ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest)
 {
-    return __ucafs_parent_aname_req(UCAFS_MSG_SYMLINK, avc, name, type,
-                                    shadow_name);
+    int ret = -1, code;
+    char * from_path = NULL;
+    caddr_t payload;
+    XDR xdrs, * xdr_reply;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_dentry_path(dp, &from_path)) {
+        goto out;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        kfree(from_path);
+        return -1;
+    }
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX) ||
+        !xdr_string(&xdrs, &target, UCAFS_FNAME_MAX)) {
+        ERROR("xdr hardlink failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_SYMLINK, &xdrs, &reply, &code) || code) {
+        goto out;
+    }
+
+    xdr_reply = &reply->xdrs;
+    if (!xdr_string(xdr_reply, dest, UCAFS_FNAME_MAX)) {
+        ERROR("parsing hardlink name failed\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (reply) {
+        kfree(reply);
+    }
+
+    if (from_path) {
+        kfree(from_path);
+    }
+
+    return ret;
 }
 
 int
-ucafs_kern_hardlink(struct vcache * avc,
-                    char * name,
-                    ucafs_entry_type type,
-                    char ** shadow_name)
+ucafs_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest)
 {
-    return __ucafs_parent_aname_req(UCAFS_MSG_HARDLINK, avc, name, type,
-                                    shadow_name);
+    int ret = -1, code;
+    char *from_path = NULL, *to_path = NULL;
+    caddr_t payload;
+    XDR xdrs, *xdr_reply;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_dentry_path(olddp, &from_path) ||
+        ucafs_dentry_path(newdp, &to_path)) {
+        goto out;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        kfree(from_path);
+        kfree(to_path);
+
+        return -1;
+    }
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX) ||
+        !xdr_string(&xdrs, &to_path, UCAFS_PATH_MAX)) {
+        ERROR("xdr hardlink failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_HARDLINK, &xdrs, &reply, &code) || code) {
+        goto out;
+    }
+
+    xdr_reply = &reply->xdrs;
+    if (!xdr_string(xdr_reply, dest, UCAFS_FNAME_MAX)) {
+        ERROR("parsing hardlink name failed\n");
+        goto out;
+    }
+
+    ERROR("hardlink got; %p vs %p\n", *dest, xdr_reply);
+
+    ret = 0;
+out:
+    if (from_path) {
+        kfree(from_path);
+    }
+
+    if (to_path) {
+        kfree(to_path);
+    }
+
+    if (reply) {
+        kfree(reply);
+    }
+
+    return ret;
 }
 
 int
@@ -278,7 +368,8 @@ ucafs_kern_filldir(char * parent_dir,
                    char ** real_name)
 {
     int err = -1, code;
-    XDR xdrs, *rsp = NULL;
+    XDR xdrs, *xdr_reply;
+    reply_data_t * reply = NULL;
     caddr_t payload;
 
     if ((payload = READPTR_LOCK()) == 0) {
@@ -296,21 +387,88 @@ ucafs_kern_filldir(char * parent_dir,
     }
 
     /* send eveything */
-    if (ucafs_mod_send(UCAFS_MSG_FILLDIR, &xdrs, &rsp, &code) || code) {
+    if (ucafs_mod_send(UCAFS_MSG_FILLDIR, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
     /* read the response */
-    if (!xdr_string(rsp, real_name, UCAFS_FNAME_MAX)) {
-        ERROR("parsing shadow_name failed");
+    xdr_reply = &reply->xdrs;
+    if (!xdr_string(xdr_reply, real_name, UCAFS_FNAME_MAX)) {
+        ERROR("parsing shadow_name failed\n");
         goto out;
     }
 
     err = 0;
 out:
-    if (rsp) {
-        kfree(rsp);
+    if (reply) {
+        kfree(reply);
     }
 
     return err;
+}
+
+int
+ucafs_kern_rename(struct vcache * from_vnode,
+                  char * oldname,
+                  struct vcache * to_vnode,
+                  char * newname,
+                  char ** old_shadowname,
+                  char ** new_shadowname)
+{
+    int ret = -1, code;
+    char *from_path = NULL, *to_path = NULL;
+    caddr_t payload;
+    XDR xdrs, *xdr_reply;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_vnode_path(from_vnode, &from_path) ||
+        ucafs_vnode_path(to_vnode, &to_path)) {
+        goto out;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        return -1;
+    }
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX) ||
+        !xdr_string(&xdrs, &oldname, UCAFS_FNAME_MAX) ||
+        !xdr_string(&xdrs, &to_path, UCAFS_PATH_MAX) ||
+        !xdr_string(&xdrs, &newname, UCAFS_FNAME_MAX)) {
+        ERROR("xdr rename failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_RENAME, &xdrs, &reply, &code) || code) {
+        goto out;
+    }
+
+    xdr_reply = &reply->xdrs;
+    if (!xdr_string(xdr_reply, old_shadowname, UCAFS_FNAME_MAX) ||
+        !xdr_string(xdr_reply, new_shadowname, UCAFS_FNAME_MAX)) {
+        ERROR("parsing rename response failed\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (from_path) {
+        kfree(from_path);
+    }
+
+    if (to_path) {
+        kfree(to_path);
+    }
+
+    if (reply) {
+        kfree(reply);
+    }
+
+    if (ret && *old_shadowname) {
+        kfree(*old_shadowname);
+        *old_shadowname = NULL;
+    }
+
+    return ret;
 }

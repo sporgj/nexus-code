@@ -16,3 +16,6 @@ uc_rpc_symlink(XDR * xdrs, XDR * rsp);
 
 int
 uc_rpc_hardlink(XDR * xdrs, XDR * rsp);
+
+int
+uc_rpc_rename(XDR * xdrs, XDR * rsp);

@@ -39,21 +39,15 @@ ucafs_kern_filldir(char * parent_dir,
                    char ** real_name);
 
 int
-ucafs_kern_symlink(char * parent_dir,
-                   char * real_name,
-                   ucafs_entry_type type,
-                   char ** shadow_name);
-
-int
-ucafs_kern_hardlink(char * parent_dir,
-                    char * real_name,
-                    ucafs_entry_type type,
-                    char ** shadow_name);
-
-int
-ucafs_kern_rename(struct vcache * from_dir,
-                  char * from_name,
-                  struct vcache * to_dir,
-                  char * to_name,
+ucafs_kern_rename(struct vcache * from_vnode,
+                  char * oldname,
+                  struct vcache * to_vnode,
+                  char * newname,
                   char ** old_shadowname,
                   char ** new_shadowname);
+
+int
+ucafs_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest);
+
+int
+ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest);
