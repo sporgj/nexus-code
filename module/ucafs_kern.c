@@ -140,7 +140,7 @@ void
 ucafs_kern_ping(void)
 {
     static int num = 0;
-    int err;
+    int err, code;
     XDR xdrs, *rsp = NULL;
     caddr_t payload;
 
@@ -159,7 +159,7 @@ ucafs_kern_ping(void)
     num++;
 
     /* send eveything */
-    if (ucafs_mod_send(UCAFS_MSG_PING, &xdrs, &rsp)) {
+    if (ucafs_mod_send(UCAFS_MSG_PING, &xdrs, &rsp, &code) || code) {
         num--;
         goto out;
     }
@@ -171,50 +171,14 @@ out:
     }
 }
 
-int
-ucafs_kern_filldir(char * parent_dir, char * shadow_name, char ** real_name)
+static int
+__ucafs_parent_aname_req(uc_msg_type_t msg_type,
+                         struct vcache * avc,
+                         char * name,
+                         ucafs_entry_type type,
+                         char ** shadow_name)
 {
-    int err;
-    XDR xdrs, *rsp = NULL;
-    caddr_t payload;
-
-    if ((payload = READPTR_LOCK()) == 0) {
-        return -1;
-    }
-
-    /* create the XDR object */
-    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
-    if (!(xdr_string(&xdrs, &parent_dir, UCAFS_PATH_MAX)) ||
-        !(xdr_string(&xdrs, &shadow_name, UCAFS_FNAME_MAX))) {
-        ERROR("xdr filldir failed\n");
-        READPTR_UNLOCK();
-        goto out;
-    }
-
-    /* send eveything */
-    if (ucafs_mod_send(UCAFS_MSG_FILLDIR, &xdrs, &rsp)) {
-        printk(KERN_INFO "filldir failure\n");
-        goto out;
-    }
-
-    printk(KERN_INFO "Got a response\n");
-
-    err = 0;
-out:
-    if (rsp) {
-        kfree(rsp);
-    }
-
-    return err;
-}
-
-int
-ucafs_kern_create(struct vcache * avc,
-                  char * name,
-                  ucafs_entry_type type,
-                  char ** shadow_name)
-{
-    int ret, err;
+    int ret = -1, code;
     XDR xdrs, *rsp = NULL;
     caddr_t payload;
     char * path;
@@ -236,18 +200,117 @@ ucafs_kern_create(struct vcache * avc,
         goto out;
     }
 
-    if (ucafs_mod_send(UCAFS_MSG_CREATE, &xdrs, &rsp)) {
+    if (ucafs_mod_send(msg_type, &xdrs, &rsp, &code) || code) {
         goto out;
     }
 
     /* read the response */
-    // TODO
+    if (!xdr_string(rsp, shadow_name, UCAFS_FNAME_MAX)) {
+        ERROR("parsing shadow_name failed");
+        goto out;
+    }
 
     ret = 0;
 out:
     kfree(path);
+
     if (rsp) {
         kfree(rsp);
     }
+
     return ret;
+}
+
+int
+ucafs_kern_create(struct vcache * avc,
+                  char * name,
+                  ucafs_entry_type type,
+                  char ** shadow_name)
+{
+    return __ucafs_parent_aname_req(UCAFS_MSG_CREATE, avc, name, type,
+                                    shadow_name);
+}
+
+int
+ucafs_kern_lookup(struct vcache * avc,
+                  char * name,
+                  ucafs_entry_type type,
+                  char ** shadow_name)
+{
+    return __ucafs_parent_aname_req(UCAFS_MSG_LOOKUP, avc, name, type,
+                                    shadow_name);
+}
+
+int
+ucafs_kern_remove(struct vcache * avc,
+                  char * name,
+                  ucafs_entry_type type,
+                  char ** shadow_name)
+{
+    return __ucafs_parent_aname_req(UCAFS_MSG_REMOVE, avc, name, type,
+                                    shadow_name);
+}
+
+int
+ucafs_kern_symlink(struct vcache * avc,
+                   char * name,
+                   ucafs_entry_type type,
+                   char ** shadow_name)
+{
+    return __ucafs_parent_aname_req(UCAFS_MSG_SYMLINK, avc, name, type,
+                                    shadow_name);
+}
+
+int
+ucafs_kern_hardlink(struct vcache * avc,
+                    char * name,
+                    ucafs_entry_type type,
+                    char ** shadow_name)
+{
+    return __ucafs_parent_aname_req(UCAFS_MSG_HARDLINK, avc, name, type,
+                                    shadow_name);
+}
+
+int
+ucafs_kern_filldir(char * parent_dir,
+                   char * shadow_name,
+                   ucafs_entry_type type,
+                   char ** real_name)
+{
+    int err = -1, code;
+    XDR xdrs, *rsp = NULL;
+    caddr_t payload;
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        return -1;
+    }
+
+    /* create the XDR object */
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!(xdr_string(&xdrs, &parent_dir, UCAFS_PATH_MAX)) ||
+        !(xdr_string(&xdrs, &shadow_name, UCAFS_FNAME_MAX)) ||
+        !xdr_int(&xdrs, (int *)&type)) {
+        ERROR("xdr filldir failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    /* send eveything */
+    if (ucafs_mod_send(UCAFS_MSG_FILLDIR, &xdrs, &rsp, &code) || code) {
+        goto out;
+    }
+
+    /* read the response */
+    if (!xdr_string(rsp, real_name, UCAFS_FNAME_MAX)) {
+        ERROR("parsing shadow_name failed");
+        goto out;
+    }
+
+    err = 0;
+out:
+    if (rsp) {
+        kfree(rsp);
+    }
+
+    return err;
 }

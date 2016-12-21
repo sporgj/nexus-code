@@ -1,6 +1,6 @@
-#include <string.h>
-#include <stdio.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "third/slog.h"
@@ -103,13 +103,13 @@ dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
 
     if ((fname = do_get_fname(fpath)) == NULL) {
         slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
-        return AFSX_STATUS_NOOP;
+        return UC_STATUS_NOOP;
     }
 
     if ((dir_path = do_get_dir(fpath)) == NULL) {
         slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
         sdsfree(fname);
-        return AFSX_STATUS_NOOP;
+        return UC_STATUS_NOOP;
     }
 
     error = dirops_new1(dir_path, fname, type, encoded_name_dest);
@@ -119,10 +119,9 @@ out:
     return error;
 }
 
-
 int
-dirops_code2plain(char * encoded_name,
-                  char * dir_path,
+dirops_code2plain(const char * dir_path,
+                  const char * encoded_name,
                   ucafs_entry_type type,
                   char ** raw_name_dest)
 {
@@ -143,7 +142,7 @@ dirops_code2plain(char * encoded_name,
     }
 
     // 3 - Get the plain filename
-    if ((result = dirnode_enc2raw(dn, fname_code, type, &atype)) == NULL) {
+    if ((result = dirnode_enc2raw(dn, fname_code, UC_ANY, &atype)) == NULL) {
         goto out;
     }
 
@@ -166,7 +165,7 @@ dirops_move(const char * from_dir,
             char ** ptr_oldname,
             char ** ptr_newname)
 {
-    int error = AFSX_STATUS_NOOP;
+    int error = UC_STATUS_NOOP;
     ucafs_entry_type atype;
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
@@ -188,31 +187,30 @@ dirops_move(const char * from_dir,
         return -1;
     }
 
-    // XXX future versions should check if the entries are 
+    // XXX future versions should check if the entries are
     // directories before removing them
     dcache_rm(dirnode1, oldname);
     dcache_rm(dirnode2, newname);
 
     if (dirnode_equals(dirnode1, dirnode2)) {
-        if (dirnode_rename(dirnode1, oldname, newname, type, &atype, &shadow1_bin,
-                           &shadow2_bin, &link_info1, &link_info2)) {
-            slog(0, SLOG_ERROR, "rename (%s) %s -> %s FAILED",
-                 from_dir, oldname, newname);
+        if (dirnode_rename(dirnode1, oldname, newname, type, &atype,
+                           &shadow1_bin, &shadow2_bin, &link_info1,
+                           &link_info2)) {
+            slog(0, SLOG_ERROR, "rename (%s) %s -> %s FAILED", from_dir,
+                 oldname, newname);
             goto out;
         }
 
         /* now write out the dirnode object */
         if (!dirnode_flush(dirnode1)) {
-            slog(0, SLOG_ERROR, "flushing dirnode (%s) FAILED",
-                 from_dir);
+            slog(0, SLOG_ERROR, "flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
     } else {
         /* get the shadow names */
         shadow1_bin = dirnode_rm(dirnode1, oldname, type, &atype, &link_info1);
         if (shadow1_bin == NULL) {
-            slog(0, SLOG_ERROR, "finding '%s' failed",
-                 oldname);
+            slog(0, SLOG_ERROR, "finding '%s' failed", oldname);
             goto out;
         }
 
@@ -257,8 +255,8 @@ dirops_move(const char * from_dir,
             goto out;
         }
     } else {
-        slog(0, SLOG_INFO, "renaming link (%s) %s -> %s", from_dir,
-             oldname, newname);
+        slog(0, SLOG_INFO, "renaming link (%s) %s -> %s", from_dir, oldname,
+             newname);
     }
 
     /* update the parent directory */
@@ -331,7 +329,7 @@ dirops_move1(const char * from_fpath,
              char ** ptr_oldname,
              char ** ptr_newname)
 {
-    int error = AFSX_STATUS_ERROR;
+    int error = UC_STATUS_ERROR;
     sds fname1 = NULL, fname2 = NULL, path1 = NULL, path2 = NULL;
 
     if ((fname1 = do_get_fname(from_fpath)) == NULL) {
@@ -370,7 +368,7 @@ dirops_symlink(const char * link_path,
                const char * target_path,
                char ** shadow_name_dest)
 {
-    int error = AFSX_STATUS_NOOP, len, link_info_len;
+    int error = UC_STATUS_NOOP, len, link_info_len;
     link_info_t * link_info = NULL;
     uc_dirnode_t * link_dnode = NULL;
     shadow_t * shadow_name2 = NULL;
@@ -446,7 +444,7 @@ dirops_hardlink(const char * target_path,
                 const char * link_path,
                 char ** shadow_name_dest)
 {
-    int error = AFSX_STATUS_NOOP, len, link_info_len;
+    int error = UC_STATUS_NOOP, len, link_info_len;
     char * fname = NULL;
     uc_filebox_t * target_fbox = NULL;
     uc_dirnode_t *target_dnode = NULL, *link_dnode = NULL;
@@ -558,27 +556,47 @@ dirops_plain2code(const char * fpath_raw,
                   ucafs_entry_type type,
                   char ** encoded_fname_dest)
 {
-    int error = -1; // TODO
-    sds fname = NULL;
-    const shadow_t * fname_code = NULL;
-    ucafs_entry_type atype;
-    sds dnode_path = NULL;
-
-    /* 1 - Get the corresponding dirnode */
-    uc_dirnode_t * dirnode = dcache_lookup(fpath_raw, false);
-    if (dirnode == NULL) {
-        return error;
-    }
+    int ret;
+    sds fname, dir_path;
 
     if ((fname = do_get_fname(fpath_raw)) == NULL) {
-        slog(0, SLOG_ERROR, "Could not get fname: %s", fpath_raw);
-        goto out;
+        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        return UC_STATUS_NOOP;
+    }
+
+    if ((dir_path = do_get_dir(fpath_raw)) == NULL) {
+        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        sdsfree(fname);
+        return UC_STATUS_NOOP;
+    }
+
+    ret = dirops_plain2code1(dir_path, fname, type, encoded_fname_dest);
+
+    sdsfree(fname);
+    sdsfree(dir_path);
+    return ret;
+}
+
+int
+dirops_plain2code1(const char * parent_path,
+                   const char * fname,
+                   ucafs_entry_type type,
+                   char ** encoded_fname_dest)
+{
+    int error = -1; // TODO
+    const shadow_t * fname_code = NULL;
+    ucafs_entry_type atype;
+
+    /* 1 - Get the corresponding dirnode */
+    uc_dirnode_t * dirnode = dcache_lookup(parent_path, true);
+    if (dirnode == NULL) {
+        return error;
     }
 
     /* Perform the operation */
     fname_code = dirnode_raw2enc(dirnode, fname, type, &atype);
     if (fname_code == NULL) {
-        slog(0, SLOG_WARN, "%s not found (%s)", fname, fpath_raw);
+        slog(0, SLOG_WARN, "%s not found (%s)", fname, parent_path);
         goto out;
     }
 
@@ -586,10 +604,6 @@ dirops_plain2code(const char * fpath_raw,
     error = 0;
 out:
     dcache_put(dirnode);
-    if (fname)
-        sdsfree(fname);
-    if (dnode_path)
-        sdsfree(dnode_path);
     return error;
 }
 
@@ -669,21 +683,42 @@ dirops_remove(const char * fpath_raw,
               ucafs_entry_type type,
               char ** encoded_fname_dest)
 {
-    int error = AFSX_STATUS_ERROR;
+    int error = -1;
+    sds fname = NULL, dir_path = NULL;
+
+    if ((fname = do_get_fname(fpath_raw)) == NULL) {
+        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        return UC_STATUS_NOOP;
+    }
+
+    if ((dir_path = do_get_dir(fpath_raw)) == NULL) {
+        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        sdsfree(fname);
+        return UC_STATUS_NOOP;
+    }
+
+    error = dirops_remove1(dir_path, fname, type, encoded_fname_dest);
+
+    sdsfree(fname);
+    sdsfree(dir_path);
+    return error;
+}
+
+int
+dirops_remove1(const char * parent_dir,
+               const char * fname,
+               ucafs_entry_type type,
+               char ** encoded_fname_dest)
+{
+    int error = UC_STATUS_ERROR;
     link_info_t * link_info = NULL;
     shadow_t * shadow_name = NULL;
     uc_dirnode_t * dirnode = NULL;
-    sds fname = NULL, path = NULL;
     ucafs_entry_type atype;
 
-    if ((dirnode = dcache_lookup(fpath_raw, false)) == NULL) {
-        slog(0, SLOG_ERROR, "dirnode (%s) not found", fpath_raw);
+    if ((dirnode = dcache_lookup(parent_dir, true)) == NULL) {
+        slog(0, SLOG_ERROR, "dirnode (%s) not found", parent_dir);
         return error;
-    }
-
-    if ((fname = do_get_fname(fpath_raw)) == NULL) {
-        slog(0, SLOG_ERROR, "getting fname (%s) failed", fpath_raw);
-        goto out;
     }
 
     /* update the dcache */
@@ -698,7 +733,7 @@ dirops_remove(const char * fpath_raw,
 
     /* write the dirnode containing the file entry */
     if (!dirnode_flush(dirnode)) {
-        slog(0, SLOG_ERROR, "flushing dirnode (%s) failed", fpath_raw);
+        slog(0, SLOG_ERROR, "flushing dirnode (%s) failed", parent_dir);
         goto out;
     }
 
@@ -716,14 +751,6 @@ dirops_remove(const char * fpath_raw,
     error = 0;
 out:
     dcache_put(dirnode);
-
-    if (fname) {
-        sdsfree(fname);
-    }
-
-    if (path) {
-        sdsfree(path);
-    }
 
     if (shadow_name) {
         free(shadow_name);

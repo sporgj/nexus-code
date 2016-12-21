@@ -1,5 +1,8 @@
 #include "ucafs_mod.h"
 
+#undef ERROR
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs_mod: " fmt, ##args)
+
 static struct ucafs_mod ucafs_m_device;
 struct ucafs_mod * dev = &ucafs_m_device;
 
@@ -23,7 +26,7 @@ ucafs_m_open(struct inode * inode, struct file * fp)
         return -EBUSY;
     }
 
-    dev->daemon_pid = current->pid;
+    dev->daemon = current;
     fp->private_data = dev;
 
     return 0;
@@ -33,7 +36,7 @@ static int
 ucafs_m_release(struct inode * inode, struct file * fp)
 {
     mutex_lock_interruptible(&dev->mut);
-    dev->daemon_pid = 0;
+    dev->daemon = NULL;
     atomic_inc(&ucafs_m_available);
     mutex_unlock(&dev->mut);
 
@@ -108,7 +111,6 @@ ucafs_m_write(struct file * fp,
               size_t count,
               loff_t * f_pos)
 {
-    ucrpc_msg_t * p_msg;
     if (mutex_lock_interruptible(&dev->mut)) {
         return -ERESTARTSYS;
     }
@@ -131,9 +133,7 @@ ucafs_m_write(struct file * fp,
         return -EFAULT;
     }
 
-    p_msg = (ucrpc_msg_t *)dev->inb;
-
-    printk(KERN_INFO "read %zu bytes, ack_id=%d\n", count, p_msg->ack_id);
+    printk(KERN_INFO "read %zu bytes\n", count);
 
     dev->avail_write -= count;
 
@@ -148,18 +148,20 @@ typedef struct {
 } xdr_data_t;
 
 int
-ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
+ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp, int * p_err)
 {
     mid_t id;
-    XDR * rsp;
     xdr_data_t * rsp_data;
     ucrpc_msg_t * msg;
     int err = -1, msg_len = (xdrs->x_private - xdrs->x_base);
+    *p_err = -1;
 
-    if (dev->daemon_pid == 0) {
+    if (UCAFS_IS_OFFLINE) {
         mutex_unlock(&dev->mut);
         return -1;
     }
+
+    RX_AFS_GUNLOCK();
 
     /* send the message */
     msg = (ucrpc_msg_t *)dev->outb;
@@ -171,9 +173,9 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
 
     while (1) {
         DEFINE_WAIT(wait);
-        if (dev->daemon_pid == 0) {
+        if (UCAFS_IS_OFFLINE) {
             printk(KERN_ERR "process is offline :(");
-            break;
+            goto out;
         }
 
         mutex_unlock(&dev->mut);
@@ -182,6 +184,7 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
         /* sleep the kernel thread */
         prepare_to_wait(&dev->kq, &wait, TASK_INTERRUPTIBLE);
 
+        /* the buffer is "empty", nothing to read */
         if (dev->avail_write == dev->buffersize) {
             schedule();
         }
@@ -191,7 +194,7 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
         /* now read the buffer */
         if (mutex_lock_interruptible(&dev->mut)) {
             printk(KERN_ERR "mutex_lock_interruptible failed\n");
-            return -1;
+            goto out;
         }
 
         msg = (ucrpc_msg_t *)dev->inb;
@@ -199,7 +202,7 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
             dev->avail_write += MSG_SIZE(msg);
 
             /* allocate the response data */
-            rsp_data = kmalloc(sizeof(xdr_data_t) + msg->len, GFP_KERNEL);
+            rsp_data = kmalloc(sizeof(xdr_data_t) + msg->len + 1, GFP_KERNEL);
             if (rsp_data == NULL) {
                 *p_err = msg->status;
                 *pp_rsp = NULL;
@@ -212,7 +215,7 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
             xdrmem_create(&rsp_data->xdrs, rsp_data->data, msg->len, XDR_DECODE);
 
             *p_err = msg->status;
-            *pp_rsp = rsp;
+            *pp_rsp = &rsp_data->xdrs;
 
             err = 0;
             break;
@@ -220,6 +223,7 @@ ucafs_mod_send(uc_msg_type_t type, XDR * xdrs, XDR ** pp_rsp)
     }
 
 out:
+    RX_AFS_GLOCK();
     mutex_unlock(&dev->mut);
     return err;
 }
@@ -227,8 +231,8 @@ out:
 static int
 ucafs_p_show(struct seq_file * sf, void * v)
 {
-    if (dev->daemon_pid) {
-        seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon_pid);
+    if (dev->daemon == NULL) {
+        seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon->pid);
     } else {
         seq_printf(sf, "daemon offline :(\n");
     }

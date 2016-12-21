@@ -1,0 +1,424 @@
+diff --git a/src/afs/LINUX/osi_module.c b/src/afs/LINUX/osi_module.c
+index 0b34f1a..87402a7 100644
+--- a/src/afs/LINUX/osi_module.c
++++ b/src/afs/LINUX/osi_module.c
+@@ -33,6 +33,8 @@
+ 
+ #include "osi_pagecopy.h"
+ 
++#include "afs/ucafs_mod.h"
++
+ extern struct file_system_type afs_fs_type;
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
+@@ -90,6 +92,8 @@ afs_init(void)
+     osi_ioctl_init();
+     afs_init_pagecopy();
+ 
++    ucafs_mod_init();
++
+     return 0;
+ }
+ 
+diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
+index 1b99c94..9e9e89e 100644
+--- a/src/afs/LINUX/osi_vnodeops.c
++++ b/src/afs/LINUX/osi_vnodeops.c
+@@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+     afs_size_t origOffset, tlen;
+     cred_t *credp = crref();
+     struct afs_fakestat_state fakestat;
++    /* ucafs code */
++    char * ucafs_path = NULL, * uc_name = NULL, * real_name = NULL;
++    int is_ucafs_file, uc_len, uc_offset;
+ 
+     AFS_GLOCK();
+     AFS_STATCNT(afs_readdir);
+@@ -383,6 +386,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+ #else
+     offset = (int) fp->f_pos;
+ #endif
++    /* ucafs code */
++    ucafs_vnode_path(avc, &ucafs_path);
++    uc_offset = offset;
+     while (1) {
+ 	dirpos = BlobScan(tdc, offset);
+ 	if (!dirpos)
+@@ -400,6 +406,11 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+ 	                    ntohl(de->fid.vnode));
+ 	len = strlen(de->name);
+ 
++	/* ucafs code */
++	uc_name = de->name;
++	uc_len = len;
++	is_ucafs_file = 0;
++
+ 	/* filldir returns -EINVAL when the buffer is full. */
+ 	{
+ 	    unsigned int type = DT_UNKNOWN;
+@@ -431,18 +442,40 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+ 		/* clean up from afs_FindVCache */
+ 		afs_PutVCache(tvc);
+ 	    }
++	    /* ucafs code */
++	    if (ucafs_path) {
++		ucafs_entry_type uc_type = UC_ANY;
++
++		if (type == DT_REG) {
++		    uc_type = UC_FILE;
++		} else if (type == DT_DIR) {
++		    uc_type = UC_DIR;
++		}
++
++		if ((uc_name[0] == '.' && uc_name[1] == '\0') ||
++			(uc_name[0] == '.' && uc_name[1] == '.' && uc_name[2] == '\0')) {
++		    goto skip;
++		}
++
++		if (ucafs_kern_filldir(ucafs_path, uc_name, uc_type, &real_name) == 0) {
++		    is_ucafs_file = 1;
++		    uc_name = real_name;
++		    uc_len = strlen(uc_name);
++		}
++	    }
+ 	    /*
+ 	     * If this is NFS readdirplus, then the filler is going to
+ 	     * call getattr on this inode, which will deadlock if we're
+ 	     * holding the GLOCK.
+ 	     */
++skip:
+ 	    AFS_GUNLOCK();
+ #if defined(STRUCT_FILE_OPERATIONS_HAS_ITERATE)
+ 	    /* dir_emit returns a bool - true when it succeeds.
+ 	     * Inverse the result to fit with how we check "code" */
+-	    code = !dir_emit(ctx, de->name, len, ino, type);
++	    code = !dir_emit(ctx, uc_name, uc_len, ino, type);
+ #else
+-	    code = (*filldir) (dirbuf, de->name, len, offset, ino, type);
++	    code = (*filldir) (dirbuf, uc_name, uc_len, uc_offset, ino, type);
+ #endif
+ 	    AFS_GLOCK();
+ 	}
+@@ -450,6 +483,12 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+ 	if (code)
+ 	    break;
+ 	offset = dirpos + 1 + ((len + 16) >> 5);
++	/* ucafs code */
++	uc_offset = dirpos + 1 + ((uc_len + 16) >> 5);
++	if (is_ucafs_file) {
++	    kfree(uc_name);
++	    real_name = NULL;
++	}
+     }
+     /* If filldir didn't fill in the last one this is still pointing to that
+      * last attempt.
+@@ -475,6 +514,10 @@ out:
+     afs_DestroyReq(treq);
+ out1:
+     AFS_GUNLOCK();
++    /* ucafs code */
++    if (ucafs_path) {
++	kfree(ucafs_path);
++    }
+     return code;
+ }
+ 
+diff --git a/src/afs/VNOPS/afs_vnop_create.c b/src/afs/VNOPS/afs_vnop_create.c
+index f33da96..d9cb9dd 100644
+--- a/src/afs/VNOPS/afs_vnop_create.c
++++ b/src/afs/VNOPS/afs_vnop_create.c
+@@ -58,6 +58,9 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     struct afs_fakestat_state fakestate;
+     struct rx_connection *rxconn;
+     XSTATS_DECLS;
++    /* ucafs code */
++    char * shadow_name = NULL;
++    int is_ucafs_file = 0;
+     OSI_VC_CONVERT(adp);
+ 
+     AFS_STATCNT(afs_create);
+@@ -299,6 +302,12 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+ 
+     if (!AFS_IS_DISCONNECTED) {
+ 	/* If not disconnected, connect to the server.*/
++	if (ucafs_kern_create(adp, aname, UC_FILE, &shadow_name) == 0) {
++	    is_ucafs_file = 1;
++	} else {
++	    is_ucafs_file = 0;
++	    shadow_name = aname;
++	}
+ 
+     	InStatus.UnixModeBits = attrs->va_mode & 0xffff;	/* only care about protection bits */
+     	do {
+@@ -310,7 +319,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+ 	    	RX_AFS_GUNLOCK();
+ 	    	code =
+ 		    RXAFS_CreateFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
+-				 aname, &InStatus, (struct AFSFid *)
++				 shadow_name, &InStatus, (struct AFSFid *)
+ 				 &newFid.Fid, OutFidStatus, OutDirStatus,
+ 				 &CallBack, &tsync);
+ 	    	RX_AFS_GLOCK();
+@@ -379,7 +388,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, OutDirStatus, 1)) {
+ 	/* we can do it locally */
+ 	ObtainWriteLock(&afs_xdcache, 291);
+-	code = afs_dir_Create(tdc, aname, &newFid.Fid);
++	code = afs_dir_Create(tdc, shadow_name, &newFid.Fid);
+ 	ReleaseWriteLock(&afs_xdcache);
+ 	if (code) {
+ 	    ZapDCE(tdc);
+@@ -503,6 +512,10 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     afs_DestroyReq(treq);
+ 
+   done2:
++    /* ucafs code */
++    if (is_ucafs_file) {
++	kfree(shadow_name);
++    }
+     osi_FreeSmallSpace(OutFidStatus);
+     osi_FreeSmallSpace(OutDirStatus);
+     return code;
+diff --git a/src/afs/VNOPS/afs_vnop_dirops.c b/src/afs/VNOPS/afs_vnop_dirops.c
+index 33455cb..c22d8bf 100644
+--- a/src/afs/VNOPS/afs_vnop_dirops.c
++++ b/src/afs/VNOPS/afs_vnop_dirops.c
+@@ -52,6 +52,9 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     struct AFSVolSync tsync;
+     afs_int32 now;
+     struct afs_fakestat_state fakestate;
++    /* ucafs code */
++    int is_ucafs_file = 0;
++    char * shadow_name = NULL;
+     XSTATS_DECLS;
+     OSI_VC_CONVERT(adp);
+ 
+@@ -107,6 +110,13 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     ObtainWriteLock(&adp->lock, 153);
+ 
+     if (!AFS_IS_DISCON_RW) {
++	if (ucafs_kern_create(adp, aname, UC_DIR, &shadow_name) == 0) {
++	    is_ucafs_file = 1;
++	} else {
++	    is_ucafs_file = 0;
++	    shadow_name = aname;
++	}
++
+     	do {
+ 	    tc = afs_Conn(&adp->f.fid, treq, SHARED_LOCK, &rxconn);
+ 	    if (tc) {
+@@ -116,7 +126,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+ 	    	code =
+ 		    RXAFS_MakeDir(rxconn,
+ 		    		(struct AFSFid *)&adp->f.fid.Fid,
+-				aname,
++				shadow_name,
+ 				&InStatus,
+ 				(struct AFSFid *)&newFid.Fid,
+ 				OutFidStatus,
+@@ -170,7 +180,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, OutDirStatus, 1)) {
+ 	/* we can do it locally */
+ 	ObtainWriteLock(&afs_xdcache, 294);
+-	code = afs_dir_Create(tdc, aname, &newFid.Fid);
++	code = afs_dir_Create(tdc, shadow_name, &newFid.Fid);
+ 	ReleaseWriteLock(&afs_xdcache);
+ 	if (code) {
+ 	    ZapDCE(tdc);	/* surprise error -- use invalid value */
+@@ -247,6 +257,10 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
+     code = afs_CheckCode(code, treq, 26);
+     afs_DestroyReq(treq);
+   done2:
++    if (is_ucafs_file) {
++	kfree(shadow_name);
++    }
++
+     osi_FreeSmallSpace(OutFidStatus);
+     osi_FreeSmallSpace(OutDirStatus);
+     return code;
+@@ -272,7 +286,10 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
+     struct AFSVolSync tsync;
+     struct afs_fakestat_state fakestate;
+     struct rx_connection *rxconn;
+-    XSTATS_DECLS;
++    XSTATS_DECLS
++    /* ucafs code */
++    char * ucafs_name = NULL;
++    int is_ucafs_file = 0;;
+     OSI_VC_CONVERT(adp);
+ 
+     AFS_STATCNT(afs_rmdir);
+@@ -340,6 +357,14 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
+ 
+     if (!AFS_IS_DISCON_RW) {
+ 	/* Not disconnected, can connect to server. */
++
++	/* ucafs code */
++	if (ucafs_kern_remove(adp, aname, UC_ANY, &ucafs_name) == 0) {
++	    is_ucafs_file = 1;
++	} else {
++	    ucafs_name = aname;
++	}
++
+     	do {
+ 	    tc = afs_Conn(&adp->f.fid, treq, SHARED_LOCK, &rxconn);
+ 	    if (tc) {
+@@ -479,5 +504,8 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
+     code = afs_CheckCode(code, treq, 27);
+     afs_DestroyReq(treq);
+   done2:
++    if (is_ucafs_file) {
++	kfree(ucafs_name);
++    }
+     return code;
+ }
+diff --git a/src/afs/VNOPS/afs_vnop_lookup.c b/src/afs/VNOPS/afs_vnop_lookup.c
+index d8205b6..56509c7 100644
+--- a/src/afs/VNOPS/afs_vnop_lookup.c
++++ b/src/afs/VNOPS/afs_vnop_lookup.c
+@@ -1390,6 +1390,10 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
+     int dynrootRetry = 1;
+     struct afs_fakestat_state fakestate;
+     int tryEvalOnly = 0;
++    /* ucafs code */
++    char * ucafs_name = NULL;
++    int is_ucafs_file = 0;
++
+     OSI_VC_CONVERT(adp);
+ 
+     AFS_STATCNT(afs_lookup);
+@@ -1680,12 +1684,24 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
+ 	 */
+ 	/* above now implemented by Check_AtSys and Next_AtSys */
+ 
++	/* ucafs code */
++	if (ucafs_kern_lookup(adp, aname, UC_ANY, &ucafs_name) == 0) {
++	    is_ucafs_file = 1;
++	} else {
++	    is_ucafs_file = 0;
++	    ucafs_name = sysState.name;
++	}
++
+ 	/* lookup the name in the appropriate dir, and return a cache entry
+ 	 * on the resulting fid */
+ 	code =
+-	    afs_dir_LookupOffset(tdc, sysState.name, &tfid.Fid,
++	    afs_dir_LookupOffset(tdc, ucafs_name, &tfid.Fid,
+ 				 &dirCookie);
+ 
++	if (is_ucafs_file) {
++	    kfree(ucafs_name);
++	}
++
+ 	/* If the first lookup doesn't succeed, maybe it's got @sys in the name */
+ 	while (code == ENOENT && Next_AtSys(adp, treq, &sysState))
+ 	    code =
+diff --git a/src/afs/VNOPS/afs_vnop_remove.c b/src/afs/VNOPS/afs_vnop_remove.c
+index 3e62781..5eb6b2c 100644
+--- a/src/afs/VNOPS/afs_vnop_remove.c
++++ b/src/afs/VNOPS/afs_vnop_remove.c
+@@ -63,15 +63,25 @@ afsremove(struct vcache *adp, struct dcache *tdc,
+     struct AFSVolSync tsync;
+     struct rx_connection *rxconn;
+     XSTATS_DECLS;
++    /* ucafs code */
++    char * ucafs_name = NULL;
++    int is_ucafs_file = 0;
++
+     if (!AFS_IS_DISCONNECTED) {
+         do {
++	    if (ucafs_kern_remove(adp, aname, UC_ANY, &ucafs_name) == 0) {
++		is_ucafs_file = 1;
++	    } else {
++		ucafs_name = aname;
++	    }
++
+ 	  tc = afs_Conn(&adp->f.fid, treqp, SHARED_LOCK, &rxconn);
+ 	    if (tc) {
+ 	        XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_REMOVEFILE);
+ 	        RX_AFS_GUNLOCK();
+ 	        code =
+ 		    RXAFS_RemoveFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
+-		  		     aname, &OutDirStatus, &tsync);
++		  		     ucafs_name, &OutDirStatus, &tsync);
+ 	        RX_AFS_GLOCK();
+ 	        XSTATS_END_TIME;
+ 	    } else
+@@ -81,9 +91,15 @@ afsremove(struct vcache *adp, struct dcache *tdc,
+ 	          SHARED_LOCK, NULL));
+     }
+ 
++
+     osi_dnlc_remove(adp, aname, tvc);
+ 
+     if (code) {
++	/* ucafs code */
++	if (is_ucafs_file) {
++	    kfree(ucafs_name);
++	}
++
+ 	if (tdc) {
+ 	    ReleaseSharedLock(&tdc->lock);
+ 	    afs_PutDCache(tdc);
+@@ -107,11 +123,16 @@ afsremove(struct vcache *adp, struct dcache *tdc,
+ 	UpgradeSToWLock(&tdc->lock, 637);
+     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, &OutDirStatus, 1)) {
+ 	/* we can do it locally */
+-	code = afs_dir_Delete(tdc, aname);
++	code = afs_dir_Delete(tdc, ucafs_name);
+ 	if (code) {
+ 	    ZapDCE(tdc);	/* surprise error -- invalid value */
+ 	    DZap(tdc);
+ 	}
++
++	/* ucafs code */
++	if (is_ucafs_file) {
++	    kfree(ucafs_name);
++	}
+     }
+     if (tdc) {
+ 	ReleaseWriteLock(&tdc->lock);
+diff --git a/src/afs/afs_daemons.c b/src/afs/afs_daemons.c
+index e8b8f9d..48e78dc 100644
+--- a/src/afs/afs_daemons.c
++++ b/src/afs/afs_daemons.c
+@@ -175,6 +175,7 @@ afs_Daemon(void)
+     /* start off with afs_initState >= 101 (basic init done) */
+     while (1) {
+ 	afs_CheckCallbacks(20);	/* unstat anything which will expire soon */
++	ucafs_kern_ping();
+ 
+ 	/* things to do every 20 seconds or less - required by protocol spec */
+ 	if (afs_nfsexporter)
+diff --git a/src/afs/afsincludes.h b/src/afs/afsincludes.h
+index 18bcfda..9af6203 100644
+--- a/src/afs/afsincludes.h
++++ b/src/afs/afsincludes.h
+@@ -62,4 +62,6 @@
+ 
+ #endif
+ 
++#include "afs/ucafs_kern.h"
++
+ #endif /* AFS_INCLUDES_H */
+diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
+index 46b9c9d..2d17495 100644
+--- a/src/libafs/Makefile.common.in
++++ b/src/libafs/Makefile.common.in
+@@ -67,6 +67,16 @@ single_compdir_libafs: depsrcs libafs
+ single_instdir_libafs: install_libafs
+ single_destdir_libafs: dest_libafs
+ 
++# ucafs objects
++UCAFSOBJS = ucafs_mod.o\
++			ucafs_kern.o
++
++ucafs_mod.o: $(TOP_SRC_AFS)/ucafs_mod.c
++	$(CRULE_OPT)
++
++ucafs_kern.o: $(TOP_SRC_AFS)/ucafs_kern.c
++	$(CRULE_OPT)
++
+ # placeholder for any sources that are built prior to compiling libafs
+ depsrcs: 
+ 

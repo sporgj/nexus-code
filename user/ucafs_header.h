@@ -30,6 +30,11 @@ typedef struct {
 
 #define UC_AFS_WATCH "sgx"
 
+typedef enum {
+    UC_STATUS_NOOP,
+    UC_STATUS_ERROR
+} uc_err_t;
+
 /* prefixes for the different file types */
 #define UC_METADATA_PREFIX "md"
 #define UC_FILEDATA_PREFIX "fd"
@@ -159,7 +164,12 @@ typedef uint16_t mid_t;
 typedef enum {
     UCAFS_MSG_PING,
     UCAFS_MSG_FILLDIR,
-    UCAFS_MSG_CREATE
+    UCAFS_MSG_CREATE,
+    UCAFS_MSG_LOOKUP,
+    UCAFS_MSG_REMOVE,
+    UCAFS_MSG_HARDLINK,
+    UCAFS_MSG_SYMLINK,
+    UCAFS_MSG_RENAME
 } uc_msg_type_t;
 
 typedef struct {
@@ -192,3 +202,7 @@ ucrpc__genid(void)
 }
 
 #endif
+
+#undef TYPE_TO_STR
+#define TYPE_TO_STR(t)                                                         \
+    (t == UC_FILE ? "F" : (t == UC_DIR ? "D" : (t == UC_LINK ? "L" : "U")))

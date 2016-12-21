@@ -6,7 +6,7 @@ OPENAFS_INC := $(OPENAFS_PATH)/include
 OPENAFS_SRC := $(OPENAFS_PATH)/src
 OPENAFS_LIB := $(OPENAFS_PATH)/lib
 
-OBJS := uc_mod.o enclave_u.o $(OBJS)
+OBJS := uc_mod.o uc_rpc.o enclave_u.o $(OBJS)
 RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
 RXINC := -I$(OPENAFS_INC)
@@ -47,7 +47,11 @@ libucafs.a: $(OBJS) libthird.a
 	@echo "ar => $@"
 
 uc_mod.o: uc_mod.c
-	@$(CC) $(CFLAGS) -Wno-pointer-sign $(RXINC) -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+uc_rpc.o: uc_rpc.c
+	@$(CC) $(CFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
 %.o: %.cc %.h

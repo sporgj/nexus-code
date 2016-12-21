@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include "ucafs_defs.h"
+#include "ucafs_header.h"
 #include "uc_filebox.h"
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \

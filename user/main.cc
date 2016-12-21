@@ -26,7 +26,7 @@ sgx_enclave_id_t global_eid = 0;
 extern "C" int setup_mod();
 extern "C" void dcache_init();
 
-const char afs_path[] = UC_AFS_PATH;
+const char afs_path[] = UCAFS_PATH;
 static bool check_main_dir()
 {
     sds afsx_repo = uc_get_repo_path();
