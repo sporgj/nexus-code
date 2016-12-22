@@ -12,6 +12,68 @@ typedef struct dcache_item {
 #define MAX_FSERV_SIZE PAGE_SIZE
 
 static int
+store_clean_context(store_context_t * context,
+                    struct AFSFetchStatus * out,
+                    int error)
+{
+    int code, buflen, ret;
+    struct AFSVolSync tsync;
+    caddr_t buf_ptr;
+    XDR xdrs;
+    reply_data_t * reply = NULL;
+
+    if (context->id == -1) {
+        goto next_op;
+    }
+
+    /* lets close the userspace context  */
+    if ((buf_ptr = READPTR_LOCK()) == 0) {
+        goto next_op;
+    }
+
+    buflen = READPTR_BUFLEN();
+
+    xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
+    if (!xdr_int(&xdrs, &context->id)) {
+        ERROR("store_close: could not parse response\n");
+        goto next_op;
+    }
+
+    ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_FINISH, context->buffer,
+                          &xdrs, &reply, &code);
+    if (ret) {
+        ERROR("store_close, could not get response from uspace\n");
+        goto next_op;
+    }
+
+/* TODO: use the code status to determine if to continue or no */
+
+next_op:
+    if (context->afs_call) {
+        RX_AFS_GUNLOCK();
+#ifdef AFS_64BIT_CLIENT
+        if (context->srv_64bit)
+            code = EndRXAFS_StoreData64(context->afs_call, out, &tsync);
+        else
+#endif
+            code = EndRXAFS_StoreData(context->afs_call, out, &tsync);
+        code = rx_EndCall(context->afs_call, error);
+        RX_AFS_GLOCK();
+
+        if (code == 0 && error) {
+            code = error;
+        }
+    }
+
+    if (reply) {
+        kfree(reply);
+    }
+
+    context->afs_call = NULL;
+    return code | ret;
+}
+
+static int
 store_write(store_context_t * context,
             uint8_t * buffer,
             afs_uint32 tlen,
@@ -70,15 +132,15 @@ store_init_fserv(store_context_t * context,
         if (!afs_serverHasNo64Bit(context->tc)) {
             context->srv_64bit = 1;
             code = StartRXAFS_StoreData64(afs_call, &avc->f.fid.Fid, &instatus,
-                                          base, chunk_len, context->total_len);
+                                          base, chunk_len, context->total_size);
         } else {
             // XXX check for total_len > 2^32 - 1
             code = StartRXAFS_StoreData(afs_call, &avc->f.fid.Fid, &instatus,
-                                        base, chunk_len, context->total_len);
+                                        base, chunk_len, context->total_size);
         }
 #else
         code = StartRXAFS_StoreData(afs_call, &avc->f.fid.Fid, &instatus, base,
-                                    chunk_len, context->total_len);
+                                    chunk_len, context->total_size);
 #endif
         RX_AFS_GLOCK();
     } else {
@@ -106,13 +168,12 @@ ucafs_storesegment(store_context_t * context,
                    int sync,
                    char * path)
 {
-    int ret = -1, pos_start, pos_end, bytes_left, i, len, written;
-    uc_xfer_stage_t xfer_stage;
+    int ret = -1, pos_start, pos_end, bytes_left, i, len, written, code;
     caddr_t buf_ptr;
-    XDR xdrs, * x_data;
+    XDR xdrs, *x_data;
     uc_fetchstore_t * fetchstore;
-    size_t nbytes, buflen;
-    reply_data_t * p_reply = NULL;
+    size_t buflen;
+    reply_data_t * reply = NULL;
     struct osi_file * fp = NULL;
     struct dcache * tdc;
     struct AFSFetchStatus output;
@@ -141,7 +202,7 @@ ucafs_storesegment(store_context_t * context,
                                     .offset = pos_start,
                                     .file_size = context->total_size,
                                     .xfer_id = 0};
-    ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_BEGIN, content->buffer,
+    ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_BEGIN, context->buffer,
                           &xdrs, &reply, &code);
     if (ret || code) {
         ERROR("initializing store for %s (%d, %d)\n", path, pos_start, pos_end);
@@ -149,7 +210,7 @@ ucafs_storesegment(store_context_t * context,
     }
 
     // read the response
-    x_data = &p_reply->xdrs;
+    x_data = &reply->xdrs;
     if (!xdr_int(x_data, &context->id)) {
         ERROR("could not read response from init stored\n");
         goto out;
@@ -183,9 +244,12 @@ ucafs_storesegment(store_context_t * context,
             }
 
             /* now send the whole thing */
-            if (store_write(context, buffer, len, &written)) {
+            if (store_write(context, context->buffer, len, &written)) {
                 goto out;
             }
+
+            kfree(reply);
+            reply = NULL;
 
             bytes_left -= len;
         }
@@ -205,7 +269,6 @@ ucafs_storesegment(store_context_t * context,
             ReleaseWriteLock(&tdc->lock);
         }
 
-
         osi_UFSClose(fp);
         fp = NULL;
     }
@@ -216,11 +279,11 @@ out:
         osi_UFSClose(fp);
     }
 
-    if (p_reply) {
-        kfree(p_reply);
+    if (reply) {
+        kfree(reply);
     }
 
-    // TODO ucafs_clean
+    store_clean_context(context, &output, ret);
 
     READPTR_TRY_UNLOCK();
 
@@ -232,7 +295,7 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
 {
     int ret, abyte, afs_chunks, dirty_chunks, count, i, bytes_left, sum_bytes;
     afs_hyper_t old_dv, new_dv;
-    size_t max_tdc_per_segment, nbytes, tdc_seen;
+    size_t tdc_per_part, part_per_tdc;
     struct dcache * tdc;
     dcache_item_t *dclist = NULL, *dcitem;
     store_context_t * context;
@@ -240,13 +303,14 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
     struct rx_connection * rx_conn;
     struct afs_conn * tc;
 
-    if (!UCAFS_IS_CONNECTED || __is_vnode_ignored(avc, &path)) {
-        return AFSX_STATUS_NOOP;
+    if (UCAFS_IS_OFFLINE || ucafs_vnode_path(avc, &path)) {
+        return UC_STATUS_NOOP;
     }
 
     /* lets flush all the data */
     osi_VM_StoreAllSegments(avc);
     if (AFS_IS_DISCONNECTED && !AFS_IN_SYNC) {
+        kfree(path);
         return ENETDOWN;
     }
 
@@ -263,7 +327,7 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         return -1;
     }
 
-    context->buffer = UCXFER_ALLOC(UCMOD_PAGE_ORDER - 1);
+    context->buffer = UCXFER_ALLOC();
     if (context->buffer == NULL) {
         ERROR("allocate context buffer\n");
         goto out;
@@ -275,7 +339,9 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
     }
 
     context->id = -1;
+    context->total_size = avc->f.m.Length;
     context->path = path;
+    context->avc = avc;
     context->tc = tc;
     context->rx_conn = rx_conn;
 
@@ -323,14 +389,19 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         count++;
 
         if (count == tdc_per_part) {
-store_chunk:
+        store_chunk:
             /* clear the list */
-            if (dirty_chunks &&
-                ucafs_storesegment(context, dclist, count, avc, sync, path)) {
+            if (dirty_chunks) {
+                goto skip_store;
+            }
+
+            if (ucafs_storesegment(context, dclist, count, sum_bytes, areq,
+                                   sync, path)) {
                 ERROR("ucafs_storesegment failed ret = %d", ret);
                 goto out1;
             }
 
+        skip_store:
             /* put back all the tdc entries, don't upgrade the version number */
             for (i = 0; i < count; i++) {
                 afs_PutDCache(dclist[i].tdc);
@@ -340,7 +411,7 @@ store_chunk:
             sum_bytes = count = i = dirty_chunks = 0;
         }
 
-        afs_chunk--;
+        afs_chunks--;
     }
 
     if (dirty_chunks) {
@@ -363,7 +434,7 @@ out:
     }
 
     if (context->buffer) {
-        FREE_XFER_BUFFER(context->buffer);
+        UCXFER_FREE(context->buffer);
     }
 
     kfree(context);

@@ -22,10 +22,6 @@ int
 fetchstore_finish(int id);
 
 int
-fetchstore_fbox(int fbox_inout, uint8_t ** buffer);
-
-
-int
 store_start(char * fpath,
             uint16_t max_xfer_size,
             uint32_t offset,

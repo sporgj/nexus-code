@@ -1,13 +1,24 @@
 #pragma once
 #include <stdint.h>
 #include "ucafs_header.h"
-#include "uc_filebox.h"
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
 
+#define UC_HARDLINK 0
+#define UC_SOFTLINK 1
+
 #define DEFAULT_REPO_DIRNAME ".afsx"
 #define DEFAULT_DNODE_FNAME "main.dnode"
+
+struct uc_dentry;
+struct filebox;
+typedef struct filebox uc_filebox_t;
+
+/* 128 bits */
+typedef struct {
+    uuid_t bin;
+} shadow_t;
 
 typedef enum {
     E_SUCCESS = 0,
@@ -17,6 +28,79 @@ typedef enum {
     E_ERROR_KEYINIT,
     E_ERROR_HASHMAP
 } enclave_error_t;
+
+typedef struct {
+    uint8_t raw[0];
+} raw_fname_t;
+
+typedef struct {
+    uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
+    uint8_t type; /* 0 for soft, 1 for hard */
+    union {
+        shadow_t meta_file;
+        char target_link[0];
+    };
+} __attribute__((packed)) link_info_t;
+
+/* cryptographic stuff */
+#define CRYPTO_AES_KEY_SIZE 16
+#define CRYPTO_AES_KEY_SIZE_BITS CRYPTO_AES_KEY_SIZE << 3
+#define CRYPTO_CRYPTO_BLK_SIZE 16
+#define CRYPTO_MAC_KEY_SIZE 16
+#define CRYPTO_MAC_KEY_SIZE_BITS 16
+#define CRYPTO_MAC_DIGEST_SIZE 32
+
+typedef struct {
+    uint8_t bytes[16];
+} crypto_iv_t;
+
+typedef struct {
+    uint8_t ekey[CRYPTO_AES_KEY_SIZE];
+} crypto_ekey_t;
+
+typedef struct {
+    uint8_t bytes[CRYPTO_MAC_DIGEST_SIZE];
+} crypto_mac_t;
+
+typedef struct {
+    crypto_ekey_t ekey;
+    crypto_ekey_t mkey;
+    crypto_iv_t iv;
+    crypto_mac_t mac;
+} __attribute__((packed)) crypto_context_t;
+
+/* File box information */
+#define UCAFS_FBOX_MAGIC 0xfb015213
+#define UCAFS_FBOX_HEADER                                                      \
+    uint32_t magic;                                                            \
+    uint8_t link_count;                                                        \
+    uint16_t chunk_count;                                                      \
+    uint32_t chunk_size;                                                       \
+    uint32_t file_size;                                                        \
+    uint16_t fbox_len;                                                         \
+    uuid_t uuid;                                                               \
+    crypto_ekey_t fbox_mkey;                                                   \
+    crypto_mac_t fbox_mac;
+
+typedef struct {
+    UCAFS_FBOX_HEADER;
+} __attribute__((packed)) uc_fbox_header_t;
+
+typedef struct uc_fbox {
+    UCAFS_FBOX_HEADER;
+    crypto_context_t chunks[1];
+} __attribute__((packed)) uc_fbox_t;
+
+#define FBOX_HEADER_LEN sizeof(uc_fbox_header_t)
+#define UCAFS_GET_REAL_FILE_SIZE(len) len - sizeof(uc_fbox_t)
+#define FBOX_DEFAULT_LEN sizeof(uc_fbox_t)
+
+static inline int
+UCAFS_FBOX_SIZE(int file_size)
+{
+    return sizeof(uc_fbox_header_t)
+        + UCAFS_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
+}
 
 typedef struct {
     int xfer_id;
@@ -38,19 +122,6 @@ typedef struct {
 } xfer_context_t;
 
 typedef struct {
-    uint8_t raw[0];
-} raw_fname_t;
-
-typedef struct {
-    uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
-    uint8_t type; /* 0 for soft, 1 for hard */
-    union {
-        shadow_t meta_file;
-        char target_link[0];
-    };
-} __attribute__((packed)) link_info_t;
-
-typedef struct {
     shadow_t uuid;
     shadow_t parent;
     uint8_t is_root;
@@ -67,5 +138,3 @@ typedef struct {
     uint32_t protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;
-
-struct uc_dentry;

@@ -8,9 +8,6 @@ extern "C" {
 
 #include "uc_types.h"
 
-struct filebox;
-typedef struct filebox uc_filebox_t;
-
 /**
  * Creates a new filebox with a default segments
  * @return NULL if we run out of memory

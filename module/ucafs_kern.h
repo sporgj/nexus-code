@@ -1,5 +1,12 @@
 #pragma once
+#include <linux/dcache.h>
+
 #include "afs/ucafs_header.h"
+
+#include <afsconfig.h>
+#include "afs/param.h"
+#include "afs/sysincludes.h"
+#include "afsincludes.h"
 
 int
 ucafs_mod_init(void);
@@ -11,7 +18,7 @@ ucafs_kern_ping(void);
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest);
 
-inline int
+int
 ucafs_vnode_path(const struct vcache * avc, char ** dest);
 
 int

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/dcache.h>
 #include <linux/fs.h>
@@ -12,7 +13,6 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/types.h>
 #include <linux/types.h>
 
 #include "afs/ucafs_header.h"
@@ -29,13 +29,14 @@
 #define UCKERN_NBR_DEVS 1
 #define UCKERN_PIPE_BUFFER PAGE_SIZE
 
-#define UCXFER_ALLOC(order) (uint8_t *)alloc_pages(GFP_KERNEL, order)
-
 #define UCMOD_PAGE_ORDER 2
 #define UCMOD_BUFFER_SIZE (PAGE_SIZE << UCMOD_PAGE_ORDER)
 #define UCMOD_BUFFER_ALLOC()                                                   \
     (char *)alloc_pages(GFP_KERNEL | __GFP_ZERO, UCMOD_PAGE_ORDER)
 #define UCMOD_BUFFER_FREE(x) free_pages(x, UCMOD_PAGE_ORDER)
+
+#define UCXFER_ALLOC() (uint8_t *)alloc_pages(GFP_KERNEL, UCMOD_PAGE_ORDER - 1)
+#define UCXFER_FREE(x) free_pages((unsigned long)x, UCMOD_PAGE_ORDER - 1)
 
 /* data structures for our module */
 struct ucafs_mod {
@@ -54,11 +55,29 @@ extern struct ucafs_mod * dev;
 #define UCAFS_IS_OFFLINE                                                       \
     (dev->daemon == NULL || task_is_stopped_or_traced(dev->daemon))
 
+#undef ERROR
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs: " fmt, ##args)
+
+static DEFINE_MUTEX(mut_msg_counter);
+static inline mid_t
+ucrpc__genid(void)
+{
+    mid_t counter;
+    mutex_lock_interruptible(&mut_msg_counter);
+    counter = (++msg_counter);
+    mutex_unlock(&mut_msg_counter);
+
+    return counter;
+}
+
 typedef struct {
     int id;
+    int srv_64bit;
+    size_t total_size;
     char * buffer;
     uint32_t buflen;
     uint8_t * path;
+    struct vcache * avc;
     struct rx_connection * rx_conn;
     struct afs_conn * tc;
     struct rx_call * afs_call;
@@ -85,7 +104,7 @@ ucafs_mod_send1(uc_msg_type_t type,
                 reply_data_t ** pp_rsp,
                 int * p_code);
 
-inline caddr_t
+static inline caddr_t
 READPTR_LOCK(void)
 {
     if (mutex_lock_interruptible(&dev->mut)) {
@@ -98,7 +117,7 @@ READPTR_LOCK(void)
     return (caddr_t)((char *)dev->outb + sizeof(ucrpc_msg_t));
 }
 
-inline void
+static inline void
 READPTR_TRY_UNLOCK(void)
 {
     if (mutex_is_locked(&dev->mut)) {
@@ -106,14 +125,14 @@ READPTR_TRY_UNLOCK(void)
     }
 }
 
-inline void
+static inline void
 READPTR_UNLOCK(void)
 {
     mutex_unlock(&dev->mut);
 }
 
 // hold READPTR_LOCK()
-inline size_t
+static inline size_t
 READPTR_BUFLEN(void)
 {
     size_t len = (dev->buffersize - dev->avail_read - sizeof(ucrpc_msg_t));

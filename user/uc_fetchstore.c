@@ -13,6 +13,7 @@
 #include "uc_dcache.h"
 #include "uc_dirnode.h"
 #include "uc_fetchstore.h"
+#include "uc_filebox.h"
 #include "uc_sgx.h"
 #include "uc_utils.h"
 
@@ -59,7 +60,7 @@ fetchstore_start(uc_xfer_op_t op,
     int chunk_count;
 
     /* lets find the dirnode object first */
-    filebox = dcache_get_filebox(fpath, FBOX_SIZE(file_size));
+    filebox = dcache_get_filebox(fpath, UCAFS_FBOX_SIZE(file_size));
     if (filebox == NULL) {
         slog(0, SLOG_ERROR, "finding filebox failed: '%s'", fpath);
         return ret;
@@ -90,7 +91,7 @@ fetchstore_start(uc_xfer_op_t op,
     xfer_ctx->offset = offset;
     xfer_ctx->total_len = file_size;
     xfer_ctx->path = strdup(fpath);
-    xfer_ctx->chunk_num = FBOX_CHUNK_NUM(offset);
+    xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(offset);
     xfer_ctx->fbox = filebox_fbox(filebox);
     xfer_ctx->filebox = filebox;
 
@@ -158,52 +159,6 @@ fetchstore_get_buffer(int id, size_t valid_buflen)
     return (uint8_t **)&xfer_ctx->buffer;
 }
 
-int
-fetchstore_fbox(int fbox_inout, uint8_t ** buffer)
-{
-    xfer_context_t * xfer_ctx
-        = (xfer_context_t *)((uintptr_t)buffer
-                             - offsetof(xfer_context_t, buffer));
-    uint8_t * fbox_buffer;
-    int ret = -1, len = xfer_ctx->valid_buflen;
-    int * fbox_xfer_ptr = (fbox_inout == UCAFS_FBOX_READ) ? &xfer_ctx->fbox_rd
-                                                          : &xfer_ctx->fbox_wr;
-
-    /* make sure we are not reading past the buffer */
-    if (*fbox_xfer_ptr + len > xfer_ctx->fbox->fbox_len) {
-        slog(0, SLOG_FATAL, "overrunning fbox buffer");
-        return -1;
-    }
-
-    fbox_buffer = (uint8_t *)xfer_ctx->fbox + xfer_ctx->fbox_xfer;
-
-    if (fbox_inout == UCAFS_FBOX_READ) {
-        memcpy(xfer_ctx->buffer, fbox_buffer, len);
-    } else {
-        memcpy(fbox_buffer, xfer_ctx->buffer, len);
-    }
-
-    *fbox_xfer_ptr += len;
-
-    /* if we have gotten enough */
-    if (*fbox_xfer_ptr == xfer_ctx->fbox->fbox_len) {
-#ifdef UCAFS_SGX
-        ecall_fetchstore_start(global_eid, &ret, xfer_ctx);
-        if (ret) {
-            slog(0, SLOG_FATAL, "enclave error");
-            goto out;
-        }
-#endif
-    }
-
-    ret = 0;
-out:
-    if (ret) {
-        free_xfer_context(xfer_ctx);
-    }
-
-    return ret;
-}
 
 int
 fetchstore_data(uint8_t ** buffer)

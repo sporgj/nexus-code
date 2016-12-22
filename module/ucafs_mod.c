@@ -1,4 +1,5 @@
 #include "ucafs_mod.h"
+#include "ucafs_header.h"
 
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_mod: " fmt, ##args)
@@ -149,12 +150,12 @@ ucafs_mod_send(uc_msg_type_t type,
 }
 
 int
-ucafs_mod_send(uc_msg_type_t type,
-               uc_submsg_type_t sub_type,
-               uint8_t * buffer,
-               XDR * xdrs,
-               reply_data_t ** pp_reply,
-               int * p_err)
+ucafs_mod_send1(uc_msg_type_t type,
+                uc_msg_subtype_t sub_type,
+                uint8_t * buffer,
+                XDR * xdrs,
+                reply_data_t ** pp_reply,
+                int * p_err)
 {
     mid_t id;
     reply_data_t * p_reply;
