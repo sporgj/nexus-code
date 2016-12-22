@@ -144,6 +144,18 @@ ucafs_mod_send(uc_msg_type_t type,
                reply_data_t ** pp_reply,
                int * p_err)
 {
+    return ucafs_mod_send1(type, UCAFS_SUBMSG_NONE, NULL, xdrs, pp_reply,
+                           p_err);
+}
+
+int
+ucafs_mod_send(uc_msg_type_t type,
+               uc_submsg_type_t sub_type,
+               uint8_t * buffer,
+               XDR * xdrs,
+               reply_data_t ** pp_reply,
+               int * p_err)
+{
     mid_t id;
     reply_data_t * p_reply;
     ucrpc_msg_t * msg;

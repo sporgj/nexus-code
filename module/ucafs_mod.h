@@ -29,13 +29,15 @@
 #define UCKERN_NBR_DEVS 1
 #define UCKERN_PIPE_BUFFER PAGE_SIZE
 
-#define UCMOD_PAGE_ORDER 0
+#define UCXFER_ALLOC(order) (uint8_t *)alloc_pages(GFP_KERNEL, order)
+
+#define UCMOD_PAGE_ORDER 2
 #define UCMOD_BUFFER_SIZE (PAGE_SIZE << UCMOD_PAGE_ORDER)
 #define UCMOD_BUFFER_ALLOC()                                                   \
     (char *)alloc_pages(GFP_KERNEL | __GFP_ZERO, UCMOD_PAGE_ORDER)
 #define UCMOD_BUFFER_FREE(x) free_pages(x, UCMOD_PAGE_ORDER)
 
-/* private stuff */
+/* data structures for our module */
 struct ucafs_mod {
     wait_queue_head_t kq, rq, wq;
     uint8_t *buffer, *end;
@@ -47,18 +49,74 @@ struct ucafs_mod {
     struct cdev cdev;
 };
 
-typedef struct {
-    XDR xdrs;
-    char data[0];
-} reply_data_t;
-
 extern struct ucafs_mod * dev;
 
 #define UCAFS_IS_OFFLINE                                                       \
     (dev->daemon == NULL || task_is_stopped_or_traced(dev->daemon))
 
+typedef struct {
+    int id;
+    char * buffer;
+    uint32_t buflen;
+    uint8_t * path;
+    struct rx_connection * rx_conn;
+    struct afs_conn * tc;
+    struct rx_call * afs_call;
+} store_context_t, fetch_context_t;
+
+/* reply data from the wire */
+typedef struct {
+    XDR xdrs;
+    char data[0];
+} reply_data_t;
+
+/* the name function to send data */
 int
 ucafs_mod_send(uc_msg_type_t type,
                XDR * xdrs,
                reply_data_t ** pp_rsp,
                int * p_code);
+
+int
+ucafs_mod_send1(uc_msg_type_t type,
+                uc_msg_subtype_t subtype,
+                uint8_t * buffer, // make sure it is large enough
+                XDR * xdrs,
+                reply_data_t ** pp_rsp,
+                int * p_code);
+
+inline caddr_t
+READPTR_LOCK(void)
+{
+    if (mutex_lock_interruptible(&dev->mut)) {
+        ERROR("locking mutex failed\n");
+        return 0;
+    }
+
+    /* clear the message at that pointer */
+    memset(dev->outb, 0, sizeof(ucrpc_msg_t));
+    return (caddr_t)((char *)dev->outb + sizeof(ucrpc_msg_t));
+}
+
+inline void
+READPTR_TRY_UNLOCK(void)
+{
+    if (mutex_is_locked(&dev->mut)) {
+        mutex_unlock(&dev->mut);
+    }
+}
+
+inline void
+READPTR_UNLOCK(void)
+{
+    mutex_unlock(&dev->mut);
+}
+
+// hold READPTR_LOCK()
+inline size_t
+READPTR_BUFLEN(void)
+{
+    size_t len = (dev->buffersize - dev->avail_read - sizeof(ucrpc_msg_t));
+    len -= (len % 16);
+    return len;
+}

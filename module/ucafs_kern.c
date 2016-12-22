@@ -9,32 +9,6 @@ static const uint32_t afs_prefix_len = 4;
 static char * watch_dirs[] = {UCAFS_PATH_KERN "/" UC_AFS_WATCH};
 static const int watch_dir_len[] = {sizeof(watch_dirs[0]) - 1};
 
-inline caddr_t
-READPTR_LOCK(void)
-{
-    if (mutex_lock_interruptible(&dev->mut)) {
-        ERROR("locking mutex failed\n");
-        return 0;
-    }
-
-    /* clear the message at that pointer */
-    memset(dev->outb, 0, sizeof(ucrpc_msg_t));
-    return (caddr_t)((char *)dev->outb + sizeof(ucrpc_msg_t));
-}
-
-inline void
-READPTR_UNLOCK(void)
-{
-    mutex_unlock(&dev->mut);
-}
-
-// hold READPTR_LOCK()
-inline size_t
-READPTR_BUFLEN(void)
-{
-    return (dev->buffersize - dev->avail_read - sizeof(ucrpc_msg_t));
-}
-
 inline ucafs_entry_type
 dentry_type(const struct dentry * dentry)
 {

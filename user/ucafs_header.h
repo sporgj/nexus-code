@@ -122,6 +122,14 @@ typedef struct uc_fbox {
 #define UCAFS_GET_REAL_FILE_SIZE(len) len - sizeof(uc_fbox_t)
 #define FBOX_DEFAULT_LEN sizeof(uc_fbox_t)
 
+typedef struct {
+    uc_xfer_op_t op,
+    uint16_t max_xfer_size,
+    uint32_t offset,
+    uint32_t file_size,
+    int xfer_id
+} __attribute__((packed)) uc_fetchstore_t;
+
 static inline int
 FBOX_CHUNK_BASE(int offset)
 {
@@ -169,11 +177,21 @@ typedef enum {
     UCAFS_MSG_REMOVE,
     UCAFS_MSG_HARDLINK,
     UCAFS_MSG_SYMLINK,
-    UCAFS_MSG_RENAME
+    UCAFS_MSG_RENAME,
+    UCAFS_MSG_STORE,
+    UCAFS_MSG_FETCH
 } uc_msg_type_t;
+
+typedef enum {
+    UCAFS_SUBMSG_NONE,
+    UCAFS_SUBMSG_BEGIN,
+    UCAFS_SUBMSG_PROCESS,
+    UCAFS_SUBMSG_FINISH
+} uc_msg_subtype_t;
 
 typedef struct {
     uc_msg_type_t type;
+    uc_msg_subtype_t sub_type;
     uint16_t msg_id; /* the ID of the message */
     uint16_t ack_id; /* the message it responds to */
     uint32_t len; /* the length of the payload */
