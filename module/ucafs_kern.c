@@ -164,6 +164,7 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
     }
 
     if ((payload = READPTR_LOCK()) == 0) {
+        kfree(path);
         return -1;
     }
 

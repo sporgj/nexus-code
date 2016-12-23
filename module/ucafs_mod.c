@@ -1,3 +1,7 @@
+/**
+ * This code is inspired by the LDD3 code examples
+ * @author Judicael
+ */
 #include "ucafs_mod.h"
 #include "ucafs_header.h"
 
@@ -36,6 +40,7 @@ ucafs_m_open(struct inode * inode, struct file * fp)
 static int
 ucafs_m_release(struct inode * inode, struct file * fp)
 {
+    /* grab the lock, reset all variables */
     mutex_lock_interruptible(&dev->mut);
     dev->daemon = NULL;
     atomic_inc(&ucafs_m_available);
@@ -44,36 +49,17 @@ ucafs_m_release(struct inode * inode, struct file * fp)
     return 0;
 }
 
-#if 0
-static int
-ucafs_m_poll(struct file * fp, poll_table * wait)
-{
-    size_t mask = 0;
-
-    mutex_lock(&dev->mut);
-    poll_wait(fp, &dev->kq, wait);
-    if (dev->avail_read) {
-        mask |= POLLIN | POLLRDNORM;
-    }
-
-    if (dev->avail_write) {
-        mask |= POLLIN | POLLRDNORM;
-    }
-    mutex_unlock(&dev->mut);
-
-    return mask;
-}
-#endif
-
 static ssize_t
 ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 {
     size_t len;
 
+    /* grab the lock */
     if (mutex_lock_interruptible(&dev->mut)) {
         return -ERESTARTSYS;
     }
 
+    /* so long as there is nothing to read, lets keep waiting */
     while (dev->avail_read == 0) {
         mutex_unlock(&dev->mut);
         // the current process waits
@@ -81,7 +67,7 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
             return -ERESTARTSYS;
         }
 
-        // we are woken up, reaquire the lock
+        // we are woken up, reacquire the lock
         if (mutex_lock_interruptible(&dev->mut)) {
             return -ERESTARTSYS;
         }
@@ -132,6 +118,7 @@ ucafs_m_write(struct file * fp,
         return -EFAULT;
     }
 
+    /* this will be reincremented */
     dev->avail_write -= count;
 
     mutex_unlock(&dev->mut);
@@ -149,6 +136,9 @@ ucafs_mod_send(uc_msg_type_t type,
                            p_err);
 }
 
+/**
+ * lock: dev->mut
+ */
 int
 ucafs_mod_send1(uc_msg_type_t type,
                 uc_msg_subtype_t sub_type,
@@ -160,8 +150,9 @@ ucafs_mod_send1(uc_msg_type_t type,
     mid_t id;
     reply_data_t * p_reply;
     ucrpc_msg_t * msg;
-    int err = -1, msg_len = (xdrs->x_private - xdrs->x_base);
+    int err = -1, msg_len = (xdrs->x_private - xdrs->x_base), alloc_len;
     *p_err = -1;
+    *pp_reply = NULL;
 
     if (UCAFS_IS_OFFLINE) {
         mutex_unlock(&dev->mut);
@@ -173,6 +164,7 @@ ucafs_mod_send1(uc_msg_type_t type,
     /* send the message */
     msg = (ucrpc_msg_t *)dev->outb;
     msg->type = type;
+    msg->subtype = subtype;
     msg->msg_id = id = ucrpc__genid();
     msg->len = msg_len;
     dev->avail_read += MSG_SIZE(msg);
@@ -209,7 +201,8 @@ ucafs_mod_send1(uc_msg_type_t type,
             dev->avail_write += MSG_SIZE(msg);
 
             /* allocate the response data */
-            p_reply = kmalloc(sizeof(reply_data_t) + msg->len + 1, GFP_KERNEL);
+            alloc_len = (buffer == NULL) ? msg->len + 1 : 0;
+            p_reply = kmalloc(sizeof(reply_data_t) + alloc_len, GFP_KERNEL);
             if (p_reply == NULL) {
                 *p_err = msg->status;
                 *pp_reply = NULL;
@@ -218,8 +211,14 @@ ucafs_mod_send1(uc_msg_type_t type,
             }
 
             /* instantiate everything */
-            memcpy(p_reply->data, msg->payload, msg->len);
-            xdrmem_create(&p_reply->xdrs, p_reply->data, msg->len, XDR_DECODE);
+            if (buffer == NULL) {
+                memcpy(p_reply->data, msg->payload, msg->len);
+                xdrmem_create(&p_reply->xdrs, p_reply->data, msg->len,
+                              XDR_DECODE);
+            } else {
+                memcpy(buffer, msg->payload, msg->len);
+                xdrmem_create(&p_reply_xdrs, buffer, msg->len, XDR_DECODE);
+            }
 
             *p_err = msg->status;
             *pp_reply = p_reply;
