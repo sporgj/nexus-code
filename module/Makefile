@@ -3,6 +3,7 @@ OPENAFS_PATH = ~/openafs
 OPENAFS_DIR := ~/openafs/src/afs
 FILES := ucafs_mod.c\
 	ucafs_kern.c\
+	ucafs_fetch.c\
 	ucafs_store.c\
 	ucafs_mod.h\
 	ucafs_kern.h\

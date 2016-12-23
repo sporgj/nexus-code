@@ -4,7 +4,6 @@
 #include <linux/cdev.h>
 #include <linux/dcache.h>
 #include <linux/fs.h>
-#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/mutex.h>
 #include <linux/poll.h>
@@ -26,6 +25,8 @@
 #include "afsincludes.h"
 // clang-format on
 
+#define MAX_FSERV_SIZE PAGE_SIZE
+
 #define UCKERN_NBR_DEVS 1
 #define UCKERN_PIPE_BUFFER PAGE_SIZE
 
@@ -35,6 +36,8 @@
     (char *)alloc_pages(GFP_KERNEL | __GFP_ZERO, UCMOD_PAGE_ORDER)
 #define UCMOD_BUFFER_FREE(x) free_pages(x, UCMOD_PAGE_ORDER)
 
+#define UCXFER_PAGE_ORDER (UCMOD_PAGE_ORDER - 1)
+#define UCXFER_BUFFER_SIZE (PAGE_SIZE << UCXFER_PAGE_ORDER)
 #define UCXFER_ALLOC() (uint8_t *)alloc_pages(GFP_KERNEL, UCMOD_PAGE_ORDER - 1)
 #define UCXFER_FREE(x) free_pages((unsigned long)x, UCMOD_PAGE_ORDER - 1)
 

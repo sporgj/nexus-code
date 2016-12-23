@@ -1,6 +1,14 @@
 #include "ucafs_kern.h"
+#include "ucafs_mod.h"
+
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_fetch: " fmt, ##args)
+
+static int
+ucafs_fetch_fserv_close(struct rx_call * afs_call,
+                        struct afs_FetchOutput * o,
+                        int srv_64bit,
+                        int error);
 
 static int
 ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size);
@@ -19,9 +27,10 @@ static int
 ucafs_fetch_daemon_finish(fetch_context_t * context)
 {
     caddr_t buf_ptr;
+    size_t buflen;
     XDR xdrs;
     reply_data_t * reply = NULL;
-    int ret = -1;
+    int ret = -1, code;
 
     if (context->id == -1) {
         goto next_op;
@@ -42,7 +51,7 @@ ucafs_fetch_daemon_finish(fetch_context_t * context)
 
     ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_FINISH, context->buffer,
                           &xdrs, &reply, &code);
-    if (ret) {
+    if (ret || code) {
         ERROR("store_close, could not get response from uspace\n");
         goto next_op;
     }
@@ -55,7 +64,7 @@ next_op:
     return ret;
 }
 
-int
+static int
 ucafs_fetch_read(fetch_context_t * context, int tlen, int * byteswritten)
 {
     int ret = 0;
@@ -95,8 +104,11 @@ ucafs_fetch(struct afs_conn * tc,
             afs_int32 size,
             struct afs_FetchOutput * tsmall)
 {
-    int ret, start_pos, end_pos, bytes_left, len, written, tdc_end;
+    int ret = -1, start_pos, end_pos, bytes_left, len, written, tdc_end, pos,
+        code;
     size_t buflen;
+    caddr_t buf_ptr;
+    reply_data_t * reply = NULL;
     XDR xdrs;
     char * path;
     fetch_context_t * context;
@@ -114,7 +126,7 @@ ucafs_fetch(struct afs_conn * tc,
     if (context == NULL) {
         ERROR("allocation error on fetch context\n");
         kfree(path);
-        return AFSX_STATUS_ERROR;
+        return UC_STATUS_NOOP;
     }
 
     if ((context->buffer = UCXFER_ALLOC()) == NULL) {
@@ -145,12 +157,14 @@ ucafs_fetch(struct afs_conn * tc,
     /* instantiate the user space */
     if ((ret = ucafs_fetch_daemon_init(context, start_pos, bytes_left))) {
         ERROR("could not start daemon\n");
-        goto out;
+        goto out1;
     }
 
+    pos = base;
+    fp->offset = 0;
     while (bytes_left > 0) {
         if ((buf_ptr = READPTR_LOCK()) == 0) {
-            goto out;
+            goto out1;
         }
 
         buflen = READPTR_BUFLEN();
@@ -163,14 +177,14 @@ ucafs_fetch(struct afs_conn * tc,
 
         /* now send the whole thing */
         if (ucafs_fetch_read(context, len, &written)) {
-            goto out;
+            goto out1;
         }
 
         /* send the enchilada */
         ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_PROCESS,
                               context->buffer, &xdrs, &reply, &code);
         if (ret || code) {
-            goto out;
+            goto out1;
         }
 
         kfree(reply);
@@ -187,11 +201,14 @@ ucafs_fetch(struct afs_conn * tc,
     }
 
     ret = 0;
-out:
+out1:
     if (context->afs_call) {
-        ucafs_fetch_fserv_close(context->afs_call, small, context->srv_64bit,
+        ucafs_fetch_fserv_close(context->afs_call, tsmall, context->srv_64bit,
                                 ret);
     }
+
+    ucafs_fetch_daemon_finish(context);
+out:
 
     if (reply) {
         kfree(reply);
@@ -211,9 +228,12 @@ out:
 static int
 ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
 {
-    int ret = -1, tlen = context->total_len, code;
-    XDR xdrs;
+    int ret = -1, code;
+
+    XDR xdrs, *x_data;
     caddr_t buf_ptr;
+    reply_data_t * reply = NULL;
+    size_t buflen;
     uc_fetchstore_t * fetchstore;
 
     if ((buf_ptr = READPTR_LOCK()) == 0) {
@@ -234,7 +254,8 @@ ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
     ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_BEGIN, context->buffer,
                           &xdrs, &reply, &code);
     if (ret || code) {
-        ERROR("initializing store for %s (%d, %d)\n", path, pos_start, pos_end);
+        ERROR("initializing store for %s (%d, %d)\n", context->path, start,
+              start + size);
         goto out;
     }
 
@@ -247,10 +268,14 @@ ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
 
     ret = 0;
 out:
+    if (reply) {
+        kfree(reply);
+    }
+
     return ret;
 }
 
-int
+static int
 ucafs_fetch_fserv_init(struct afs_conn * tc,
                        struct rx_connection * rxconn,
                        struct vcache * avc,

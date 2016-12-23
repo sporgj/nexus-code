@@ -9,14 +9,12 @@ typedef struct dcache_item {
     struct dcache * tdc;
 } dcache_item_t;
 
-#define MAX_FSERV_SIZE PAGE_SIZE
-
 static int
 store_clean_context(store_context_t * context,
                     struct AFSFetchStatus * out,
                     int error)
 {
-    int code, buflen, ret;
+    int code, buflen, ret = 0;
     struct AFSVolSync tsync;
     caddr_t buf_ptr;
     XDR xdrs;
@@ -293,15 +291,15 @@ out:
 int
 ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
 {
-    int ret, abyte, afs_chunks, dirty_chunks, count, i, bytes_left, sum_bytes;
+    int ret = -1, abyte, afs_chunks, dirty_chunks, count, i, bytes_left, sum_bytes;
     afs_hyper_t old_dv, new_dv;
     size_t tdc_per_part, part_per_tdc;
     struct dcache * tdc;
     dcache_item_t *dclist = NULL, *dcitem;
     store_context_t * context;
     char * path;
-    struct rx_connection * rx_conn;
-    struct afs_conn * tc;
+    struct rx_connection * rx_conn = NULL;
+    struct afs_conn * tc = NULL;
 
     if (UCAFS_IS_OFFLINE || ucafs_vnode_path(avc, &path)) {
         return UC_STATUS_NOOP;
@@ -395,8 +393,8 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
                 goto skip_store;
             }
 
-            if (ucafs_storesegment(context, dclist, count, sum_bytes, areq,
-                                   sync, path)) {
+            if ((ret = ucafs_storesegment(context, dclist, count, sum_bytes, areq,
+                                   sync, path))) {
                 ERROR("ucafs_storesegment failed ret = %d", ret);
                 goto out1;
             }

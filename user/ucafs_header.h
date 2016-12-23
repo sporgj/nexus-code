@@ -63,6 +63,7 @@ typedef struct {
     uint32_t offset;
     uint32_t file_size;
     int xfer_id;
+    uint32_t part_size;
 } __attribute__((packed)) uc_fetchstore_t;
 
 static inline int
