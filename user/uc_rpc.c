@@ -110,7 +110,7 @@ uc_rpc_symlink(XDR * xdrs, XDR * xdr_out)
     // get the strings
     if (!xdr_string(xdrs, &from_path, UCAFS_PATH_MAX)
         || !xdr_string(xdrs, &target_link, UCAFS_PATH_MAX)) {
-        uerror("uc_rpc_hardlink decoding failed");
+        uerror("uc_rpc_symlink decoding failed");
         goto out;
     }
 

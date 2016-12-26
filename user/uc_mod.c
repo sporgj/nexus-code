@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <uv.h>
 
@@ -44,15 +45,19 @@ typedef struct xdr_outsp {
 #define XDROUT_DATALEN 64
 #define XDROUT_TOTALLEN XDROUT_DATALEN + sizeof(XDR) + sizeof(ucrpc_msg_t)
 
+/** we are going to have 3 buffers */
+uint8_t in_buffer[UCAFS_DATA_BUFLEN], out_buffer[UCAFS_DATA_BUFLEN];
+ucrpc_msg_t in_rpc;
+
 int
 setup_mod()
 {
     int len, status;
     size_t nbytes;
-    xdr_data_t * x_data = NULL;
-    xdr_rsp_t * x_rsp = NULL;
-    XDR *xdr_in, *xdr_out;
-    ucrpc_msg_t m, *msg = &m, *rsp;
+    xdr_data_t * x_data = (xdr_data_t *)in_buffer;
+    xdr_rsp_t * x_rsp = (xdr_rsp_t *)out_buffer;
+    ucrpc_msg_t *in_msg = &in_rpc, *out_msg = &x_rsp->msg;
+    XDR *xdr_in = &x_data->xdrs, *xdr_out = &x_rsp->xdrs;
 
     uv_mutex_init(&mut_msg_counter);
 
@@ -67,29 +72,17 @@ setup_mod()
     }
 
     while (1) {
-        nbytes = fread(msg, 1, sizeof(ucrpc_msg_t), ucafs_mod_fid);
+        nbytes = fread(in_msg, 1, sizeof(ucrpc_msg_t), ucafs_mod_fid);
         if (nbytes == sizeof(ucrpc_msg_t)) {
-            if ((x_data = malloc(sizeof(xdr_data_t) + msg->len + 10)) == NULL) {
-                uerror("allocation failed... abort now");
-                break;
-            }
-
-            if ((x_rsp = malloc(XDROUT_TOTALLEN)) == NULL) {
-                uerror("allocating response.. failed");
-                break;
-            }
-
             /* read the data on the wire */
-            fread(x_data->data, 1, msg->len, ucafs_mod_fid);
+            fread(x_data->data, 1, in_msg->len, ucafs_mod_fid);
 
             /* create our XDR data */
-            xdr_in = &x_data->xdrs;
-            xdr_out = &x_rsp->xdrs;
-            xdrmem_create(xdr_in, x_data->data, msg->len, XDR_DECODE);
-            xdrmem_create(xdr_out, x_rsp->data, XDROUT_DATALEN, XDR_ENCODE);
+            xdrmem_create(xdr_in, x_data->data, in_msg->len, XDR_DECODE);
+            xdrmem_create(xdr_out, x_rsp->data, PAGE_SIZE, XDR_ENCODE);
 
             /* dispatch to the corresponding function */
-            switch (msg->type) {
+            switch (in_msg->type) {
             case UCAFS_MSG_PING:
                 status = uc_rpc_ping(xdr_in, xdr_out);
                 break;
@@ -97,7 +90,7 @@ setup_mod()
             case UCAFS_MSG_FILLDIR:
             case UCAFS_MSG_CREATE:
             case UCAFS_MSG_REMOVE:
-                status = uc_rpc_dirops(msg->type, xdr_in, xdr_out);
+                status = uc_rpc_dirops(in_msg->type, xdr_in, xdr_out);
                 break;
             case UCAFS_MSG_SYMLINK:
                 status = uc_rpc_symlink(xdr_in, xdr_out);
@@ -113,22 +106,18 @@ setup_mod()
             }
 
             /* send the response */
-            rsp = &x_rsp->msg;
             nbytes = xdr_out->x_private - xdr_out->x_base;
-            *rsp = (ucrpc_msg_t){.msg_id = ucrpc__genid(),
-                                 .ack_id = msg->msg_id,
-                                 .len = nbytes,
-                                 .status = status };
-            len = MSG_SIZE(rsp);
+            *out_msg = (ucrpc_msg_t){.msg_id = ucrpc__genid(),
+                                     .ack_id = in_msg->msg_id,
+                                     .len = nbytes,
+                                     .status = status };
+            len = MSG_SIZE(out_msg);
 
             /* send the whole thing */
-            nbytes = fwrite(rsp, 1, len, ucafs_mod_fid);
+            nbytes = fwrite(out_msg, 1, len, ucafs_mod_fid);
 
             /* log_debug("{ uc_mod } status=%d in=(%zu, %d), out=(%zu, %d)",
                status, MSG_SIZE(msg), msg->len, nbytes, rsp->len); */
-            free(x_data);
-            free(x_rsp);
-
             status = 0;
         }
     }

@@ -159,6 +159,8 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
     caddr_t payload;
     char * path;
 
+    *shadow_name = NULL;
+
     if (ucafs_vnode_path(avc, &path)) {
         return -1;
     }
@@ -238,6 +240,9 @@ ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest)
     XDR xdrs, * xdr_reply;
     reply_data_t * reply = NULL;
 
+    *dest = NULL;
+
+    /* get the path to the dentry */
     if (ucafs_dentry_path(dp, &from_path)) {
         goto out;
     }
@@ -286,6 +291,8 @@ ucafs_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest)
     caddr_t payload;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
+
+    *dest = NULL;
 
     if (ucafs_dentry_path(olddp, &from_path) ||
         ucafs_dentry_path(newdp, &to_path)) {

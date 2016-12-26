@@ -141,7 +141,7 @@ ucafs_mod_send(uc_msg_type_t type,
  */
 int
 ucafs_mod_send1(uc_msg_type_t type,
-                uc_msg_subtype_t sub_type,
+                uc_msg_subtype_t subtype,
                 uint8_t * buffer,
                 XDR * xdrs,
                 reply_data_t ** pp_reply,
@@ -217,7 +217,7 @@ ucafs_mod_send1(uc_msg_type_t type,
                               XDR_DECODE);
             } else {
                 memcpy(buffer, msg->payload, msg->len);
-                xdrmem_create(&p_reply_xdrs, buffer, msg->len, XDR_DECODE);
+                xdrmem_create(&p_reply->xdrs, buffer, msg->len, XDR_DECODE);
             }
 
             *p_err = msg->status;

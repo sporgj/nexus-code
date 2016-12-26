@@ -21,7 +21,7 @@ index 0b34f1a..87402a7 100644
  }
  
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..af56488 100644
+index 1b99c94..f5c14a4 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -132,7 +132,7 @@ index 1b99c94..af56488 100644
      struct inode *oldip = olddp->d_inode;
 +    /* ucafs code */
 +    int is_ucafs_file;
-+    char * ucafs_name;
++    char * ucafs_name = NULL;
  
      /* If afs_link returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
@@ -563,18 +563,26 @@ index 18bcfda..9af6203 100644
 +
  #endif /* AFS_INCLUDES_H */
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..2d17495 100644
+index 46b9c9d..02ebd3f 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
-@@ -67,6 +67,16 @@ single_compdir_libafs: depsrcs libafs
+@@ -67,10 +67,28 @@ single_compdir_libafs: depsrcs libafs
  single_instdir_libafs: install_libafs
  single_destdir_libafs: dest_libafs
  
 +# ucafs objects
 +UCAFSOBJS = ucafs_mod.o\
++			ucafs_store.o\
++			ucafs_fetch.o\
 +			ucafs_kern.o
 +
 +ucafs_mod.o: $(TOP_SRC_AFS)/ucafs_mod.c
++	$(CRULE_OPT)
++
++ucafs_store.o: $(TOP_SRC_AFS)/ucafs_store.c
++	$(CRULE_OPT)
++
++ucafs_fetch.o: $(TOP_SRC_AFS)/ucafs_fetch.c
 +	$(CRULE_OPT)
 +
 +ucafs_kern.o: $(TOP_SRC_AFS)/ucafs_kern.c
@@ -583,3 +591,8 @@ index 46b9c9d..2d17495 100644
  # placeholder for any sources that are built prior to compiling libafs
  depsrcs: 
  
+-AFSAOBJS = \
++AFSAOBJS = $(UCAFSOBJS)\
+ 	afs_atomlist.o \
+ 	afs_lhash.o \
+ 	afs_analyze.o \

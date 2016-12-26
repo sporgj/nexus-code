@@ -12,7 +12,15 @@ typedef struct {
 } uuid_t;
 #else
 #include <uuid/uuid.h>
+#include <stdlib.h>
 #endif
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+
+#define UCAFS_DATA_BUFPAGES 1
+#define UCAFS_DATA_BUFLEN (PAGE_SIZE << UCAFS_DATA_BUFPAGES)
 
 #define UCAFS_PATH_MAX 4096
 #define UCAFS_FNAME_MAX 256
@@ -121,7 +129,7 @@ typedef enum {
 
 typedef struct {
     uc_msg_type_t type;
-    uc_msg_subtype_t sub_type;
+    uc_msg_subtype_t subtype;
     uint16_t msg_id; /* the ID of the message */
     uint16_t ack_id; /* the message it responds to */
     uint32_t len; /* the length of the payload */
