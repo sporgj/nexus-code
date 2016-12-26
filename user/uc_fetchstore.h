@@ -2,15 +2,7 @@
 extern "C" {
 #endif
 
-int
-fetchstore_start(uc_xfer_op_t op,
-            char * fpath,
-            uint16_t max_xfer_size,
-            uint32_t offset,
-            uint32_t file_size,
-            int old_fbox_len,
-            int * xfer_id,
-            int * new_fbox_len);
+int fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t *rp);
 
 uint8_t **
 fetchstore_get_buffer(int id, size_t valid_buflen);

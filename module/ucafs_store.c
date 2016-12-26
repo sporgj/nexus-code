@@ -1,5 +1,8 @@
 #include "ucafs_kern.h"
 #include "ucafs_mod.h"
+#include <linux/mm.h>
+#include <linux/highmem.h>
+#include <linux/page-flags.h>
 
 typedef struct dcache_item {
     bool is_dirty;
@@ -43,8 +46,6 @@ store_clean_context(store_context_t * context,
         ERROR("store_close, could not get response from uspace\n");
         goto next_op;
     }
-
-/* TODO: use the code status to determine if to continue or no */
 
 next_op:
     if (context->afs_call) {
@@ -166,15 +167,17 @@ ucafs_storesegment(store_context_t * context,
                    int sync,
                    char * path)
 {
-    int ret = -1, pos_start, pos_end, bytes_left, i, len, written, code;
+    int ret = -1, pos_start, pos_end, bytes_left, i, len, written, code, total_bytes;
     caddr_t buf_ptr;
     XDR xdrs, *x_data;
-    uc_fetchstore_t * fetchstore;
-    size_t buflen;
+    xfer_req_t xfer_req;
+    xfer_rsp_t xfer_rsp;
     reply_data_t * reply = NULL;
     struct osi_file * fp = NULL;
     struct dcache * tdc;
     struct AFSFetchStatus output;
+    struct page * page = NULL;
+    char * data_bufptr = NULL;
 
     pos_start = dclist[0].pos;
     pos_end = pos_start + sum_bytes;
@@ -189,17 +192,21 @@ ucafs_storesegment(store_context_t * context,
         goto out;
     }
 
-    buflen = READPTR_BUFLEN();
-
-    xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
-    xdrs.x_private += sizeof(uc_fetchstore_t);
+    xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
     /* lets start writing, we have to manully move the xdr */
-    fetchstore = (uc_fetchstore_t *)buf_ptr;
-    *fetchstore = (uc_fetchstore_t){.op = UCAFS_STORE,
-                                    .xfer_size = buflen,
-                                    .offset = pos_start,
-                                    .file_size = context->total_size,
-                                    .xfer_id = 0};
+    xfer_req = (xfer_req_t){.op = UCAFS_STORE,
+                            .xfer_size = PAGE_SIZE,
+                            .offset = pos_start,
+                            .part_size = sum_bytes,
+                            .file_size = context->total_size};
+    /* create the request */
+    if (!xdr_opaque(&xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t)) ||
+        !xdr_string(&xdrs, &path, UCAFS_PATH_MAX)) {
+        ERROR("error encoding XDR object\n");
+        goto out;
+    }
+
+    /* after this, the READPTR_LOCK() gets released */
     ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_BEGIN, context->buffer,
                           &xdrs, &reply, &code);
     if (ret || code) {
@@ -209,46 +216,69 @@ ucafs_storesegment(store_context_t * context,
 
     // read the response
     x_data = &reply->xdrs;
-    if (!xdr_int(x_data, &context->id)) {
+    if (!xdr_opaque(x_data, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
         ERROR("could not read response from init stored\n");
         goto out;
     }
 
+    context->id = xfer_rsp.xfer_id;
+    /* we get to pin the user's pages and start the transfer */
+    down_read(&dev->daemon->mm->mmap_sem);
+    ret = get_user_pages(dev->daemon, dev->daemon->mm,
+                         (unsigned long)xfer_rsp.uaddr, 1, 1, 1, &page, NULL);
+    if (ret != 1) {
+        up_read(&dev->daemon->mm->mmap_sem);
+        ERROR("getting user pages failed: uaddr=%p\n", xfer_rsp.uaddr);
+        goto out;
+    }
+
+    /* now lets kmap and start I/O */
+    data_bufptr = kmap(page);
+    up_read(&dev->daemon->mm->mmap_sem);
+
+    /* the int will contain our context transfer ID */
+
     /* now, lets start pushing the data around */
-    bytes_left = sum_bytes;
+    total_bytes = 0;
     for (i = 0; i < count; i++) {
         tdc = dclist[i].tdc;
         fp = afs_CFileOpen(&tdc->f.inode);
 
-        READPTR_LOCK();
         bytes_left = dclist[i].len;
         while (bytes_left > 0) {
             if ((buf_ptr = READPTR_LOCK()) == 0) {
-                goto out;
+                goto out1;
             }
 
-            len = MIN(bytes_left, buflen);
+            /* copy data to the daata buffer */
+            len = MIN(bytes_left, xfer_rsp.buflen);
+            afs_osi_Read(fp, -1, data_bufptr, len);
 
             /* create our xdrs and fake the pointers */
-            xdrmem_create(&xdrs, buf_ptr, len, XDR_ENCODE);
-            afs_osi_Read(fp, -1, xdrs.x_private, len);
-            xdrs.x_private += len;
+            xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
+            if (!xdr_int(&xdrs, &context->id) || !xdr_int(&xdrs, &len)) {
+                ERROR("xdr store_data failed\n");
+                goto out1;
+            }
 
             /* send the enchilada */
             ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_PROCESS,
                                   context->buffer, &xdrs, &reply, &code);
             if (ret || code) {
-                goto out;
+                ERROR("error from uspace code=%d\n", code);
+                goto out1;
             }
 
-            /* now send the whole thing */
-            if (store_write(context, context->buffer, len, &written)) {
-                goto out;
+            /* now send the whole thing, hold the lock on the ptr to avoid
+             * any other process from writing over */
+            if (store_write(context, buf_ptr, len, &written)) {
+                goto out1;
             }
 
             kfree(reply);
             reply = NULL;
 
+            total_bytes += len;
             bytes_left -= len;
         }
 
@@ -272,6 +302,13 @@ ucafs_storesegment(store_context_t * context,
     }
 
     ret = 0;
+out1:
+    /* unpin the page and release everything */
+    kunmap(page);
+    if (!PageReserved(page)) {
+        SetPageDirty(page);
+        page_cache_release(page);
+    }
 out:
     if (fp == NULL) {
         osi_UFSClose(fp);
@@ -291,7 +328,8 @@ out:
 int
 ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
 {
-    int ret = -1, abyte, afs_chunks, dirty_chunks, count, i, bytes_left, sum_bytes;
+    int ret = -1, abyte, afs_chunks, dirty_chunks, count, i, bytes_left,
+        sum_bytes;
     afs_hyper_t old_dv, new_dv;
     size_t tdc_per_part, part_per_tdc;
     struct dcache * tdc;
@@ -375,8 +413,10 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
             dcitem->is_dirty = 1;
         }
 
+        /* update the amount of data being processed */
         dcitem->len = tdc->f.chunkBytes;
         sum_bytes += dcitem->len;
+        abyte += dcitem->len;
         ReleaseSharedLock(&tdc->lock);
 
         dcitem->tdc = tdc;
@@ -389,12 +429,12 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         if (count == tdc_per_part) {
         store_chunk:
             /* clear the list */
-            if (dirty_chunks) {
+            if (dirty_chunks == 0) {
                 goto skip_store;
             }
 
-            if ((ret = ucafs_storesegment(context, dclist, count, sum_bytes, areq,
-                                   sync, path))) {
+            if ((ret = ucafs_storesegment(context, dclist, count, sum_bytes,
+                                          areq, sync, path))) {
                 ERROR("ucafs_storesegment failed ret = %d", ret);
                 goto out1;
             }
@@ -412,6 +452,7 @@ ucafs_store(struct vcache * avc, struct vrequest * areq, int sync)
         afs_chunks--;
     }
 
+    /* if there a lingering chunks but count != tdc_per_part */
     if (dirty_chunks) {
         goto store_chunk;
     }

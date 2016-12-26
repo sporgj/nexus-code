@@ -193,10 +193,10 @@ uc_rpc_rename(XDR * xdrs, XDR * xdr_out)
     char *from_path = NULL, *to_path = NULL, *newname = NULL, *oldname = NULL,
          *old_shadowname = NULL, *new_shadowname = NULL;
 
-    if (!xdr_string(xdrs, &from_path, UCAFS_PATH_MAX) ||
-        !xdr_string(xdrs, &oldname, UCAFS_FNAME_MAX) ||
-        !xdr_string(xdrs, &to_path, UCAFS_PATH_MAX) ||
-        !xdr_string(xdrs, &newname, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdrs, &from_path, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &oldname, UCAFS_FNAME_MAX)
+        || !xdr_string(xdrs, &to_path, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &newname, UCAFS_FNAME_MAX)) {
         uerror("xdr rename failed");
         goto out;
     }
@@ -211,8 +211,8 @@ uc_rpc_rename(XDR * xdrs, XDR * xdr_out)
 
     log_info("[rename] %s/%s -> %s/%s", from_path, oldname, to_path, newname);
 
-    if (!xdr_string(xdr_out, &old_shadowname, UCAFS_FNAME_MAX) ||
-        !xdr_string(xdr_out, &new_shadowname, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdr_out, &old_shadowname, UCAFS_FNAME_MAX)
+        || !xdr_string(xdr_out, &new_shadowname, UCAFS_FNAME_MAX)) {
         uerror("encoding rename response failed");
         goto out;
     }
@@ -241,6 +241,53 @@ out:
 
     if (new_shadowname) {
         free(new_shadowname);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_store(XDR * xdrs, XDR * xdr_out, uc_msg_subtype_t subop)
+{
+    int ret = -1, xfer_id, dummy;
+    size_t nbytes;
+    xfer_req_t xfer_req;
+    xfer_rsp_t xfer_rsp;
+    char * fpath = NULL;
+
+    switch (subop) {
+    case UCAFS_SUBMSG_BEGIN:
+        // initiate the transfer context
+        if (!xdr_opaque(xdrs, (caddr_t)&fs, sizeof(xfer_req_t))
+            || !xdr_string(xdrs, &fpath, UCAFS_PATH_MAX)) {
+            uerror("xdr parsing for store start failed");
+            goto out;
+        }
+
+        // call fetchstore start
+        if (fetchstore_init(&xfer_req, fpath, &xfer_rsp)) {
+            log_error("fetchstore_start failed :(");
+            goto out;
+        }
+
+        // otherwise, lets just setup our response
+        if (!xdr_opaque(xdr_out, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
+            log_error("Error with setting xfer_id");
+            goto out;
+        }
+
+        log_info("ucafs_store: xfer_id=%d %s", xfer_id, fpath);
+        break;
+
+    case UCAFS_SUBMSG_PROCESS:
+        // copy the transfer buffer 
+
+    }
+
+    ret = 0;
+out:
+    if (fpath) {
+        free(fpath);
     }
 
     return ret;

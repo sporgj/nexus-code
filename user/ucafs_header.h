@@ -70,9 +70,14 @@ typedef struct {
     uint16_t xfer_size;
     uint32_t offset;
     uint32_t file_size;
-    int xfer_id;
     uint32_t part_size;
-} __attribute__((packed)) uc_fetchstore_t;
+} __attribute__((packed)) xfer_req_t;
+
+typedef struct {
+    int xfer_id;
+    size_t buflen;
+    char * uaddr;
+} __attribute__((packed)) xfer_rsp_t;
 
 static inline int
 UCAFS_CHUNK_BASE(int offset)

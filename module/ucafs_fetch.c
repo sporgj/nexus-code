@@ -1,5 +1,6 @@
 #include "ucafs_kern.h"
 #include "ucafs_mod.h"
+#include <linux/mm.h> 
 
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_fetch: " fmt, ##args)
@@ -11,7 +12,10 @@ ucafs_fetch_fserv_close(struct rx_call * afs_call,
                         int error);
 
 static int
-ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size);
+ucafs_fetch_daemon_init(fetch_context_t * context,
+                        xfer_rsp_t * rp,
+                        int start,
+                        int size);
 
 static int
 ucafs_fetch_fserv_init(struct afs_conn * tc,
@@ -65,11 +69,13 @@ next_op:
 }
 
 static int
-ucafs_fetch_read(fetch_context_t * context, int tlen, int * byteswritten)
+ucafs_fetch_read(fetch_context_t * context,
+                 caddr_t buf,
+                 int tlen,
+                 int * byteswritten)
 {
     int ret = 0;
     struct rx_call * afs_call = context->afs_call;
-    uint8_t * buf = context->buffer;
     afs_int32 nbytes, bytes_left = tlen, size;
     *byteswritten = 0;
 
@@ -94,6 +100,90 @@ out:
     return ret;
 }
 
+static int
+ucafs_fetchproc(fetch_context_t * context,
+                struct dcache * adc,
+                struct osi_file * fp,
+                xfer_rsp_t * xfer_rsp,
+                int base,
+                int start_pos,
+                int end_pos,
+                int tdc_end)
+{
+    int ret = -1, pos, bytes_left, len, code, buflen, written;
+    struct page * page;
+    char * data_bufptr;
+    caddr_t buf_ptr;
+    XDR xdrs;
+    reply_data_t * reply = NULL;
+
+    /* we get to pin the user's pages and start the transfer */
+    down_read(&dev->daemon->mm->mmap_sem);
+    ret = get_user_pages(dev->daemon, dev->daemon->mm,
+                         (unsigned long)xfer_rsp->uaddr, 1, 1, 1, &page, NULL);
+    if (ret != 1) {
+        up_read(&dev->daemon->mm->mmap_sem);
+        ERROR("getting user pages failed: uaddr=%p\n", xfer_rsp->uaddr);
+        goto out;
+    }
+
+    /* now lets kmap and start I/O */
+    data_bufptr = kmap(page);
+    up_read(&dev->daemon->mm->mmap_sem);
+
+    pos = start_pos;
+    fp->offset = 0;
+    while (bytes_left > 0) {
+        if ((buf_ptr = READPTR_LOCK()) == 0) {
+            goto out1;
+        }
+
+        buflen = READPTR_BUFLEN();
+        len = MIN(bytes_left, buflen);
+
+        /* now send the whole thing */
+        if (ucafs_fetch_read(context, data_bufptr, len, &written)) {
+            goto out1;
+        }
+
+        /* create our xdrs and fake the pointers */
+        xdrmem_create(&xdrs, buf_ptr, len, XDR_ENCODE);
+
+        /* send the enchilada */
+        ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_PROCESS,
+                              context->buffer, &xdrs, &reply, &code);
+        if (ret || code) {
+            goto out1;
+        }
+
+        kfree(reply);
+        reply = NULL;
+
+        pos += len;
+        bytes_left -= len;
+
+        if (pos >= base || pos <= tdc_end) {
+            afs_osi_Write(fp, -1, (void *)data_bufptr, written);
+            adc->validPos = pos;
+            afs_osi_Wakeup(&adc->validPos);
+        }
+    }
+
+    ret = 0;
+out1:
+    kunmap(page);
+    if (!PageReserved(page)) {
+        SetPageDirty(page);
+        page_cache_release(page);
+    }
+
+    if (reply) {
+        kfree(reply);
+    }
+out:
+    return ret;
+}
+
 int
 ucafs_fetch(struct afs_conn * tc,
             struct rx_connection * rxconn,
@@ -104,14 +194,10 @@ ucafs_fetch(struct afs_conn * tc,
             afs_int32 size,
             struct afs_FetchOutput * tsmall)
 {
-    int ret = -1, start_pos, end_pos, bytes_left, len, written, tdc_end, pos,
-        code;
-    size_t buflen;
-    caddr_t buf_ptr;
-    reply_data_t * reply = NULL;
-    XDR xdrs;
+    int ret = -1, start_pos, end_pos, bytes_left, len, tdc_end;
     char * path;
     fetch_context_t * context;
+    xfer_rsp_t xfer_rsp;
 
     if (UCAFS_IS_OFFLINE || vType(avc) == VDIR) {
         return UC_STATUS_NOOP;
@@ -155,49 +241,16 @@ ucafs_fetch(struct afs_conn * tc,
     }
 
     /* instantiate the user space */
-    if ((ret = ucafs_fetch_daemon_init(context, start_pos, bytes_left))) {
+    if ((ret = ucafs_fetch_daemon_init(context, &xfer_rsp, start_pos,
+                                       bytes_left))) {
         ERROR("could not start daemon\n");
         goto out1;
     }
 
-    pos = base;
-    fp->offset = 0;
-    while (bytes_left > 0) {
-        if ((buf_ptr = READPTR_LOCK()) == 0) {
-            goto out1;
-        }
-
-        buflen = READPTR_BUFLEN();
-        len = MIN(bytes_left, buflen);
-
-        /* create our xdrs and fake the pointers */
-        xdrmem_create(&xdrs, buf_ptr, len, XDR_ENCODE);
-        afs_osi_Read(fp, -1, xdrs.x_private, len);
-        xdrs.x_private += len;
-
-        /* now send the whole thing */
-        if (ucafs_fetch_read(context, len, &written)) {
-            goto out1;
-        }
-
-        /* send the enchilada */
-        ret = ucafs_mod_send1(UCAFS_MSG_STORE, UCAFS_SUBMSG_PROCESS,
-                              context->buffer, &xdrs, &reply, &code);
-        if (ret || code) {
-            goto out1;
-        }
-
-        kfree(reply);
-        reply = NULL;
-
-        pos += len;
-        bytes_left -= len;
-
-        if (pos >= base || pos <= tdc_end) {
-            afs_osi_Write(fp, -1, context->buffer, written);
-            adc->validPos = pos;
-            afs_osi_Wakeup(&adc->validPos);
-        }
+    if (ucafs_fetchproc(context, adc, fp, &xfer_rsp, base, start_pos, end_pos,
+                        tdc_end)) {
+        ERROR("fetchproc failed\n");
+        goto out;
     }
 
     ret = 0;
@@ -209,11 +262,6 @@ out1:
 
     ucafs_fetch_daemon_finish(context);
 out:
-
-    if (reply) {
-        kfree(reply);
-    }
-
     kfree(path);
 
     if (context->buffer) {
@@ -226,7 +274,10 @@ out:
 }
 
 static int
-ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
+ucafs_fetch_daemon_init(fetch_context_t * context,
+                        xfer_rsp_t * rp,
+                        int start,
+                        int size)
 {
     int ret = -1, code;
 
@@ -234,7 +285,7 @@ ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
     caddr_t buf_ptr;
     reply_data_t * reply = NULL;
     size_t buflen;
-    uc_fetchstore_t * fetchstore;
+    xfer_req_t rq;
 
     if ((buf_ptr = READPTR_LOCK()) == 0) {
         goto out;
@@ -243,14 +294,18 @@ ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
     buflen = READPTR_BUFLEN();
 
     xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
-    xdrs.x_private += sizeof(uc_fetchstore_t);
-    /* lets start writing, we have to manully move the xdr */
-    fetchstore = (uc_fetchstore_t *)buf_ptr;
-    *fetchstore = (uc_fetchstore_t){.op = UCAFS_FETCH,
-                                    .xfer_size = buflen,
-                                    .offset = start,
-                                    .part_size = size,
-                                    .file_size = context->total_size};
+    rq = (xfer_req_t){.op = UCAFS_FETCH,
+                      .xfer_size = buflen,
+                      .offset = start,
+                      .part_size = size,
+                      .file_size = context->total_size};
+
+    if (!xdr_opaque(&xdrs, (caddr_t)&rq, sizeof(xfer_req_t)) ||
+        !xdr_string(&xdrs, (char **)&context->path, UCAFS_PATH_MAX)) {
+        ERROR("daemon_init xdr encoding failed\n");
+        goto out;
+    }
+
     ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_BEGIN, context->buffer,
                           &xdrs, &reply, &code);
     if (ret || code) {
@@ -261,10 +316,12 @@ ucafs_fetch_daemon_init(fetch_context_t * context, int start, int size)
 
     // read the response
     x_data = &reply->xdrs;
-    if (!xdr_int(x_data, &context->id)) {
+    if (!xdr_opaque(x_data, (caddr_t)rp, sizeof(xfer_rsp_t))) {
         ERROR("could not read response from init stored\n");
         goto out;
     }
+
+    context->id = rp->xfer_id;
 
     ret = 0;
 out:
