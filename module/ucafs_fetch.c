@@ -110,7 +110,7 @@ ucafs_fetchproc(fetch_context_t * context,
                 int end_pos,
                 int tdc_end)
 {
-    int ret = -1, pos, bytes_left, len, code, buflen, written;
+    int ret = -1, pos, bytes_left, len, code, written;
     struct page * page;
     char * data_bufptr;
     caddr_t buf_ptr;
@@ -139,18 +139,17 @@ ucafs_fetchproc(fetch_context_t * context,
             goto out1;
         }
 
-        buflen = READPTR_BUFLEN();
-        len = MIN(bytes_left, buflen);
+        len = MIN(bytes_left, xfer_rsp->buflen);
 
-        /* now send the whole thing */
+        /* Read from the server */
         if (ucafs_fetch_read(context, data_bufptr, len, &written)) {
             goto out1;
         }
 
         /* tell userspace to encrypt */
-        xdrmem_create(&xdrs, buf_ptr, len, XDR_ENCODE);
+        xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
         if (!xdr_int(&xdrs, &context->id) || !xdr_int(&xdrs, &len)) {
-            ERROR("xdr store_data failed\n");
+            ERROR("xdr fetch_data failed\n");
             goto out1;
         }
 
@@ -166,7 +165,7 @@ ucafs_fetchproc(fetch_context_t * context,
         pos += len;
         bytes_left -= len;
 
-        if (pos >= base || pos <= tdc_end) {
+        if (pos >= base && pos <= tdc_end) {
             afs_osi_Write(fp, -1, (void *)data_bufptr, written);
             adc->validPos = pos;
             afs_osi_Wakeup(&adc->validPos);
@@ -198,7 +197,8 @@ ucafs_fetch(struct afs_conn * tc,
             afs_int32 size,
             struct afs_FetchOutput * tsmall)
 {
-    int ret = -1, start_pos, end_pos, bytes_left, len, tdc_end;
+    int ret = -1, start_pos, end_pos, chunk_len, bytes_left, tdc_end,
+        tdc_per_part, part_per_tdc;
     char * path;
     fetch_context_t * context;
     xfer_rsp_t xfer_rsp;
@@ -219,11 +219,6 @@ ucafs_fetch(struct afs_conn * tc,
         return UC_STATUS_NOOP;
     }
 
-    if ((context->buffer = UCXFER_ALLOC()) == NULL) {
-        ERROR("context's buffer allocation failed\n");
-        goto out;
-    }
-
     context->buflen = UCXFER_BUFFER_SIZE;
     context->id = -1;
     context->path = path;
@@ -232,17 +227,37 @@ ucafs_fetch(struct afs_conn * tc,
     context->rx_conn = rxconn;
     context->total_size = avc->f.m.Length;
 
+    /* use the chunk spans */
+    tdc_per_part = CHUNK_RATIO(UCAFS_CHUNK_LOG, AFS_LOGCHUNK);
+    part_per_tdc = CHUNK_RATIO(AFS_LOGCHUNK, UCAFS_CHUNK_LOG);
+
     start_pos = UCAFS_CHUNK_BASE(base);
-    end_pos = MIN(context->total_size, start_pos + MAX(UCAFS_CHUNK_SIZE, size));
-    len = end_pos - start_pos;
+
+    /* if chunk_size = N * tdc_size */
+    if (tdc_per_part >= part_per_tdc) {
+        start_pos = UCAFS_CHUNK_BASE(base);
+        chunk_len = UCAFS_CHUNK_SIZE;
+        ERROR("part > tdc: start_pos=%d, chunk_len=%d\n", start_pos, chunk_len);
+    } else {
+        start_pos = base;
+        chunk_len = size;
+        ERROR("tdc > part: start_pos=%d, chunk_len=%d\n", start_pos, chunk_len);
+    }
+
     tdc_end = base + size;
 
-    ret = ucafs_fetch_fserv_init(tc, rxconn, avc, start_pos, len, &bytes_left,
-                                 &context->srv_64bit, &context->afs_call);
+    ret = ucafs_fetch_fserv_init(tc, rxconn, avc, start_pos, chunk_len,
+                                 &bytes_left, &context->srv_64bit,
+                                 &context->afs_call);
     if (ret) {
         ERROR("could not start fileserver. code=%d\n", ret);
         goto out;
     }
+
+    end_pos = start_pos + bytes_left;
+
+    ERROR("start_pos=%d, chunk_len=%d, bytes_left=%d\n", start_pos, chunk_len,
+          bytes_left);
 
     /* instantiate the user space */
     if ((ret = ucafs_fetch_daemon_init(context, &xfer_rsp, start_pos,
@@ -267,11 +282,6 @@ out1:
     ucafs_fetch_daemon_finish(context);
 out:
     kfree(path);
-
-    if (context->buffer) {
-        UCXFER_FREE(context->buffer);
-    }
-
     kfree(context);
 
     return ret;
@@ -299,9 +309,8 @@ ucafs_fetch_daemon_init(fetch_context_t * context,
 
     xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
     rq = (xfer_req_t){.op = UCAFS_FETCH,
-                      .xfer_size = buflen,
+                      .xfer_size = size,
                       .offset = start,
-                      .part_size = size,
                       .file_size = context->total_size};
 
     if (!xdr_opaque(&xdrs, (caddr_t)&rq, sizeof(xfer_req_t)) ||

@@ -208,9 +208,8 @@ ucafs_storesegment(store_context_t * context,
     xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
     /* lets start writing, we have to manully move the xdr */
     xfer_req = (xfer_req_t){.op = UCAFS_STORE,
-                            .xfer_size = PAGE_SIZE,
+                            .xfer_size = sum_bytes,
                             .offset = pos_start,
-                            .part_size = sum_bytes,
                             .file_size = context->total_size};
     /* create the request */
     if (!xdr_opaque(&xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t)) ||

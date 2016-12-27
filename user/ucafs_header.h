@@ -71,7 +71,6 @@ typedef struct {
     uint16_t xfer_size;
     uint32_t offset;
     uint32_t file_size;
-    uint32_t part_size;
 } __attribute__((packed)) xfer_req_t;
 
 typedef struct {
@@ -107,7 +106,7 @@ static inline size_t
 CHUNK_RATIO(int numerator_log, int denomintor_log)
 {
     int ratio = numerator_log - denomintor_log;
-    return ratio <= 0 ? 2 : (1 << ratio) + 1;
+    return ratio < 0 ? 0 : (1 << ratio) + 1;
 }
 
 /* module-userspace data structures */
