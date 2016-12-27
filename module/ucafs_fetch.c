@@ -53,8 +53,7 @@ ucafs_fetch_daemon_finish(fetch_context_t * context)
         goto next_op;
     }
 
-    ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_FINISH, context->buffer,
-                          &xdrs, &reply, &code);
+    ret = ucafs_mod_send(UCAFS_MSG_XFER_EXIT, &xdrs, &reply, &code);
     if (ret || code) {
         ERROR("store_close, could not get response from uspace\n");
         goto next_op;
@@ -81,6 +80,7 @@ ucafs_fetch_read(fetch_context_t * context,
 
     /* send the data to the server */
     RX_AFS_GUNLOCK();
+
     while (bytes_left > 0) {
         size = MIN(MAX_FSERV_SIZE, bytes_left);
 
@@ -94,9 +94,9 @@ ucafs_fetch_read(fetch_context_t * context,
         bytes_left -= size;
         *byteswritten += size;
     }
-    RX_AFS_GLOCK();
 
 out:
+    RX_AFS_GLOCK();
     return ret;
 }
 
@@ -133,6 +133,7 @@ ucafs_fetchproc(fetch_context_t * context,
 
     pos = start_pos;
     fp->offset = 0;
+    bytes_left = end_pos - start_pos;
     while (bytes_left > 0) {
         if ((buf_ptr = READPTR_LOCK()) == 0) {
             goto out1;
@@ -146,12 +147,14 @@ ucafs_fetchproc(fetch_context_t * context,
             goto out1;
         }
 
-        /* create our xdrs and fake the pointers */
+        /* tell userspace to encrypt */
         xdrmem_create(&xdrs, buf_ptr, len, XDR_ENCODE);
+        if (!xdr_int(&xdrs, &context->id) || !xdr_int(&xdrs, &len)) {
+            ERROR("xdr store_data failed\n");
+            goto out1;
+        }
 
-        /* send the enchilada */
-        ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_PROCESS,
-                              context->buffer, &xdrs, &reply, &code);
+        ret = ucafs_mod_send(UCAFS_MSG_XFER_RUN, &xdrs, &reply, &code);
         if (ret || code) {
             goto out1;
         }
@@ -159,6 +162,7 @@ ucafs_fetchproc(fetch_context_t * context,
         kfree(reply);
         reply = NULL;
 
+        /* move our pointers and copy the data into the tdc file */
         pos += len;
         bytes_left -= len;
 
@@ -306,8 +310,7 @@ ucafs_fetch_daemon_init(fetch_context_t * context,
         goto out;
     }
 
-    ret = ucafs_mod_send1(UCAFS_MSG_FETCH, UCAFS_SUBMSG_BEGIN, context->buffer,
-                          &xdrs, &reply, &code);
+    ret = ucafs_mod_send(UCAFS_MSG_XFER_INIT, &xdrs, &reply, &code);
     if (ret || code) {
         ERROR("initializing store for %s (%d, %d)\n", context->path, start,
               start + size);

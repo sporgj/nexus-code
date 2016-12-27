@@ -551,6 +551,21 @@ index e8b8f9d..48e78dc 100644
  
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
+diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
+index f494677..34c9700 100644
+--- a/src/afs/afs_fetchstore.c
++++ b/src/afs/afs_fetchstore.c
+@@ -1150,6 +1150,10 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+ 
+     XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
+ 
++    if (ucafs_fetch(tc, rxconn, fP, base, adc, avc, size, tsmall) == 0) {
++	return 0;
++    }
++
+     /*
+      * Locks held:
+      * avc->lock(R) if setLocks && !slowPass
 diff --git a/src/afs/afs_segments.c b/src/afs/afs_segments.c
 index 2dd89cf..0a4efad 100644
 --- a/src/afs/afs_segments.c
@@ -579,19 +594,23 @@ index 18bcfda..9af6203 100644
 +
  #endif /* AFS_INCLUDES_H */
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..20a3506 100644
+index 46b9c9d..6334aed 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
-@@ -67,6 +67,20 @@ single_compdir_libafs: depsrcs libafs
+@@ -67,10 +67,28 @@ single_compdir_libafs: depsrcs libafs
  single_instdir_libafs: install_libafs
  single_destdir_libafs: dest_libafs
  
 +# ucafs objects
 +UCAFSOBJS = ucafs_mod.o\
 +			ucafs_store.o\
++			ucafs_fetch.o\
 +			ucafs_kern.o
 +
 +ucafs_store.o: $(TOP_SRC_AFS)/ucafs_store.c
++	$(CRULE_OPT)
++
++ucafs_fetch.o: $(TOP_SRC_AFS)/ucafs_fetch.c
 +	$(CRULE_OPT)
 +
 +ucafs_mod.o: $(TOP_SRC_AFS)/ucafs_mod.c
@@ -603,3 +622,8 @@ index 46b9c9d..20a3506 100644
  # placeholder for any sources that are built prior to compiling libafs
  depsrcs: 
  
+-AFSAOBJS = \
++AFSAOBJS = $(UCAFSOBJS)\
+ 	afs_atomlist.o \
+ 	afs_lhash.o \
+ 	afs_analyze.o \

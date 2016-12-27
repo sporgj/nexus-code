@@ -205,8 +205,6 @@ ucafs_storesegment(store_context_t * context,
         goto out;
     }
 
-    ERROR("setting up xdr\n");
-
     xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
     /* lets start writing, we have to manully move the xdr */
     xfer_req = (xfer_req_t){.op = UCAFS_STORE,
@@ -234,8 +232,6 @@ ucafs_storesegment(store_context_t * context,
         ERROR("could not read response from init stored\n");
         goto out;
     }
-
-    ERROR("response acquired, uaddr_t=%p\n", xfer_rsp.uaddr);
 
     context->id = xfer_rsp.xfer_id;
     /* we get to pin the user's pages and start the transfer */
@@ -284,7 +280,7 @@ ucafs_storesegment(store_context_t * context,
 
             /* now send the whole thing, hold the lock on the ptr to avoid
              * any other process from writing over */
-            if (store_write(context, buf_ptr, len, &written)) {
+            if (store_write(context, data_bufptr, len, &written)) {
                 goto out1;
             }
 

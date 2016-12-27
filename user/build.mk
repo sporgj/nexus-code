@@ -6,7 +6,7 @@ SGX_DEBUG := 1
 SGX_PRELEASE := 0
 
 # enable SGX ecalls
-UCAFS_SGX := 0
+UCAFS_SGX := 1
 
 # are we running a development build
 UCAFS_DEV := 1

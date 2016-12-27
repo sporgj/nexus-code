@@ -61,3 +61,13 @@ ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest);
 
 int
 ucafs_store(struct vcache * avc, struct vrequest * areq, int sync);
+
+int
+ucafs_fetch(struct afs_conn * tc,
+            struct rx_connection * rxconn,
+            struct osi_file * fp,
+            afs_size_t base,
+            struct dcache * adc,
+            struct vcache * avc,
+            afs_int32 size,
+            struct afs_FetchOutput * tsmall);
