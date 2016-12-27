@@ -58,3 +58,6 @@ ucafs_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest);
 
 int
 ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest);
+
+int
+ucafs_store(struct vcache * avc, struct vrequest * areq, int sync);

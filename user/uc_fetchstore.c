@@ -107,7 +107,7 @@ int fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t *rp)
     *rp = (xfer_rsp_t){
         .xfer_id = xfer_ctx->xfer_id,
         .buflen = PAGE_SIZE,
-        .addr = xfer_ctx->buffer
+        .uaddr = xfer_ctx->buffer
     };
 
     ret = 0;

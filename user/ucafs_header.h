@@ -36,6 +36,7 @@ typedef struct {
 #define UC_AFS_WATCH "sgx"
 
 typedef enum {
+    UC_STATUS_GOOD = 0,
     UC_STATUS_NOOP,
     UC_STATUS_ERROR
 } uc_err_t;
@@ -121,20 +122,13 @@ typedef enum {
     UCAFS_MSG_HARDLINK,
     UCAFS_MSG_SYMLINK,
     UCAFS_MSG_RENAME,
-    UCAFS_MSG_STORE,
-    UCAFS_MSG_FETCH
+    UCAFS_MSG_XFER_INIT,
+    UCAFS_MSG_XFER_RUN,
+    UCAFS_MSG_XFER_EXIT
 } uc_msg_type_t;
-
-typedef enum {
-    UCAFS_SUBMSG_NONE,
-    UCAFS_SUBMSG_BEGIN,
-    UCAFS_SUBMSG_PROCESS,
-    UCAFS_SUBMSG_FINISH
-} uc_msg_subtype_t;
 
 typedef struct {
     uc_msg_type_t type;
-    uc_msg_subtype_t subtype;
     uint16_t msg_id; /* the ID of the message */
     uint16_t ack_id; /* the message it responds to */
     uint32_t len; /* the length of the payload */

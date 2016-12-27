@@ -99,14 +99,6 @@ ucafs_mod_send(uc_msg_type_t type,
                reply_data_t ** pp_rsp,
                int * p_code);
 
-int
-ucafs_mod_send1(uc_msg_type_t type,
-                uc_msg_subtype_t subtype,
-                uint8_t * buffer, // make sure it is large enough
-                XDR * xdrs,
-                reply_data_t ** pp_rsp,
-                int * p_code);
-
 static inline caddr_t
 READPTR_LOCK(void)
 {

@@ -247,7 +247,7 @@ out:
 }
 
 int
-uc_rpc_store(XDR * xdrs, XDR * xdr_out, uc_msg_subtype_t subop)
+uc_rpc_xfer_init(XDR * xdrs, XDR * xdr_out)
 {
     int ret = -1, xfer_id, dummy;
     size_t nbytes;
@@ -255,34 +255,29 @@ uc_rpc_store(XDR * xdrs, XDR * xdr_out, uc_msg_subtype_t subop)
     xfer_rsp_t xfer_rsp;
     char * fpath = NULL;
 
-    switch (subop) {
-    case UCAFS_SUBMSG_BEGIN:
-        // initiate the transfer context
-        if (!xdr_opaque(xdrs, (caddr_t)&fs, sizeof(xfer_req_t))
-            || !xdr_string(xdrs, &fpath, UCAFS_PATH_MAX)) {
-            uerror("xdr parsing for store start failed");
-            goto out;
-        }
-
-        // call fetchstore start
-        if (fetchstore_init(&xfer_req, fpath, &xfer_rsp)) {
-            log_error("fetchstore_start failed :(");
-            goto out;
-        }
-
-        // otherwise, lets just setup our response
-        if (!xdr_opaque(xdr_out, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
-            log_error("Error with setting xfer_id");
-            goto out;
-        }
-
-        log_info("ucafs_store: xfer_id=%d %s", xfer_id, fpath);
-        break;
-
-    case UCAFS_SUBMSG_PROCESS:
-        // copy the transfer buffer 
-
+    /* get the data from the wire */
+    if (!xdr_opaque(xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t))
+        || !xdr_string(xdrs, &fpath, UCAFS_PATH_MAX)) {
+        uerror("xdr parsing for store start failed");
+        goto out;
     }
+
+    // call fetchstore start
+    if (fetchstore_init(&xfer_req, fpath, &xfer_rsp)) {
+        log_error("fetchstore_start failed :(");
+        goto out;
+    }
+
+    // otherwise, lets just setup our response
+    if (!xdr_opaque(xdr_out, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
+        log_error("Error with setting xfer_rsp");
+        goto out;
+    }
+
+    log_info("[%s] id=%d (xfer_size=%d, file_size=%d, offset=%d) %s",
+             (xfer_req.op == UCAFS_STORE ? "ucafs_store" : "ucafs_fetch"),
+             xfer_rsp.xfer_id, xfer_req.xfer_size, xfer_req.file_size,
+             xfer_req.offset, fpath);
 
     ret = 0;
 out:
@@ -290,5 +285,47 @@ out:
         free(fpath);
     }
 
+    return ret;
+}
+
+int
+uc_rpc_xfer_run(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, xfer_id, xfer_len;
+
+    /* get params and call fetchstore to do some encryption */
+    if (!xdr_int(xdrs, &xfer_id) || !xdr_int(xdrs, &xfer_len)) {
+        uerror("xdr parsing of transfer run failed");
+        goto out;
+    }
+
+    if ((ret = fetchstore_run(xfer_id, xfer_len))) {
+        log_error("fetchstore_run faild ret=%d", ret);
+        goto out;
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+int
+uc_rpc_xfer_exit(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, xfer_id, xfer_len;
+
+    /* get params and call fetchstore to do some encryption */
+    if (!xdr_int(xdrs, &xfer_id)) {
+        uerror("xdr parsing of xfer_exit failed");
+        goto out;
+    }
+
+    if ((ret = fetchstore_finish(xfer_id))) {
+        log_error("fetchstore_finish faild ret=%d", ret);
+        goto out;
+    }
+
+    ret = 0;
+out:
     return ret;
 }

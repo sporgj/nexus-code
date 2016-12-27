@@ -126,31 +126,19 @@ ucafs_m_write(struct file * fp,
     return count;
 }
 
+/**
+ * lock: dev->mut
+ */
 int
 ucafs_mod_send(uc_msg_type_t type,
                XDR * xdrs,
                reply_data_t ** pp_reply,
                int * p_err)
 {
-    return ucafs_mod_send1(type, UCAFS_SUBMSG_NONE, NULL, xdrs, pp_reply,
-                           p_err);
-}
-
-/**
- * lock: dev->mut
- */
-int
-ucafs_mod_send1(uc_msg_type_t type,
-                uc_msg_subtype_t subtype,
-                uint8_t * buffer,
-                XDR * xdrs,
-                reply_data_t ** pp_reply,
-                int * p_err)
-{
     mid_t id;
     reply_data_t * p_reply;
     ucrpc_msg_t * msg;
-    int err = -1, msg_len = (xdrs->x_private - xdrs->x_base), alloc_len;
+    int err = -1, msg_len = (xdrs->x_private - xdrs->x_base);
     *p_err = -1;
     *pp_reply = NULL;
 
@@ -164,7 +152,6 @@ ucafs_mod_send1(uc_msg_type_t type,
     /* send the message */
     msg = (ucrpc_msg_t *)dev->outb;
     msg->type = type;
-    msg->subtype = subtype;
     msg->msg_id = id = ucrpc__genid();
     msg->len = msg_len;
     dev->avail_read += MSG_SIZE(msg);
@@ -201,8 +188,7 @@ ucafs_mod_send1(uc_msg_type_t type,
             dev->avail_write += MSG_SIZE(msg);
 
             /* allocate the response data */
-            alloc_len = (buffer == NULL) ? msg->len + 1 : 0;
-            p_reply = kmalloc(sizeof(reply_data_t) + alloc_len, GFP_KERNEL);
+            p_reply = kmalloc(sizeof(reply_data_t) + msg->len, GFP_KERNEL);
             if (p_reply == NULL) {
                 *p_err = msg->status;
                 *pp_reply = NULL;
@@ -211,14 +197,8 @@ ucafs_mod_send1(uc_msg_type_t type,
             }
 
             /* instantiate everything */
-            if (buffer == NULL) {
-                memcpy(p_reply->data, msg->payload, msg->len);
-                xdrmem_create(&p_reply->xdrs, p_reply->data, msg->len,
-                              XDR_DECODE);
-            } else {
-                memcpy(buffer, msg->payload, msg->len);
-                xdrmem_create(&p_reply->xdrs, buffer, msg->len, XDR_DECODE);
-            }
+            memcpy(p_reply->data, msg->payload, msg->len);
+            xdrmem_create(&p_reply->xdrs, p_reply->data, msg->len, XDR_DECODE);
 
             *p_err = msg->status;
             *pp_reply = p_reply;

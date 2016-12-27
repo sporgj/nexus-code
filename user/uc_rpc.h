@@ -19,3 +19,12 @@ uc_rpc_hardlink(XDR * xdrs, XDR * rsp);
 
 int
 uc_rpc_rename(XDR * xdrs, XDR * rsp);
+
+int
+uc_rpc_xfer_init(XDR * xdrs, XDR * rsp);
+
+int
+uc_rpc_xfer_run(XDR * xdrs, XDR * rsp);
+
+int
+uc_rpc_xfer_exit(XDR * xdrs, XDR * rsp);
