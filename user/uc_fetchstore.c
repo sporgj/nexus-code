@@ -37,7 +37,8 @@ free_xfer_context(xfer_context_t * xfer_ctx)
     free(xfer_ctx);
 }
 
-int fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t *rp)
+int
+fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
 {
     int ret = -1;
     xfer_context_t * xfer_ctx = NULL;
@@ -104,11 +105,9 @@ int fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t *rp)
 #endif
 
     /* set the response */
-    *rp = (xfer_rsp_t){
-        .xfer_id = xfer_ctx->xfer_id,
-        .buflen = PAGE_SIZE,
-        .uaddr = xfer_ctx->buffer
-    };
+    *rp = (xfer_rsp_t){.xfer_id = xfer_ctx->xfer_id,
+                       .buflen = PAGE_SIZE,
+                       .uaddr = xfer_ctx->buffer };
 
     ret = 0;
 out:
@@ -130,7 +129,8 @@ fetchstore_run(int id, size_t valid_buflen)
         return -1;
     }
 
-    hexdump(xfer_ctx->buffer, MIN(16, valid_buflen));
+    xfer_ctx->valid_buflen = valid_buflen;
+
 #ifdef UCAFS_SGX
     ecall_fetchstore_crypto(global_eid, &ret, xfer_ctx);
     if (ret) {
@@ -138,8 +138,6 @@ fetchstore_run(int id, size_t valid_buflen)
         goto out;
     }
 #endif
-    hexdump(xfer_ctx->buffer, MIN(16, valid_buflen));
-    printf("\n");
 
     ret = 0;
 out:

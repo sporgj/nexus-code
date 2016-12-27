@@ -8,6 +8,8 @@ typedef struct {
     int chunk_num;
     size_t pos;
     size_t offset;
+    size_t done;
+    size_t chunk_left;
     crypto_iv_t _iv;
     crypto_context_t curr_crypto_ctx;
     mbedtls_aes_context aes_ctx;
@@ -19,6 +21,9 @@ typedef struct {
 } enclave_context_t;
 
 static struct seqptrmap * xfer_context_map = NULL;
+
+static int
+close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx);
 
 static void
 free_enclave_context(enclave_context_t * context)
@@ -85,6 +90,7 @@ update_crypto_ctx(enclave_context_t * context,
                   xfer_context_t * xfer_ctx,
                   int chunk_num)
 {
+    crypto_mac_t mac_bytes, *p_mac;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
     if (chunk_num >= context->fbox_hdr.chunk_count) {
@@ -107,6 +113,11 @@ update_crypto_ctx(enclave_context_t * context,
     aes_ctx = &context->aes_ctx;
     hmac_ctx = &context->hmac_ctx;
 
+    if (context->done && close_chunk_crypto(context, xfer_ctx)) {
+        // then we are done
+        return E_ERROR_CRYPTO;
+    }
+
     mbedtls_md_free(hmac_ctx);
 
     // implicity calls init & free
@@ -115,6 +126,7 @@ update_crypto_ctx(enclave_context_t * context,
     mbedtls_md_hmac_starts(hmac_ctx, (uint8_t *)&crypto_ctx->mkey,
                            sizeof(crypto_ekey_t));
 
+    context->chunk_left = UCAFS_CHUNK_SIZE;
     context->chunk_num = chunk_num;
     return 0;
 }
@@ -136,9 +148,9 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
     /* copy the fbox information */
     fbox_hdr = &context->fbox_hdr;
     memcpy(fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
-    fbox_hdr->chunk_count = FBOX_CHUNK_COUNT(file_size);
+    fbox_hdr->chunk_count = UCAFS_CHUNK_COUNT(file_size);
     fbox_hdr->chunk_size = UCAFS_CHUNK_SIZE;
-    fbox_hdr->fbox_len = FBOX_SIZE(file_size);
+    fbox_hdr->fbox_len = UCAFS_FBOX_SIZE(file_size);
     fbox_hdr->file_size = file_size;
 
     // TODO instantiate crypto data for fbox here
@@ -165,6 +177,13 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
         return error;
     }
 
+    if (context->chunk_left == 0) {
+        error = update_crypto_ctx(context, xfer_ctx, chunk_num + 1);
+        if (error) {
+            return error;
+        }
+    }
+
     crypto_ctx = &context->curr_crypto_ctx;
     iv = &context->_iv;
     p_in = context->input_buffer, p_out = context->output_buffer,
@@ -188,38 +207,27 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
         if (context->xfer_op == UCAFS_FETCH) {
             mbedtls_aes_crypt_ctr(aes_ctx, nbytes, &context->pos, iv->bytes,
                                   nonce, p_in, p_out);
-
-            context->offset += nbytes;
-            chunk_num = FBOX_CHUNK_NUM(context->offset);
-            if (chunk_num != context->chunk_num) {
-                update_crypto_ctx(context, xfer_ctx, chunk_num);
-            }
         }
 
         memcpy(p_buf, p_out, nbytes);
 
         bytes_left -= nbytes;
         p_buf += nbytes;
+        context->offset += nbytes;
+        context->done -= nbytes;
     }
 
     return E_SUCCESS;
 }
 
-int
-ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
+static int
+close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, len, bytes_left;
     crypto_context_t *crypto_ctx, *dest_crypto_ctx;
-    enclave_context_t * context;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
     crypto_mac_t * mac;
-
-    context = (enclave_context_t *)seqptrmap_get(xfer_context_map,
-                                                 xfer_ctx->enclave_crypto_id);
-    if (context == NULL) {
-        return error;
-    }
 
     crypto_ctx = &context->curr_crypto_ctx;
     aes_ctx = &context->aes_ctx;
@@ -242,15 +250,28 @@ ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
         error = E_SUCCESS;
         memcpy(dest_crypto_ctx, crypto_ctx, sizeof(crypto_context_t));
     } else {
-        error = memcmp(mac, &dest_crypto_ctx->mac, sizeof(crypto_mac_t))
-            ? E_ERROR_ERROR
-            : E_SUCCESS;
+        error = memcmp(mac, &dest_crypto_ctx->mac, sizeof(crypto_mac_t));
+        error = error ? E_ERROR_ERROR : E_SUCCESS;
     }
 
-    aes_ctx = &context->aes_ctx;
-    hmac_ctx = &context->hmac_ctx;
+    return error;
+}
+
+int
+ecall_fetchstore_finish(xfer_context_t * xfer_ctx)
+{
+    int error;
+    enclave_context_t * context;
+    context = (enclave_context_t *)seqptrmap_get(xfer_context_map,
+                                                 xfer_ctx->enclave_crypto_id);
+    if (context == NULL) {
+        return E_ERROR_ERROR;
+    }
+
+    error = close_chunk_crypto(context, xfer_ctx);
 
     seqptrmap_delete(xfer_context_map, xfer_ctx->enclave_crypto_id);
     free_enclave_context(context);
+
     return error;
 }
