@@ -74,15 +74,8 @@ ucrpc__genid(void)
 }
 
 typedef struct {
-    int id;
-    int srv_64bit;
-    size_t total_size;
-    char * buffer;
-    uint32_t buflen;
-    uint8_t * path;
-    struct vcache * avc;
-    struct rx_connection * rx_conn;
-    struct afs_conn * tc;
+    int id, xfer_size, offset, buflen, total_size;
+    char *uaddr, *buffer, *path;
     struct rx_call * afs_call;
 } store_context_t, fetch_context_t;
 

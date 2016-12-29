@@ -68,7 +68,7 @@ typedef enum {
 
 typedef struct {
     uc_xfer_op_t op;
-    uint16_t xfer_size;
+    uint32_t xfer_size;
     uint32_t offset;
     uint32_t file_size;
 } __attribute__((packed)) xfer_req_t;

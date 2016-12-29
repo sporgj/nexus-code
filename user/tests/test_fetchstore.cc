@@ -16,7 +16,7 @@ void
 fill_buffer(uint8_t * buffer, int len)
 {
     for (size_t i = 0; i < len; i++) {
-        buffer[i] = rand() % CHAR_MAX;
+        buffer[i] = 0; //rand() % CHAR_MAX;
     }
 }
 
@@ -29,65 +29,47 @@ perform_crypto(uc_xfer_op_t op,
                uint8_t * p_input,
                uint8_t * p_output)
 {
-    int xfer_id, new_fbox_len, bytes_left, len, chunk_len, nbytes;
-    uint8_t **buf;
+    xfer_req_t _req, *req = &_req;
+    xfer_rsp_t _rsp, *rsp = &_rsp;
+    int bytes_left, len;
 
-    chunk_len = bytes_left = file_size;
+    _req = (xfer_req_t){.op = op,
+                        .xfer_size = xfer_buflen,
+                        .offset = offset,
+                        .file_size = file_size };
 
-next_chunk:
-    if (op == UCAFS_STORE) {
-        bytes_left = MIN(chunk_len, UCAFS_CHUNK_SIZE);
-    }
+    ASSERT_EQ(0, fetchstore_init(req, path, rsp));
 
-    /* initalize the store */
-    ASSERT_EQ(0, fetchstore_start(op, path, xfer_buflen, offset, file_size,
-                                  0, &xfer_id, &new_fbox_len));
+    bytes_left = file_size;
+    while (bytes_left) {
+        len = MIN(bytes_left, rsp->buflen);
 
-    printf("%s: len=%d, buflen=%d, bytes_left=%d, offset=%d\n",
-           (op == UCAFS_STORE ? "store" : "fetch"), file_size, xfer_buflen,
-           chunk_len, offset);
+        memcpy(rsp->uaddr, p_input, len);
 
-    nbytes = 0;
-    /* now store the data */
-    while (bytes_left > 0) {
-        len = MIN(xfer_buflen, bytes_left);
+        ASSERT_EQ(0, fetchstore_run(rsp->xfer_id, len));
 
-        ASSERT_FALSE((buf = fetchstore_get_buffer(xfer_id, len)) == NULL);
+        memcpy(p_output, rsp->uaddr, len);
 
-        // now copy the data
-        memcpy(*buf, p_input, len);
-
-        ASSERT_EQ(0, fetchstore_data(buf));
-
-        memcpy(p_output, *buf, len);
-
-        nbytes += len;
         bytes_left -= len;
         p_input += len;
         p_output += len;
     }
 
-    ASSERT_EQ(0, fetchstore_finish(xfer_id));
-
-    if (op == UCAFS_STORE) {
-        offset += nbytes;
-        chunk_len -= nbytes;
-        if (chunk_len > 0) {
-            goto next_chunk;
-        }
-    }
+    ASSERT_EQ(0, fetchstore_finish(rsp->xfer_id));
 }
 
-TEST(UC_FETCHSTORE, SanityTest)
+TEST(FETCHSTORE, Test1)
 {
-    int file_size = file_size_test[0], xfer_buflen = xfer_size_test[0];
-    uint8_t **buf, *temp, *input, *output;
+    int file_size = 2 * UCAFS_CHUNK_SIZE;
+    const char * fname = "file.txt";
+    sds path = MK_PATH(fname);
     char * test;
-    sds path = MK_PATH("file.txt");
+    uint8_t **buf, *temp, *input, *output;
+
     srand(time(NULL));
 
-    /* create our file */
     ASSERT_EQ(0, dirops_new(path, UC_FILE, &test)) << "dirops_new failed";
+    uinfo("File: %s", test);
 
     /* start create variables */
     ASSERT_FALSE((input = (uint8_t *)malloc(file_size)) == NULL);
@@ -96,8 +78,8 @@ TEST(UC_FETCHSTORE, SanityTest)
 
     fill_buffer(input, file_size);
 
-    perform_crypto(UCAFS_STORE, path, xfer_buflen, 0, file_size, input, output);
-    perform_crypto(UCAFS_FETCH, path, xfer_buflen, 0, file_size, output, temp);
+    perform_crypto(UCAFS_STORE, path, UCAFS_CHUNK_SIZE, 0, file_size, input, output);
+    perform_crypto(UCAFS_FETCH, path, UCAFS_CHUNK_SIZE, 0, file_size, output, temp);
 
     uinfo("input");
     hexdump(input, MIN(32, file_size));

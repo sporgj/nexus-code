@@ -57,14 +57,7 @@ ecall_fetchstore_init(xfer_context_t * xfer_ctx)
     context->offset = xfer_ctx->offset;
 
     /* initialize the crypto contexts */
-    aes_ctx = &context->aes_ctx;
-    mbedtls_aes_init(aes_ctx);
-
-    hmac_ctx = &context->hmac_ctx;
-    mbedtls_md_init(hmac_ctx);
-    mbedtls_md_setup(hmac_ctx, HMAC_TYPE, 1);
-
-    if (xfer_context_map == NULL
+        if (xfer_context_map == NULL
         && (xfer_context_map = seqptrmap_init()) == NULL) {
         error = E_ERROR_ALLOC;
         goto out;
@@ -97,6 +90,11 @@ update_crypto_ctx(enclave_context_t * context,
         return -1;
     }
 
+    if (context->done && close_chunk_crypto(context, xfer_ctx)) {
+        // then we are done
+        return E_ERROR_CRYPTO;
+    }
+
     crypto_context_t * crypto_ctx = &context->curr_crypto_ctx;
     if (context->xfer_op == UCAFS_STORE) {
         sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
@@ -111,14 +109,11 @@ update_crypto_ctx(enclave_context_t * context,
 
     /* initialize the crypto stuff here */
     aes_ctx = &context->aes_ctx;
+    mbedtls_aes_init(aes_ctx);
+
     hmac_ctx = &context->hmac_ctx;
-
-    if (context->done && close_chunk_crypto(context, xfer_ctx)) {
-        // then we are done
-        return E_ERROR_CRYPTO;
-    }
-
-    mbedtls_md_free(hmac_ctx);
+    mbedtls_md_init(hmac_ctx);
+    mbedtls_md_setup(hmac_ctx, HMAC_TYPE, 1);
 
     // implicity calls init & free
     mbedtls_aes_setkey_enc(aes_ctx, (uint8_t *)&crypto_ctx->ekey,
@@ -163,7 +158,8 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 int
 ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
 {
-    int error = E_ERROR_ERROR, nbytes, bytes_left, chunk_num;
+    int error = E_ERROR_ERROR, nbytes, bytes_left, chunk_num, chunk_left,
+        chunk_size;
     crypto_context_t * crypto_ctx;
     enclave_context_t * context;
     uint8_t *p_in, *p_out, *p_buf, *nonce;
@@ -177,8 +173,16 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
         return error;
     }
 
+    bytes_left = xfer_ctx->valid_buflen;
+    p_in = context->input_buffer, p_out = context->output_buffer,
+    p_buf = xfer_ctx->buffer;
+    aes_ctx = &context->aes_ctx;
+    hmac_ctx = &context->hmac_ctx;
+    nonce = context->nonce;
+
+next_chunk:
     if (context->chunk_left == 0) {
-        error = update_crypto_ctx(context, xfer_ctx, chunk_num + 1);
+        error = update_crypto_ctx(context, xfer_ctx, context->chunk_num + 1);
         if (error) {
             return error;
         }
@@ -186,15 +190,10 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
 
     crypto_ctx = &context->curr_crypto_ctx;
     iv = &context->_iv;
-    p_in = context->input_buffer, p_out = context->output_buffer,
-    p_buf = xfer_ctx->buffer;
-    aes_ctx = &context->aes_ctx;
-    hmac_ctx = &context->hmac_ctx;
-    nonce = context->nonce;
 
-    bytes_left = xfer_ctx->valid_buflen;
-    while (bytes_left > 0) {
-        nbytes = MIN(bytes_left, E_CRYPTO_BUFFER_LEN);
+    chunk_size = chunk_left = MIN(bytes_left, UCAFS_CHUNK_SIZE);
+    while (chunk_left > 0) {
+        nbytes = MIN(chunk_left, E_CRYPTO_BUFFER_LEN);
         memcpy(p_in, p_buf, nbytes);
 
         if (context->xfer_op == UCAFS_STORE) {
@@ -211,10 +210,16 @@ ecall_fetchstore_crypto(xfer_context_t * xfer_ctx)
 
         memcpy(p_buf, p_out, nbytes);
 
-        bytes_left -= nbytes;
+        chunk_left -= nbytes;
         p_buf += nbytes;
         context->offset += nbytes;
-        context->done -= nbytes;
+        context->done += nbytes;
+    }
+
+    context->chunk_left -= chunk_size;
+    bytes_left -= chunk_size;
+    if (bytes_left > 0) {
+        goto next_chunk;
     }
 
     return E_SUCCESS;

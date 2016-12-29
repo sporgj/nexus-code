@@ -153,15 +153,14 @@ ucafs_fetch_xfer(fetch_context_t * context,
 
     *xferred = fp->offset = 0;
     while (bytes_left > 0) {
-        if ((buf_ptr = READPTR_LOCK()) == 0) {
-            goto out;
-        }
-
         size = MIN(bytes_left, context->buflen);
 
         // read from the server
         if (ucafs_fetch_read(context, context->buffer, size, &nbytes)) {
-            READPTR_UNLOCK();
+            goto out;
+        }
+
+        if ((buf_ptr = READPTR_LOCK()) == 0) {
             goto out;
         }
 

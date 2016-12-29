@@ -9,6 +9,12 @@ static const uint32_t afs_prefix_len = 4;
 static char * watch_dirs[] = {UCAFS_PATH_KERN "/" UC_AFS_WATCH};
 static const int watch_dir_len[] = {sizeof(watch_dirs[0]) - 1};
 
+int
+UCAFS_DISCONNECTED()
+{
+    return UCAFS_IS_OFFLINE;
+}
+
 inline ucafs_entry_type
 dentry_type(const struct dentry * dentry)
 {

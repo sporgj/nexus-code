@@ -9,6 +9,9 @@
 #include "afsincludes.h"
 
 int
+UCAFS_DISCONNECTED(void);
+
+int
 ucafs_mod_init(void);
 
 /* prototypes called from afs */
@@ -60,14 +63,25 @@ int
 ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest);
 
 int
-ucafs_store(struct vcache * avc, struct vrequest * areq, int sync);
+ucafs_kern_store(struct vcache * avc,
+                 struct dcache ** dclist,
+                 afs_size_t bytes,
+                 afs_hyper_t * anewDV,
+                 int * doProcessFS,
+                 struct AFSFetchStatus * OutStatus,
+                 afs_uint32 nchunks,
+                 int nomore,
+                 struct rx_call * afs_call,
+                 char * path,
+                 int base);
 
 int
-ucafs_fetch(struct afs_conn * tc,
-            struct rx_connection * rxconn,
-            struct osi_file * fp,
-            afs_size_t base,
-            struct dcache * adc,
-            struct vcache * avc,
-            afs_int32 size,
-            struct afs_FetchOutput * tsmall);
+ucafs_kern_fetch(struct afs_conn * tc,
+                 struct rx_connection * rxconn,
+                 struct osi_file * fp,
+                 afs_size_t base,
+                 struct dcache * adc,
+                 struct vcache * avc,
+                 afs_int32 size,
+                 struct rx_call * acall,
+                 char * path);
