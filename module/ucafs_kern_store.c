@@ -213,7 +213,7 @@ ucafs_kern_store(struct vcache * avc,
                  char * path,
                  int base)
 {
-    int ret = -1, i, nbytes, code, bytes_stored = 0;
+    int ret = -1, i, nbytes, bytes_stored = 0;
     struct page * page = NULL;
     fetch_context_t _context, *context = &_context;
 
@@ -225,7 +225,7 @@ ucafs_kern_store(struct vcache * avc,
 
     /* 1 - instantiate the context */
     if (ucafs_store_init(context, avc, bytes, base)) {
-        goto exit;
+        return -1;
     }
 
     /* 2 - pin the user pages and start the transfer */
@@ -270,23 +270,7 @@ out1:
     }
 
 out:
-    // happens whenever we exit mid-loop
     ucafs_store_exit(context, OutStatus, ret, doProcessFS);
-    if (*doProcessFS) {
-        hadd32(*anewDV, 1);
-    }
-
-exit:
-    /* store D cache is responsible for closing the afs call */
-    if (context->afs_call) {
-        RX_AFS_GUNLOCK();
-        if ((code = rx_EndCall(context->afs_call, ret))) {
-            *doProcessFS = 0;
-        }
-        RX_AFS_GLOCK();
-
-        ret |= code;
-    }
 
     return ret;
 }

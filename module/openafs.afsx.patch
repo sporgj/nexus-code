@@ -552,7 +552,7 @@ index e8b8f9d..48e78dc 100644
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..26578bf 100644
+index f494677..12d9e63 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
 @@ -590,6 +590,15 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
@@ -571,7 +571,7 @@ index f494677..26578bf 100644
  
      for (bytes = 0, j = 0; !code && j <= high; j++) {
  	if (dcList[j]) {
-@@ -641,12 +650,35 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
+@@ -641,12 +650,46 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
  #endif
  		code = rxfs_storeInit(avc, tc, rxconn, base, bytes, length,
  				      sync, &ops, &rock);
@@ -587,6 +587,17 @@ index f494677..26578bf 100644
 +                                       base);
 +
 +                if (ret == 0) {
++		    code = (*ops->close)(rock, &OutStatus, &doProcessFS);
++		    if (doProcessFS) {
++			hadd32(*anewDV, 1);
++		    }
++		}
++
++		if (ops) {
++		    code = (*ops->destroy)(&rock, code);
++		}
++
++		if (ret == 0) {
 +		    goto post_dcache_store;
 +		}
 +
@@ -607,7 +618,7 @@ index f494677..26578bf 100644
  #ifdef AFS_64BIT_CLIENT
  		if (code == RXGEN_OPCODE && !afs_serverHasNo64Bit(tc)) {
  		    afs_serverSetNo64Bit(tc);
-@@ -720,6 +752,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
+@@ -720,6 +763,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
  	}
      }
  
@@ -619,7 +630,7 @@ index f494677..26578bf 100644
      return code;
  }
  
-@@ -1145,7 +1182,15 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1145,7 +1193,15 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      osi_timeval_t xferStartTime;	/*FS xfer start time */
      afs_size_t bytesToXfer = 0, bytesXferred = 0;
  #endif
@@ -636,7 +647,7 @@ index f494677..26578bf 100644
      AFS_STATCNT(CacheFetchProc);
  
      XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
-@@ -1156,9 +1201,28 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1156,9 +1212,28 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
       * avc->lock(W) if !setLocks || slowPass
       * adc->lock(W)
       */
@@ -665,7 +676,7 @@ index f494677..26578bf 100644
  #ifndef AFS_NOSTATS
      osi_GetuTime(&xferStartTime);
  #endif /* AFS_NOSTATS */
-@@ -1211,6 +1275,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1211,6 +1286,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
  	}
  	code = 0;
      } while (moredata);
