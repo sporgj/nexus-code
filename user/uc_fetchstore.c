@@ -34,6 +34,10 @@ free_xfer_context(xfer_context_t * xfer_ctx)
         free(xfer_ctx->path);
     }
 
+    if (xfer_ctx->buffer) {
+        free(xfer_ctx->buffer);
+    }
+
     free(xfer_ctx);
 }
 
@@ -61,7 +65,7 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     }
 
     // XXX sometimes, we don't need a whole page just for data
-    if (posix_memalign((void **)&xfer_ctx->buffer, PAGE_SIZE, PAGE_SIZE)) {
+    if (posix_memalign((void **)&xfer_ctx->buffer, PAGE_SIZE, 2 * PAGE_SIZE)) {
         slog(0, SLOG_FATAL, "fetchstore - memory allocatio failed");
         goto out;
     }

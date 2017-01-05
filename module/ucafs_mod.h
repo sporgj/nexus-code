@@ -30,21 +30,14 @@
 #define UCKERN_NBR_DEVS 1
 #define UCKERN_PIPE_BUFFER PAGE_SIZE
 
-#define UCMOD_PAGE_ORDER 2
+#define UCMOD_PAGE_ORDER 0
 #define UCMOD_BUFFER_SIZE (PAGE_SIZE << UCMOD_PAGE_ORDER)
-#define UCMOD_BUFFER_ALLOC()                                                   \
-    (char *)alloc_pages(GFP_KERNEL | __GFP_ZERO, UCMOD_PAGE_ORDER)
-#define UCMOD_BUFFER_FREE(x) free_pages(x, UCMOD_PAGE_ORDER)
-
-#define UCXFER_PAGE_ORDER (UCMOD_PAGE_ORDER - 1)
-#define UCXFER_BUFFER_SIZE (PAGE_SIZE << UCXFER_PAGE_ORDER)
-#define UCXFER_ALLOC() (uint8_t *)alloc_pages(GFP_KERNEL, UCMOD_PAGE_ORDER - 1)
-#define UCXFER_FREE(x) free_pages((unsigned long)x, UCMOD_PAGE_ORDER - 1)
+#define UCMOD_BUFFER_ALLOC() (char *)get_zeroed_page(GFP_KERNEL)
+#define UCMOD_BUFFER_FREE(x) free_page(x)
 
 /* data structures for our module */
 struct ucafs_mod {
-    wait_queue_head_t kq, rq, wq;
-    uint8_t *buffer, *end;
+    wait_queue_head_t kq, rq, wq, mq;
     size_t buffersize;
     char *outb, *inb;
     size_t avail_read, avail_write, msg_len;
@@ -102,7 +95,7 @@ READPTR_LOCK(void)
 
     /* clear the message at that pointer */
     memset(dev->outb, 0, sizeof(ucrpc_msg_t));
-    return (caddr_t)((char *)dev->outb + sizeof(ucrpc_msg_t));
+    return (caddr_t)(((char *)dev->outb) + sizeof(ucrpc_msg_t));
 }
 
 static inline void
@@ -123,7 +116,5 @@ READPTR_UNLOCK(void)
 static inline size_t
 READPTR_BUFLEN(void)
 {
-    size_t len = (dev->buffersize - dev->avail_read - sizeof(ucrpc_msg_t));
-    len -= (len % 16);
-    return len;
+    return (dev->buffersize - sizeof(ucrpc_msg_t));
 }

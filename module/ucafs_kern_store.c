@@ -25,6 +25,7 @@ ucafs_store_exit(store_context_t * context,
 
     xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
     if (!xdr_int(&xdrs, &context->id) || !xdr_int(&xdrs, &error)) {
+        READPTR_UNLOCK();
         ERROR("store_close: could not parse response\n");
         goto out;
     }
@@ -228,6 +229,10 @@ ucafs_kern_store(struct vcache * avc,
         return -1;
     }
 
+    if (1) {
+        goto out;
+    }
+
     /* 2 - pin the user pages and start the transfer */
     down_read(&dev->daemon->mm->mmap_sem);
     ret = get_user_pages(dev->daemon, dev->daemon->mm,
@@ -254,9 +259,9 @@ ucafs_kern_store(struct vcache * avc,
         bytes_stored += dclist[i]->f.chunkBytes;
     }
 
-    if (bytes_stored != context->total_size) {
-        ERROR("incomplete store (%s) stored=%d, file_size=%d\n", path,
-              bytes_stored, context->total_size);
+    if (bytes_stored != bytes) {
+        ERROR("incomplete store (%s) stored=%d, size=%d\n", path, bytes_stored,
+              bytes);
     }
 
     ret = 0;

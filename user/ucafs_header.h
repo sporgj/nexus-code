@@ -113,7 +113,7 @@ CHUNK_RATIO(int numerator_log, int denomintor_log)
 typedef uint16_t mid_t;
 
 typedef enum {
-    UCAFS_MSG_PING,
+    UCAFS_MSG_PING = 1,
     UCAFS_MSG_FILLDIR,
     UCAFS_MSG_CREATE,
     UCAFS_MSG_LOOKUP,

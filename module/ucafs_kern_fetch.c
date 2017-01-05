@@ -226,6 +226,10 @@ ucafs_kern_fetch(struct afs_conn * tc,
         goto out;
     }
 
+    if (1) {
+        goto out;
+    }
+
     /* 2 - Pin the user pages and start tranferring */
     down_read(&dev->daemon->mm->mmap_sem);
     ret = get_user_pages(dev->daemon, dev->daemon->mm,

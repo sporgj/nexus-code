@@ -53,6 +53,7 @@ static ssize_t
 ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 {
     size_t len;
+    ucrpc_msg_t * msg = (ucrpc_msg_t *)dev->outb;
 
     /* grab the lock */
     if (mutex_lock_interruptible(&dev->mut)) {
@@ -82,11 +83,21 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
         return -EFAULT;
     }
 
+    printk(
+        KERN_ERR
+        "mod_read: [%s] type=%d msg_id=%d, len=%d, count=%d, avail_read=%d\n",
+        current->comm, msg->type, msg->msg_id, dev->msg_len, count,
+        dev->avail_read);
+
     /* update the pointer */
     dev->avail_read -= count;
     // TODO zero the buffer
 
     mutex_unlock(&dev->mut);
+    if (dev->avail_read == 0) {
+        wake_up_interruptible(&dev->mq);
+    }
+
     return count;
 }
 
@@ -96,6 +107,7 @@ ucafs_m_write(struct file * fp,
               size_t count,
               loff_t * f_pos)
 {
+    ucrpc_msg_t * msg = (ucrpc_msg_t *)dev->inb;
     if (mutex_lock_interruptible(&dev->mut)) {
         return -ERESTARTSYS;
     }
@@ -120,6 +132,9 @@ ucafs_m_write(struct file * fp,
 
     /* this will be reincremented */
     dev->avail_write -= count;
+
+    printk(KERN_ERR "mod_write: [%s] ack_id=%d, count=%d, avail_write=%d\n",
+           current->comm, msg->ack_id, count, dev->avail_write);
 
     mutex_unlock(&dev->mut);
     wake_up_interruptible(&dev->kq);
@@ -147,6 +162,20 @@ ucafs_mod_send(uc_msg_type_t type,
         return -1;
     }
 
+    /* if there is a message being transmitted, lets wait for it to
+     * finish */
+    while (dev->avail_read) {
+        mutex_unlock(&dev->mut);
+
+        if (wait_event_interruptible(dev->mq, dev->avail_read == 0)) {
+            return -1;
+        }
+
+        if (mutex_lock_interruptible(&dev->mut)) {
+            return -1;
+        }
+    }
+
     RX_AFS_GUNLOCK();
 
     /* send the message */
@@ -156,6 +185,10 @@ ucafs_mod_send(uc_msg_type_t type,
     msg->len = msg_len;
     dev->avail_read += MSG_SIZE(msg);
     dev->msg_len = MSG_SIZE(msg);
+
+    /*printk(KERN_ERR "mod_send: [%s] type=%d msg_id=%d, len=%d, avail_read=%d\n",
+           current->comm, msg->type, msg->msg_id, dev->msg_len,
+           dev->avail_read);*/
 
     while (1) {
         DEFINE_WAIT(wait);
@@ -267,17 +300,16 @@ ucafs_mod_init(void)
     init_waitqueue_head(&dev->kq);
     init_waitqueue_head(&dev->rq);
     init_waitqueue_head(&dev->wq);
+    init_waitqueue_head(&dev->mq);
     mutex_init(&dev->mut);
 
-    if ((dev->buffer = UCMOD_BUFFER_ALLOC()) == NULL) {
+    if (((dev->outb = UCMOD_BUFFER_ALLOC()) == NULL) ||
+        ((dev->inb = UCMOD_BUFFER_ALLOC()) == NULL)) {
         printk(KERN_ERR "buffer allocation failed\n");
         return -1;
     }
 
-    dev->buffersize = UCMOD_BUFFER_SIZE >> 1;
-    dev->end = dev->buffer + UCMOD_BUFFER_SIZE;
-    dev->outb = dev->buffer;
-    dev->inb = dev->buffer + dev->buffersize;
+    dev->buffersize = UCMOD_BUFFER_SIZE;
     dev->avail_read = 0;
     dev->avail_write = dev->buffersize;
 
