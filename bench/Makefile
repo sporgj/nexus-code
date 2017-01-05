@@ -1,5 +1,5 @@
 PROGS := gen_file
-CFLAGS := -std=c11 -O3
+CFLAGS := -std=gnu11 -O3
 
 gen_file: gen_file.c
 	gcc $(CFLAGS) $< -o $@

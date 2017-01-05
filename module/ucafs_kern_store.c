@@ -229,10 +229,6 @@ ucafs_kern_store(struct vcache * avc,
         return -1;
     }
 
-    if (1) {
-        goto out;
-    }
-
     /* 2 - pin the user pages and start the transfer */
     down_read(&dev->daemon->mm->mmap_sem);
     ret = get_user_pages(dev->daemon, dev->daemon->mm,
