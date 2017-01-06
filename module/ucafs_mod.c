@@ -83,11 +83,13 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
         return -EFAULT;
     }
 
+    /*
     printk(
         KERN_ERR
         "mod_read: [%s] type=%d msg_id=%d, len=%d, count=%d, avail_read=%d\n",
         current->comm, msg->type, msg->msg_id, dev->msg_len, count,
         dev->avail_read);
+        */
 
     /* update the pointer */
     dev->avail_read -= count;
@@ -133,8 +135,8 @@ ucafs_m_write(struct file * fp,
     /* this will be reincremented */
     dev->avail_write -= count;
 
-    printk(KERN_ERR "mod_write: [%s] ack_id=%d, count=%d, avail_write=%d\n",
-           current->comm, msg->ack_id, count, dev->avail_write);
+    /*printk(KERN_ERR "mod_write: [%s] ack_id=%d, count=%d, avail_write=%d\n",
+           current->comm, msg->ack_id, count, dev->avail_write);*/
 
     mutex_unlock(&dev->mut);
     wake_up_interruptible(&dev->kq);
@@ -186,7 +188,8 @@ ucafs_mod_send(uc_msg_type_t type,
     dev->avail_read += MSG_SIZE(msg);
     dev->msg_len = MSG_SIZE(msg);
 
-    /*printk(KERN_ERR "mod_send: [%s] type=%d msg_id=%d, len=%d, avail_read=%d\n",
+    /*printk(KERN_ERR "mod_send: [%s] type=%d msg_id=%d, len=%d,
+       avail_read=%d\n",
            current->comm, msg->type, msg->msg_id, dev->msg_len,
            dev->avail_read);*/
 

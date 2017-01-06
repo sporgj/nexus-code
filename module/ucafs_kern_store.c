@@ -261,7 +261,7 @@ ucafs_kern_store(struct vcache * avc,
 
     if (bytes_stored != bytes) {
         ERROR("incomplete store (%s) stored=%d, size=%d\n", path, bytes_stored,
-              bytes);
+              (int)bytes);
     }
 
     ret = 0;
