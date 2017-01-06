@@ -1,12 +1,12 @@
 diff --git a/src/afs/LINUX/osi_module.c b/src/afs/LINUX/osi_module.c
-index 0b34f1a..87402a7 100644
+index 0b34f1a..7775a94 100644
 --- a/src/afs/LINUX/osi_module.c
 +++ b/src/afs/LINUX/osi_module.c
 @@ -33,6 +33,8 @@
  
  #include "osi_pagecopy.h"
  
-+#include "afs/ucafs_mod.h"
++#include "afs/ucafs_module.h"
 +
  extern struct file_system_type afs_fs_type;
  
@@ -552,7 +552,7 @@ index e8b8f9d..48e78dc 100644
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..12d9e63 100644
+index f494677..5a2c4b0 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
 @@ -590,6 +590,15 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
@@ -571,7 +571,7 @@ index f494677..12d9e63 100644
  
      for (bytes = 0, j = 0; !code && j <= high; j++) {
  	if (dcList[j]) {
-@@ -641,12 +650,46 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
+@@ -641,12 +650,35 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
  #endif
  		code = rxfs_storeInit(avc, tc, rxconn, base, bytes, length,
  				      sync, &ops, &rock);
@@ -587,17 +587,6 @@ index f494677..12d9e63 100644
 +                                       base);
 +
 +                if (ret == 0) {
-+		    code = (*ops->close)(rock, &OutStatus, &doProcessFS);
-+		    if (doProcessFS) {
-+			hadd32(*anewDV, 1);
-+		    }
-+		}
-+
-+		if (ops) {
-+		    code = (*ops->destroy)(&rock, code);
-+		}
-+
-+		if (ret == 0) {
 +		    goto post_dcache_store;
 +		}
 +
@@ -618,7 +607,7 @@ index f494677..12d9e63 100644
  #ifdef AFS_64BIT_CLIENT
  		if (code == RXGEN_OPCODE && !afs_serverHasNo64Bit(tc)) {
  		    afs_serverSetNo64Bit(tc);
-@@ -720,6 +763,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
+@@ -720,6 +752,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
  	}
      }
  
@@ -630,12 +619,12 @@ index f494677..12d9e63 100644
      return code;
  }
  
-@@ -1145,7 +1193,15 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1145,7 +1182,15 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      osi_timeval_t xferStartTime;	/*FS xfer start time */
      afs_size_t bytesToXfer = 0, bytesXferred = 0;
  #endif
 -
-+/* ucafs code */
++    /* ucafs code */
 +    int is_ucafs_file = 1, ret;
 +    struct rx_call * acall;
 +    char * path = NULL;
@@ -647,7 +636,7 @@ index f494677..12d9e63 100644
      AFS_STATCNT(CacheFetchProc);
  
      XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
-@@ -1156,9 +1212,28 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1156,9 +1201,28 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
       * avc->lock(W) if !setLocks || slowPass
       * adc->lock(W)
       */
@@ -676,7 +665,7 @@ index f494677..12d9e63 100644
  #ifndef AFS_NOSTATS
      osi_GetuTime(&xferStartTime);
  #endif /* AFS_NOSTATS */
-@@ -1211,6 +1286,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1211,6 +1275,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
  	}
  	code = 0;
      } while (moredata);
@@ -709,7 +698,7 @@ index 18bcfda..9af6203 100644
 +
  #endif /* AFS_INCLUDES_H */
 diff --git a/src/libafs/Makefile.common.in b/src/libafs/Makefile.common.in
-index 46b9c9d..fde8d56 100644
+index 46b9c9d..4aabdf5 100644
 --- a/src/libafs/Makefile.common.in
 +++ b/src/libafs/Makefile.common.in
 @@ -67,10 +67,28 @@ single_compdir_libafs: depsrcs libafs
@@ -717,7 +706,7 @@ index 46b9c9d..fde8d56 100644
  single_destdir_libafs: dest_libafs
  
 +# ucafs objects
-+UCAFSOBJS = ucafs_mod.o\
++UCAFSOBJS = ucafs_kern_mod.o\
 +			ucafs_kern_store.o\
 +			ucafs_kern_fetch.o\
 +			ucafs_kern.o
@@ -728,7 +717,7 @@ index 46b9c9d..fde8d56 100644
 +ucafs_kern_fetch.o: $(TOP_SRC_AFS)/ucafs_kern_fetch.c
 +	$(CRULE_OPT)
 +
-+ucafs_mod.o: $(TOP_SRC_AFS)/ucafs_mod.c
++ucafs_kern_mod.o: $(TOP_SRC_AFS)/ucafs_kern_mod.c
 +	$(CRULE_OPT)
 +
 +ucafs_kern.o: $(TOP_SRC_AFS)/ucafs_kern.c

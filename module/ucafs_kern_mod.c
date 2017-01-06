@@ -36,10 +36,8 @@ static int
 ucafs_m_release(struct inode * inode, struct file * fp)
 {
     /* grab the lock, reset all variables */
-    mutex_lock_interruptible(&dev->mut);
     dev->daemon = NULL;
     atomic_inc(&ucafs_m_available);
-    mutex_unlock(&dev->mut);
 
     return 0;
 }
@@ -53,8 +51,7 @@ ucafs_p_show(struct seq_file * sf, void * v)
         seq_printf(sf, "daemon offline :(\n");
     }
 
-    seq_printf(sf, "avail_read=%zu, avail_write=%zu\n", dev->avail_read,
-               dev->avail_write);
+    seq_printf(sf, "outb=%zu, inb=%zu\n", dev->outb_len, dev->inb_len);
 
     return 0;
 }
@@ -80,7 +77,6 @@ ucafs_m_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
     /* send it to userspace */
     len = min(count, dev->outb_len - dev->outb_sent);
     if (copy_to_user(buf, dev->outb + dev->outb_sent, count)) {
-        mutex_unlock(&dev->mut);
         return -EFAULT;
     }
 
@@ -101,12 +97,11 @@ ucafs_m_write(struct file * fp,
 {
     /* copy the message in full */
     if (copy_from_user(dev->inb, buf, count)) {
-        mutex_unlock(&dev->mut);
         return -EFAULT;
     }
 
     /* this will be reincremented */
-    dev->avail_write -= count;
+    dev->inb_len += count;
 
     wake_up_interruptible(&dev->msgq);
     return count;
@@ -122,6 +117,83 @@ const struct file_operations ucafs_proc_fops = {.open = ucafs_p_open,
                                                 .read = seq_read,
                                                 .llseek = seq_lseek,
                                                 .release = single_release};
+
+/**
+ * hold dev->send_mut
+ */
+int
+ucafs_mod_send(uc_msg_type_t type,
+               XDR * xdrs,
+               reply_data_t ** pp_reply,
+               int * p_err)
+{
+    int err = -1;
+    mid_t id;
+    reply_data_t * p_reply;
+    ucrpc_msg_t * msg;
+    size_t payload_len = (xdrs->x_private - xdrs->x_base);
+
+    if (UCAFS_IS_OFFLINE) {
+        READPTR_UNLOCK();
+        return -1;
+    }
+
+    /* write the message to the buffer */
+    msg = (ucrpc_msg_t *)dev->outb;
+    msg->type = type;
+    msg->msg_id = id = ucrpc__genid();
+    msg->len = payload_len;
+    dev->outb_len = MSG_SIZE(msg);
+
+    /* now, lets wait for the response */
+    while (1) {
+        DEFINE_WAIT(wait);
+        if (UCAFS_IS_OFFLINE) {
+            printk(KERN_ERR "process is offline :(");
+            goto out;
+        }
+
+        wake_up_interruptible(&dev->outq);
+        /* sleep the kernel thread */
+        prepare_to_wait(&dev->msgq, &wait, TASK_INTERRUPTIBLE);
+
+        /* the buffer is "empty", nothing to read */
+        if (dev->inb_len == 0) {
+            schedule();
+        }
+
+        finish_wait(&dev->msgq, &wait);
+
+        msg = (ucrpc_msg_t *)dev->inb;
+        if (msg->ack_id == id) {
+            dev->inb_len -= MSG_SIZE(msg);
+
+            /* allocate the response data */
+            p_reply = kmalloc(sizeof(reply_data_t) + msg->len, GFP_KERNEL);
+            if (p_reply == NULL) {
+                *p_err = msg->status;
+                *pp_reply = NULL;
+                ERROR("allocation error\n");
+                goto out;
+            }
+
+            /* instantiate everything */
+            memcpy(p_reply->data, msg->payload, msg->len);
+            xdrmem_create(&p_reply->xdrs, p_reply->data, msg->len, XDR_DECODE);
+
+            *p_err = msg->status;
+            *pp_reply = p_reply;
+
+            err = 0;
+            break;
+        }
+    }
+
+out:
+    READPTR_UNLOCK();
+
+    return err;
+}
 
 int
 ucafs_mod_init(void)

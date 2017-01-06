@@ -1,4 +1,4 @@
-#include "ucafs_mod.h"
+#include "ucafs_module.h"
 
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_kern: " fmt, ##args)

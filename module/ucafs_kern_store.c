@@ -1,5 +1,5 @@
 #include "ucafs_kern.h"
-#include "ucafs_mod.h"
+#include "ucafs_module.h"
 #include <linux/highmem.h>
 #include <linux/mm.h>
 #include <linux/page-flags.h>
@@ -153,15 +153,14 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
     fp = afs_CFileOpen(&tdc->f.inode);
 
     while (bytes_left > 0) {
-        if ((rpc_ptr = READPTR_LOCK()) == 0) {
-            goto out;
-        }
-
         size = MIN(bytes_left, context->buflen);
 
         /* 1 - read the file into the buffer */
         afs_osi_Read(fp, -1, context->buffer, size);
 
+        if ((rpc_ptr = READPTR_LOCK()) == 0) {
+            goto out;
+        }
         /* 2 - tell uspace we have data */
         xdrmem_create(&xdrs, rpc_ptr, READPTR_BUFLEN(), XDR_ENCODE);
         if (!xdr_int(&xdrs, &context->id) || !xdr_int(&xdrs, &size)) {

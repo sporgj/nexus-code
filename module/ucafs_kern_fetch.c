@@ -1,5 +1,5 @@
 #include "ucafs_kern.h"
-#include "ucafs_mod.h"
+#include "ucafs_module.h"
 #include <linux/mm.h>
 
 #undef ERROR
