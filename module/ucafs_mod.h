@@ -42,7 +42,7 @@ struct ucafs_mod {
     char *outb, *inb;
     size_t avail_read, avail_write, msg_len;
     struct task_struct * daemon;
-    struct mutex mut;
+    struct mutex mut, m_mut;
     struct cdev cdev;
 };
 

@@ -109,6 +109,7 @@ ucafs_m_write(struct file * fp,
               size_t count,
               loff_t * f_pos)
 {
+    /*
     ucrpc_msg_t * msg = (ucrpc_msg_t *)dev->inb;
     if (mutex_lock_interruptible(&dev->mut)) {
         return -ERESTARTSYS;
@@ -125,6 +126,7 @@ ucafs_m_write(struct file * fp,
             return -ERESTARTSYS;
         }
     }
+    */
 
     /* copy the message in full */
     if (copy_from_user(dev->inb, buf, count)) {
@@ -138,7 +140,7 @@ ucafs_m_write(struct file * fp,
     /*printk(KERN_ERR "mod_write: [%s] ack_id=%d, count=%d, avail_write=%d\n",
            current->comm, msg->ack_id, count, dev->avail_write);*/
 
-    mutex_unlock(&dev->mut);
+    //mutex_unlock(&dev->mut);
     wake_up_interruptible(&dev->kq);
     return count;
 }
@@ -159,23 +161,9 @@ ucafs_mod_send(uc_msg_type_t type,
     *p_err = -1;
     *pp_reply = NULL;
 
-    if (UCAFS_IS_OFFLINE) {
+    if (UCAFS_IS_OFFLINE || mutex_lock_interruptible(&dev->m_mut)) {
         mutex_unlock(&dev->mut);
         return -1;
-    }
-
-    /* if there is a message being transmitted, lets wait for it to
-     * finish */
-    while (dev->avail_read) {
-        mutex_unlock(&dev->mut);
-
-        if (wait_event_interruptible(dev->mq, dev->avail_read == 0)) {
-            return -1;
-        }
-
-        if (mutex_lock_interruptible(&dev->mut)) {
-            return -1;
-        }
     }
 
     RX_AFS_GUNLOCK();
@@ -247,6 +235,7 @@ ucafs_mod_send(uc_msg_type_t type,
 out:
     RX_AFS_GLOCK();
     mutex_unlock(&dev->mut);
+    mutex_unlock(&dev->m_mut);
     return err;
 }
 
@@ -305,6 +294,7 @@ ucafs_mod_init(void)
     init_waitqueue_head(&dev->wq);
     init_waitqueue_head(&dev->mq);
     mutex_init(&dev->mut);
+    mutex_init(&dev->m_mut);
 
     if (((dev->outb = UCMOD_BUFFER_ALLOC()) == NULL) ||
         ((dev->inb = UCMOD_BUFFER_ALLOC()) == NULL)) {

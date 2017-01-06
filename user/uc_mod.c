@@ -119,14 +119,17 @@ setup_mod()
             *out_msg = (ucrpc_msg_t){.msg_id = ucrpc__genid(),
                                      .ack_id = in_msg->msg_id,
                                      .len = nbytes,
+                                     .type = in_msg->type,
                                      .status = status };
             len = MSG_SIZE(out_msg);
 
             /* send the whole thing */
             nbytes = fwrite(out_msg, 1, len, ucafs_mod_fid);
 
-            /* log_debug("{ uc_mod } status=%d in=(%zu, %d), out=(%zu, %d)",
-               status, MSG_SIZE(msg), msg->len, nbytes, rsp->len); */
+            /*log_debug("{ uc_mod } type=%d id=%d status=%d in=(%zu, %d), "
+                      "out=(%zu, %d)",
+                      out_msg->type, out_msg->ack_id, status, MSG_SIZE(in_msg),
+                      in_msg->len, nbytes, out_msg->len); */
             status = 0;
         }
     }
