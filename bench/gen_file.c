@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -43,11 +44,13 @@ static void usage(char* prog) {
 int is_afs_env = 0;
 typedef enum { WRITE, READ } io_op_t;
 
-inline clock_t file_io(io_op_t op, char* fname, int64_t total_size) {
+inline double file_io(io_op_t op, char* fname, int64_t total_size) {
     FILE* fd;
     char c, c1;
-    clock_t diff = clock();
+    struct timespec t1, t2;
     size_t temp;
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
 
     fd = fopen(fname, (op == WRITE ? "wb+" : "rb"));
     if (fd == NULL) {
@@ -79,7 +82,10 @@ inline clock_t file_io(io_op_t op, char* fname, int64_t total_size) {
 
     fsync(fileno(fd));
     fclose(fd);
-    return clock() - diff;
+
+    clock_gettime(CLOCK_MONOTONIC, &t2);
+
+    return (((t2.tv_sec - t1.tv_sec) * 1e9) + (t2.tv_nsec - t1.tv_nsec)) / 1e9;
 }
 
 const char * flush_afs_cmd = "fs flush -p ./%s";
@@ -87,8 +93,9 @@ const char * flush_afs_cmd = "fs flush -p ./%s";
 static void gen_file(int64_t total_size, int repeat) {
     int status;
     char fname[20], cmd[100];
-    clock_t diff, total_write = 0, total_read = 0;
-    double avg_read, avg_write;
+    double read_time, write_time;
+
+    printf("write(s), read(s)\n");
 
     snprintf(fname, sizeof(fname), "file.%d", (int)getpid());
     if (is_afs_env) {
@@ -96,7 +103,7 @@ static void gen_file(int64_t total_size, int repeat) {
     }
 
     for (int i = 0; i < repeat; i++) {
-        total_write += file_io(WRITE, fname, total_size);
+        write_time = file_io(WRITE, fname, total_size);
         /* here lets flush the file out of the cache */
         if (is_afs_env) {
             if ((status = system(cmd))) {
@@ -104,14 +111,11 @@ static void gen_file(int64_t total_size, int repeat) {
             }
         }
 
-        total_read += file_io(READ, fname, total_size);
+        read_time = file_io(READ, fname, total_size);
         remove(fname);
+
+	printf("%.6f, %.6f\n", write_time, read_time);
     }
-
-    avg_read = (((double)total_read) / repeat) / CLOCKS_PER_SEC;
-    avg_write = (((double)total_write) / repeat) / CLOCKS_PER_SEC;
-
-    printf("avg_read(s) = %lf \t avg_write(s) = %lf\n", avg_read, avg_write);
 }
 
 int main(int argc, char** argv) {
