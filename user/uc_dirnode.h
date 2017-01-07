@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include <uv.h>
+
 #include "third/sds.h"
 
 #include "uc_types.h"
@@ -11,6 +13,8 @@ extern "C" {
 
 struct dirnode;
 typedef struct dirnode uc_dirnode_t;
+
+struct uc_dentry;
 
 uc_dirnode_t *
 dirnode_new();
@@ -79,6 +83,9 @@ dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2);
 bool
 dirnode_flush(uc_dirnode_t * dn);
 
+bool
+dirnode_fsync(uc_dirnode_t * dn);
+
 /**
  * Used to add files and directories
  * @see dinode_add_alias. Sets p_encoded_name and link_info to NULL
@@ -117,19 +124,19 @@ dirnode_rm(uc_dirnode_t * dn,
            link_info_t ** pp_link_info);
 
 const char *
-dirnode_enc2raw(const uc_dirnode_t * dn,
+dirnode_enc2raw(uc_dirnode_t * dn,
                 const shadow_t * encoded_name,
                 ucafs_entry_type type,
                 ucafs_entry_type * p_type);
 
 const shadow_t *
-dirnode_raw2enc(const uc_dirnode_t * dn,
+dirnode_raw2enc(uc_dirnode_t * dn,
                 const char * realname,
                 ucafs_entry_type type,
                 ucafs_entry_type * p_type);
 
 const shadow_t *
-dirnode_traverse(const uc_dirnode_t * dn,
+dirnode_traverse(uc_dirnode_t * dn,
                  const char * realname,
                  ucafs_entry_type type,
                  ucafs_entry_type * p_type,
@@ -145,6 +152,13 @@ dirnode_rename(uc_dirnode_t * dn,
                shadow_t ** pp_shadow2_bin,
                link_info_t ** pp_link_info1,
                link_info_t ** pp_link_info2);
+
+// internal functions to manage the dirnode in-memory object
+void dirnode_mark_dirty(uc_dirnode_t * dn);
+void dirnode_mark_clean(uc_dirnode_t * dn);
+bool dirnode_is_dirty(uc_dirnode_t * dn);
+int dirnode_trylock(uc_dirnode_t * dn);
+void dirnode_unlock(uc_dirnode_t * dn);
 
 #ifdef __cplusplus
 }

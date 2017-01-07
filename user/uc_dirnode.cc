@@ -1,5 +1,6 @@
 #include "uc_dirnode.h"
 #include "uc_encode.h"
+#include "uc_icache.h"
 #include "uc_sgx.h"
 #include "uc_uspace.h"
 
@@ -15,6 +16,10 @@ struct dirnode {
     dnode * protobuf;
     const struct uc_dentry * dentry;
     sds dnode_path;
+
+    /* live object stuff */
+    int is_dirty;
+    uv_mutex_t lock;
 };
 
 uc_dirnode_t *
@@ -195,6 +200,8 @@ dirnode_from_file(const sds filepath)
     obj->dnode_path = sdsdup(filepath);
     obj->protobuf = _dnode;
     obj->dentry = NULL;
+    uv_mutex_init(&obj->lock);
+
     memcpy(&obj->header, &header, sizeof(dnode_header_t));
 
     error = 0;
@@ -218,11 +225,14 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     bool ret = false;
     int error;
     uint8_t * buffer = NULL;
-    size_t len = dn->protobuf->ByteSize();
     FILE * fd;
+    size_t len;
+
+    len = dn->protobuf->ByteSize();
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
+        uv_mutex_unlock(&dn->lock);
         slog(0, SLOG_ERROR, "dirnode - file not found: %s", fpath);
         return false;
     }
@@ -258,6 +268,8 @@ out:
         free(buffer);
     }
 
+    dn->is_dirty = 0;
+
     return ret;
 }
 
@@ -265,6 +277,12 @@ bool
 dirnode_flush(uc_dirnode_t * dn)
 {
     assert(dn != NULL);
+    return true;
+}
+
+bool
+dirnode_fsync(uc_dirnode_t * dn)
+{
     return dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
 }
 
@@ -288,6 +306,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
         return nullptr;
     }
 
+    uv_mutex_lock(&dn->lock);
     switch (type) {
     case UC_FILE:
         dentry = dn->protobuf->add_file();
@@ -318,6 +337,12 @@ dirnode_add_alias(uc_dirnode_t * dn,
 
     dn->header.count++;
 
+    if (dn->is_dirty == 0) {
+        icache_dirty_dirnode(dn, &dn->header.uuid);
+        dn->is_dirty = 1;
+    }
+
+    uv_mutex_unlock(&dn->lock);
     return encoded_name;
 }
 
@@ -356,6 +381,9 @@ dirnode_rm(uc_dirnode_t * dn,
     }
 
 retry:
+    uv_mutex_unlock(&dn->lock);
+    *pp_link_info = NULL;
+
     switch (type) {
     case UC_FILE:
         dentry_list = dn->protobuf->mutable_file();
@@ -367,6 +395,7 @@ retry:
         dentry_list = dn->protobuf->mutable_link();
         break;
     default:
+        uv_mutex_unlock(&dn->lock);
         return NULL;
     }
 
@@ -379,7 +408,8 @@ retry:
             && memcmp(realname, str_entry.data(), len) == 0) {
             result = (shadow_t *)malloc(sizeof(shadow_t));
             if (result == NULL) {
-                return NULL;
+                slog(0, SLOG_FATAL, "allocation error");
+                goto out;
             }
 
             /* send the link info */
@@ -387,9 +417,13 @@ retry:
                 link_len = curr_dentry->link_info().size();
                 link_info = (link_info_t *)malloc(link_len);
                 if (link_info == NULL) {
+                    free(result);
+                    result = NULL;
+
                     slog(0, SLOG_ERROR, "allocating link_info space failed"
-                            " len=%d", link_len);
-                    return NULL;
+                                        " len=%d",
+                         link_len);
+                    goto out;
                 }
 
                 memcpy(link_info, curr_dentry->link_info().data(), link_len);
@@ -403,7 +437,7 @@ retry:
             dentry_list->erase(curr_dentry);
             dn->header.count--;
             *p_type = type;
-            return result;
+            goto out;
         }
 
         curr_dentry++;
@@ -425,16 +459,25 @@ retry:
         }
     }
 
-    return NULL;
+out:
+    if (result && dn->is_dirty == 0) {
+        icache_dirty_dirnode(dn, &dn->header.uuid);
+        dn->is_dirty = 1;
+    }
+
+    uv_mutex_unlock(&dn->lock);
+
+    return result;
 }
 
 const char *
-dirnode_enc2raw(const uc_dirnode_t * dn,
+dirnode_enc2raw(uc_dirnode_t * dn,
                 const shadow_t * encoded_name,
                 ucafs_entry_type type,
                 ucafs_entry_type * p_type)
 {
     const RepeatedPtrField<dnode_dentry> * dentry_list;
+    const char * result = NULL;
     int ret;
 
     bool iterate;
@@ -445,6 +488,7 @@ dirnode_enc2raw(const uc_dirnode_t * dn,
         iterate = false;
     }
 retry:
+    uv_mutex_lock(&dn->lock);
     switch (type) {
     case UC_FILE:
         dentry_list = &dn->protobuf->file();
@@ -456,6 +500,7 @@ retry:
         dentry_list = &dn->protobuf->link();
         break;
     default:
+        uv_mutex_unlock(&dn->lock);
         return NULL;
     }
 
@@ -465,7 +510,8 @@ retry:
                      sizeof(shadow_t));
         if (ret == 0) {
             *p_type = type;
-            return curr_dentry->raw_name().c_str();
+            result = curr_dentry->raw_name().c_str();
+            goto out;
         }
 
         curr_dentry++;
@@ -487,18 +533,20 @@ retry:
         }
     }
 
-    return NULL;
+out:
+    uv_mutex_unlock(&dn->lock);
+    return result;
 }
 
 static const shadow_t *
-__dirnode_raw2enc(const uc_dirnode_t * dn,
-                const char * realname,
-                ucafs_entry_type type,
-                ucafs_entry_type * p_type,
-                const link_info_t ** pp_link_info)
+__dirnode_raw2enc(uc_dirnode_t * dn,
+                  const char * realname,
+                  ucafs_entry_type type,
+                  ucafs_entry_type * p_type,
+                  const link_info_t ** pp_link_info)
 {
     size_t len = strlen(realname);
-    shadow_t * encoded;
+    const shadow_t * encoded;
     const RepeatedPtrField<dnode_dentry> * dentry_list;
 
     bool iterate;
@@ -509,6 +557,7 @@ __dirnode_raw2enc(const uc_dirnode_t * dn,
         iterate = false;
     }
 retry:
+    uv_mutex_lock(&dn->lock);
     switch (type) {
     case UC_FILE:
         dentry_list = &dn->protobuf->file();
@@ -520,6 +569,7 @@ retry:
         dentry_list = &dn->protobuf->link();
         break;
     default:
+        uv_mutex_unlock(&dn->lock);
         return NULL;
     }
 
@@ -528,7 +578,7 @@ retry:
         const string & str_entry = curr_dentry->raw_name();
 
         if (len == str_entry.size()
-            && memcmp(realname, curr_dentry->raw_name().data(), len) == 0) {
+            && memcmp(realname, str_entry.data(), len) == 0) {
             *p_type = type;
 
             /* check if we are traversing */
@@ -536,7 +586,8 @@ retry:
                 *pp_link_info = (link_info_t *)curr_dentry->link_info().data();
             }
 
-            return (shadow_t *)curr_dentry->encoded_name().data();
+            encoded = (const shadow_t *)curr_dentry->encoded_name().data();
+            goto out;
         }
         curr_dentry++;
     }
@@ -557,11 +608,13 @@ retry:
         }
     }
 
-    return NULL;
+out:
+    uv_mutex_unlock(&dn->lock);
+    return encoded;
 }
 
 const shadow_t *
-dirnode_raw2enc(const uc_dirnode_t * dn,
+dirnode_raw2enc(uc_dirnode_t * dn,
                 const char * realname,
                 ucafs_entry_type type,
                 ucafs_entry_type * p_type)
@@ -570,7 +623,7 @@ dirnode_raw2enc(const uc_dirnode_t * dn,
 }
 
 const shadow_t *
-dirnode_traverse(const uc_dirnode_t * dn,
+dirnode_traverse(uc_dirnode_t * dn,
                  const char * realname,
                  ucafs_entry_type type,
                  ucafs_entry_type * p_type,
@@ -579,12 +632,13 @@ dirnode_traverse(const uc_dirnode_t * dn,
     return __dirnode_raw2enc(dn, realname, type, p_type, pp_link_info);
 }
 
+// TODO fix locking
 int
 dirnode_rename(uc_dirnode_t * dn,
                const char * oldname,
                const char * newname,
                ucafs_entry_type type,
-               ucafs_entry_type *p_type,
+               ucafs_entry_type * p_type,
                shadow_t ** ptr_shadow1_bin,
                shadow_t ** ptr_shadow2_bin,
                link_info_t ** pp_link_info1,
@@ -616,4 +670,26 @@ dirnode_rename(uc_dirnode_t * dn,
         return shadow2_bin == NULL ? -1 : 0;
     }
     return -1;
+}
+
+inline void
+dirnode_mark_dirty(uc_dirnode_t * dn)
+{
+    uv_mutex_lock(&dn->lock);
+    dn->is_dirty = 1;
+    uv_mutex_unlock(&dn->lock);
+}
+
+inline void
+dirnode_mark_clean(uc_dirnode_t * dn)
+{
+    uv_mutex_lock(&dn->lock);
+    dn->is_dirty = 0;
+    uv_mutex_unlock(&dn->lock);
+}
+
+inline bool
+dirnode_is_dirty(uc_dirnode_t * dn)
+{
+    return dn->is_dirty == 1;
 }

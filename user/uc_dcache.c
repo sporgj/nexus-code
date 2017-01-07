@@ -298,7 +298,7 @@ traverse(struct uc_dentry * parent_dentry,
 
         found_in_cache = false;
 next:
-        /* get the path to the dnode */        
+        /* get the path to the dnode */
         if (found_in_cache == false) {
             alias_dn = dn;
             if ((dn = dirnode_from_shadow_name(shadow_name)) == NULL) {
