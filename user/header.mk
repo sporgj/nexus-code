@@ -37,6 +37,7 @@ OBJS = uc_dirnode.o\
        uc_filebox.o\
        uc_dirops.o\
        uc_dcache.o\
+       uc_metadata.o\
        uc_uspace.o\
        uc_encode.o\
        uc_fetchstore.o\

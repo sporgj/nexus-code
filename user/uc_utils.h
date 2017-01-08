@@ -35,6 +35,9 @@ do_absolute_path(const char * path);
 int
 hash_string(const char * keystring);
 
+uint32_t
+murmurhash(const char * key, uint32_t len, uint32_t seed);
+
 #ifdef __cplusplus
 }
 #endif

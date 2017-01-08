@@ -15,6 +15,7 @@ struct dirnode;
 typedef struct dirnode uc_dirnode_t;
 
 struct uc_dentry;
+struct metadata_entry;
 
 uc_dirnode_t *
 dirnode_new();
@@ -44,6 +45,9 @@ dirnode_get_dentry(uc_dirnode_t * dirnode);
 
 void
 dirnode_clear_dentry(uc_dirnode_t * dirnode);
+
+struct metadata_entry * dirnode_get_metadata(uc_dirnode_t * dn);
+void dirnode_set_metadata(uc_dirnode_t *, struct metadata_entry *);
 
 /**
  * Creates a new dirnode object from the path.

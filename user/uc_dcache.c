@@ -9,6 +9,7 @@
 #include "third/slog.h"
 
 #include "uc_dirnode.h"
+#include "uc_metadata.h"
 #include "uc_encode.h"
 #include "uc_filebox.h"
 #include "uc_uspace.h"
@@ -269,9 +270,9 @@ traverse(struct uc_dentry * parent_dentry,
         /* 2 - We have to do a real fetch from disk */
         if (dn == NULL) {
             if (parent_dentry == root_dentry) {
-                dn = dirnode_default_dnode();
+                dn = metadata_get_dirnode(&uc_root_dirnode_shadow_name);
             } else {
-                dn = dirnode_from_shadow_name(&parent_dentry->shdw_name);
+                dn = metadata_get_dirnode(&parent_dentry->shdw_name);
             }
 
             if (dn == NULL) {
@@ -301,7 +302,7 @@ next:
         /* get the path to the dnode */
         if (found_in_cache == false) {
             alias_dn = dn;
-            if ((dn = dirnode_from_shadow_name(shadow_name)) == NULL) {
+            if ((dn = metadata_get_dirnode(shadow_name)) == NULL) {
                 break;
             }
 
@@ -325,7 +326,7 @@ next1:
     /* now return the entry */
     if (nch == NULL) {
         *p_dest_dn = (dn == NULL)
-            ? dirnode_from_shadow_name(&parent_dentry->shdw_name)
+            ? metadata_get_dirnode(&parent_dentry->shdw_name)
             : dn;
         return dentry;
     }

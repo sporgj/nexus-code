@@ -1,6 +1,6 @@
 #include "uc_dirnode.h"
 #include "uc_encode.h"
-#include "uc_icache.h"
+#include "uc_metadata.h"
 #include "uc_sgx.h"
 #include "uc_uspace.h"
 
@@ -20,6 +20,7 @@ struct dirnode {
     /* live object stuff */
     int is_dirty;
     uv_mutex_t lock;
+    struct metadata_entry * mcache;
 };
 
 uc_dirnode_t *
@@ -79,6 +80,17 @@ dirnode_clear_dentry(uc_dirnode_t * dirnode)
     dirnode->dentry = NULL;
 }
 
+struct metadata_entry * dirnode_get_metadata(uc_dirnode_t * dn)
+{
+    return dn->mcache;
+}
+
+void dirnode_set_metadata(uc_dirnode_t * dn, struct metadata_entry * entry)
+{
+    // XXX get the lock here?
+    dn->mcache = entry;
+}
+
 int
 dirnode_is_root(uc_dirnode_t * dirnode)
 {
@@ -127,11 +139,18 @@ dirnode_default_dnode()
 uc_dirnode_t *
 dirnode_from_shadow_name(const shadow_t * shdw_name)
 {
-    char * temp = metaname_bin2str(shdw_name);
-    sds path_sds = uc_get_dnode_path(temp);
+    sds path_sds;
+
+    if (memcmp(shdw_name, &uc_root_dirnode_shadow_name, sizeof(shadow_t)) == 0) {
+        path_sds = uc_main_dnode_fpath();
+    } else {
+        char * temp = metaname_bin2str(shdw_name);
+        path_sds = uc_get_dnode_path(temp);
+        free(temp);
+    }
+
     uc_dirnode_t * dn = dirnode_from_file(path_sds);
     sdsfree(path_sds);
-    free(temp);
     return dn;
 }
 
@@ -338,7 +357,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
     dn->header.count++;
 
     if (dn->is_dirty == 0) {
-        icache_dirty_dirnode(dn, &dn->header.uuid);
+        metadata_dirty_dirnode(dn);
         dn->is_dirty = 1;
     }
 
@@ -461,7 +480,7 @@ retry:
 
 out:
     if (result && dn->is_dirty == 0) {
-        icache_dirty_dirnode(dn, &dn->header.uuid);
+        metadata_dirty_dirnode(dn);
         dn->is_dirty = 1;
     }
 
@@ -672,24 +691,12 @@ dirnode_rename(uc_dirnode_t * dn,
     return -1;
 }
 
-inline void
-dirnode_mark_dirty(uc_dirnode_t * dn)
+int dirnode_trylock(uc_dirnode_t * dn)
 {
-    uv_mutex_lock(&dn->lock);
-    dn->is_dirty = 1;
-    uv_mutex_unlock(&dn->lock);
+    return uv_mutex_trylock(&dn->lock);
 }
 
-inline void
-dirnode_mark_clean(uc_dirnode_t * dn)
+void dirnode_unlock(uc_dirnode_t * dn)
 {
-    uv_mutex_lock(&dn->lock);
-    dn->is_dirty = 0;
     uv_mutex_unlock(&dn->lock);
-}
-
-inline bool
-dirnode_is_dirty(uc_dirnode_t * dn)
-{
-    return dn->is_dirty == 1;
 }
