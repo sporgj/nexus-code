@@ -321,7 +321,6 @@ next:
         }
 
         if (alias_dn) {
-            dirnode_free(alias_dn);
             alias_dn = NULL;
         }
 next1:
@@ -335,10 +334,6 @@ next1:
             ? metadata_get_dirnode(&parent_dentry->shdw_name)
             : dn;
         return dentry;
-    }
-
-    if (dn) {
-        dirnode_free(dn);
     }
 
     *p_dest_dn = NULL;
@@ -382,7 +377,7 @@ dcache_lookup(const char * path, bool dirpath)
         dentry = real_lookup(relpath, &dirnode);
     } else {
         dentry = root_dentry;
-        dirnode = dirnode_default_dnode();
+        dirnode = metadata_get_dirnode(&uc_root_dirnode_shadow_name);
     }
 
     /* increase the ref count */
@@ -412,7 +407,6 @@ dcache_get_filebox(const char * path, size_t hint)
     }
 
     if ((fname = do_get_fname(path)) == NULL) {
-        dirnode_free(dirnode);
         return NULL;
     }
 
@@ -450,7 +444,6 @@ dcache_get_filebox(const char * path, size_t hint)
 
     fb = filebox_from_shadow_name2(codename, hint);
 out:
-    dirnode_free(dirnode);
     sdsfree(fname);
     return fb;
 }
@@ -467,9 +460,7 @@ dcache_put(uc_dirnode_t * dn)
         return;
     }
 
-    // THIS may be overwrought
-    dirnode_clear_dentry(dn);
-    dirnode_free(dn);
+    // TODO add mutiple links to single dentry object
 }
 
 /**

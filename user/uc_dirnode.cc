@@ -339,6 +339,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
         dentry = dn->protobuf->add_link();
         break;
     default:
+        uv_mutex_unlock(&dn->lock);
         return NULL;
     }
 
@@ -401,8 +402,8 @@ dirnode_rm(uc_dirnode_t * dn,
         iterate = false;
     }
 
+    uv_mutex_lock(&dn->lock);
 retry:
-    uv_mutex_unlock(&dn->lock);
     *pp_link_info = NULL;
 
     switch (type) {
@@ -508,8 +509,9 @@ dirnode_enc2raw(uc_dirnode_t * dn,
     } else {
         iterate = false;
     }
-retry:
+
     uv_mutex_lock(&dn->lock);
+retry:
     switch (type) {
     case UC_FILE:
         dentry_list = &dn->protobuf->file();
@@ -567,7 +569,7 @@ __dirnode_raw2enc(uc_dirnode_t * dn,
                   const link_info_t ** pp_link_info)
 {
     size_t len = strlen(realname);
-    const shadow_t * encoded;
+    const shadow_t * encoded = NULL;
     const RepeatedPtrField<dnode_dentry> * dentry_list;
 
     bool iterate;
@@ -577,8 +579,9 @@ __dirnode_raw2enc(uc_dirnode_t * dn,
     } else {
         iterate = false;
     }
-retry:
+
     uv_mutex_lock(&dn->lock);
+retry:
     switch (type) {
     case UC_FILE:
         dentry_list = &dn->protobuf->file();

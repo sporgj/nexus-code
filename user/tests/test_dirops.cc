@@ -10,7 +10,7 @@
 
 #include "uc_test.h"
 
-#define TOTAL_FILE_COUNT 600
+#define TOTAL_FILE_COUNT 60
 
 class TestDirops : public ::testing::Test {
 protected:
@@ -122,7 +122,7 @@ TEST_F(TestDirops, FileRenaming1)
 
     /* check that the renamed file is not accessible */
     temp_path = do_get_dir(path1);
-    ASSERT_NE(0, dirops_code2plain(temp1, temp_path, type, &temp4));
+    ASSERT_NE(0, dirops_code2plain(temp_path, temp1, type, &temp4));
     sdsfree(temp_path);
 
     /* verifying the old dnode path is not accessible */
@@ -167,7 +167,7 @@ TEST_F(TestDirops, HardLinkTest1)
     /* 4 - Access the hardlink */
     ASSERT_EQ(0, dirops_plain2code(linkpath, UC_FILE, &temp3))
         << "Could not reference hardlink";
-    ASSERT_EQ(0, dirops_code2plain(temp3, linkdir, UC_FILE, &temp3));
+    ASSERT_EQ(0, dirops_code2plain(linkdir, temp3, UC_FILE, &temp3));
 
     /* 5 - Check filebox file still exists */
     ASSERT_EQ(0, stat(filebox_path, &stat_buf))
@@ -179,7 +179,7 @@ TEST_F(TestDirops, HardLinkTest1)
     /* 7 - Access the hardlink */
     ASSERT_NE(0, dirops_plain2code(linkpath, UC_FILE, &temp3))
         << "Could not reference hardlink";
-    ASSERT_NE(0, dirops_code2plain(temp3, linkdir, UC_FILE, &temp3));
+    ASSERT_NE(0, dirops_code2plain(linkdir, temp3, UC_FILE, &temp3));
 
     /* 5 - Check filebox file still exists */
     ASSERT_NE(0, stat(filebox_path, &stat_buf))
@@ -210,7 +210,7 @@ TEST_F(TestDirops, HardLinkTest2)
     /* 4 - Access the file */
     ASSERT_EQ(0, dirops_plain2code(filepath, UC_FILE, &temp3))
         << "Could not reference file";
-    ASSERT_EQ(0, dirops_code2plain(temp3, filedir, UC_FILE, &temp3));
+    ASSERT_EQ(0, dirops_code2plain(filedir, temp3, UC_FILE, &temp3));
 
     /* 5 - Check filebox file still exists */
     ASSERT_EQ(0, stat(filebox_path, &stat_buf))
@@ -222,7 +222,7 @@ TEST_F(TestDirops, HardLinkTest2)
     /* 7 - Access the file */
     ASSERT_NE(0, dirops_plain2code(filepath, UC_FILE, &temp3))
         << "Could not reference file";
-    ASSERT_NE(0, dirops_code2plain(temp3, filedir, UC_FILE, &temp3));
+    ASSERT_NE(0, dirops_code2plain(filedir, temp3, UC_FILE, &temp3));
 
     /* 5 - Check filebox file still exists */
     ASSERT_NE(0, stat(filebox_path, &stat_buf))

@@ -187,7 +187,6 @@ metadata_flush(uv_timer_t * handle)
     dirty_item_t *var, *tvar;
 
     uv_mutex_lock(&dirty_list_lock);
-    uv_timer_stop(handle);
     TAILQ_FOREACH_SAFE(var, dirty_list_head, next_item, tvar)
     {
         k++;
@@ -215,10 +214,11 @@ metadata_flush(uv_timer_t * handle)
     }
 
     dirty_list_count -= i;
-    printf(":: flush_entries(): size=%zu, flushed=%d, skipped=%d, seen=%d\n",
-           dirty_list_count, i, j, k);
+    if (i || j || k) {
+        printf(":: flush_entries(): size=%zu, flushed=%d, skipped=%d, seen=%d\n",
+                dirty_list_count, i, j, k);
+    }
     fflush(stdout);
-    //uv_timer_start(&flush_timer, metadata_flush, 2000, 0);
     uv_mutex_unlock(&dirty_list_lock);
 }
 
