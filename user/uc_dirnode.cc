@@ -19,8 +19,8 @@ struct dirnode {
 
     /* live object stuff */
     int is_dirty;
-    uv_mutex_t lock;
     struct metadata_entry * mcache;
+    uv_mutex_t lock;
 };
 
 uc_dirnode_t *
@@ -219,7 +219,9 @@ dirnode_from_file(const sds filepath)
     obj->dnode_path = sdsdup(filepath);
     obj->protobuf = _dnode;
     obj->dentry = NULL;
+    obj->is_dirty = 0;
     uv_mutex_init(&obj->lock);
+    obj->mcache = NULL;
 
     memcpy(&obj->header, &header, sizeof(dnode_header_t));
 

@@ -79,3 +79,23 @@ sds uc_derive_relpath(const char * path, bool is_dirpath)
 
     return len > 0 ? sdsnewlen(ptr1, len) : sdsnew("");
 }
+
+int ucafs_init_uspace()
+{
+    int ret;
+
+    if ((ret = metadata_init())) {
+        return ret;
+    }
+
+    dcache_init();
+
+    return ret;
+}
+
+int ucafs_exit_uspace()
+{
+    metadata_exit();
+
+    return 0;
+}

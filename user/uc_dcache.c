@@ -116,6 +116,12 @@ dcache_init()
     // uv_thread_create(&stats_thread, start_stats_thread, NULL);
 }
 
+void
+dcache_exit()
+{
+    // TODO clear variables and exit timers here
+}
+
 struct uc_dentry *
 dcache_new(const char * name,
            const shadow_t * dirnode_name,

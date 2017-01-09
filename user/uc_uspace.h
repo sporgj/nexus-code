@@ -45,6 +45,16 @@ uc_get_dnode_path(const char * fname);
 sds
 uc_derive_relpath(const char * fullpath, bool is_dirpath);
 
+
+int metadata_init();
+void metadata_exit();
+
+void dcache_init();
+void dcache_exit();
+
+int ucafs_init_uspace();
+int ucafs_exit_uspace();
+
 #ifdef __cplusplus
 }
 #endif

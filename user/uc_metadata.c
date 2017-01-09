@@ -96,11 +96,6 @@ _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
     ptr = hashmapPut(metadata_hashmap, (void *)shdw, entry, &hash);
     hashmapUnlock(metadata_hashmap);
 
-    if (ptr == NULL) {
-        slog(0, SLOG_ERROR, "hashmapPut returned NULL");
-        goto out;
-    }
-
     ret = 0;
 out:
     if (ret) {
@@ -179,8 +174,12 @@ cleanup:
     return NULL;
 }
 
+static uv_timer_t flush_timer;
+static uv_thread_t flush_thread;
+static uv_loop_t _fl, * flush_loop = &_fl;
+
 static void
-metadata_flush()
+metadata_flush(uv_timer_t * handle)
 {
     int i = 0, j = 0, k = 0;
     uc_dirnode_t * dn;
@@ -188,6 +187,7 @@ metadata_flush()
     dirty_item_t *var, *tvar;
 
     uv_mutex_lock(&dirty_list_lock);
+    uv_timer_stop(handle);
     TAILQ_FOREACH_SAFE(var, dirty_list_head, next_item, tvar)
     {
         k++;
@@ -215,22 +215,20 @@ metadata_flush()
     }
 
     dirty_list_count -= i;
-    printf(":: flush_entries(): size=%zu, flushed=%d, skipped=%d, seen=%d",
+    printf(":: flush_entries(): size=%zu, flushed=%d, skipped=%d, seen=%d\n",
            dirty_list_count, i, j, k);
+    fflush(stdout);
+    //uv_timer_start(&flush_timer, metadata_flush, 2000, 0);
     uv_mutex_unlock(&dirty_list_lock);
 }
-
-static uv_timer_t flush_timer;
-static uv_thread_t flush_thread;
 
 static void
 start_flush_thread()
 {
-    uv_loop_t * loop = uv_loop_new();
-    uv_loop_init(loop);
-    uv_timer_init(loop, &flush_timer);
-    uv_timer_start(&flush_timer, metadata_flush, 5000, 500);
-    uv_run(loop, UV_RUN_DEFAULT);
+    uv_loop_init(flush_loop);
+    uv_timer_init(flush_loop, &flush_timer);
+    uv_timer_start(&flush_timer, metadata_flush, 5000, 2000);
+    uv_run(flush_loop, UV_RUN_DEFAULT);
 }
 
 static int
@@ -256,13 +254,20 @@ metadata_init()
 
     TAILQ_INIT(dirty_list_head);
 
-	// add the default dnode to the cache
-	if (metadata_get_dirnode(&uc_root_dirnode_shadow_name)) {
-		slog(0, SLOG_ERROR, "metadata_get_dirnode root failed");
-		return -1;
-	}
+    // add the default dnode to the cache
+    if (metadata_get_dirnode(&uc_root_dirnode_shadow_name) == NULL) {
+        slog(0, SLOG_ERROR, "metadata_get_dirnode root failed");
+        return -1;
+    }
 
     uv_thread_create(&flush_thread, start_flush_thread, NULL);
 
     return 0;
+}
+
+void
+metadata_exit()
+{
+    uv_stop(flush_loop);
+    // TODO clear all data here
 }

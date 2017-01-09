@@ -33,8 +33,13 @@ protected:
         // cout << ", status = " << status << endl;
 
         create_default_dnode();
+        ucafs_init_uspace();
         init_systems();
         sdsfree(dir);
+    }
+
+    virtual void TearDown() {
+        ucafs_exit_uspace();
     }
 };
 

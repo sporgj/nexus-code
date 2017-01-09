@@ -24,7 +24,6 @@ FILE * global_mod_fid = NULL;
 sgx_enclave_id_t global_eid = 0;
 
 extern "C" int setup_mod();
-extern "C" void dcache_init();
 
 const char afs_path[] = UCAFS_PATH;
 static bool check_main_dir()
@@ -81,10 +80,13 @@ int main(int argc, char ** argv)
     cout << ". Loaded enclave" << endl;
 #endif
 
-    dcache_init();
-
     cout << ":: Checking " << afs_path << "..." << endl;
     if (!check_main_dir()) {
+        return -1;
+    }
+
+    if (ucafs_init_uspace()) {
+        cout << "init uspace subsystem failed" << endl;
         return -1;
     }
 

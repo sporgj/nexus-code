@@ -27,8 +27,6 @@ using namespace std;
 
 sgx_enclave_id_t global_eid = 0;
 
-extern "C" void dcache_init();
-
 static sds MK_PATH(const char * path)
 {
     sds rv = sdsnew(TEST_REPO_DIR);
@@ -103,7 +101,6 @@ static void
 init_systems()
 {
     //uinfo("Initializing...");
-    dcache_init();
 #ifdef UCAFS_SGX
     if (init_enclave()) {
         exit(-1);
