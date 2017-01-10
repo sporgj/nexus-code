@@ -35,6 +35,8 @@ typedef struct {
 
 #define UC_AFS_WATCH "sgx"
 
+#define UCAFS_REPO_FNAME ".ucafs"
+
 typedef enum {
     UC_STATUS_GOOD = 0,
     UC_STATUS_NOOP,

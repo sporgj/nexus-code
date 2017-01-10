@@ -23,6 +23,8 @@ copyconfig:
 cryptolib: copyconfig
 	cd mbedtls/library && make clean && make SHARED=t
 
+admin_ucafs: admin_ucafs.c uc_superblock.o libthird.a
+	$(CC) $(App_C_Flags) $^ -pthread -luuid -o $@
 
 enclave_u.c: sgx/enclave.edl
 	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
