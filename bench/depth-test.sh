@@ -14,6 +14,10 @@ do
   echo             $i $files              
   echo '------------------------------------'
 
-  python3 dir_create.py $i $files
+  for j in `seq 1 5`;
+  do
+	python3 dir_create.py $i $files
+  done
+
   echo
 done

@@ -52,8 +52,9 @@ os.chdir(rootdir + '/' + testdir);
 
 t1 = timeit.timeit(run, number=1);
 
-print("Total dirs = {}".format(total_dirs));
-print("Total time = {}s".format(t1));
+def clean():
+    cmd = ['rm', '-rf', rootdir + '/' + testdir];
+    subprocess.call(cmd);
 
-cmd = ['rm', '-rf', rootdir + '/' + testdir];
-subprocess.call(cmd);
+t2 = timeit.timeit(clean, number=1);
+print("dirs={} \t create = {}s \t delete = {}s".format(total_dirs, t1, t2));
