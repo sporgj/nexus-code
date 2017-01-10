@@ -32,6 +32,8 @@
 #ifndef MBEDTLS_CONFIG_H
 #define MBEDTLS_CONFIG_H
 
+#define SHARED
+
 /* System support */
 #define MBEDTLS_HAVE_ASM
 //#define MBEDTLS_HAVE_TIME
@@ -45,8 +47,10 @@
 //#define MBEDTLS_ERROR_STRERROR_DUMMY
 //#define MBEDTLS_FS_IO
 
+#define UCAFS_AESNI_HAS_SUPPORT
+
 /* mbed TLS modules */
-//#define MBEDTLS_AESNI_C
+#define MBEDTLS_AESNI_C
 #define MBEDTLS_AES_C
 #define MBEDTLS_ASN1_PARSE_C
 #define MBEDTLS_ASN1_WRITE_C
