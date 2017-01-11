@@ -10,13 +10,13 @@
 #include "third/linenoise.h"
 
 #include "ucafs_header.h"
-#include "uc_superblock.h"
+#include "uc_supernode.h"
 
 const char * repo_fname = "repo.datum";
 
 static char repo_path[1024];
 
-superblock_t * super = NULL;
+supernode_t * super = NULL;
 
 static int shell()
 {

@@ -2,14 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "uc_superblock.h"
+#include "uc_supernode.h"
 
 #include "third/slog.h"
 
-superblock_t *
+supernode_t *
 superblock_new()
 {
-    superblock_t * super = (superblock_t *)malloc(sizeof(superblock_t));
+    supernode_t * super = (supernode_t *)malloc(sizeof(supernode_t));
     if (super == NULL) {
         // TODO die here
         return NULL;
@@ -24,11 +24,11 @@ superblock_new()
     return super;
 }
 
-superblock_t *
+supernode_t *
 superblock_from_file(char * path)
 {
     int err = -1;
-    superblock_t * super = NULL;
+    supernode_t * super = NULL;
     FILE * fd;
     size_t nbytes;
 
@@ -38,13 +38,13 @@ superblock_from_file(char * path)
         return NULL;
     }
 
-    super = (superblock_t *)malloc(sizeof(superblock_t));
+    super = (supernode_t *)malloc(sizeof(supernode_t));
     if (super == NULL) {
         // TODO die here
         goto out;
     }
 
-    nbytes = fread(super, sizeof(superblock_t), 1, fd);
+    nbytes = fread(super, sizeof(supernode_t), 1, fd);
     if (!nbytes) {
         slog(0, SLOG_ERROR, "superblock format error: %s", path);
         goto out;
@@ -67,7 +67,7 @@ out:
 }
 
 bool
-superblock_flush(superblock_t * super, char * path)
+superblock_flush(supernode_t * super, char * path)
 {
     bool err = false;
     FILE * fd;
@@ -83,7 +83,7 @@ superblock_flush(superblock_t * super, char * path)
 // seal info here
 #endif
 
-    nbytes = fwrite(super, sizeof(superblock_t), 1, fd);
+    nbytes = fwrite(super, sizeof(supernode_t), 1, fd);
     if (!nbytes) {
         slog(0, SLOG_ERROR, "writing superblock %s failed", path);
         goto out;
@@ -97,7 +97,7 @@ out:
 }
 
 void
-superblock_free(superblock_t * super)
+superblock_free(supernode_t * super)
 {
     free(super);
 }
