@@ -7,7 +7,7 @@
 #include "third/slog.h"
 
 supernode_t *
-superblock_new()
+superblock_new(size_t keylen)
 {
     supernode_t * super = (supernode_t *)malloc(sizeof(supernode_t));
     if (super == NULL) {

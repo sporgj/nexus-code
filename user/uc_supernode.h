@@ -3,11 +3,6 @@
 
 #include "uc_types.h"
 
-typedef struct {
-    shadow_t root_dnode;
-    crypto_context_t crypto_context;
-} supernode_t;
-
 supernode_t * superblock_new();
 
 supernode_t * superblock_from_file(char * path);

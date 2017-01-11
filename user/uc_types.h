@@ -11,6 +11,8 @@
 #define DEFAULT_REPO_DIRNAME ".afsx"
 #define DEFAULT_DNODE_FNAME "main.dnode"
 
+#define PUBKEY_HASH_LEN 256
+
 struct uc_dentry;
 struct filebox;
 typedef struct filebox uc_filebox_t;
@@ -138,3 +140,18 @@ typedef struct {
     uint32_t protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;
+
+#define SUPERNODE_HEADER \
+    crypto_context_t crypto_ctx; \
+    shadow_t root_dnode; \
+    uint8_t random[16]; \
+    uint8_t pubkey[PUBKEY_HASH_LEN];
+
+typedef struct {
+    SUPERNODE_HEADER;
+} __attribute__((packed)) supernode_header_t;
+
+typedef struct {
+    SUPERNODE_HEADER;
+} __attribute__((packed)) supernode_t;
+

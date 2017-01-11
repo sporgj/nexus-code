@@ -12,6 +12,8 @@
 #include "ucafs_header.h"
 #include "uc_supernode.h"
 
+#include "mbedtls/pk.h"
+
 const char * repo_fname = "repo.datum";
 
 static char repo_path[1024];
@@ -31,6 +33,28 @@ static int shell()
 	}
 
 	return 0;
+}
+
+/**
+ * We will parse the public in PEM format
+ * @param path is the path to load from
+ * @return 0 on success
+ */
+static int new_supernode(const char * path)
+{
+	int err = -1;
+	mbedtls_pk_context _ctx, * pk_ctx = &_ctx;
+
+	mbedtls_pk_init(pk_ctx);
+
+	if (mbedtls_pk_parse_public_keyfile(pk_ctx, path)) {
+		uerror("mbedtls_pk_parse_public_keyfile returned an error");
+		return -1;
+	}
+
+	err = 0;
+out:
+	return err;
 }
 
 int main() {
