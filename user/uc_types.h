@@ -143,9 +143,8 @@ typedef struct {
 
 #define SUPERNODE_HEADER \
     crypto_context_t crypto_ctx; \
-    shadow_t root_dnode; \
-    uint8_t random[16]; \
-    uint8_t pubkey[PUBKEY_HASH_LEN];
+    uint32_t count; \
+    shadow_t root_dnode;
 
 typedef struct {
     SUPERNODE_HEADER;

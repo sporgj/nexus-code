@@ -18,6 +18,9 @@ enclave {
         public int ecall_fetchstore_crypto([in, out] xfer_context_t * xfer_ctx);
 
         public int ecall_fetchstore_finish([in, out] xfer_context_t * xfer_ctx);
+
+        /* authentication */
+        public int ecall_initialize([in, out] supernode_t * supernode);
     };
 
 };

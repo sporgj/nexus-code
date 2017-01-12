@@ -20,6 +20,8 @@ static char repo_path[1024];
 
 supernode_t * super = NULL;
 
+sgx_enclave_id_t global_eid = 0;
+
 static int shell()
 {
 	char * line;
@@ -89,6 +91,19 @@ int main() {
 			return -1;
 		}
 	}
+
+    /* initialize the enclave */
+#ifdef UCAFS_SGX
+    sgx_launch_token_t token;
+    ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
+                             &global_eid, NULL);
+    if (ret != SGX_SUCCESS) {
+        uerror("Could not open enclave: ret=%d", ret);
+        return -1;
+    }
+
+    uinfo(". Loaded enclave");
+#endif
 
 	uinfo("Startup complete... :)");
 	/* send the user to the cmd */
