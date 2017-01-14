@@ -1,15 +1,16 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include "uc_sgx.h"
 #include "uc_supernode.h"
 
 #include "third/slog.h"
 
 supernode_t *
-superblock_new(size_t keylen)
+supernode_new()
 {
-    supernode_t * super = (supernode_t *)malloc(sizeof(supernode_t));
+    supernode_t * super = (supernode_t *)calloc(sizeof(supernode_t));
     if (super == NULL) {
         // TODO die here
         return NULL;
@@ -25,7 +26,7 @@ superblock_new(size_t keylen)
 }
 
 supernode_t *
-superblock_from_file(char * path)
+supernode_from_file(const char * path)
 {
     int err = -1;
     supernode_t * super = NULL;
@@ -67,20 +68,26 @@ out:
 }
 
 bool
-superblock_flush(supernode_t * super, char * path)
+supernode_flush(supernode_t * super, const char * path)
 {
     bool err = false;
+    int ret = -1;
     FILE * fd;
     size_t nbytes;
 
-    fd = fopen(path, "rb");
+    fd = fopen(path, "wb");
     if (fd == NULL) {
         slog(0, SLOG_ERROR, "could not open %s", path);
         return false;
     }
 
 #ifdef UCAFS_SGX
-// seal info here
+    // seal info here
+    ecall_seal_supernode(global_eid, &ret, super);
+    if (ret) {
+        slog(0, SLOG_ERROR, "sealing supernode failed");
+        goto out;
+    }
 #endif
 
     nbytes = fwrite(super, sizeof(supernode_t), 1, fd);
@@ -97,7 +104,7 @@ out:
 }
 
 void
-superblock_free(supernode_t * super)
+supernode_free(supernode_t * super)
 {
     free(super);
 }

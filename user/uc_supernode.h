@@ -3,10 +3,10 @@
 
 #include "uc_types.h"
 
-supernode_t * superblock_new();
+supernode_t * supernode_new();
 
-supernode_t * superblock_from_file(char * path);
+supernode_t * supernode_from_file(const char * path);
 
-void superblock_free(supernode_t * super);
+void supernode_free(supernode_t * super);
 
-bool superblock_flush(supernode_t * super, char * path);
+bool supernode_flush(supernode_t * super, const char * path);

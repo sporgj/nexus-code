@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "ucafs_header.h"
+#include <mbedtls/pk.h>
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)

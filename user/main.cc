@@ -15,8 +15,6 @@
 #include "uc_uspace.h"
 #include "uc_sgx.h"
 
-#define ENCLAVE_FILENAME "sgx/enclave.signed.so"
-
 using namespace std;
 
 FILE * global_mod_fid = NULL;
