@@ -24,7 +24,7 @@ cryptolib: copyconfig
 	cd mbedtls/library && make clean && make SHARED=t DEBUG=t
 
 admin_ucafs: admin_ucafs.c libucafs.a
-	$(CXX) $(CPPFLAGS)  $^ libthird.a $(LIBS) $(App_Link_Flags) -lmbedcrypto -o $@
+	@$(CXX) $(CPPFLAGS)  $^ libthird.a $(LIBS) $(App_Link_Flags) -lmbedcrypto -o $@
 	@echo "GEN => $@"
 
 enclave_u.c: sgx/enclave.edl

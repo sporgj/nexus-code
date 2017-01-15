@@ -2,18 +2,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <getopt.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "cdefs.h"
 #include "third/linenoise.h"
 #include "third/sds.h"
 
-#include "uc_sgx.h"
 #include "uc_dirnode.h"
 #include "uc_encode.h"
+#include "uc_sgx.h"
 #include "uc_supernode.h"
 #include "ucafs_header.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 const char * repo_fname = "profile/repo.datum";
 
@@ -87,6 +96,7 @@ new_supernode(const char * pubkey_path,
     dnode_path = sdsnew(user_root_path);
     dnode_path = sdscat(dnode_path, "/");
     dnode_path = sdscat(dnode_path, UCAFS_REPO_DIR);
+    dnode_path = sdscat(dnode_path, "/");
     dnode_path = sdscat(dnode_path, main_dnode_fname);
 
     /* noe lets create the main dnode */
@@ -105,11 +115,11 @@ out:
     }
 
     if (dnode_path) {
-	sdsfree(dnode_path);
+        sdsfree(dnode_path);
     }
 
     if (main_dnode_fname) {
-	free(main_dnode_fname);
+        free(main_dnode_fname);
     }
 
     return err;
@@ -146,10 +156,14 @@ out:
     return err;
 }
 
+static struct option long_options[]
+    = { { "init", no_argument, NULL, 'i' }, { 0, 0, 0, 0 } };
+
 int
-main()
+main(int argc, char * argv[])
 {
-    int ret, err, nbytes, updated;
+    int ret, err, nbytes, updated, opt_index = 0;
+    char c;
     FILE *fd1, *fd2;
     struct stat st;
     sds repo_file, main_dnode_path;
@@ -176,11 +190,34 @@ main()
     nbytes = fread(repo_path, 1, sizeof(repo_path), fd1);
     repo_path[strlen(repo_path) - 1] = '\0';
 
-    /* 2 - Check if the repository exists */
     repo_file = sdsnew(repo_path);
     repo_file = sdscat(repo_file, "/");
     repo_file = sdscat(repo_file, UCAFS_REPO_FNAME);
 
+    // if we get the --init flag, just initialize and quit
+    while (1) {
+        c = getopt_long(argc, argv, "i:", long_options, &opt_index);
+        if (c == -1) {
+            break;
+        }
+
+        switch (c) {
+        case 0:
+            if (long_options[opt_index].val = 'i') {
+                // we are doing an init
+                return new_supernode("profile/public_key", repo_file,
+                                     repo_path);
+            }
+
+            break;
+
+        case -1:
+            break;
+        }
+    }
+
+#if 0
+    /* 3 - We are trying to login */
     err = stat(repo_file, &st);
     if (err && new_supernode("profile/public_key", repo_file, repo_path)) {
         uerror("Error creating new supernode");
@@ -190,6 +227,7 @@ main()
     uinfo("Startup complete... :)");
     /* send the user to the cmd */
     shell();
+#endif
 
 out:
     fclose(fd1);
