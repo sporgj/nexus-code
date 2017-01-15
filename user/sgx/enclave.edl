@@ -23,6 +23,9 @@ enclave {
         public int ecall_initialize([in, out] supernode_t * supernode,
                 [user_check] mbedtls_pk_context * rsa_ctx);
 
+        public int ecall_ucafs_login([in, out] supernode_t * supernode,
+                [user_check] mbedtls_pk_context * rsa_ctx );
+
         public int ecall_seal_supernode([in, out] supernode_t * supernode);
     };
 

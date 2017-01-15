@@ -23,8 +23,8 @@ copyconfig:
 cryptolib: copyconfig
 	cd mbedtls/library && make clean && make SHARED=t DEBUG=t
 
-admin_ucafs: admin_ucafs.c uc_supernode.o enclave_u.o libthird.a
-	@$(CC) $(FLAGS) $(App_C_Flags) $^ $(App_Link_Flags) -pthread -luuid -lmbedcrypto -o $@
+admin_ucafs: admin_ucafs.c libucafs.a
+	$(CXX) $(CPPFLAGS)  $^ libthird.a $(LIBS) $(App_Link_Flags) -lmbedcrypto -o $@
 	@echo "GEN => $@"
 
 enclave_u.c: sgx/enclave.edl

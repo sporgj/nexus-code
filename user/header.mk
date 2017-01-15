@@ -41,6 +41,7 @@ OBJS = uc_dirnode.o\
        uc_uspace.o\
        uc_encode.o\
        uc_fetchstore.o\
+       uc_supernode.o\
        uc_utils.o\
        dnode.pb.o
 

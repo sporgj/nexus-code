@@ -37,6 +37,8 @@ typedef struct {
 
 #define UCAFS_REPO_FNAME ".ucafs"
 
+#define UCAFS_REPO_DIR ".afsx"
+
 typedef enum {
     UC_STATUS_GOOD = 0,
     UC_STATUS_NOOP,

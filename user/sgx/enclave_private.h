@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <stdbool.h>
 
 #include "enclave_t.h"
 
@@ -33,6 +34,8 @@ extern "C" {
 #endif
 
 extern sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
+
+extern bool enclave_is_logged_in;
 
 int enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op);
 

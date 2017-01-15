@@ -10,7 +10,7 @@
 supernode_t *
 supernode_new()
 {
-    supernode_t * super = (supernode_t *)calloc(sizeof(supernode_t));
+    supernode_t * super = (supernode_t *)calloc(1, sizeof(supernode_t));
     if (super == NULL) {
         // TODO die here
         return NULL;
@@ -50,10 +50,6 @@ supernode_from_file(const char * path)
         slog(0, SLOG_ERROR, "superblock format error: %s", path);
         goto out;
     }
-
-#ifdef UCAFS_SGX
-// verify the superblock object here
-#endif
 
     err = 0;
 out:

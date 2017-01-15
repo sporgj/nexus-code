@@ -29,6 +29,7 @@ typedef enum {
     E_ERROR_CRYPTO,
     E_ERROR_ALLOC,
     E_ERROR_KEYINIT,
+    E_ERROR_LOGIN,
     E_ERROR_HASHMAP
 } enclave_error_t;
 
