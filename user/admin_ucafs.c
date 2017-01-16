@@ -48,28 +48,21 @@ shell()
     return 0;
 }
 
-/**
- * We will parse the public in PEM format
- * @param path is the path to load from
- * @return 0 on success
- */
 static int
-new_supernode(const char * pubkey_path,
-              const char * path,
-              const char * user_root_path)
+initialize_repo(const char * user_root_path)
 {
     int err = -1;
-    sds dnode_path = NULL;
-    char * main_dnode_fname = NULL;
     mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
-    uc_dirnode_t * dirnode = NULL;
+    char * temp = NULL;
+    sds supernode_path, repo_path, main_dnode_path;
 
     supernode_t * super = supernode_new();
     if (super == NULL) {
-        uerror("supernode_new() returned NULL");
+        uerror();
         return -1;
     }
 
+    /* lets parse the public key */
     mbedtls_pk_init(pk_ctx);
     if (mbedtls_pk_parse_public_keyfile(pk_ctx, pubkey_path)) {
         supernode_free(super);
@@ -85,74 +78,43 @@ new_supernode(const char * pubkey_path,
     }
 #endif
 
-    if (!supernode_flush(super, path)) {
-        uerror("supernode_write() failed");
-        goto out;
-    }
+    /* generate the paths to save the files to */
+    repo_path = sdsnew(user_root_path);
+    repo_path = sdscat(repo_path, "/");
+    repo_path = sdscat(repo_path, UCAFS_REPO_DIR);
+    repo_path = sdscat(repo_path, "/");
 
-    /* now let's create the main dirnode */
-    main_dnode_fname = metaname_bin2str(&super->root_dnode);
+    supernode_path = sdsdup(repo_path);
+    supernode_path = sdscat(supernode_path, UCAFS_SUPERNODE);
 
-    dnode_path = sdsnew(user_root_path);
-    dnode_path = sdscat(dnode_path, "/");
-    dnode_path = sdscat(dnode_path, UCAFS_REPO_DIR);
-    dnode_path = sdscat(dnode_path, "/");
-    dnode_path = sdscat(dnode_path, main_dnode_fname);
+    temp = metaname_bin2str(&super->root_dnode);
+    main_dnode_path = repo_path;
+    main_dnode_path = sdscat(main_dnode_path, temp);
 
-    /* noe lets create the main dnode */
+    /* now, create the dirnode and write both structures to disk */
     dirnode = dirnode_new_alias(&super->root_dnode);
-    if (!dirnode_write(dirnode, dnode_path)) {
-        uerror("dirnode_write() failed");
+
+    if (!supernode_flush(super, supernode_path)
+        || !dirnode_write(dirnode, main_dnode_path)) {
         goto out;
     }
 
     err = 0;
 out:
-    mbedtls_pk_free(pk_ctx);
+    if (supernode_path) {
+        sdsfree(supernode_path);
+    }
+
+    if (repo_path) {
+        sdsfree(repo_path);
+    }
+
     supernode_free(super);
+
     if (dirnode) {
         dirnode_free(dirnode);
     }
 
-    if (dnode_path) {
-        sdsfree(dnode_path);
-    }
-
-    if (main_dnode_fname) {
-        free(main_dnode_fname);
-    }
-
-    return err;
-}
-
-static int
-login_enclave(const char * pubkey_path, const char * afs_repo_file)
-{
-    int err = -1;
-    mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
-    supernode_t * super = supernode_from_file(afs_repo_file);
-    if (super == NULL) {
-        return -1;
-    }
-
-    mbedtls_pk_init(pk_ctx);
-    if (mbedtls_pk_parse_public_keyfile(pk_ctx, pubkey_path)) {
-        supernode_free(super);
-        uerror("mbedtls_pk_parse_public_keyfile returned an error");
-        return -1;
-    }
-
-#ifdef UCAFS_SGX
-    ecall_ucafs_login(global_eid, &err, super, pk_ctx);
-    if (err) {
-        uerror("ecall_login returned %d", err);
-        goto out;
-    }
-#endif
-
-    err = 0;
-out:
-    supernode_free(super);
     return err;
 }
 
@@ -190,10 +152,6 @@ main(int argc, char * argv[])
     nbytes = fread(repo_path, 1, sizeof(repo_path), fd1);
     repo_path[strlen(repo_path) - 1] = '\0';
 
-    repo_file = sdsnew(repo_path);
-    repo_file = sdscat(repo_file, "/");
-    repo_file = sdscat(repo_file, UCAFS_REPO_FNAME);
-
     // if we get the --init flag, just initialize and quit
     while (1) {
         c = getopt_long(argc, argv, "i:", long_options, &opt_index);
@@ -205,8 +163,7 @@ main(int argc, char * argv[])
         case 0:
             if (long_options[opt_index].val = 'i') {
                 // we are doing an init
-                return new_supernode("profile/public_key", repo_file,
-                                     repo_path);
+                return initialize_repo(repo_path);
             }
 
             break;
