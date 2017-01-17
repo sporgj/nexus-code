@@ -6,6 +6,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/md.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/sha256.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,15 +60,14 @@ shell()
  * @return 0 on success
  */
 static int
-new_supernode(const char * pubkey_path,
-              const char * path,
-              const char * user_root_path)
+initialize_repository(const char * user_root_path)
 {
     int err = -1;
-    sds dnode_path = NULL;
+    sds snode_path = NULL, dnode_path = NULL, repo_path;
     char * main_dnode_fname = NULL;
     mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
     uc_dirnode_t * dirnode = NULL;
+    struct stat st;
 
     supernode_t * super = supernode_new();
     if (super == NULL) {
@@ -71,7 +76,7 @@ new_supernode(const char * pubkey_path,
     }
 
     mbedtls_pk_init(pk_ctx);
-    if (mbedtls_pk_parse_public_keyfile(pk_ctx, pubkey_path)) {
+    if (mbedtls_pk_parse_public_keyfile(pk_ctx, CONFIG_PUBKEY)) {
         supernode_free(super);
         uerror("mbedtls_pk_parse_public_keyfile returned an error");
         return -1;
@@ -85,19 +90,31 @@ new_supernode(const char * pubkey_path,
     }
 #endif
 
-    if (!supernode_flush(super, path)) {
+    main_dnode_fname = metaname_bin2str(&super->root_dnode);
+
+    /* create the paths for the dnode and the supernode */
+    repo_path = sdsnew(user_root_path);
+    repo_path = sdscat(repo_path, "/");
+    repo_path = sdscat(repo_path, UCAFS_REPO_DIR);
+
+    // lets make sure we have the folder available
+    if (stat(repo_path, &st)) {
+        if (mkdir(repo_path, S_IRWXG)) {
+            uerror("mkdir FAILED: %s", repo_path);
+            goto out;
+        }
+    }
+
+    repo_path = sdscat(repo_path, "/");
+    snode_path = repo_path, dnode_path = sdsdup(repo_path);
+
+    snode_path = sdscat(snode_path, UCAFS_SUPER_FNAME);
+    dnode_path = sdscat(dnode_path, main_dnode_fname);
+
+    if (!supernode_write(super, snode_path)) {
         uerror("supernode_write() failed");
         goto out;
     }
-
-    /* now let's create the main dirnode */
-    main_dnode_fname = metaname_bin2str(&super->root_dnode);
-
-    dnode_path = sdsnew(user_root_path);
-    dnode_path = sdscat(dnode_path, "/");
-    dnode_path = sdscat(dnode_path, UCAFS_REPO_DIR);
-    dnode_path = sdscat(dnode_path, "/");
-    dnode_path = sdscat(dnode_path, main_dnode_fname);
 
     /* noe lets create the main dnode */
     dirnode = dirnode_new_alias(&super->root_dnode);
@@ -114,6 +131,10 @@ out:
         dirnode_free(dirnode);
     }
 
+    if (snode_path) {
+        sdsfree(snode_path);
+    }
+
     if (dnode_path) {
         sdsfree(dnode_path);
     }
@@ -126,24 +147,98 @@ out:
 }
 
 static int
-login_enclave(const char * pubkey_path, const char * afs_repo_file)
+login_enclave(const char * user_root_path)
 {
     int err = -1;
-    mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
-    supernode_t * super = supernode_from_file(afs_repo_file);
+    size_t olen = 0;
+    uint8_t hash[32], buf[MBEDTLS_MPI_MAX_SIZE], nonce_a[32];
+    sds snode_path = NULL;
+    supernode_t * super;
+    struct enclave_auth auth;
+    mbedtls_sha256_context sha256_ctx;
+    mbedtls_pk_context _ctx1, *public_k = &_ctx1, _ctx2, *private_k = &_ctx2,
+                              _ctx3, *enclave_pubkey = &_ctx3;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_entropy_context entropy;
+
+    snode_path = ucafs_supernode_path(user_root_path);
+    super = supernode_from_file(snode_path);
     if (super == NULL) {
+        sdsfree(snode_path);
         return -1;
     }
 
-    mbedtls_pk_init(pk_ctx);
-    if (mbedtls_pk_parse_public_keyfile(pk_ctx, pubkey_path)) {
-        supernode_free(super);
-        uerror("mbedtls_pk_parse_public_keyfile returned an error");
-        return -1;
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    err = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL,
+                                0);
+    if (err) {
+        uerror("mbedtls_ctr_drbg_seed failed ret=%#x", err);
+        goto out;
+    }
+
+    err = mbedtls_ctr_drbg_random(&ctr_drbg, nonce_a, sizeof(nonce_a));
+    if (err) {
+        uerror("mbedtls_ctr_drbg_random FAIELD ret=%#x", err);
+        goto out;
     }
 
 #ifdef UCAFS_SGX
-    ecall_ucafs_login(global_eid, &err, super, pk_ctx);
+    /* 1 - Challenge the enclave */
+    ecall_ucafs_challenge(global_eid, &err, nonce_a, &auth);
+    if (err) {
+        uerror("enclave_challenge failed :(");
+        goto out;
+    }
+#endif
+
+    /* now compute our own version of the hash and respond to the enclave */
+    mbedtls_sha256_init(&sha256_ctx);
+    mbedtls_sha256_starts(&sha256_ctx, 0);
+    mbedtls_sha256_update(&sha256_ctx, nonce_a, sizeof(nonce_a));
+    mbedtls_sha256_update(&sha256_ctx, (uint8_t *)&auth, sizeof(auth));
+    mbedtls_sha256_finish(&sha256_ctx, hash);
+    mbedtls_sha256_free(&sha256_ctx);
+
+    /* parse the enclave public key */
+    mbedtls_pk_init(enclave_pubkey);
+    err = mbedtls_pk_parse_public_keyfile(enclave_pubkey,
+                                          CONFIG_ENCLAVE_PUBKEY);
+    if (err) {
+        uerror("mbedtls_pk_parse_public_keyfile returned %d", err);
+        goto out;
+    }
+
+    err = mbedtls_pk_verify(enclave_pubkey, MBEDTLS_MD_SHA256, hash, 0,
+                            auth.signature, auth.sig_len);
+    if (err) {
+        uerror("mbedtls_pk_verify failed %d", err);
+        goto out;
+    }
+
+    // now lets respond to the enclave
+    /* parse the public key */
+    mbedtls_pk_init(public_k);
+    if ((err = mbedtls_pk_parse_public_keyfile(public_k, CONFIG_PUBKEY))) {
+        uerror("mbedtls_pk_parse_public_keyfile returned %d", err);
+        goto out;
+    }
+
+    /* parse the private key */
+    mbedtls_pk_init(private_k);
+    if ((err = mbedtls_pk_parse_keyfile(private_k, CONFIG_PRIVKEY, NULL))) {
+        uerror("mbedtls_pk_parse returned %d", err);
+        goto out;
+    }
+
+    if ((err = mbedtls_pk_sign(private_k, MBEDTLS_MD_SHA256, hash, 0, buf,
+                               &olen, mbedtls_ctr_drbg_random, &ctr_drbg))) {
+        uerror("mbedtls_pk_sign ret = %d", err);
+        goto out;
+    }
+
+#ifdef UCAFS_SGX
+    ecall_ucafs_response(global_eid, &err, super, public_k, buf, olen);
     if (err) {
         uerror("ecall_login returned %d", err);
         goto out;
@@ -153,6 +248,11 @@ login_enclave(const char * pubkey_path, const char * afs_repo_file)
     err = 0;
 out:
     supernode_free(super);
+
+    if (snode_path) {
+        sdsfree(snode_path);
+    }
+
     return err;
 }
 
@@ -166,7 +266,6 @@ main(int argc, char * argv[])
     char c;
     FILE *fd1, *fd2;
     struct stat st;
-    sds repo_file, main_dnode_path;
 
 #ifdef UCAFS_SGX
     /* initialize the enclave */
@@ -178,7 +277,7 @@ main(int argc, char * argv[])
         return -1;
     }
 
-    uinfo(". Loaded enclave");
+    uinfo("Loaded enclave :)");
 #endif
 
     fd1 = fopen(repo_fname, "rb");
@@ -190,11 +289,6 @@ main(int argc, char * argv[])
     nbytes = fread(repo_path, 1, sizeof(repo_path), fd1);
     repo_path[strlen(repo_path) - 1] = '\0';
 
-    repo_file = sdsnew(repo_path);
-    repo_file = sdscat(repo_file, "/");
-    repo_file = sdscat(repo_file, UCAFS_REPO_FNAME);
-
-    // if we get the --init flag, just initialize and quit
     while (1) {
         c = getopt_long(argc, argv, "i:", long_options, &opt_index);
         if (c == -1) {
@@ -202,35 +296,24 @@ main(int argc, char * argv[])
         }
 
         switch (c) {
-        case 0:
-            if (long_options[opt_index].val = 'i') {
-                // we are doing an init
-                return new_supernode("profile/public_key", repo_file,
-                                     repo_path);
-            }
-
-            break;
+        case 'i':
+            // if we get the --init flag, just initialize and quit
+            return initialize_repository(repo_path);
 
         case -1:
             break;
         }
     }
 
-#if 0
-    /* 3 - We are trying to login */
-    err = stat(repo_file, &st);
-    if (err && new_supernode("profile/public_key", repo_file, repo_path)) {
-        uerror("Error creating new supernode");
+    // else lets login into the enclave
+    if (login_enclave(repo_path)) {
         goto out;
     }
 
-    uinfo("Startup complete... :)");
-    /* send the user to the cmd */
+    uinfo("Logged in :)");
     shell();
-#endif
 
 out:
     fclose(fd1);
-    sdsfree(repo_file);
     return ret;
 }

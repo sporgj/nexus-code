@@ -64,7 +64,7 @@ out:
 }
 
 bool
-supernode_flush(supernode_t * super, const char * path)
+supernode_write(supernode_t * super, const char * path)
 {
     bool err = false;
     int ret = -1;

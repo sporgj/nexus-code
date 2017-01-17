@@ -3,9 +3,12 @@
 
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
+struct enclave_auth enclave_auth_data = {0};
+
 int
 ecall_init_enclave()
 {
+    sgx_report_t report;
 #if 0
     /* uncomment this when ready to push */
     sgx_key_request_t request;
@@ -28,6 +31,16 @@ ecall_init_enclave()
 out:
     return ret;
 #endif
+
+    /* lets generate our random nonce */
+    sgx_read_rand(enclave_auth_data.nonce, sizeof(enclave_auth_data.nonce));
+    if (sgx_create_report(NULL, NULL, &report) != SGX_SUCCESS) {
+        return -1;
+    }
+
+    /* copy our enclave signature */
+    memcpy(&enclave_auth_data.mrenclave, &report.body.mr_enclave,
+           sizeof(sgx_measurement_t));
 
     memset(&__enclave_encryption_key__, 0, sizeof(sgx_key_128bit_t));
     return 0;

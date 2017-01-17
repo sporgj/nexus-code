@@ -35,9 +35,12 @@ typedef struct {
 
 #define UC_AFS_WATCH "sgx"
 
-#define UCAFS_REPO_FNAME ".ucafs"
-
+#define UCAFS_SUPER_FNAME ".ucafs"
 #define UCAFS_REPO_DIR ".afsx"
+
+#define CONFIG_PUBKEY   "profile/public_key"
+#define CONFIG_PRIVKEY  "profile/private_key"
+#define CONFIG_ENCLAVE_PUBKEY   "profile/enclave_pubkey"
 
 typedef enum {
     UC_STATUS_GOOD = 0,

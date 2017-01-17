@@ -13,7 +13,9 @@ supernode_t * supernode_from_file(const char * path);
 
 void supernode_free(supernode_t * super);
 
-bool supernode_flush(supernode_t * super, const char * path);
+bool supernode_write(supernode_t * super, const char * path);
+
+uint8_t * supernode_hash(supernode_t * super);
 
 #ifdef __cplusplus
 }

@@ -14,6 +14,8 @@
 
 #define PUBKEY_HASH_LEN 256
 
+#define CONFIG_SHA256_BUFLEN 32
+
 struct uc_dentry;
 struct filebox;
 typedef struct filebox uc_filebox_t;
@@ -156,3 +158,16 @@ typedef struct {
     SUPERNODE_HEADER;
 } __attribute__((packed)) supernode_t;
 
+#define ENCLAVE_AUTH_DATA \
+    uint8_t nonce[32]; \
+    uint8_t mrenclave[32];
+
+struct enclave_auth_data {
+    ENCLAVE_AUTH_DATA;
+};
+
+struct enclave_auth {
+    ENCLAVE_AUTH_DATA;
+    size_t sig_len;
+    uint8_t signature[MBEDTLS_MPI_MAX_SIZE];
+};

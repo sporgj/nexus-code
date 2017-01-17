@@ -37,6 +37,8 @@ extern sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
 extern bool enclave_is_logged_in;
 
+extern struct enclave_auth enclave_auth_data;
+
 int enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op);
 
 int

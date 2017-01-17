@@ -9,9 +9,10 @@ sds global_repo_path;
 
 bool global_env_is_afs;
 
-shadow_t uc_root_dirnode_shadow_name = {0};
+shadow_t uc_root_dirnode_shadow_name = { 0 };
 
-void uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs)
+void
+uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs)
 {
     global_env_is_afs = is_afs;
 
@@ -31,13 +32,20 @@ void uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs)
     main_dnode_fpath = sdscat(main_dnode_fpath, "main.dnode");
 }
 
-sds uc_get_repo_path() {
+sds
+uc_get_repo_path()
+{
     return sdsdup(global_repo_path);
 }
 
-sds uc_main_dnode_fpath() { return sdsdup(main_dnode_fpath); }
+sds
+uc_main_dnode_fpath()
+{
+    return sdsdup(main_dnode_fpath);
+}
 
-sds uc_get_dnode_path(const char * dnode_name)
+sds
+uc_get_dnode_path(const char * dnode_name)
 {
     sds path = sdsdup(global_repo_path);
     path = sdscat(path, "/");
@@ -45,10 +53,11 @@ sds uc_get_dnode_path(const char * dnode_name)
     return path;
 }
 
-sds uc_derive_relpath(const char * path, bool is_dirpath)
+sds
+uc_derive_relpath(const char * path, bool is_dirpath)
 {
     int len, temp = strlen(global_home_path);
-    const char * ptr1 = path, * ptr2 = global_home_path;
+    const char *ptr1 = path, *ptr2 = global_home_path;
 
     while (*ptr1 == *ptr2 && *ptr2 != '\0' && *ptr1 != '\0' && temp > 0) {
         ptr1++;
@@ -57,7 +66,7 @@ sds uc_derive_relpath(const char * path, bool is_dirpath)
     }
 
     // XXX FIXME very very stupid. We know the length of the home
-    // path doesn't change. I'm just keeping this here not to 
+    // path doesn't change. I'm just keeping this here not to
     // forget in a future fix
     if (*ptr2 == '/') {
         temp--;
@@ -80,7 +89,8 @@ sds uc_derive_relpath(const char * path, bool is_dirpath)
     return len > 0 ? sdsnewlen(ptr1, len) : sdsnew("");
 }
 
-int ucafs_init_uspace()
+int
+ucafs_init_uspace()
 {
     int ret;
 
@@ -93,9 +103,39 @@ int ucafs_init_uspace()
     return ret;
 }
 
-int ucafs_exit_uspace()
+int
+ucafs_exit_uspace()
 {
     metadata_exit();
 
     return 0;
+}
+
+static inline sds
+repo_path(const char * root_path)
+{
+    sds rv = sdsnew(root_path);
+    rv = sdscat(rv, "/");
+    rv = sdscat(rv, UCAFS_REPO_DIR);
+    rv = sdscat(rv, "/");
+
+    return rv;
+}
+
+sds
+ucafs_supernode_path(const char * root_path)
+{
+    sds rv = repo_path(root_path);
+    rv = sdscat(rv, UCAFS_SUPER_FNAME);
+
+    return rv;
+}
+
+sds
+ucafs_metadata_path(const char * root_path, const char * meta_fname)
+{
+    sds rv = repo_path(root_path);
+    rv = sdscat(rv, meta_fname);
+
+    return rv;
 }
