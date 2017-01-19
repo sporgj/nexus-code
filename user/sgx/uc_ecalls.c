@@ -3,7 +3,7 @@
 
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
-struct enclave_auth enclave_auth_data = {0};
+auth_struct_t enclave_auth_data = {0};
 
 int
 ecall_init_enclave()

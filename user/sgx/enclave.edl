@@ -23,8 +23,8 @@ enclave {
         public int ecall_initialize([in, out] supernode_t * supernode,
                                     [user_check] mbedtls_pk_context * rsa_ctx);
 
-        public int ecall_ucafs_challenge([in] uint8_t nonce_a[32],
-                                         [user_check] struct enclave_auth * auth);
+        public int ecall_ucafs_challenge([user_check] uint8_t * nonce_a,
+                                         [user_check] auth_struct_t * auth);
 
         public int ecall_ucafs_response([in] supernode_t * super,
                                         [user_check] mbedtls_pk_context * pk,

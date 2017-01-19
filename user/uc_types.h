@@ -15,6 +15,8 @@
 #define PUBKEY_HASH_LEN 256
 
 #define CONFIG_SHA256_BUFLEN 32
+#define CONFIG_NONCE_SIZE 64
+#define CONFIG_MRENCLAVE 32
 
 struct uc_dentry;
 struct filebox;
@@ -145,29 +147,29 @@ typedef struct {
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;
 
-#define SUPERNODE_HEADER \
-    crypto_context_t crypto_ctx; \
+#define SUPERNODE_PAYLOAD \
     uint32_t count; \
     shadow_t root_dnode;
 
 typedef struct {
-    SUPERNODE_HEADER;
-} __attribute__((packed)) supernode_header_t;
+    SUPERNODE_PAYLOAD;
+} __attribute__((packed)) supernode_payload_t;
 
 typedef struct {
-    SUPERNODE_HEADER;
+    SUPERNODE_PAYLOAD;
+    crypto_context_t crypto_ctx;
 } __attribute__((packed)) supernode_t;
 
 #define ENCLAVE_AUTH_DATA \
-    uint8_t nonce[32]; \
-    uint8_t mrenclave[32];
+    uint8_t nonce[CONFIG_NONCE_SIZE]; \
+    uint8_t mrenclave[CONFIG_MRENCLAVE];
 
-struct enclave_auth_data {
+typedef struct {
     ENCLAVE_AUTH_DATA;
-};
+} auth_payload_t;
 
-struct enclave_auth {
+typedef struct {
     ENCLAVE_AUTH_DATA;
     size_t sig_len;
     uint8_t signature[MBEDTLS_MPI_MAX_SIZE];
-};
+} auth_struct_t;

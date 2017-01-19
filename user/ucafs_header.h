@@ -35,7 +35,7 @@ typedef struct {
 
 #define UC_AFS_WATCH "sgx"
 
-#define UCAFS_SUPER_FNAME ".ucafs"
+#define UCAFS_SUPER_FNAME "ucafs"
 #define UCAFS_REPO_DIR ".afsx"
 
 #define CONFIG_PUBKEY   "profile/public_key"

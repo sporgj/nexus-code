@@ -19,6 +19,7 @@ extern "C" {
 #include "cdefs.h"
 #include "third/linenoise.h"
 #include "third/sds.h"
+#include "third/log.h"
 
 #include "uc_dirnode.h"
 #include "uc_encode.h"
@@ -123,6 +124,8 @@ initialize_repository(const char * user_root_path)
         goto out;
     }
 
+    log_info("Enclave initalized: %s", user_root_path);
+
     err = 0;
 out:
     mbedtls_pk_free(pk_ctx);
@@ -151,10 +154,10 @@ login_enclave(const char * user_root_path)
 {
     int err = -1;
     size_t olen = 0;
-    uint8_t hash[32], buf[MBEDTLS_MPI_MAX_SIZE], nonce_a[32];
+    uint8_t hash[32], buf[MBEDTLS_MPI_MAX_SIZE], nonce_a[CONFIG_NONCE_SIZE];
     sds snode_path = NULL;
     supernode_t * super;
-    struct enclave_auth auth;
+    auth_struct_t auth;
     mbedtls_sha256_context sha256_ctx;
     mbedtls_pk_context _ctx1, *public_k = &_ctx1, _ctx2, *private_k = &_ctx2,
                               _ctx3, *enclave_pubkey = &_ctx3;
@@ -196,7 +199,8 @@ login_enclave(const char * user_root_path)
     mbedtls_sha256_init(&sha256_ctx);
     mbedtls_sha256_starts(&sha256_ctx, 0);
     mbedtls_sha256_update(&sha256_ctx, nonce_a, sizeof(nonce_a));
-    mbedtls_sha256_update(&sha256_ctx, (uint8_t *)&auth, sizeof(auth));
+    mbedtls_sha256_update(&sha256_ctx, (uint8_t *)&auth,
+                          sizeof(auth_payload_t));
     mbedtls_sha256_finish(&sha256_ctx, hash);
     mbedtls_sha256_free(&sha256_ctx);
 
@@ -216,6 +220,10 @@ login_enclave(const char * user_root_path)
         goto out;
     }
 
+    mbedtls_pk_free(enclave_pubkey);
+
+    // TODO verify that measurement matches
+
     // now lets respond to the enclave
     /* parse the public key */
     mbedtls_pk_init(public_k);
@@ -231,6 +239,8 @@ login_enclave(const char * user_root_path)
         goto out;
     }
 
+    /* compute a new hash */
+    mbedtls_sha256(auth.nonce, CONFIG_NONCE_SIZE, hash, 0);
     if ((err = mbedtls_pk_sign(private_k, MBEDTLS_MD_SHA256, hash, 0, buf,
                                &olen, mbedtls_ctr_drbg_random, &ctr_drbg))) {
         uerror("mbedtls_pk_sign ret = %d", err);
@@ -240,10 +250,13 @@ login_enclave(const char * user_root_path)
 #ifdef UCAFS_SGX
     ecall_ucafs_response(global_eid, &err, super, public_k, buf, olen);
     if (err) {
-        uerror("ecall_login returned %d", err);
+        uerror("ecall_ucafs_response returned %d", err);
         goto out;
     }
 #endif
+
+    mbedtls_pk_free(public_k);
+    mbedtls_pk_free(private_k);
 
     err = 0;
 out:
@@ -275,6 +288,12 @@ main(int argc, char * argv[])
     if (ret != SGX_SUCCESS) {
         uerror("Could not open enclave: ret=%d", ret);
         return -1;
+    }
+
+    ecall_init_enclave(global_eid, &err);
+    if (err) {
+        uerror("Initializing enclave failed");
+        goto out;
     }
 
     uinfo("Loaded enclave :)");
