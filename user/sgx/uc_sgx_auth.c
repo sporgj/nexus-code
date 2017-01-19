@@ -4,6 +4,7 @@
 #include <mbedtls/entropy.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/aes.h>
 
 #define RSA_PUB_DER_MAX_BYTES 38 + 2 * MBEDTLS_MPI_MAX_SIZE
 
@@ -45,15 +46,25 @@ enum auth_stage { CHALLENGE, RESPONSE, COMPLETE };
 
 enum auth_stage auth_stage = CHALLENGE;
 
+typedef enum {
+    SUPERNODE_NONE,
+    SUPERNODE_ENCRYPT,
+    SUPERNODE_DECRYPT
+} snode_crypto_t;
+
 static int
 supernode_hash(supernode_t * super,
                mbedtls_pk_context * user_pubkey_ctx,
                crypto_context_t * crypto_ctx,
-               crypto_mac_t * mac)
+               crypto_mac_t * mac,
+               snode_crypto_t op)
 {
-    int len;
+    int len, bytes_left;
+    crypto_iv_t iv;
+    size_t off;
     mbedtls_md_context_t _h, *hmac_ctx = &_h;
-    unsigned char buf[RSA_PUB_DER_MAX_BYTES] = {0}, *c;
+    mbedtls_aes_context _a, *aes_ctx = &_a;
+    uint8_t buf[RSA_PUB_DER_MAX_BYTES] = {0}, *c, stream_block[16];
 
     len = mbedtls_pk_write_pubkey_der(user_pubkey_ctx, buf, sizeof(buf));
     if (len < 0) {
@@ -71,6 +82,37 @@ supernode_hash(supernode_t * super,
     mbedtls_md_hmac_update(hmac_ctx, (uint8_t *)super,
                            sizeof(supernode_payload_t));
     mbedtls_md_hmac_update(hmac_ctx, c, len);
+    
+    // lets go through every user
+    mbedtls_aes_init(aes_ctx);
+    mbedtls_aes_setkey_enc(aes_ctx, (uint8_t *)&crypto_ctx->ekey, CRYPTO_AES_KEY_SIZE_BITS);
+
+    if (op) {
+        sgx_read_rand((uint8_t *)&crypto_ctx->iv, sizeof(crypto_iv_t));
+    }
+
+    memcpy(&iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
+
+    bytes_left = super->users_buflen;
+    while (bytes_left > 0) {
+        // lets reuse buf
+        len = MIN(sizeof(buf), bytes_left);
+        memcpy(buf, super->users, len);
+
+        if (op == SUPERNODE_ENCRYPT) {
+            mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block, buf, buf);
+        }
+
+        mbedtls_md_hmac_update(hmac_ctx, buf, len);
+
+        if (op == SUPERNODE_ENCRYPT) {
+            mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block, buf, buf);
+        }
+
+        memcpy(super->users, buf, len);
+
+        bytes_left -= len;
+    }
 
     mbedtls_md_hmac_finish(hmac_ctx, (uint8_t *)mac);
     mbedtls_md_free(hmac_ctx);
@@ -88,10 +130,12 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
     /* initialize the data */
     memcpy(&_super.root_dnode, &super->root_dnode, sizeof(shadow_t));
     _super.count = 0;
+    _super.users_buflen = 0;
     sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
 
     /* hash it */
-    if (supernode_hash(&_super, pk_ctx, crypto_ctx, &crypto_ctx->mac)) {
+    if (supernode_hash(&_super, pk_ctx, crypto_ctx, &crypto_ctx->mac,
+                       SUPERNODE_ENCRYPT)) {
         return E_ERROR_CRYPTO;
     }
 
@@ -202,7 +246,7 @@ ecall_ucafs_response(supernode_t * super,
     enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
     enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
 
-    supernode_hash(super, user_pubkey_ctx, crypto_ctx, &mac);
+    supernode_hash(super, user_pubkey_ctx, crypto_ctx, &mac, SUPERNODE_NONE);
     if (memcmp(&crypto_ctx->mac, &mac, sizeof(crypto_mac_t))) {
         err = E_ERROR_LOGIN;
         goto out;

@@ -149,6 +149,7 @@ typedef struct {
 
 #define SUPERNODE_PAYLOAD \
     uint32_t count; \
+    uint32_t users_buflen; \
     shadow_t root_dnode;
 
 typedef struct {
@@ -156,8 +157,15 @@ typedef struct {
 } __attribute__((packed)) supernode_payload_t;
 
 typedef struct {
+    uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN];
+    int len;
+    char username;
+} __attribute__((packed)) supernode_user_t;
+
+typedef struct {
     SUPERNODE_PAYLOAD;
     crypto_context_t crypto_ctx;
+    supernode_user_t users[0];
 } __attribute__((packed)) supernode_t;
 
 #define ENCLAVE_AUTH_DATA \
