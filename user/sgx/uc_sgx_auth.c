@@ -1,10 +1,10 @@
 #include "enclave_private.h"
 
+#include <mbedtls/aes.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
-#include <mbedtls/aes.h>
 
 #define RSA_PUB_DER_MAX_BYTES 38 + 2 * MBEDTLS_MPI_MAX_SIZE
 
@@ -52,9 +52,25 @@ typedef enum {
     SUPERNODE_DECRYPT
 } snode_crypto_t;
 
+/* store the hash of the user's public key */
+static int
+sha256_pubkey(mbedtls_pk_context * user_pubkey_ctx, uint8_t * pubkey_hash)
+{
+    unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c;
+    int len = mbedtls_pk_write_pubkey_der(user_pubkey_ctx, buf,
+                                          sizeof(buf));
+    if (len < 0) {
+        return E_ERROR_CRYPTO;
+    }
+
+    c = buf + sizeof(buf) - len - 1;
+
+    mbedtls_sha256(buf, len, pubkey_hash, 0);
+    return 0;
+}
+
 static int
 supernode_hash(supernode_t * super,
-               mbedtls_pk_context * user_pubkey_ctx,
                crypto_context_t * crypto_ctx,
                crypto_mac_t * mac,
                snode_crypto_t op)
@@ -64,14 +80,7 @@ supernode_hash(supernode_t * super,
     size_t off;
     mbedtls_md_context_t _h, *hmac_ctx = &_h;
     mbedtls_aes_context _a, *aes_ctx = &_a;
-    uint8_t buf[RSA_PUB_DER_MAX_BYTES] = {0}, *c, stream_block[16];
-
-    len = mbedtls_pk_write_pubkey_der(user_pubkey_ctx, buf, sizeof(buf));
-    if (len < 0) {
-        return E_ERROR_CRYPTO;
-    }
-
-    c = buf + sizeof(buf) - len - 1;
+    uint8_t buf[E_CRYPTO_BUFFER_LEN] = { 0 }, stream_block[16], *users_buf;
 
     /* generate the hmac */
     mbedtls_md_init(hmac_ctx);
@@ -81,36 +90,41 @@ supernode_hash(supernode_t * super,
 
     mbedtls_md_hmac_update(hmac_ctx, (uint8_t *)super,
                            sizeof(supernode_payload_t));
-    mbedtls_md_hmac_update(hmac_ctx, c, len);
-    
+
     // lets go through every user
     mbedtls_aes_init(aes_ctx);
-    mbedtls_aes_setkey_enc(aes_ctx, (uint8_t *)&crypto_ctx->ekey, CRYPTO_AES_KEY_SIZE_BITS);
+    mbedtls_aes_setkey_enc(aes_ctx, (uint8_t *)&crypto_ctx->ekey,
+                           CRYPTO_AES_KEY_SIZE_BITS);
 
-    if (op) {
+    /* setup the IV */
+    if (op == SUPERNODE_ENCRYPT) {
         sgx_read_rand((uint8_t *)&crypto_ctx->iv, sizeof(crypto_iv_t));
     }
 
     memcpy(&iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
 
+    users_buf = super->users_buffer;
     bytes_left = super->users_buflen;
     while (bytes_left > 0) {
         // lets reuse buf
         len = MIN(sizeof(buf), bytes_left);
-        memcpy(buf, super->users, len);
+        memcpy(buf, users_buf, len);
 
         if (op == SUPERNODE_ENCRYPT) {
-            mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block, buf, buf);
+            mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block,
+                                  buf, buf);
         }
 
         mbedtls_md_hmac_update(hmac_ctx, buf, len);
 
         if (op == SUPERNODE_ENCRYPT) {
-            mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block, buf, buf);
+            mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block,
+                                  buf, buf);
         }
 
-        memcpy(super->users, buf, len);
+        memcpy(users_buf, buf, len);
 
+        users_buf += len;
         bytes_left -= len;
     }
 
@@ -129,12 +143,14 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
 
     /* initialize the data */
     memcpy(&_super.root_dnode, &super->root_dnode, sizeof(shadow_t));
-    _super.count = 0;
+    _super.user_count = 0;
     _super.users_buflen = 0;
     sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
 
+    sha256_pubkey(pk_ctx, _super.owner_pubkey);
+
     /* hash it */
-    if (supernode_hash(&_super, pk_ctx, crypto_ctx, &crypto_ctx->mac,
+    if (supernode_hash(&_super, crypto_ctx, &crypto_ctx->mac,
                        SUPERNODE_ENCRYPT)) {
         return E_ERROR_CRYPTO;
     }
@@ -225,10 +241,10 @@ ecall_ucafs_response(supernode_t * super,
                      uint8_t * user_signature,
                      size_t sig_len)
 {
-    int err = -1, len;
+    int err = E_ERROR_ERROR, len;
     crypto_context_t _ctx, *crypto_ctx = &_ctx;
     crypto_mac_t mac;
-    unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c;
+    unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c, hash[CONFIG_SHA256_BUFLEN];
 
     if (auth_stage != RESPONSE || sig_len > MBEDTLS_MPI_MAX_SIZE) {
         return -1;
@@ -242,13 +258,18 @@ ecall_ucafs_response(supernode_t * super,
 
     /* 2 - Verify the supernode has not been tampered and was created with the
      * specified public key */
+    err = E_ERROR_LOGIN;
     memcpy(crypto_ctx, &super->crypto_ctx, sizeof(crypto_context_t));
     enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
     enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
 
-    supernode_hash(super, user_pubkey_ctx, crypto_ctx, &mac, SUPERNODE_NONE);
+    supernode_hash(super, crypto_ctx, &mac, SUPERNODE_NONE);
     if (memcmp(&crypto_ctx->mac, &mac, sizeof(crypto_mac_t))) {
-        err = E_ERROR_LOGIN;
+        goto out;
+    }
+
+    sha256_pubkey(user_pubkey_ctx, hash);
+    if (memcmp(&super->owner_pubkey, hash, sizeof(hash))) {
         goto out;
     }
 
@@ -260,13 +281,29 @@ out:
     return err;
 }
 
-// TODO
 int
-ecall_seal_supernode(supernode_t * super)
+ecall_supernode_crypto(supernode_t * super, seal_op_t op)
 {
-    int err = -1;
+    int ret = -1;
+    supernode_t _super;
+    crypto_context_t * crypto_ctx = &_super.crypto_ctx;
+    snode_crypto_t super_op
+        = (op == CRYPTO_SEAL ? SUPERNODE_ENCRYPT : SUPERNODE_DECRYPT);
 
-    err = 0;
+    /* copy in the supernode data and unseal the crypto keys */
+    memcpy(&_super, super, sizeof(supernode_t));
+    enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+
+    if (supernode_hash(&_super, crypto_ctx, &crypto_ctx->mac, super_op)) {
+        goto out;
+    }
+
+    enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
+    memcpy(super, &_super, sizeof(supernode_t));
+
+    ret = 0;
 out:
-    return err;
+    return ret;
 }

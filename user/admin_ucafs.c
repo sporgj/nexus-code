@@ -18,8 +18,8 @@ extern "C" {
 
 #include "cdefs.h"
 #include "third/linenoise.h"
-#include "third/sds.h"
 #include "third/log.h"
+#include "third/sds.h"
 
 #include "uc_dirnode.h"
 #include "uc_encode.h"
@@ -40,20 +40,7 @@ supernode_t * super = NULL;
 sgx_enclave_id_t global_eid = 0;
 
 static int
-shell()
-{
-    char * line;
-
-    while ((line = linenoise("> ")) != NULL) {
-        if (line[0] != '\0' && line[0] != '/') {
-            linenoiseHistoryAdd(line);
-        }
-
-        free(line);
-    }
-
-    return 0;
-}
+shell();
 
 /**
  * We will parse the public in PEM format
@@ -335,4 +322,151 @@ main(int argc, char * argv[])
 out:
     fclose(fd1);
     return ret;
+}
+
+/***** the shell commands section of the program */
+typedef enum {
+    SHELL_ADD_USER,
+    SHELL_DEL_USER,
+    SHELL_LIST_USER
+} shell_cmd_type_t;
+
+typedef struct {
+    shell_cmd_type_t type;
+    int num_args;
+    const char * cmd_str;
+} shell_cmd_t;
+
+static const shell_cmd_t shell_cmds[] = { { SHELL_ADD_USER, 2, "add" },
+                                          { SHELL_DEL_USER, 2, "del" },
+                                          { SHELL_LIST_USER, 0, "l" } };
+
+#define MAX_SHELL_ARGS 5
+typedef struct {
+    shell_cmd_type_t type;
+    uint16_t argc;
+    char * args[MAX_SHELL_ARGS];
+} shell_input_t;
+
+static inline bool
+is_ws(char c)
+{
+    return c == '\t' || c == ' ' || c == '\r';
+}
+
+static void
+free_shell_input(shell_input_t * input)
+{
+    free(input);
+}
+
+// rudimentary parsing of commands
+static shell_input_t *
+parse_command(char * stmt)
+{
+    char *temp, *str_buf;
+    bool quotes = false;
+    size_t i = 0, start = 0, stop = 0, max_args = 0, temp_len, j,
+           len = strlen(stmt);
+    shell_input_t * shell_input = NULL;
+
+    while (i < len) {
+    next_argument:
+        quotes = false;
+        while (is_ws(*stmt) && i < len) {
+            i++;
+            stmt++;
+        }
+
+        // we've skipped all the whitespace, lets parse the type
+        if (*stmt == '"') {
+            quotes = true;
+            stmt++;
+            i++;
+        }
+
+        start = i;
+        temp = stmt;
+
+        while (i < len) {
+            if ((quotes && *stmt == '"') || (!quotes && is_ws(*stmt))) {
+                break;
+            }
+
+            i++;
+            stmt++;
+        }
+
+        stop = i;
+
+        // move to the next character
+        i++;
+        stmt++;
+
+        // if we have a shell input object, that means we are ready to
+        // parse arguments
+        if (shell_input) {
+            goto parse_args;
+        }
+
+        // now lets get the command
+        for (j = 0; j < sizeof(shell_cmds) / sizeof(shell_cmd_t); j++) {
+            if (strncmp(shell_cmds[j].cmd_str, temp, stop - start) == 0) {
+                shell_input = (shell_input_t *)malloc(sizeof(shell_input_t));
+                if (shell_input == NULL) {
+                    log_fatal("allocation failed\n");
+                    return NULL;
+                }
+
+                shell_input->type = shell_cmds[j].type;
+                shell_input->argc = 0;
+                max_args = shell_cmds[j].num_args;
+                goto next_argument;
+            }
+        }
+
+        // if we are here, we couldn't detect the command type
+        uerror("invalid command (%s)", temp);
+        return NULL;
+
+    parse_args:
+        if (shell_input->argc >= max_args) {
+            free_shell_input(shell_input);
+            uerror("too many arguments (max = %zu)", max_args);
+            return NULL;
+        }
+
+        shell_input->args[shell_input->argc++] = temp;
+        temp[1] = '\0';
+    }
+
+    return shell_input;
+}
+
+static int
+shell()
+{
+    char * line;
+    shell_input_t * input;
+
+    while ((line = linenoise("> ")) != NULL) {
+        if (!line || (strlen(line) == 4
+                      && (strstr(line, "exit") || strstr(line, "quit")))) {
+            uinfo("bye :)\n");
+            return 0;
+        }
+
+        if (line[0] != '\0' && line[0] != '/') {
+            linenoiseHistoryAdd(line);
+        }
+
+        input = parse_command(line);
+        free(line);
+
+        if (input) {
+            free_shell_input(input);
+        }
+    }
+
+    return 0;
 }

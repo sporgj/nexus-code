@@ -31,7 +31,8 @@ enclave {
                                         [user_check] uint8_t * user_signature,
                                         size_t sig_len);
 
-        public int ecall_seal_supernode([in, out] supernode_t * supernode);
+        public int ecall_supernode_crypto([in, out] supernode_t * supernode,
+                seal_op_t op);
     };
 
 };

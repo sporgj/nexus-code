@@ -54,5 +54,8 @@
 #define log_error(M, ...)
 #endif
 
+// @author judicael. TODO will change the colors for fatal
+#define log_fatal log_error
+
 #endif
 
