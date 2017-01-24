@@ -20,7 +20,7 @@ enclave {
         public int ecall_fetchstore_finish([in, out] xfer_context_t * xfer_ctx);
 
         /* authentication */
-        public int ecall_initialize([in, out] supernode_t * supernode,
+        public int ecall_initialize([user_check] supernode_t * supernode,
                                     [user_check] mbedtls_pk_context * rsa_ctx);
 
         public int ecall_ucafs_challenge([user_check] uint8_t * nonce_a,
@@ -31,7 +31,7 @@ enclave {
                                         [user_check] uint8_t * user_signature,
                                         size_t sig_len);
 
-        public int ecall_supernode_crypto([in, out] supernode_t * supernode,
+        public int ecall_supernode_crypto([user_check] supernode_t * supernode,
                 seal_op_t op);
     };
 

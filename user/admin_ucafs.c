@@ -31,11 +31,14 @@ extern "C" {
 }
 #endif
 
+#define RSA_PUB_DER_MAX_BYTES 38 + 2 * MBEDTLS_MPI_MAX_SIZE
+
 const char * repo_fname = "profile/repo.datum";
 
 static char repo_path[1024];
 
 supernode_t * super = NULL;
+sds supernode_path = NULL;
 
 sgx_enclave_id_t global_eid = 0;
 
@@ -143,7 +146,6 @@ login_enclave(const char * user_root_path)
     size_t olen = 0;
     uint8_t hash[32], buf[MBEDTLS_MPI_MAX_SIZE], nonce_a[CONFIG_NONCE_SIZE];
     sds snode_path = NULL;
-    supernode_t * super;
     auth_struct_t auth;
     mbedtls_sha256_context sha256_ctx;
     mbedtls_pk_context _ctx1, *public_k = &_ctx1, _ctx2, *private_k = &_ctx2,
@@ -247,8 +249,6 @@ login_enclave(const char * user_root_path)
 
     err = 0;
 out:
-    supernode_free(super);
-
     if (snode_path) {
         sdsfree(snode_path);
     }
@@ -316,6 +316,8 @@ main(int argc, char * argv[])
         goto out;
     }
 
+    supernode_path = ucafs_supernode_path(repo_path);
+
     uinfo("Logged in :)");
     shell();
 
@@ -339,7 +341,7 @@ typedef struct {
 
 static const shell_cmd_t shell_cmds[] = { { SHELL_ADD_USER, 2, "add" },
                                           { SHELL_DEL_USER, 2, "del" },
-                                          { SHELL_LIST_USER, 0, "l" } };
+                                          { SHELL_LIST_USER, 0, "list" } };
 
 #define MAX_SHELL_ARGS 5
 typedef struct {
@@ -360,6 +362,27 @@ free_shell_input(shell_input_t * input)
     free(input);
 }
 
+void
+shell_usage(shell_cmd_type_t type)
+{
+    const char * str;
+    switch (type) {
+    case SHELL_ADD_USER:
+        str = "add username path_to_pubkey";
+        break;
+    case SHELL_DEL_USER:
+        str = "del username path_to_pubkey";
+        break;
+    case SHELL_LIST_USER:
+        str = "del username path_to_pubkey";
+        break;
+    default:
+        return;
+    }
+
+    uerror("%s", str);
+}
+
 // rudimentary parsing of commands
 static shell_input_t *
 parse_command(char * stmt)
@@ -370,8 +393,12 @@ parse_command(char * stmt)
            len = strlen(stmt);
     shell_input_t * shell_input = NULL;
 
-    while (i < len) {
+    while (1) {
     next_argument:
+        if (i >= len) {
+            break;
+        }
+
         quotes = false;
         while (is_ws(*stmt) && i < len) {
             i++;
@@ -397,11 +424,14 @@ parse_command(char * stmt)
             stmt++;
         }
 
-        stop = i;
+        if (quotes) {
+            // move to the next character
+            i++;
+            stmt++;
+        }
 
-        // move to the next character
-        i++;
-        stmt++;
+        // exclude the " mark
+        stop = i - (quotes ? 1 : 0) - 1;
 
         // if we have a shell input object, that means we are ready to
         // parse arguments
@@ -412,7 +442,7 @@ parse_command(char * stmt)
         // now lets get the command
         for (j = 0; j < sizeof(shell_cmds) / sizeof(shell_cmd_t); j++) {
             if (strncmp(shell_cmds[j].cmd_str, temp, stop - start) == 0) {
-                shell_input = (shell_input_t *)malloc(sizeof(shell_input_t));
+                shell_input = (shell_input_t *)calloc(1, sizeof(shell_input_t));
                 if (shell_input == NULL) {
                     log_fatal("allocation failed\n");
                     return NULL;
@@ -437,10 +467,57 @@ parse_command(char * stmt)
         }
 
         shell_input->args[shell_input->argc++] = temp;
-        temp[1] = '\0';
+        *stmt++ = '\0';
+    }
+
+    if (shell_input->argc != max_args) {
+        shell_usage(shell_input->type);
+        free(shell_input);
+        return NULL;
     }
 
     return shell_input;
+}
+
+static int
+shell_add_user(const char * username, const char * pubkey)
+{
+    int ret = -1, len;
+    uint8_t hash[CONFIG_SHA256_BUFLEN], buf[RSA_PUB_DER_MAX_BYTES], *c;
+    mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
+
+    mbedtls_pk_init(pk_ctx);
+    if ((ret = mbedtls_pk_parse_public_keyfile(pk_ctx, pubkey))) {
+        uerror("mbedtls_pk_parse_public_keyfile error (ret=%#x)", ret);
+        return -1;
+    }
+
+    len = mbedtls_pk_write_pubkey_der(pk_ctx, buf, sizeof(buf));
+    if (len < 0) {
+        uerror("mbedtls_pk_write_pubkey_der error (ret=%d)", len);
+        return -1;
+    }
+
+    c = buf + sizeof(buf) - len - 1;
+    mbedtls_sha256(c, len, hash, 0);
+
+    if (supernode_add(super, username, hash)) {
+        return -1;
+    }
+
+    /* save the supernode and call it a day */
+    if (!supernode_write(super, supernode_path)) {
+        return -1;
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+static void shell_list_users()
+{
+    supernode_list(super);
 }
 
 static int
@@ -448,6 +525,11 @@ shell()
 {
     char * line;
     shell_input_t * input;
+
+    if (supernode_mount(super)) {
+        uerror("Exiting :(");
+        return -1;
+    }
 
     while ((line = linenoise("> ")) != NULL) {
         if (!line || (strlen(line) == 4
@@ -461,11 +543,23 @@ shell()
         }
 
         input = parse_command(line);
-        free(line);
 
         if (input) {
+            switch (input->type) {
+            case SHELL_ADD_USER:
+                shell_add_user(input->args[0], input->args[1]);
+                break;
+            case SHELL_DEL_USER:
+                break;
+            case SHELL_LIST_USER:
+                shell_list_users();
+                break;
+            }
+
             free_shell_input(input);
         }
+
+        free(line);
     }
 
     return 0;

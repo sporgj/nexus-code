@@ -195,7 +195,7 @@ typedef struct {
 
 typedef struct {
     SUPERNODE_HEADER;
-    bool is_wrapped;
+    bool is_mounted;
     uint8_t * users_buffer;
     SIMPLEQ_HEAD(snode_user_list, snode_user_entry) users_list;
 } __attribute__((packed)) supernode_t;

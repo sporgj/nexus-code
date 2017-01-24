@@ -65,7 +65,7 @@ sha256_pubkey(mbedtls_pk_context * user_pubkey_ctx, uint8_t * pubkey_hash)
 
     c = buf + sizeof(buf) - len - 1;
 
-    mbedtls_sha256(buf, len, pubkey_hash, 0);
+    mbedtls_sha256(c, len, pubkey_hash, 0);
     return 0;
 }
 
@@ -77,7 +77,7 @@ supernode_hash(supernode_t * super,
 {
     int len, bytes_left;
     crypto_iv_t iv;
-    size_t off;
+    size_t off = 0;
     mbedtls_md_context_t _h, *hmac_ctx = &_h;
     mbedtls_aes_context _a, *aes_ctx = &_a;
     uint8_t buf[E_CRYPTO_BUFFER_LEN] = { 0 }, stream_block[16], *users_buf;
@@ -90,6 +90,11 @@ supernode_hash(supernode_t * super,
 
     mbedtls_md_hmac_update(hmac_ctx, (uint8_t *)super,
                            sizeof(supernode_payload_t));
+
+    /* if there're no users, just close the hmac and call it a day */
+    if (super->user_count == 0) {
+        goto out;
+    }
 
     // lets go through every user
     mbedtls_aes_init(aes_ctx);
@@ -117,7 +122,7 @@ supernode_hash(supernode_t * super,
 
         mbedtls_md_hmac_update(hmac_ctx, buf, len);
 
-        if (op == SUPERNODE_ENCRYPT) {
+        if (op == SUPERNODE_DECRYPT) {
             mbedtls_aes_crypt_ctr(aes_ctx, len, &off, iv.bytes, stream_block,
                                   buf, buf);
         }
@@ -128,6 +133,8 @@ supernode_hash(supernode_t * super,
         bytes_left -= len;
     }
 
+    mbedtls_aes_free(aes_ctx);
+out:
     mbedtls_md_hmac_finish(hmac_ctx, (uint8_t *)mac);
     mbedtls_md_free(hmac_ctx);
 
@@ -142,7 +149,7 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
     crypto_context_t * crypto_ctx = &_super.crypto_ctx;
 
     /* initialize the data */
-    memcpy(&_super.root_dnode, &super->root_dnode, sizeof(shadow_t));
+    memcpy(&_super, super, sizeof(supernode_t));
     _super.user_count = 0;
     _super.users_buflen = 0;
     sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));

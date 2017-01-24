@@ -23,12 +23,22 @@ supernode_new()
     return super;
 }
 
+/**
+ * Converts the elements in the list to a buffer
+ */
 static int
-_supernode_unwrap(supernode_t * super)
+_supernode_to_list(supernode_t * super)
 {
     int ret = -1, i = 0, len;
     snode_user_t * curr_user;
     snode_user_entry_t * user_entry;
+
+    if (super->is_mounted || super->users_buffer == NULL) {
+        log_warn("(!super->is_mounted || super->users_buffer == NULL)");
+        return 0;
+    }
+
+    // TODO delete elements in existing list
     SIMPLEQ_INIT(&super->users_list);
 
     curr_user = (snode_user_t *)super->users_buffer;
@@ -49,46 +59,42 @@ _supernode_unwrap(supernode_t * super)
         curr_user = (snode_user_t *)(((uint8_t *)curr_user) + len);
         i++;
     }
-    
-    super->is_wrapped = false;
-    free(super->users_buffer);
+
     super->users_buffer = NULL;
+    super->is_mounted = true;
 
     ret = 0;
 out:
     return ret;
 }
 
-static int
-_supernode_wrap(supernode_t * super)
+/**
+ * Converts the elements in the list to the buffer representation.
+ * Usually called before writing the file to disk
+ *
+ * @param super
+ */
+static uint8_t *
+_supernode_to_buffer(supernode_t * super)
 {
     int ret = -1, len;
     snode_user_entry_t * curr;
+    uint8_t * buffer = (uint8_t *)malloc(super->users_buflen), * buf = buffer;
 
-    uint8_t * buffer = (uint8_t *)malloc(super->users_buflen), *buf = buffer;
     if (buffer == NULL) {
         log_fatal("allocation failed");
-        goto out;
+        return NULL;
     }
 
     SIMPLEQ_FOREACH(curr, &super->users_list, next_user)
     {
-        len  = sizeof(snode_user_t) + curr->len;
-        memcpy(buf, curr, len);
+        len = sizeof(snode_user_t) + curr->len;
+        memcpy(buffer, curr, len);
 
-        buf += len;
+        buffer += len;
     }
 
-    // XXX this should never happen but, lets just be safe
-    if (super->users_buffer) {
-        free(super->users_buffer);
-    }
-
-    super->users_buffer = buffer;
-    super->is_wrapped = true;
-    ret = 0;
-out:
-    return ret;
+    return buf;
 }
 
 supernode_t *
@@ -106,7 +112,7 @@ supernode_from_file(const char * path)
         return NULL;
     }
 
-    super = (supernode_t *)malloc(sizeof(supernode_t));
+    super = (supernode_t *)calloc(1, sizeof(supernode_t));
     if (super == NULL) {
         // TODO die here
         goto out;
@@ -116,6 +122,10 @@ supernode_from_file(const char * path)
     if (!nbytes) {
         slog(0, SLOG_ERROR, "superblock format error: %s", path);
         goto out;
+    }
+
+    if (super->users_buflen == 0) {
+        goto skip_read;
     }
 
     buffer = (uint8_t *)malloc(super->users_buflen);
@@ -132,11 +142,15 @@ supernode_from_file(const char * path)
     }
 
     super->users_buffer = buffer;
+
+skip_read:
+    SIMPLEQ_INIT(&super->users_list);
+
     err = 0;
 out:
     fclose(fd);
 
-    if (err) {
+    if (err && super) {
         free(super);
         super = NULL;
     }
@@ -149,7 +163,7 @@ out:
 }
 
 int
-supernode_unwrap(supernode_t * super)
+supernode_mount(supernode_t * super)
 {
     int ret = -1;
 
@@ -162,9 +176,16 @@ supernode_unwrap(supernode_t * super)
 #endif
 
     /* now lets parse the users buffer into a linked list */
-    if (_supernode_wrap(super)) {
+    if (_supernode_to_list(super)) {
         goto out;
     }
+
+    /* free the buffer and set it to null */
+    if (super->users_buffer) {
+        free(super->users_buffer);
+    }
+
+    super->users_buffer = NULL;
 
     ret = 0;
 out:
@@ -178,12 +199,19 @@ supernode_write(supernode_t * super, const char * path)
     int ret = -1;
     FILE * fd;
     size_t nbytes;
+    uint8_t * buffer = NULL;
 
     fd = fopen(path, "wb");
     if (fd == NULL) {
         slog(0, SLOG_ERROR, "could not open %s", path);
         return false;
     }
+
+    if ((buffer = _supernode_to_buffer(super)) == NULL) {
+        goto out;
+    }
+
+    super->users_buffer = buffer;
 
 #ifdef UCAFS_SGX
     // seal info here
@@ -194,9 +222,15 @@ supernode_write(supernode_t * super, const char * path)
     }
 #endif
 
-    nbytes = fwrite(super, sizeof(supernode_t), 1, fd);
+    nbytes = fwrite(super, sizeof(supernode_header_t), 1, fd);
     if (!nbytes) {
         slog(0, SLOG_ERROR, "writing superblock %s failed", path);
+        goto out;
+    }
+
+    nbytes = fwrite(buffer, 1, super->users_buflen, fd);
+    if (nbytes != super->users_buflen) {
+        slog(0, SLOG_ERROR, "writing superblock body failed: %s", path);
         goto out;
     }
 
@@ -204,13 +238,33 @@ supernode_write(supernode_t * super, const char * path)
 out:
     fclose(fd);
 
+    if (buffer) {
+        free(buffer);
+    }
+
+    super->users_buffer = NULL;
+
     return err;
 }
 
 void
 supernode_free(supernode_t * super)
 {
+    if (super->users_buffer) {
+        free(super->users_buffer);
+    }
+
     free(super);
+}
+
+void
+supernode_list(supernode_t * super)
+{
+    struct snode_user_entry * curr;
+    SIMPLEQ_FOREACH(curr, &super->users_list, next_user)
+    {
+        printf("%s\n", curr->username);
+    }
 }
 
 int
@@ -238,16 +292,16 @@ supernode_add(supernode_t * super,
     }
 
     /* add it to the list and call it a day */
-    len = strlen(username);
-    curr = (struct snode_user_entry *)malloc(sizeof(struct snode_user_entry)
-                                             + len);
+    len = strlen(username) + 1;
+    curr = (struct snode_user_entry *)calloc(1, sizeof(struct snode_user_entry)
+                                                 + len);
     if (curr == NULL) {
         slog(0, SLOG_ERROR, "memory allocation failed");
         goto out;
     }
 
     curr->len = len;
-    memcpy(curr->username, username, len);
+    memcpy(curr->username, username, len - 1);
     memcpy(curr->pubkey_hash, hash, CONFIG_SHA256_BUFLEN);
 
     SIMPLEQ_INSERT_TAIL(&super->users_list, curr, next_user);
@@ -259,10 +313,6 @@ out:
     return ret;
 }
 
-/**
- * removes an entry in the list of users. It stops iterating on find the first
- * matching name/pubkey
- */
 int
 supernode_rm(supernode_t * super,
              const char * username,
@@ -285,7 +335,9 @@ supernode_rm(supernode_t * super,
         prev = curr;
     }
 
+    /* if we are here, we don't have anything to remove */
     goto out;
+
 remove:
     super->user_count--;
     super->users_buflen -= sizeof(snode_user_t) + curr->len;
