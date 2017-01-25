@@ -158,19 +158,16 @@ typedef struct {
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;
 
-#define SNODE_USER_STRUCT \
-    uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN]; \
-    int len; \
-    char username[0];
-
 typedef struct {
-    SNODE_USER_STRUCT;
+    uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN];
+    int len;
+    char username[0];
 } __attribute__((packed)) snode_user_t;
 
 struct snode_user_entry {
-    SNODE_USER_STRUCT;
     SIMPLEQ_ENTRY(snode_user_entry) next_user;
-};
+    snode_user_t user_data;
+} __attribute__((packed));
 
 typedef struct snode_user_entry snode_user_entry_t;
 

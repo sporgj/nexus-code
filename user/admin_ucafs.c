@@ -340,7 +340,7 @@ typedef struct {
 } shell_cmd_t;
 
 static const shell_cmd_t shell_cmds[] = { { SHELL_ADD_USER, 2, "add" },
-                                          { SHELL_DEL_USER, 2, "del" },
+                                          { SHELL_DEL_USER, 1, "del" },
                                           { SHELL_LIST_USER, 0, "list" } };
 
 #define MAX_SHELL_ARGS 5
@@ -510,6 +510,52 @@ shell_add_user(const char * username, const char * pubkey)
         return -1;
     }
 
+    uinfo("%s was added to the supernode", username);
+
+    ret = 0;
+out:
+    return ret;
+}
+
+static int
+shell_del_user(const char * username, const char * pubkey)
+{
+    int ret = -1, len;
+    uint8_t hash[CONFIG_SHA256_BUFLEN] = {0}, buf[RSA_PUB_DER_MAX_BYTES], *c;
+    mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
+
+    // this is for the del command
+    if (pubkey == NULL) {
+        goto by_username;
+    }
+
+    mbedtls_pk_init(pk_ctx);
+    if ((ret = mbedtls_pk_parse_public_keyfile(pk_ctx, pubkey))) {
+        uerror("mbedtls_pk_parse_public_keyfile error (ret=%#x)", ret);
+        return -1;
+    }
+
+    len = mbedtls_pk_write_pubkey_der(pk_ctx, buf, sizeof(buf));
+    if (len < 0) {
+        uerror("mbedtls_pk_write_pubkey_der error (ret=%d)", len);
+        return -1;
+    }
+
+    c = buf + sizeof(buf) - len - 1;
+    mbedtls_sha256(c, len, hash, 0);
+
+by_username:
+    if (supernode_rm(super, username, hash)) {
+        return -1;
+    }
+
+    /* save the supernode and call it a day */
+    if (!supernode_write(super, supernode_path)) {
+        return -1;
+    }
+
+    uinfo("%s was removed from the supernode", username);
+
     ret = 0;
 out:
     return ret;
@@ -550,6 +596,7 @@ shell()
                 shell_add_user(input->args[0], input->args[1]);
                 break;
             case SHELL_DEL_USER:
+                shell_del_user(input->args[0], NULL);
                 break;
             case SHELL_LIST_USER:
                 shell_list_users();

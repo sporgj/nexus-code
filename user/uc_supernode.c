@@ -43,15 +43,17 @@ _supernode_to_list(supernode_t * super)
 
     curr_user = (snode_user_t *)super->users_buffer;
     while (i < super->user_count) {
+        len = sizeof(snode_user_t) + curr_user->len;
+
         /* create a new entry */
-        user_entry = (snode_user_entry_t *)malloc(sizeof(snode_user_entry_t));
+        user_entry
+            = (snode_user_entry_t *)malloc(sizeof(snode_user_entry_t) + len);
         if (user_entry == NULL) {
             log_fatal("allocation failed");
             goto out;
         }
 
-        len = sizeof(snode_user_t) + curr_user->len;
-        memcpy(user_entry, curr_user, len);
+        memcpy(&user_entry->user_data, curr_user, len);
 
         /* add it to the list and move on to the next entry */
         SIMPLEQ_INSERT_TAIL(&super->users_list, user_entry, next_user);
@@ -88,8 +90,8 @@ _supernode_to_buffer(supernode_t * super)
 
     SIMPLEQ_FOREACH(curr, &super->users_list, next_user)
     {
-        len = sizeof(snode_user_t) + curr->len;
-        memcpy(buffer, curr, len);
+        len = sizeof(snode_user_t) + curr->user_data.len;
+        memcpy(buffer, &curr->user_data, len);
 
         buffer += len;
     }
@@ -263,7 +265,7 @@ supernode_list(supernode_t * super)
     struct snode_user_entry * curr;
     SIMPLEQ_FOREACH(curr, &super->users_list, next_user)
     {
-        printf("%s\n", curr->username);
+        printf("%s\n", curr->user_data.username);
     }
 }
 
@@ -274,19 +276,21 @@ supernode_add(supernode_t * super,
 {
     int ret = -1, len;
     struct snode_user_entry * curr;
+    snode_user_t * user;
 
     /* iterate the list and check if the same public key/password exists */
     SIMPLEQ_FOREACH(curr, &super->users_list, next_user)
     {
-        if (strncmp(curr->username, username, curr->len) == 0) {
+        user = &curr->user_data;
+        if (strncmp(user->username, username, user->len) == 0) {
             slog(0, SLOG_ERROR, "user '%s' already exists in superblock",
                  username);
             goto out;
         }
 
-        if (memcmp(curr->pubkey_hash, hash, CONFIG_SHA256_BUFLEN) == 0) {
+        if (memcmp(user->pubkey_hash, hash, CONFIG_SHA256_BUFLEN) == 0) {
             slog(0, SLOG_ERROR, "user '%s', already has public key",
-                 curr->username);
+                 user->username);
             goto out;
         }
     }
@@ -300,13 +304,16 @@ supernode_add(supernode_t * super,
         goto out;
     }
 
-    curr->len = len;
-    memcpy(curr->username, username, len - 1);
-    memcpy(curr->pubkey_hash, hash, CONFIG_SHA256_BUFLEN);
+    // get the user data
+    user = &curr->user_data;
+
+    user->len = len;
+    memcpy(user->username, username, len - 1);
+    memcpy(user->pubkey_hash, hash, CONFIG_SHA256_BUFLEN);
 
     SIMPLEQ_INSERT_TAIL(&super->users_list, curr, next_user);
     super->user_count++;
-    super->users_buflen += sizeof(snode_user_t) + curr->len;
+    super->users_buflen += sizeof(snode_user_t) + user->len;
 
     ret = 0;
 out:
@@ -320,15 +327,18 @@ supernode_rm(supernode_t * super,
 {
     int ret = -1, len;
     struct snode_user_entry *curr, *prev = NULL;
+    snode_user_t * user;
 
     /* iterate the list and check if the same public key/password exists */
     SIMPLEQ_FOREACH(curr, &super->users_list, next_user)
     {
-        if (strncmp(curr->username, username, curr->len) == 0) {
+        user = &curr->user_data;
+
+        if (strncmp(user->username, username, user->len) == 0) {
             goto remove;
         }
 
-        if (memcmp(curr->pubkey_hash, hash, CONFIG_SHA256_BUFLEN) == 0) {
+        if (memcmp(user->pubkey_hash, hash, CONFIG_SHA256_BUFLEN) == 0) {
             goto remove;
         }
 
@@ -340,7 +350,7 @@ supernode_rm(supernode_t * super,
 
 remove:
     super->user_count--;
-    super->users_buflen -= sizeof(snode_user_t) + curr->len;
+    super->users_buflen -= sizeof(snode_user_t) + user->len;
 
     SIMPLEQ_REMOVE_AFTER(&super->users_list, prev, next_user);
     free(curr);
