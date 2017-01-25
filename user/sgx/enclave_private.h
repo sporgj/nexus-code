@@ -29,6 +29,8 @@
 
 #define E_CRYPTO_BUFFER_LEN 256
 
+#define HMAC_TYPE mbedtls_md_info_from_type(MBEDTLS_MD_SHA256)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
