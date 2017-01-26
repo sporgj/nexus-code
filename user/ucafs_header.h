@@ -15,6 +15,22 @@ typedef struct {
 #include <stdlib.h>
 #endif
 
+#ifndef UCPRIV_ENCLAVE
+#include <linux/ioctl.h>
+
+#define UCAFS_IOC_MAGIC 'W'
+
+#define IOCTL_ADD_PATH _IOW(UCAFS_IOC_MAGIC, 1, char *)
+
+#define UCAFS_IOC_MAXNR 1
+
+typedef struct {
+    int len;
+    char path[0];
+} watchlist_path_t;
+#endif
+
+
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
 #endif

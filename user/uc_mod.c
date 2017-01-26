@@ -52,7 +52,7 @@ ucrpc_msg_t in_rpc;
 int
 setup_mod()
 {
-    int len, status;
+    int len, status, ret, fno;
     size_t nbytes;
     xdr_data_t * x_data = (xdr_data_t *)in_buffer;
     xdr_rsp_t * x_rsp = (xdr_rsp_t *)out_buffer;
@@ -68,6 +68,14 @@ setup_mod()
     if ((ucafs_mod_fid = fopen(UCAFS_MOD_FILE, "rb+")) == NULL) {
         uerror("opening '%s' failed", UCAFS_MOD_FILE);
         perror("Error: ");
+        return -1;
+    }
+
+    fno = fileno(ucafs_mod_fid);
+
+    /* send all the paths */
+    if ((ret = ioctl(fno, IOCTL_ADD_PATH, UCAFS_PATH_KERN))) {
+        uerror("ioctl ADD_PATH failed\n");
         return -1;
     }
 
