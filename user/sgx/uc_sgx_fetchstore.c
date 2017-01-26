@@ -1,8 +1,6 @@
 #include "enclave_private.h"
 #include "seqptrmap.h"
 
-#define HMAC_TYPE mbedtls_md_info_from_type(MBEDTLS_MD_SHA256)
-
 typedef struct {
     uc_xfer_op_t xfer_op;
     int chunk_num;

@@ -55,6 +55,12 @@ void dcache_exit();
 int ucafs_init_uspace();
 int ucafs_exit_uspace();
 
+sds
+ucafs_supernode_path(const char * root_path);
+
+sds
+ucafs_metadata_path(const char * root_path, const char * meta_fname);
+
 #ifdef __cplusplus
 }
 #endif

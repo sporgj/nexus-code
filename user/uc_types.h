@@ -1,7 +1,13 @@
 #pragma once
 #include <stdint.h>
-#include "ucafs_header.h"
+#include <stdbool.h>
+
 #include <mbedtls/pk.h>
+
+#include "third/queue.h"
+
+#include "ucafs_header.h"
+
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
@@ -13,6 +19,10 @@
 #define DEFAULT_DNODE_FNAME "main.dnode"
 
 #define PUBKEY_HASH_LEN 256
+
+#define CONFIG_SHA256_BUFLEN 32
+#define CONFIG_NONCE_SIZE 64
+#define CONFIG_MRENCLAVE 32
 
 struct uc_dentry;
 struct filebox;
@@ -32,6 +42,11 @@ typedef enum {
     E_ERROR_LOGIN,
     E_ERROR_HASHMAP
 } enclave_error_t;
+
+typedef enum {
+    CRYPTO_SEAL,
+    CRYPTO_UNSEAL
+} seal_op_t;
 
 typedef struct {
     uint8_t raw[0];
@@ -143,10 +158,33 @@ typedef struct {
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) fbox_header_t;
 
+typedef struct {
+    uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN];
+    int len;
+    char username[0];
+} __attribute__((packed)) snode_user_t;
+
+struct snode_user_entry {
+    SIMPLEQ_ENTRY(snode_user_entry) next_user;
+    snode_user_t user_data;
+} __attribute__((packed));
+
+typedef struct snode_user_entry snode_user_entry_t;
+
+/* structs for supernode stuff */
+#define SUPERNODE_PAYLOAD \
+    uint32_t user_count; \
+    uint32_t users_buflen; \
+    shadow_t root_dnode; \
+    uint8_t owner_pubkey[CONFIG_SHA256_BUFLEN];
+
+typedef struct {
+    SUPERNODE_PAYLOAD;
+} __attribute__((packed)) supernode_payload_t;
+
 #define SUPERNODE_HEADER \
-    crypto_context_t crypto_ctx; \
-    uint32_t count; \
-    shadow_t root_dnode;
+    SUPERNODE_PAYLOAD; \
+    crypto_context_t crypto_ctx;
 
 typedef struct {
     SUPERNODE_HEADER;
@@ -154,5 +192,21 @@ typedef struct {
 
 typedef struct {
     SUPERNODE_HEADER;
+    bool is_mounted;
+    uint8_t * users_buffer;
+    SIMPLEQ_HEAD(snode_user_list, snode_user_entry) users_list;
 } __attribute__((packed)) supernode_t;
 
+#define ENCLAVE_AUTH_DATA \
+    uint8_t nonce[CONFIG_NONCE_SIZE]; \
+    uint8_t mrenclave[CONFIG_MRENCLAVE];
+
+typedef struct {
+    ENCLAVE_AUTH_DATA;
+} auth_payload_t;
+
+typedef struct {
+    ENCLAVE_AUTH_DATA;
+    size_t sig_len;
+    uint8_t signature[MBEDTLS_MPI_MAX_SIZE];
+} auth_struct_t;

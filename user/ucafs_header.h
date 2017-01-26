@@ -15,6 +15,22 @@ typedef struct {
 #include <stdlib.h>
 #endif
 
+#ifndef UCPRIV_ENCLAVE
+#include <linux/ioctl.h>
+
+#define UCAFS_IOC_MAGIC 'W'
+
+#define IOCTL_ADD_PATH _IOW(UCAFS_IOC_MAGIC, 1, char *)
+
+#define UCAFS_IOC_MAXNR 1
+
+typedef struct {
+    int len;
+    char path[0];
+} watchlist_path_t;
+#endif
+
+
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
 #endif
@@ -35,9 +51,12 @@ typedef struct {
 
 #define UC_AFS_WATCH "sgx"
 
-#define UCAFS_REPO_FNAME ".ucafs"
-
+#define UCAFS_SUPER_FNAME "ucafs"
 #define UCAFS_REPO_DIR ".afsx"
+
+#define CONFIG_PUBKEY   "profile/public_key"
+#define CONFIG_PRIVKEY  "profile/private_key"
+#define CONFIG_ENCLAVE_PUBKEY   "profile/enclave_pubkey"
 
 typedef enum {
     UC_STATUS_GOOD = 0,

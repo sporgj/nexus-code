@@ -71,6 +71,10 @@
 #define MBEDTLS_RIPEMD160_C
 #define MBEDTLS_SHA1_C
 #define MBEDTLS_SHA256_C
+#define MBEDTLS_CTR_DRBG_C
+#define MBEDTLS_NO_DEFAULT_ENTROPY_SOURCES
+#define MBEDTLS_NO_PLATFORM_ENTROPY
+#define MBEDTLS_PEM_PARSE_C
 
 #include "mbedtls/check_config.h"
 

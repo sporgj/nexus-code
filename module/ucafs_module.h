@@ -35,6 +35,17 @@
 #define UCMOD_BUFFER_ALLOC() (char *)get_zeroed_page(GFP_KERNEL)
 #define UCMOD_BUFFER_FREE(x) free_page(x)
 
+typedef struct {
+    struct list_head list;
+    int path_len;
+    char afs_path[0];
+} watch_path_t;
+
+extern struct list_head * watchlist_ptr;
+
+int add_path_to_watchlist(const char * path);
+void clear_watchlist(void);
+
 struct ucafs_mod {
     wait_queue_head_t outq, msgq;
     size_t buffersize;

@@ -29,6 +29,8 @@
 
 #define E_CRYPTO_BUFFER_LEN 256
 
+#define HMAC_TYPE mbedtls_md_info_from_type(MBEDTLS_MD_SHA256)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +38,8 @@ extern "C" {
 extern sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
 extern bool enclave_is_logged_in;
+
+extern auth_struct_t enclave_auth_data;
 
 int enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op);
 

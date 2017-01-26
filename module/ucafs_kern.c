@@ -9,6 +9,44 @@ static const uint32_t afs_prefix_len = 4;
 static char * watch_dirs[] = {UCAFS_PATH_KERN "/" UC_AFS_WATCH};
 static const int watch_dir_len[] = {sizeof(watch_dirs[0]) - 1};
 
+LIST_HEAD(_watchlist), *watchlist_ptr = &_watchlist;
+
+int add_path_to_watchlist(const char * path)
+{
+    watch_path_t * curr;
+    int len;
+
+    list_for_each_entry(curr, watchlist_ptr, list) {
+        if (strncmp(curr->afs_path, path, curr->path_len) == 0) {
+            return 0;
+        }
+    }
+
+    /* if we are here, we need to add the entry to the list */
+    len = strnlen(path, UCAFS_PATH_MAX);
+    curr = (watch_path_t *)kmalloc(sizeof(watch_path_t) + len + 1, GFP_KERNEL);
+    if (curr == NULL) {
+        ERROR("allocation error, cannot add path to list");
+        return -1;
+    }
+
+    curr->path_len = len;
+    strncpy(curr->afs_path, path, len);
+    list_add(&curr->list, watchlist_ptr);
+
+    return 0;
+}
+
+void clear_watchlist(void)
+{
+    watch_path_t * curr_wp, *prev_wp;
+
+    list_for_each_entry_safe(curr_wp, prev_wp, watchlist_ptr, list) {
+        list_del(&curr_wp->list);
+        kfree(curr_wp);
+    }
+}
+
 int
 UCAFS_DISCONNECTED()
 {
@@ -58,9 +96,10 @@ startsWith(const char * pre, const char * str)
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 {
-    int len, i, total_len;
-    char *path, *curr_dir, *result;
+    int len, total_len;
+    char *path, *result;
     char buf[512];
+    watch_path_t * curr_entry;
 
     if (dentry == NULL) {
         return 1;
@@ -84,12 +123,8 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
     print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf),
                    1); */
 
-    for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
-        curr_dir = watch_dirs[i];
-
-        if (startsWith(curr_dir, path)) {
-            // TODO maybe check the prefix on the name
-            // we're good
+    list_for_each_entry(curr_entry, watchlist_ptr, list) {
+        if (startsWith(curr_entry->afs_path, path)) {
             if (dest) {
                 len = strlen(path);
                 total_len = afs_prefix_len + len;
@@ -99,6 +134,7 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
                 result[total_len] = '\0';
                 *dest = result;
             }
+
             return 0;
         }
     }
