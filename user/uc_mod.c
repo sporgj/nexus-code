@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <sys/ioctl.h>
+
 #include <uv.h>
 
 #include "third/log.h"
@@ -12,6 +14,7 @@
 #include "ucafs_header.h"
 
 #include "uc_rpc.h"
+#include "uc_uspace.h"
 
 #define UCAFS_MOD_FILE "/dev/ucafs_mod"
 
@@ -74,9 +77,11 @@ setup_mod()
     fno = fileno(ucafs_mod_fid);
 
     /* send all the paths */
-    if ((ret = ioctl(fno, IOCTL_ADD_PATH, UCAFS_PATH_KERN))) {
-        uerror("ioctl ADD_PATH failed\n");
-        return -1;
+    for (size_t i = 0; i < global_supernode_count; i++) {
+        if ((ret = ioctl(fno, IOCTL_ADD_PATH, global_supernode_paths[i]))) {
+            uerror("ioctl ADD_PATH (%s) failed\n", global_supernode_paths[i]);
+            return -1;
+        }
     }
 
     while (1) {

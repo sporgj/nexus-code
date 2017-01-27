@@ -17,6 +17,8 @@
 
 using namespace std;
 
+#define REPO_DATUM "profile/repo.datum"
+
 FILE * global_mod_fid = NULL;
 
 sgx_enclave_id_t global_eid = 0;
@@ -40,7 +42,7 @@ static bool check_main_dir()
 
     sds afsx_dnode = uc_main_dnode_fpath();
     if (stat(afsx_dnode, &stat_buf)) {
-        cout << ". Initializing a new filebox" << endl;
+        cout << ". Initializing a new dirnode" << endl;
         uc_dirnode_t * dirnode = dirnode_new_alias(&uc_root_dirnode_shadow_name);
         if (!dirnode_write(dirnode, afsx_dnode)) {
             cout << ". Writing main dirnode failed" << endl;
@@ -85,6 +87,11 @@ int main(int argc, char ** argv)
 
     if (ucafs_init_uspace()) {
         cout << "init uspace subsystem failed" << endl;
+        return -1;
+    }
+
+    if (ucafs_launch(REPO_DATUM)) {
+        cout << "launching repo failed" << endl;
         return -1;
     }
 

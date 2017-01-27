@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+#define MAX_SUPERNODE_PATHS 20
+
 /**
  * path to the default home directory
  */
@@ -19,6 +21,10 @@ extern sds global_repo_path;
 extern bool global_env_is_afs;
 
 extern shadow_t uc_root_dirnode_shadow_name;
+
+extern char * global_supernode_paths[MAX_SUPERNODE_PATHS];
+
+extern size_t global_supernode_count;
 
 /**
  * Sets the home path. Essentially, the directory where the metadata is stored
@@ -61,6 +67,8 @@ ucafs_supernode_path(const char * root_path);
 sds
 ucafs_metadata_path(const char * root_path, const char * meta_fname);
 
+int
+ucafs_launch(const char * mount_file_path);
 #ifdef __cplusplus
 }
 #endif

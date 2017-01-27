@@ -14,8 +14,6 @@ else
        FLAGS += -UUCAFS_DEV
 endif
 
-KERNSRC_PATH = ../kernel
-
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
@@ -24,7 +22,7 @@ FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 
 
 CPPFLAGS = $(FLAGS)
-CFLAGS = $(FLAGS)
+CFLAGS = $(FLAGS) -std=gnu11
 LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv
 
 ifeq ($(UCAFS_PROFILER), 1)

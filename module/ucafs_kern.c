@@ -9,6 +9,13 @@ static const uint32_t afs_prefix_len = 4;
 static char * watch_dirs[] = {UCAFS_PATH_KERN "/" UC_AFS_WATCH};
 static const int watch_dir_len[] = {sizeof(watch_dirs[0]) - 1};
 
+bool
+startsWith(const char * pre, const char * str)
+{
+    size_t lenpre = strlen(pre), lenstr = strlen(str);
+    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
+}
+
 LIST_HEAD(_watchlist), *watchlist_ptr = &_watchlist;
 
 int add_path_to_watchlist(const char * path)
@@ -24,14 +31,17 @@ int add_path_to_watchlist(const char * path)
 
     /* if we are here, we need to add the entry to the list */
     len = strnlen(path, UCAFS_PATH_MAX);
-    curr = (watch_path_t *)kmalloc(sizeof(watch_path_t) + len + 1, GFP_KERNEL);
+    curr = (watch_path_t *)kzalloc(sizeof(watch_path_t) + len, GFP_KERNEL);
     if (curr == NULL) {
         ERROR("allocation error, cannot add path to list");
         return -1;
     }
 
     curr->path_len = len;
-    strncpy(curr->afs_path, path, len);
+    if (startsWith(afs_prefix, path)) {
+        strncpy(curr->afs_path, path + afs_prefix_len, len - afs_prefix_len);
+    }
+
     list_add(&curr->list, watchlist_ptr);
 
     return 0;
@@ -45,6 +55,8 @@ void clear_watchlist(void)
         list_del(&curr_wp->list);
         kfree(curr_wp);
     }
+
+    INIT_LIST_HEAD(watchlist_ptr);
 }
 
 int
@@ -84,13 +96,6 @@ vnode_type(const struct vcache * vnode)
     }
 
     return UC_ANY;
-}
-
-bool
-startsWith(const char * pre, const char * str)
-{
-    size_t lenpre = strlen(pre), lenstr = strlen(str);
-    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
 }
 
 int

@@ -1,5 +1,7 @@
-#include "uc_uspace.h"
 #include <string.h>
+
+#include "cdefs.h"
+#include "uc_uspace.h"
 
 static sds main_dnode_fpath;
 
@@ -10,6 +12,9 @@ sds global_repo_path;
 bool global_env_is_afs;
 
 shadow_t uc_root_dirnode_shadow_name = { 0 };
+
+char * global_supernode_paths[MAX_SUPERNODE_PATHS] = { NULL };
+size_t global_supernode_count = 0;
 
 void
 uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs)
@@ -138,4 +143,47 @@ ucafs_metadata_path(const char * root_path, const char * meta_fname)
     rv = sdscat(rv, meta_fname);
 
     return rv;
+}
+
+static inline void
+trim(char * str)
+{
+    while (*str != '\0') {
+        if (*str == '\n') {
+            *str = '\0';
+            break;
+        }
+
+        str++;
+    }
+}
+
+int
+ucafs_launch(const char * mount_file_path)
+{
+    int ret = -1;
+    ssize_t sz;
+    size_t n, count = 0;
+    FILE * fd1;
+    char * repo_path = NULL;
+
+    fd1 = fopen(mount_file_path, "rb");
+    if (fd1 == NULL) {
+        uerror("Could not open '%s'", mount_file_path);
+        return -1;
+    }
+
+    /* read each line and have them added to the list of paths */
+    while (((sz = getline(&repo_path, &n, fd1)) != -1)
+           && count < MAX_SUPERNODE_PATHS) {
+        trim(repo_path);
+        global_supernode_paths[count++] = repo_path;
+
+        repo_path = NULL;
+    }
+
+    global_supernode_count = count;
+
+    fclose(fd1);
+    return 0;
 }

@@ -1,5 +1,6 @@
 #include "uc_rpc.h"
 #include "uc_dirops.h"
+#include "uc_fetchstore.h"
 #include "uc_types.h"
 
 #include "cdefs.h"
