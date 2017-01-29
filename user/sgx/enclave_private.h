@@ -41,6 +41,10 @@ extern bool enclave_is_logged_in;
 
 extern auth_struct_t enclave_auth_data;
 
+extern supernode_t user_supernode;
+
+extern pubkey_t * user_pubkey;
+
 int enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op);
 
 int
@@ -48,6 +52,15 @@ crypto_metadata(crypto_context_t * p_ctx,
                 size_t protolen,
                 uint8_t * data,
                 uc_crypto_op_t op);
+
+struct snode_entry {
+    SLIST_ENTRY(snode_entry);
+    supernode_t super;
+};
+
+extern SLIST_HEAD(snode_head, snode_entry) supernode_list_head;
+typedef struct snode_head snode_head_t;
+typedef struct snode_entry snode_entry_t;
 
 #ifdef __cplusplus
 }

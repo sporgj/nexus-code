@@ -10,6 +10,12 @@
 
 bool enclave_is_logged_in = false;
 
+supernode_t user_supernode;
+pubkey_t * user_pubkey = (pubkey_t *)&user_supernode.owner_pubkey;
+
+snode_head_t supernode_list_head = SLIST_HEAD_INITIALIZER(NULL),
+             *snode_list = &supernode_list_head;
+
 /* the enclave private key */
 static const char enclave_private_key[]
     = "-----BEGIN RSA PRIVATE KEY-----\n"
@@ -57,8 +63,7 @@ static int
 sha256_pubkey(mbedtls_pk_context * user_pubkey_ctx, uint8_t * pubkey_hash)
 {
     unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c;
-    int len = mbedtls_pk_write_pubkey_der(user_pubkey_ctx, buf,
-                                          sizeof(buf));
+    int len = mbedtls_pk_write_pubkey_der(user_pubkey_ctx, buf, sizeof(buf));
     if (len < 0) {
         return E_ERROR_CRYPTO;
     }
@@ -280,6 +285,9 @@ ecall_ucafs_response(supernode_t * super,
         goto out;
     }
 
+    /* now copy the super structure */
+    memcpy(&user_supernode, super, sizeof(supernode_t));
+
     auth_stage = COMPLETE;
     enclave_is_logged_in = true;
 
@@ -291,11 +299,13 @@ out:
 int
 ecall_supernode_crypto(supernode_t * super, seal_op_t op)
 {
-    int ret = -1;
+    int ret = -1, err = -1;
     supernode_t _super;
-    crypto_context_t * crypto_ctx = &_super.crypto_ctx;
+    crypto_context_t _ctx, *crypto_ctx = &_ctx;
     snode_crypto_t super_op
         = (op == CRYPTO_SEAL ? SUPERNODE_ENCRYPT : SUPERNODE_DECRYPT);
+
+    memcpy(crypto_ctx, &super->crypto_ctx, sizeof(crypto_context_t));
 
     /* copy in the supernode data and unseal the crypto keys */
     memcpy(&_super, super, sizeof(supernode_t));
@@ -306,11 +316,64 @@ ecall_supernode_crypto(supernode_t * super, seal_op_t op)
         goto out;
     }
 
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
     memcpy(super, &_super, sizeof(supernode_t));
 
     ret = 0;
 out:
     return ret;
+}
+
+static int
+usgx_supernode_mount(supernode_t * super)
+{
+    int err = -1, i = 0, ret, len;
+    crypto_mac_t mac;
+    crypto_context_t _ctx, *crypto_ctx = &_ctx;
+    snode_user_t * curr_user;
+    snode_entry_t * snode_entry;
+
+    memcpy(crypto_ctx, &super->crypto_ctx, sizeof(crypto_context_t));
+    enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+
+    /* 1 - verify that the supernode matches */
+    err = supernode_hash(super, crypto_ctx, &mac, SUPERNODE_DECRYPT);
+    if (err) {
+        goto out;
+    }
+
+    /* 2 - check the hash value */
+    curr_user = (snode_user_t *)super->users_buffer;
+    while (i < super->user_count) {
+        len = sizeof(snode_user_t) + curr_user->len;
+
+        ret = memcmp(&curr_user->pubkey_hash, user_pubkey, sizeof(pubkey_t));
+        if (ret != 0) {
+            goto next_entry;
+        }
+
+        /* add the supernode to the map of supernodes */
+        snode_entry = (snode_entry_t *)malloc(sizeof(snode_entry_t));
+        memcpy(&snode_entry->super, super, sizeof(supernode_t));
+        SLIST_INSERT_HEAD(snode_list, snode_entry, next_entry);
+
+    next_entry:
+        curr_user = (snode_user_t *)(((uint8_t *)curr_user) + len);
+        i++;
+    }
+
+    err = 0;
+out:
+    return err;
+}
+
+/**
+ * Verfifies if you have access rights to the supernode been mounted
+ * @param super is the supernode object
+ * @return 0 on success
+ */
+int
+ecall_supernode_mount(supernode_t * super)
+{
+    return usgx_supernode_mount(super);
 }

@@ -88,6 +88,10 @@ typedef struct {
     crypto_mac_t mac;
 } __attribute__((packed)) crypto_context_t;
 
+typedef struct {
+    uint8_t bytes[CONFIG_SHA256_BUFLEN];
+} __attribute__((packed)) pubkey_t;
+
 /* File box information */
 #define UCAFS_FBOX_MAGIC 0xfb015213
 #define UCAFS_FBOX_HEADER                                                      \

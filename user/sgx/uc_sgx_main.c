@@ -43,6 +43,7 @@ out:
            sizeof(sgx_measurement_t));
 
     memset(&__enclave_encryption_key__, 0, sizeof(sgx_key_128bit_t));
+
     return 0;
 }
 
