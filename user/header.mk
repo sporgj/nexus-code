@@ -23,7 +23,8 @@ FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS) -std=gnu11
-LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv
+LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv\
+       -lmbedcrypto
 
 ifeq ($(UCAFS_PROFILER), 1)
        LIBS += -lprofiler
@@ -41,6 +42,7 @@ OBJS = uc_dirnode.o\
        uc_fetchstore.o\
        uc_supernode.o\
        uc_utils.o\
+       uc_vfs.o\
        dnode.pb.o
 
 TESTS := test_dirops

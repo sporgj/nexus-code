@@ -53,6 +53,8 @@ typedef struct {
 
 #define UCAFS_SUPER_FNAME "ucafs"
 #define UCAFS_REPO_DIR ".afsx"
+#define UCAFS_WATCH_DIR "sgx"
+#define UCAFS_METADATA_DIR UCAFS_REPO_DIR
 
 #define CONFIG_PUBKEY   "profile/public_key"
 #define CONFIG_PRIVKEY  "profile/private_key"

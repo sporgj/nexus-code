@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" {
 #include "third/slog.h"
-}
 
 #include "uc_encode.h"
 #include "uc_filebox.h"
