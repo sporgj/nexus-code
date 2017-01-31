@@ -10,18 +10,6 @@ extern "C" {
 
 #define MAX_SUPERNODE_PATHS 20
 
-/**
- * path to the default home directory
- */
-extern sds global_home_path;
-
-/** path to the default repo director.  home_path/.afsx */
-extern sds global_repo_path;
-
-extern bool global_env_is_afs;
-
-extern shadow_t uc_root_dirnode_shadow_name;
-
 extern char * global_supernode_paths[MAX_SUPERNODE_PATHS];
 
 extern size_t global_supernode_count;

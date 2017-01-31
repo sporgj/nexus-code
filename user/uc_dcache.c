@@ -110,7 +110,6 @@ dcache_init()
     uv_mutex_init(&dcache_lock);
 
     /* create our default dentry */
-    root_dentry = dcache_new("", &uc_root_dirnode_shadow_name, NULL);
     dcache_add(root_dentry, NULL);
 
     // uv_thread_create(&stats_thread, start_stats_thread, NULL);
