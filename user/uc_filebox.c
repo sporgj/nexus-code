@@ -59,25 +59,6 @@ filebox_equals(const uc_filebox_t * fb1, uc_filebox_t * fb2)
     return memcmp(&fb1->fbox->uuid, &fb2->fbox->uuid, sizeof(uuid_t)) == 0;
 }
 
-uc_filebox_t *
-filebox_from_shadow_name2(const shadow_t * shdw_name, size_t hint)
-{
-    char * temp = metaname_bin2str(shdw_name);
-    sds fbox_path = uc_get_dnode_path(temp);
-
-    uc_filebox_t * fb = filebox_from_file2(fbox_path, hint);
-
-    free(temp);
-    sdsfree(fbox_path);
-    return fb;
-}
-
-uc_filebox_t *
-filebox_from_shadow_name(const shadow_t * shdw_name)
-{
-    return filebox_from_shadow_name2(shdw_name, 0);
-}
-
 void
 filebox_free(uc_filebox_t * filebox)
 {

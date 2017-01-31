@@ -10,6 +10,7 @@
 #include "third/queue.h"
 #include "third/sds.h"
 #include "third/slog.h"
+#include "third/log.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -130,13 +131,28 @@ _evict_entry(metadata_entry_t * entry)
 }
 
 uc_dirnode_t *
-metadata_get_dirnode(const shadow_t * shadow_name)
+metadata_root_dirnode(const char * path)
+{
+    sds fpath = vfs_root_dirnode_path(path);
+    if (fpath) {
+        log_error("vfs_root_dnode_path (%s) returned NULL", path);
+        return NULL;
+    }
+
+    uc_dirnode_t * dirnode = dirnode_from_file(fpath);
+    sdsfree(fpath);
+
+    return dirnode;
+}
+
+uc_dirnode_t *
+metadata_get_dirnode(const char * path, const shadow_t * shadow_name)
 {
     uc_dirnode_t * dn = NULL;
     metadata_entry_t * entry;
     struct stat st;
     int * hashval;
-    sds fpath;
+    sds fpath = NULL;
 
     /* check if the item is in the cache */
     entry
@@ -156,7 +172,14 @@ metadata_get_dirnode(const shadow_t * shadow_name)
     goto out;
 
 load_from_disk:
-    dn = dirnode_from_shadow_name(shadow_name);
+    if ((fpath = vfs_metadata_path(path, shadow_name)) == NULL) {
+        log_error("vfs_metadata_path returned NULL (%s)", fpath);
+        goto out;
+    }
+
+    dn = dirnode_from_file(fpath);
+    sdsfree(fpath);
+
     if (dn == NULL) {
         goto out;
     }
@@ -254,11 +277,7 @@ metadata_init()
 
     TAILQ_INIT(dirty_list_head);
 
-    // add the default dnode to the cache
-    if (metadata_get_dirnode(&uc_root_dirnode_shadow_name) == NULL) {
-        slog(0, SLOG_ERROR, "metadata_get_dirnode root failed");
-        return -1;
-    }
+    // TODO load the root dirnode
 
     uv_thread_create(&flush_thread, start_flush_thread, NULL);
 

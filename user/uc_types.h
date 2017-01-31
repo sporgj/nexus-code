@@ -49,10 +49,6 @@ typedef enum {
 } seal_op_t;
 
 typedef struct {
-    uint8_t raw[0];
-} raw_fname_t;
-
-typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
     uint8_t type; /* 0 for soft, 1 for hard */
     union {
@@ -145,11 +141,8 @@ typedef struct {
 } xfer_context_t;
 
 typedef struct {
-    shadow_t uuid;
-    shadow_t parent;
-    uint8_t is_root;
-    uint32_t count;
-    uint32_t protolen;
+    shadow_t uuid, parent, root;
+    uint32_t count, protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 

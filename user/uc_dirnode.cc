@@ -24,7 +24,7 @@ struct dirnode {
 };
 
 uc_dirnode_t *
-dirnode_new_alias(const shadow_t * id)
+dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 {
     uc_dirnode_t * obj = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
     if (obj == NULL) {
@@ -41,7 +41,18 @@ dirnode_new_alias(const shadow_t * id)
     obj->dnode_path = NULL;
     obj->dentry = NULL;
 
+    if (parent) {
+        memcpy(&obj->header.parent, &parent->header.uuid, sizeof(shadow_t));
+        memcpy(&obj->header.root, &parent->header.root, sizeof(shadow_t));
+    }
+
     return obj;
+}
+
+uc_dirnode_t *
+dirnode_new_alias(const shadow_t * id)
+{
+    return dirnode_new2(id, NULL);
 }
 
 uc_dirnode_t *
@@ -53,7 +64,7 @@ dirnode_new()
 void
 dirnode_set_parent(uc_dirnode_t * dirnode, const uc_dirnode_t * parent)
 {
-    memcmp(&dirnode->header.parent, &parent->header.uuid, sizeof(shadow_t));
+    memcpy(&dirnode->header.parent, &parent->header.uuid, sizeof(shadow_t));
 }
 
 const shadow_t *
@@ -91,12 +102,6 @@ void dirnode_set_metadata(uc_dirnode_t * dn, struct metadata_entry * entry)
     dn->mcache = entry;
 }
 
-int
-dirnode_is_root(uc_dirnode_t * dirnode)
-{
-    return dirnode->header.is_root;
-}
-
 const sds
 dirnode_get_fpath(uc_dirnode_t * dirnode)
 {
@@ -119,39 +124,6 @@ dirnode_free(uc_dirnode_t * dirnode)
     }
 
     free(dirnode);
-}
-
-uc_dirnode_t *
-dirnode_default_dnode()
-{
-    uc_dirnode_t * dn;
-    sds path = uc_main_dnode_fpath();
-    if (path == NULL) {
-        return NULL;
-    }
-
-    dn = dirnode_from_file(path);
-    sdsfree(path);
-
-    return dn;
-}
-
-uc_dirnode_t *
-dirnode_from_shadow_name(const shadow_t * shdw_name)
-{
-    sds path_sds;
-
-    if (memcmp(shdw_name, &uc_root_dirnode_shadow_name, sizeof(shadow_t)) == 0) {
-        path_sds = uc_main_dnode_fpath();
-    } else {
-        char * temp = metaname_bin2str(shdw_name);
-        path_sds = uc_get_dnode_path(temp);
-        free(temp);
-    }
-
-    uc_dirnode_t * dn = dirnode_from_file(path_sds);
-    sdsfree(path_sds);
-    return dn;
 }
 
 uc_dirnode_t *

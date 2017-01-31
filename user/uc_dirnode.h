@@ -20,6 +20,9 @@ struct metadata_entry;
 uc_dirnode_t *
 dirnode_new();
 
+uc_dirnode_t *
+dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent);
+
 /**
  * Generates a new dirnode object with a pregenerated name
  * @param id is the ID of the dirnode, NULL if you want the ID randomly
@@ -56,9 +59,6 @@ void dirnode_set_metadata(uc_dirnode_t *, struct metadata_entry *);
  */
 uc_dirnode_t *
 dirnode_from_file(const sds file_path);
-
-uc_dirnode_t *
-dirnode_from_shadow_name(const shadow_t * shdw_name);
 
 void
 dirnode_free(uc_dirnode_t * dirnode);

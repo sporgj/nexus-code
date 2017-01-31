@@ -29,21 +29,6 @@ extern size_t global_supernode_count;
 extern supernode_t * global_supernode_object;
 
 /**
- * Sets the home path. Essentially, the directory where the metadata is stored
- */
-void
-uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs);
-
-sds
-uc_get_repo_path();
-
-sds
-uc_main_dnode_fpath();
-
-sds
-uc_get_dnode_path(const char * fname);
-
-/**
  * Derives the relative path with respect to the watch folder
  * @param path is the full path
  * @param is_dirpath if the path passed is the path to a parent folder
@@ -52,7 +37,6 @@ uc_get_dnode_path(const char * fname);
  */
 sds
 uc_derive_relpath(const char * fullpath, bool is_dirpath);
-
 
 int metadata_init();
 void metadata_exit();
@@ -68,8 +52,6 @@ int ucafs_exit_vfs();
 
 int ucafs_init_enclave();
 
-int
-vfs_mount(const char * path);
 
 int
 ucafs_login(const char * user_root_path);
@@ -82,6 +64,24 @@ ucafs_metadata_path(const char * root_path, const char * meta_fname);
 
 int
 ucafs_launch(const char * mount_file_path);
+
+
+/* vfs */
+sds
+vfs_metadata_path(const char * path, const shadow_t * shdw_name);
+
+sds
+vfs_relpath(const char * path, bool dirpath);
+
+sds
+vfs_root_path(const char * path);
+
+sds
+vfs_root_dirnode_path(const char * path);
+
+int
+vfs_mount(const char * path);
+
 #ifdef __cplusplus
 }
 #endif

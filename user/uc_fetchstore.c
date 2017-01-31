@@ -19,7 +19,7 @@
 
 static struct seqptrmap * xfer_context_array = NULL;
 
-static int
+static void
 free_xfer_context(xfer_context_t * xfer_ctx)
 {
     if (xfer_ctx->xfer_id != -1) {

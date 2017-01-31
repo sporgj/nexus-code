@@ -1,12 +1,11 @@
-#include "uc_vfs.h"
-#include "uc_types.h"
-#include "uc_uspace.h"
 #include "uc_encode.h"
 #include "uc_supernode.h"
+#include "uc_types.h"
+#include "uc_uspace.h"
 
 #include "third/log.h"
-#include "third/sds.h"
 #include "third/queue.h"
+#include "third/sds.h"
 
 struct supernode_entry {
     SLIST_ENTRY(supernode_entry) next_entry;
@@ -80,27 +79,49 @@ vfs_get_root_path(const char * path)
 }
 
 sds
-vfs_metedata_path(const char * path, shadow_t * shdw_name)
+vfs_append(sds root_path, const shadow_t * shdw_name)
 {
-    char * metaname;
-    sds root_path = vfs_get_root_path(path);
-    if (root_path == NULL) {
-        return NULL;
-    }
-
-    metaname = metaname_bin2str(shdw_name);
+    char * metaname = metaname_bin2str(shdw_name);
     root_path = sdscat(root_path, "/");
     root_path = sdscat(root_path, UCAFS_REPO_DIR);
     root_path = sdscat(root_path, metaname);
 
     free(metaname);
+
     return root_path;
+}
+
+sds
+vfs_root_dirnode_path(const char * path)
+{
+    sds root_path;
+    supernode_entry_t * curr;
+    SLIST_FOREACH(curr, snode_list, next_entry)
+    {
+        if (strstr(path, curr->path)) {
+            root_path = sdsdup(curr->path);
+            return vfs_append(root_path, &curr->super->root_dnode);
+        }
+    }
+
+    return NULL;
+}
+
+sds
+vfs_metadata_path(const char * path, const shadow_t * shdw_name)
+{
+    sds root_path = vfs_get_root_path(path);
+    if (root_path == NULL) {
+        return NULL;
+    }
+
+    return vfs_append(root_path, shdw_name);
 }
 
 sds
 vfs_relpath(const char * path, bool dirpath)
 {
-    const char * ptr1 = path, * ptr2;
+    const char *ptr1 = path, *ptr2;
     int len1, len2, nchar;
 
     /* 1 - Find the root directory */
@@ -133,7 +154,7 @@ vfs_relpath(const char * path, bool dirpath)
     if ((ptr2 - path) > len2) {
         return NULL;
     }
-    
+
     return sdsnew(ptr2);
 }
 

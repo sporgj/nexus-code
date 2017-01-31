@@ -91,8 +91,8 @@ setup_mod()
             fread(x_data->data, 1, in_msg->len, ucafs_mod_fid);
 
             /* create our XDR data */
-            xdrmem_create(xdr_in, x_data->data, in_msg->len, XDR_DECODE);
-            xdrmem_create(xdr_out, x_rsp->data, PAGE_SIZE, XDR_ENCODE);
+            xdrmem_create(xdr_in, (caddr_t) x_data->data, in_msg->len, XDR_DECODE);
+            xdrmem_create(xdr_out, (caddr_t) x_rsp->data, PAGE_SIZE, XDR_ENCODE);
 
             /* dispatch to the corresponding function */
             switch (in_msg->type) {

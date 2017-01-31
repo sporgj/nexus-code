@@ -23,7 +23,6 @@ dirops_new1(const char * parent_dir,
     uc_dirnode_t *dirnode = NULL, *dirnode1 = NULL;
     uc_filebox_t * filebox = NULL;
     shadow_t * fname_code = NULL;
-    char * metaname = NULL;
     sds path1 = NULL;
 
     /* lets get the directory entry */
@@ -44,16 +43,13 @@ dirops_new1(const char * parent_dir,
         goto out;
     }
 
-    metaname = metaname_bin2str(fname_code);
-    path1 = uc_get_dnode_path(metaname);
+    path1 = vfs_metadata_path(parent_dir, fname_code);
 
     if (type == UC_DIR) {
-        if ((dirnode1 = dirnode_new_alias(fname_code)) == NULL) {
+        if ((dirnode1 = dirnode_new2(fname_code, dirnode)) == NULL) {
             slog(0, SLOG_ERROR, "new dirnode failed: %s/%s", parent_dir, fname);
             goto out;
         }
-
-        dirnode_set_parent(dirnode1, dirnode);
 
         if (!dirnode_write(dirnode1, path1)) {
             slog(0, SLOG_ERROR, "Creating: '%s/%s' dirnode failed", parent_dir,
@@ -89,8 +85,6 @@ out:
         sdsfree(path1);
     if (fname_code)
         free((void *)fname_code);
-    if (metaname)
-        free(metaname);
 
     return error;
 }
@@ -170,8 +164,7 @@ dirops_move(const char * from_dir,
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
     shadow_t *shadow1_bin = NULL, *shadow2_bin = NULL;
-    char *shadow1_str = NULL, *shadow2_str = NULL, *metaname1 = NULL,
-         *metaname2 = NULL;
+    char *shadow1_str = NULL, *shadow2_str = NULL;
     sds path1 = NULL, path2 = NULL, path3 = NULL;
     sds fpath1 = NULL, fpath2 = NULL;
 
@@ -243,11 +236,10 @@ dirops_move(const char * from_dir,
         goto out;
     }
 
-    metaname1 = metaname_bin2str(shadow1_bin);
-    metaname2 = metaname_bin2str(shadow2_bin);
-    path1 = uc_get_dnode_path(metaname1);
-    path2 = uc_get_dnode_path(metaname2);
+    path1 = vfs_metadata_path(from_dir, shadow1_bin);
+    path2 = vfs_metadata_path(to_dir, shadow2_bin);
 
+    // TODO just update the entry in the dirnode
     /* move the metadata file */
     if (atype != UC_LINK) {
         if (rename(path1, path2)) {
@@ -259,10 +251,9 @@ dirops_move(const char * from_dir,
              newname);
     }
 
-    /* update the parent directory */
+    /* last step is to update the moved entry's parent directory. */
     if (atype == UC_DIR) {
-        path3 = uc_get_dnode_path(path2);
-        if ((dirnode3 = dirnode_from_file(path3)) == NULL) {
+        if ((dirnode3 = dirnode_from_file(path2)) == NULL) {
             slog(0, SLOG_INFO, "loading dirnode file failed(%s)", path3);
             goto out;
         }
@@ -293,14 +284,6 @@ out:
 
     if (shadow2_bin) {
         free(shadow2_bin);
-    }
-
-    if (metaname1) {
-        free(metaname1);
-    }
-
-    if (metaname2) {
-        free(metaname2);
     }
 
     if (error && shadow1_str) {
@@ -608,23 +591,15 @@ out:
 }
 
 static int
-__delete_metadata_file(const shadow_t * shadowname_bin, int is_filebox)
+__delete_metadata_file(const char * parent_dir,
+                       const shadow_t * shadowname_bin,
+                       int is_filebox)
 {
     int error = -1;
     uc_dirnode_t * dirnode = NULL;
     uc_filebox_t * filebox = NULL;
-    sds metadata_path;
 
-    char * metaname_str = metaname_bin2str(shadowname_bin);
-    if (metaname_str == NULL) {
-        return -1;
-    }
-
-    metadata_path = uc_get_dnode_path(metaname_str);
-    if (metadata_path == NULL) {
-        free(metaname_str);
-        return -1;
-    }
+    sds metadata_path = vfs_metadata_path(parent_dir, shadowname_bin);
 
     if (is_filebox) {
         /* instatiate, update ref count and delete */
@@ -665,10 +640,6 @@ out:
 
     if (dirnode) {
         dirnode_free(dirnode);
-    }
-
-    if (metaname_str) {
-        free(metaname_str);
     }
 
     if (metadata_path) {
@@ -740,11 +711,11 @@ dirops_remove1(const char * parent_dir,
     /* we only need to call for hardlinks */
     if (link_info) {
         if (link_info->type == UC_HARDLINK) {
-            __delete_metadata_file(&link_info->meta_file, 1);
+            __delete_metadata_file(parent_dir, &link_info->meta_file, 1);
         }
     } else {
         // delete a normal file or directory
-        __delete_metadata_file(shadow_name, atype == UC_FILE);
+        __delete_metadata_file(parent_dir, shadow_name, atype == UC_FILE);
     }
 
     *encoded_fname_dest = filename_bin2str(shadow_name);

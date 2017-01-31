@@ -225,12 +225,14 @@ hash_lookup(const struct uc_dentry * parent, const char * name)
 /**
  * The main traversal procedure
  * @param parent_dentry is where we start traversing from
+ * @param canonical_path is the absolute path of the item we want
  * @param path_cstr is the path to traverse from the dentry
  * @param p_dest_dn, the destination dirnode object
  * @return NULL if the dentry is not found
  */
 static struct uc_dentry *
 traverse(struct uc_dentry * parent_dentry,
+         const char * canonical_path,
          char * path_cstr,
          uc_dirnode_t ** p_dest_dn)
 {
@@ -276,9 +278,10 @@ traverse(struct uc_dentry * parent_dentry,
         /* 2 - We have to do a real fetch from disk */
         if (dn == NULL) {
             if (parent_dentry == root_dentry) {
-                dn = metadata_get_dirnode(&uc_root_dirnode_shadow_name);
+                dn = metadata_root_dirnode(canonical_path);
             } else {
-                dn = metadata_get_dirnode(&parent_dentry->shdw_name);
+                dn = metadata_get_dirnode(canonical_path,
+                                          &parent_dentry->shdw_name);
             }
 
             if (dn == NULL) {
@@ -295,7 +298,7 @@ traverse(struct uc_dentry * parent_dentry,
         if (atype == UC_LINK) {
             /* get the link and recursively traverse */
             char * link_cstr = strdup(link_info->target_link);
-            dentry = traverse(parent_dentry, link_cstr, &dn);
+            dentry = traverse(parent_dentry, canonical_path, link_cstr, &dn);
             free(link_cstr);
 
             if (dentry) {
@@ -308,7 +311,8 @@ next:
         /* get the path to the dnode */
         if (found_in_cache == false) {
             alias_dn = dn;
-            if ((dn = metadata_get_dirnode(shadow_name)) == NULL) {
+            dn = metadata_get_dirnode(canonical_path, shadow_name);
+            if (dn == NULL) {
                 break;
             }
 
@@ -331,7 +335,7 @@ next1:
     /* now return the entry */
     if (nch == NULL) {
         *p_dest_dn = (dn == NULL)
-            ? metadata_get_dirnode(&parent_dentry->shdw_name)
+            ? metadata_get_dirnode(canonical_path, &parent_dentry->shdw_name)
             : dn;
         return dentry;
     }
@@ -341,13 +345,15 @@ next1:
 }
 
 static struct uc_dentry *
-real_lookup(const char * rel_path, uc_dirnode_t ** dn)
+real_lookup(const char * canonical_path,
+            const char * rel_path,
+            uc_dirnode_t ** dn)
 {
     /* first, lets get the parent dnode */
     struct uc_dentry * result_dentry;
     char * path_cstr = strdup(rel_path);
 
-    result_dentry = traverse(root_dentry, path_cstr, dn);
+    result_dentry = traverse(root_dentry, canonical_path, path_cstr, dn);
 
     free(path_cstr);
     return result_dentry;
@@ -374,10 +380,10 @@ dcache_lookup(const char * path, bool dirpath)
 
     // just return the root dirnode
     if (strlen(relpath)) {
-        dentry = real_lookup(relpath, &dirnode);
+        dentry = real_lookup(path, relpath, &dirnode);
     } else {
         dentry = root_dentry;
-        dirnode = metadata_get_dirnode(&uc_root_dirnode_shadow_name);
+        dirnode = metadata_root_dirnode(path);
     }
 
     /* increase the ref count */
@@ -442,7 +448,9 @@ dcache_get_filebox(const char * path, size_t hint)
         }
     }
 
-    fb = filebox_from_shadow_name2(codename, hint);
+    fbox_path = vfs_metadata_path(path, codename);
+    fb = filebox_from_file(temp2);
+    sdsfree(fbox_path);
 out:
     sdsfree(fname);
     return fb;
