@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 #include "uc_dirnode.h"
-#include "uc_dcache.h"
+#include "uc_vfs.h"
 #include "uc_uspace.h"
 #include "uc_sgx.h"
 

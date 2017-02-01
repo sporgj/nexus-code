@@ -2,6 +2,7 @@
 #include "uc_supernode.h"
 #include "uc_types.h"
 #include "uc_uspace.h"
+#include "uc_vfs.h"
 
 #include "third/log.h"
 #include "third/queue.h"
@@ -10,6 +11,7 @@
 struct supernode_entry {
     SLIST_ENTRY(supernode_entry) next_entry;
     supernode_t * super;
+    struct dentry_tree * dentry_tree;
     sds path;
 };
 
@@ -17,6 +19,18 @@ typedef struct supernode_entry supernode_entry_t;
 
 static SLIST_HEAD(_list, supernode_entry) _s = SLIST_HEAD_INITIALIZER(NULL),
                                           *snode_list = &_s;
+
+uc_filebox_t *
+vfs_get_filebox(const char * path, size_t hint)
+{
+    return NULL;
+}
+
+uc_dirnode_t *
+vfs_lookup(const char * path, bool dirpath)
+{
+    return NULL;
+}
 
 /**
  * Adds the path to the list of all supernodes
@@ -28,10 +42,11 @@ vfs_mount(const char * path)
 {
     int ret = -1;
     supernode_entry_t * snode_entry;
-    sds snode_path = ucafs_supernode_path(path);
+    struct uc_dentry * root_dentry;
+    sds snode_path = ucafs_supernode_path(path), root_dnode_path = NULL;
 
     /* open the supernode object */
-    supernode_t * super = supernode_from_file(path);
+    supernode_t * super = supernode_from_file(snode_path);
     if (super == NULL) {
         sdsfree(snode_path);
         return -1;
@@ -53,12 +68,20 @@ vfs_mount(const char * path)
 
     SLIST_INSERT_HEAD(snode_list, snode_entry, next_entry);
 
+    // initialize the root dentry
+    root_dnode_path = vfs_append(sdsnew(path), &super->root_dnode);
+    snode_entry->dentry_tree = dcache_new_root(&super->root_dnode);
+
     ret = 0;
 out:
     if (ret) {
         sdsfree(snode_path);
 
         supernode_free(super);
+    }
+
+    if (root_dnode_path) {
+        sdsfree(root_dnode_path);
     }
 
     return ret;

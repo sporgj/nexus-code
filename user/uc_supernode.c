@@ -170,7 +170,7 @@ supernode_mount(supernode_t * super)
     int ret = -1;
 
 #ifdef UCAFS_SGX
-    ecall_supernode_crypto(global_eid, &ret, super, CRYPTO_UNSEAL);
+    ecall_supernode_mount(global_eid, &ret, super);
     if (ret) {
         log_error("enclave operation failed\n");
         goto out;

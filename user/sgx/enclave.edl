@@ -33,6 +33,8 @@ enclave {
 
         public int ecall_supernode_crypto([user_check] supernode_t * supernode,
                 seal_op_t op);
+
+        public int ecall_supernode_mount([user_check] supernode_t * supernode);
     };
 
 };

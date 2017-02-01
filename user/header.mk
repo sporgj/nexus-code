@@ -21,7 +21,7 @@ FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 	-fno-builtin-free
 
 
-CPPFLAGS = $(FLAGS)
+CPPFLAGS = $(FLAGS) -std=gnu++11
 CFLAGS = $(FLAGS) -std=gnu11
 LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv\
        -lmbedcrypto

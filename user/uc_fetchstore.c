@@ -10,7 +10,7 @@
 #include "third/seqptrmap.h"
 #include "third/slog.h"
 
-#include "uc_dcache.h"
+#include "uc_vfs.h"
 #include "uc_dirnode.h"
 #include "uc_fetchstore.h"
 #include "uc_filebox.h"
@@ -52,7 +52,7 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     int chunk_count;
 
     /* lets find the dirnode object first */
-    filebox = dcache_get_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
+    filebox = vfs_get_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
     if (filebox == NULL) {
         slog(0, SLOG_ERROR, "finding filebox failed: '%s'", fpath);
         return ret;

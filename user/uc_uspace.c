@@ -12,6 +12,7 @@
 
 #include "uc_sgx.h"
 #include "uc_supernode.h"
+#include "uc_vfs.h"
 
 #include "cdefs.h"
 #include "uc_uspace.h"
@@ -29,8 +30,6 @@ ucafs_init_uspace()
     if ((ret = metadata_init())) {
         return ret;
     }
-
-    dcache_init();
 
     return ret;
 }

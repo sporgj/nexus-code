@@ -5,7 +5,7 @@
 
 #include "third/slog.h"
 
-#include "uc_dcache.h"
+#include "uc_vfs.h"
 #include "uc_dirnode.h"
 #include "uc_dirops.h"
 #include "uc_encode.h"
@@ -26,7 +26,7 @@ dirops_new1(const char * parent_dir,
     sds path1 = NULL;
 
     /* lets get the directory entry */
-    if ((dirnode = dcache_lookup(parent_dir, true)) == NULL) {
+    if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
         slog(0, SLOG_ERROR, "Error loading dirnode: %s", parent_dir);
         return error;
     }
@@ -130,7 +130,7 @@ dirops_code2plain(const char * dir_path,
     }
 
     // 2 - Get the corresponding dirnode
-    uc_dirnode_t * dn = dcache_lookup(dir_path, true);
+    uc_dirnode_t * dn = vfs_lookup(dir_path, true);
     if (dn == NULL) {
         goto out;
     }
@@ -169,12 +169,12 @@ dirops_move(const char * from_dir,
     sds fpath1 = NULL, fpath2 = NULL;
 
     /* get the dirnode objects */
-    dirnode1 = dcache_lookup(from_dir, true);
+    dirnode1 = vfs_lookup(from_dir, true);
     if (dirnode1 == NULL) {
         return -1;
     }
 
-    dirnode2 = dcache_lookup(to_dir, true);
+    dirnode2 = vfs_lookup(to_dir, true);
     if (dirnode2 == NULL) {
         dcache_put(dirnode1);
         return -1;
@@ -359,7 +359,7 @@ dirops_symlink(const char * link_path,
     sds target_fname = NULL, link_fname = NULL;
 
     /* 1 - get the respective dirnode */
-    if ((link_dnode = dcache_lookup(link_path, false)) == NULL) {
+    if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
         return error;
     }
@@ -438,18 +438,18 @@ dirops_hardlink(const char * target_path,
     link_info_t * link_info = NULL;
 
     /* 1 - Get the dirnodes for both link and target */
-    if ((target_fbox = dcache_get_filebox(target_path, 0)) == NULL) {
+    if ((target_fbox = vfs_get_filebox(target_path, 0)) == NULL) {
         slog(0, SLOG_ERROR, "filebox (%s) not found", target_path);
         return error;
     }
 
-    if ((target_dnode = dcache_lookup(target_path, false)) == NULL) {
+    if ((target_dnode = vfs_lookup(target_path, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", target_path);
         filebox_free(target_fbox);
         return error;
     }
 
-    if ((link_dnode = dcache_lookup(link_path, false)) == NULL) {
+    if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
         filebox_free(target_fbox);
         dcache_put(target_dnode);
@@ -571,7 +571,7 @@ dirops_plain2code1(const char * parent_path,
     ucafs_entry_type atype;
 
     /* 1 - Get the corresponding dirnode */
-    uc_dirnode_t * dirnode = dcache_lookup(parent_path, true);
+    uc_dirnode_t * dirnode = vfs_lookup(parent_path, true);
     if (dirnode == NULL) {
         return error;
     }
@@ -687,7 +687,7 @@ dirops_remove1(const char * parent_dir,
     uc_dirnode_t * dirnode = NULL;
     ucafs_entry_type atype;
 
-    if ((dirnode = dcache_lookup(parent_dir, true)) == NULL) {
+    if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode (%s) not found", parent_dir);
         return error;
     }

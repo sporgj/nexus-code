@@ -16,6 +16,8 @@ extern size_t global_supernode_count;
 
 extern supernode_t * global_supernode_object;
 
+struct dirnode;
+
 /**
  * Derives the relative path with respect to the watch folder
  * @param path is the full path
@@ -52,23 +54,6 @@ ucafs_metadata_path(const char * root_path, const char * meta_fname);
 
 int
 ucafs_launch(const char * mount_file_path);
-
-
-/* vfs */
-sds
-vfs_metadata_path(const char * path, const shadow_t * shdw_name);
-
-sds
-vfs_relpath(const char * path, bool dirpath);
-
-sds
-vfs_root_path(const char * path);
-
-sds
-vfs_root_dirnode_path(const char * path);
-
-int
-vfs_mount(const char * path);
 
 #ifdef __cplusplus
 }

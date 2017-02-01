@@ -5,47 +5,17 @@
 #include <uv.h>
 
 #include "third/hashmap.h"
+#include "third/log.h"
 #include "third/queue.h"
 #include "third/slog.h"
 
+#include "uc_vfs.h"
 #include "uc_dirnode.h"
-#include "uc_metadata.h"
 #include "uc_encode.h"
 #include "uc_filebox.h"
+#include "uc_metadata.h"
 #include "uc_uspace.h"
 #include "uc_utils.h"
-
-#define MAP_INIT_SIZE 2 << 12
-
-typedef atomic_int ref_t;
-
-typedef struct {
-    const struct uc_dentry * parent;
-    int * p_hashval;
-    sds name;
-} dcache_key_t;
-
-typedef struct dcache_item_t {
-    struct uc_dentry * dentry;
-    SLIST_ENTRY(dcache_item_t) next_dptr;
-} dcache_item_t;
-
-struct uc_dentry {
-    bool valid; /* if the entry is valid */
-    ref_t count; /* number of references to the dentry */
-    shadow_t shdw_name; /* the dirnode file name */
-    dcache_key_t key;
-    SLIST_HEAD(dcache_list_t, dcache_item_t) children;
-
-    uv_mutex_t v_lock; /* required to change valid */
-    uv_mutex_t c_lock; /* to change the children */
-};
-
-static Hashmap * dcache_hashmap = NULL;
-static uv_mutex_t hashmap_lock;
-
-static struct uc_dentry * root_dentry = NULL;
-static uv_mutex_t dcache_lock;
 
 unsigned long
 crc32(const unsigned char * s, unsigned int len);
@@ -56,7 +26,8 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent);
 struct uc_dentry *
 dcache_new(const char * name,
            const shadow_t * dirnode_name,
-           const struct uc_dentry * parent);
+           const struct uc_dentry * parent,
+           struct dentry_tree * dentry_tree);
 
 /* for statistics */
 uint64_t stats_total_cache_entries = 0;
@@ -80,7 +51,8 @@ hash_is_equals(void * keyA, void * keyB)
     return da->parent == db->parent && strcmp(da->name, db->name) == 0;
 }
 
-void print_dcache_stats(uv_timer_t * handle)
+void
+print_dcache_stats(uv_timer_t * handle)
 {
     printf("\n------------------ DCACHE STATS -------------------");
     printf("\n references: %lu, misses: %lu, hits: %lu", stats_cache_lookups,
@@ -88,8 +60,8 @@ void print_dcache_stats(uv_timer_t * handle)
     printf("\n---------------------------------------------------\n");
 }
 
-
-static void start_stats_thread()
+static void
+start_stats_thread()
 {
     uv_loop_t * loop = uv_loop_new();
     uv_loop_init(loop);
@@ -98,21 +70,43 @@ static void start_stats_thread()
     uv_run(loop, UV_RUN_DEFAULT);
 }
 
-void
-dcache_init()
+struct dentry_tree *
+dcache_new_root(shadow_t * root_shdw)
 {
-    if (dcache_hashmap) {
-        return;
+    int err = -1;
+    struct dentry_tree * tree = NULL;
+    if ((tree = calloc(1, sizeof(struct dentry_tree))) == NULL) {
+        log_fatal("allocation failed");
+        return NULL;
     }
 
-    dcache_hashmap = hashmapCreate(MAP_INIT_SIZE, hash_dentry, hash_is_equals);
-    uv_mutex_init(&hashmap_lock);
-    uv_mutex_init(&dcache_lock);
+    tree->hashmap = hashmapCreate(MAP_INIT_SIZE, hash_dentry, hash_is_equals);
+    tree->root_dentry = dcache_new("", root_shdw, NULL, tree);
+    if (tree->root_dentry == NULL) {
+        log_fatal("allocation failed");
+        goto out;
+    }
 
-    /* create our default dentry */
-    dcache_add(root_dentry, NULL);
+    uv_mutex_init(&tree->dcache_lock);
 
-    // uv_thread_create(&stats_thread, start_stats_thread, NULL);
+    dcache_add(tree->root_dentry, NULL);
+
+    err = 0;
+out:
+    if (err) {
+        if (tree->root_dentry) {
+            free(tree->root_dentry);
+        }
+
+        if (tree->hashmap) {
+            hashmapFree(tree->hashmap);
+        }
+
+        free(tree);
+        tree = NULL;
+    }
+
+    return tree;
 }
 
 void
@@ -124,7 +118,8 @@ dcache_exit()
 struct uc_dentry *
 dcache_new(const char * name,
            const shadow_t * dirnode_name,
-           const struct uc_dentry * parent)
+           const struct uc_dentry * parent,
+           struct dentry_tree * dentry_tree)
 {
     struct uc_dentry * dentry;
     dentry = (struct uc_dentry *)calloc(1, sizeof(struct uc_dentry));
@@ -137,6 +132,7 @@ dcache_new(const char * name,
     dentry->key.parent = parent;
     dentry->key.name = sdsnew(name);
     dentry->valid = 1;
+    dentry->dentry_tree = dentry_tree;
     uv_mutex_init(&dentry->v_lock);
     uv_mutex_init(&dentry->c_lock);
 
@@ -151,6 +147,7 @@ void
 dcache_free(struct uc_dentry * dentry)
 {
     dcache_item_t * ptr_entry;
+    Hashmap * hashmap = dentry->dentry_tree->hashmap;
 
     /* deallocate the children */
     uv_mutex_lock(&dentry->c_lock);
@@ -165,10 +162,10 @@ dcache_free(struct uc_dentry * dentry)
     }
     uv_mutex_unlock(&dentry->c_lock);
 
-    uv_mutex_lock(&hashmap_lock);
-    hashmapRemove(dcache_hashmap, &dentry->key);
+    hashmapLock(hashmap);
+    hashmapRemove(hashmap, &dentry->key);
     stats_total_cache_entries--;
-    uv_mutex_unlock(&hashmap_lock);
+    hashmapUnlock(hashmap);
 
     sdsfree(dentry->key.name);
     memset(dentry, 0, sizeof(struct uc_dentry));
@@ -178,6 +175,7 @@ dcache_free(struct uc_dentry * dentry)
 void
 dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
 {
+    Hashmap * hashmap = dentry->dentry_tree->hashmap;
     dcache_item_t * entry = (dcache_item_t *)malloc(sizeof(dcache_item_t));
     if (entry == NULL) {
         slog(0, SLOG_ERROR, "allocation on new dlist_item");
@@ -194,22 +192,21 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
     }
 
     /* add it to the hashmap */
-    /* TODO hashmapPut returns the exisiting hash value if we have a 
+    /* TODO hashmapPut returns the exisiting hash value if we have a
      * matching entry */
-    hashmapPut(dcache_hashmap, &dentry->key, dentry, &dentry->key.p_hashval);
+    hashmapPut(hashmap, &dentry->key, dentry, &dentry->key.p_hashval);
 
-    uv_mutex_lock(&hashmap_lock);
+    // TODO add lock
     stats_total_cache_entries++;
-    uv_mutex_unlock(&hashmap_lock);
 }
 
 struct uc_dentry *
 hash_lookup(const struct uc_dentry * parent, const char * name)
 {
-    dcache_key_t v = {.parent = parent, .name = (const sds) name };
+    Hashmap * hashmap = parent->dentry_tree->hashmap;
+    dcache_key_t v = {.parent = parent, .name = (const sds)name };
 
-    struct uc_dentry * dentry
-        = (struct uc_dentry *)hashmapGet(dcache_hashmap, &v);
+    struct uc_dentry * dentry = (struct uc_dentry *)hashmapGet(hashmap, &v);
 
     stats_cache_lookups++;
     if (dentry && dentry->valid) {
@@ -230,14 +227,15 @@ hash_lookup(const struct uc_dentry * parent, const char * name)
  * @return NULL if the dentry is not found
  */
 static struct uc_dentry *
-traverse(struct uc_dentry * parent_dentry,
+traverse(struct uc_dentry * root_dentry,
+         struct uc_dentry * parent_dentry,
          const char * canonical_path,
          char * path_cstr,
          uc_dirnode_t ** p_dest_dn)
 {
     struct uc_dentry * dentry = parent_dentry;
     ucafs_entry_type atype;
-    char * metaname_str, *nch, *pch;
+    char *metaname_str, *nch, *pch;
     const link_info_t * link_info;
     const shadow_t * shadow_name;
     uc_dirnode_t *dn = NULL, *alias_dn = NULL;
@@ -297,7 +295,8 @@ traverse(struct uc_dentry * parent_dentry,
         if (atype == UC_LINK) {
             /* get the link and recursively traverse */
             char * link_cstr = strdup(link_info->target_link);
-            dentry = traverse(parent_dentry, canonical_path, link_cstr, &dn);
+            dentry = traverse(root_dentry, parent_dentry, canonical_path,
+                              link_cstr, &dn);
             free(link_cstr);
 
             if (dentry) {
@@ -306,7 +305,7 @@ traverse(struct uc_dentry * parent_dentry,
         }
 
         found_in_cache = false;
-next:
+    next:
         /* get the path to the dnode */
         if (found_in_cache == false) {
             alias_dn = dn;
@@ -316,7 +315,10 @@ next:
             }
 
             /* lets add the entry to the dirnode */
-            if ((dentry = dcache_new(nch, shadow_name, parent_dentry)) == NULL) {
+            dentry = dcache_new(nch, shadow_name, parent_dentry,
+                                parent_dentry->dentry_tree);
+            if (dentry == NULL) {
+                log_error("dcache_new returned NULL");
                 break;
             }
 
@@ -326,7 +328,7 @@ next:
         if (alias_dn) {
             alias_dn = NULL;
         }
-next1:
+    next1:
         parent_dentry = dentry;
         nch = strtok_r(NULL, "/", &pch);
     }
@@ -344,7 +346,8 @@ next1:
 }
 
 static struct uc_dentry *
-real_lookup(const char * canonical_path,
+real_lookup(struct uc_dentry * root_dentry,
+            const char * canonical_path,
             const char * rel_path,
             uc_dirnode_t ** dn)
 {
@@ -352,7 +355,8 @@ real_lookup(const char * canonical_path,
     struct uc_dentry * result_dentry;
     char * path_cstr = strdup(rel_path);
 
-    result_dentry = traverse(root_dentry, canonical_path, path_cstr, dn);
+    result_dentry
+        = traverse(root_dentry, root_dentry, canonical_path, path_cstr, dn);
 
     free(path_cstr);
     return result_dentry;
@@ -365,23 +369,22 @@ real_lookup(const char * canonical_path,
  * return the corresponding uc_dentry, else NULL if not found
  */
 uc_dirnode_t *
-dcache_lookup(const char * path, bool dirpath)
+dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath)
 {
-    struct uc_dentry * dentry = NULL;
+    struct uc_dentry * dentry = tree->root_dentry;
     uc_dirnode_t * dirnode = NULL;
     char * temp;
     sds temp_path, relpath;
 
-    if ((relpath = uc_derive_relpath(path, dirpath)) == NULL) {
+    if ((relpath = vfs_relpath(path, dirpath)) == NULL) {
         slog(0, SLOG_ERROR, "getting relpath `%s` FAILED", path);
         return NULL;
     }
 
     // just return the root dirnode
     if (strlen(relpath)) {
-        dentry = real_lookup(path, relpath, &dirnode);
+        dentry = real_lookup(dentry, path, relpath, &dirnode);
     } else {
-        dentry = root_dentry;
         dirnode = metadata_root_dirnode(path);
     }
 
@@ -397,7 +400,7 @@ done:
 }
 
 uc_filebox_t *
-dcache_get_filebox(const char * path, size_t hint)
+dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
 {
     const shadow_t * codename;
     char *fname = NULL, *temp = NULL, *temp2 = NULL;
@@ -405,7 +408,7 @@ dcache_get_filebox(const char * path, size_t hint)
     ucafs_entry_type atype;
     const link_info_t * link_info = NULL;
     uc_filebox_t * fb = NULL;
-    uc_dirnode_t * dirnode = dcache_lookup(path, false);
+    uc_dirnode_t * dirnode = dcache_lookup(tree, path, false);
 
     if (dirnode == NULL) {
         return NULL;
@@ -430,7 +433,7 @@ dcache_get_filebox(const char * path, size_t hint)
             if (link_info->target_link[0] == '/') {
                 // we have an absolute path
                 // send request here
-                fb = dcache_get_filebox(link_info->target_link, hint);
+                fb = dcache_get_filebox(tree, link_info->target_link, hint);
                 goto out;
             } else {
                 // have an relative path
@@ -439,7 +442,7 @@ dcache_get_filebox(const char * path, size_t hint)
                 path_link = sdscat(path_link, link_info->target_link);
                 temp2 = do_absolute_path(path_link);
 
-                fb = dcache_get_filebox(temp2, hint);
+                fb = dcache_get_filebox(tree, temp2, hint);
                 sdsfree(path_link);
                 free(temp2);
                 goto out;
@@ -477,32 +480,36 @@ dcache_put(uc_dirnode_t * dn)
 void
 dcache_rm(uc_dirnode_t * dn, const char * entry_name)
 {
-    struct uc_dentry * parent = (struct uc_dentry *)dirnode_get_dentry(dn);
-    struct uc_dentry * child;
+    struct uc_dentry *parent = (struct uc_dentry *)dirnode_get_dentry(dn),
+                     *child;
     dcache_item_t *prev = NULL, *curr, *next;
     dcache_key_t temp_key = {.parent = parent, .name = (const sds)entry_name };
-    int hash_val = hashmapHashKey(dcache_hashmap, &temp_key);
+    Hashmap * hashmap = parent->dentry_tree->hashmap;
+    int hash_val = hashmapHashKey(hashmap, &temp_key);
+
+    if (parent == NULL) {
+        return;
+    }
 
     // remove the entry from the parent
-    if (parent) {
-        SLIST_FOREACH_SAFE(curr, &parent->children, next_dptr, next) {
-            child = curr->dentry;
-            /* perform a hash comparison for a fast check */
-            if (hash_val == *child->key.p_hashval
-                && strcmp(entry_name, child->key.name) == 0) {
-                /* free the memory */
-                if (prev == NULL) {
-                    SLIST_REMOVE_HEAD(&parent->children, next_dptr);
-                } else {
-                    SLIST_REMOVE_AFTER(prev, next_dptr);
-                }
-
-                dcache_free(child);
-                free(curr);
-                break;
+    SLIST_FOREACH_SAFE(curr, &parent->children, next_dptr, next)
+    {
+        child = curr->dentry;
+        /* perform a hash comparison for a fast check */
+        if (hash_val == *child->key.p_hashval
+            && strcmp(entry_name, child->key.name) == 0) {
+            /* free the memory */
+            if (prev == NULL) {
+                SLIST_REMOVE_HEAD(&parent->children, next_dptr);
+            } else {
+                SLIST_REMOVE_AFTER(prev, next_dptr);
             }
-            prev = curr;
+
+            dcache_free(child);
+            free(curr);
+            break;
         }
+
+        prev = curr;
     }
 }
-

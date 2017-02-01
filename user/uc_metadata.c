@@ -5,6 +5,7 @@
  */
 #include "uc_metadata.h"
 #include "uc_utils.h"
+#include "uc_vfs.h"
 
 #include "third/hashmap.h"
 #include "third/queue.h"
