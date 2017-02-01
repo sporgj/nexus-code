@@ -33,7 +33,7 @@ _supernode_to_list(supernode_t * super)
     snode_user_t * curr_user;
     snode_user_entry_t * user_entry;
 
-    if (super->is_mounted || super->users_buffer == NULL) {
+    if (super->is_mounted || (super->users_buffer && super->user_count)) {
         log_warn("(!super->is_mounted || super->users_buffer == NULL)");
         return 0;
     }

@@ -51,6 +51,11 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     ucafs_entry_type atype;
     int chunk_count;
 
+    /* TODO move this to an init function */
+    if (xfer_context_array == NULL) {
+        xfer_context_array = seqptrmap_init();
+    }
+
     /* lets find the dirnode object first */
     filebox = vfs_get_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
     if (filebox == NULL) {
@@ -81,11 +86,6 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(rq->offset);
     xfer_ctx->fbox = filebox_fbox(filebox);
     xfer_ctx->filebox = filebox;
-
-    /* TODO move this to an init function */
-    if (xfer_context_array == NULL) {
-        xfer_context_array = seqptrmap_init();
-    }
 
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {

@@ -23,12 +23,28 @@ static SLIST_HEAD(_list, supernode_entry) _s = SLIST_HEAD_INITIALIZER(NULL),
 uc_filebox_t *
 vfs_get_filebox(const char * path, size_t hint)
 {
+    supernode_entry_t * curr;
+    SLIST_FOREACH(curr, snode_list, next_entry)
+    {
+        if (strstr(path, curr->path)) {
+            return dcache_get_filebox(curr->dentry_tree, path, hint);
+        }
+    }
+
     return NULL;
 }
 
 uc_dirnode_t *
 vfs_lookup(const char * path, bool dirpath)
 {
+    supernode_entry_t * curr;
+    SLIST_FOREACH(curr, snode_list, next_entry)
+    {
+        if (strstr(path, curr->path)) {
+            return dcache_lookup(curr->dentry_tree, path, dirpath);
+        }
+    }
+
     return NULL;
 }
 
@@ -107,11 +123,26 @@ vfs_append(sds root_path, const shadow_t * shdw_name)
     char * metaname = metaname_bin2str(shdw_name);
     root_path = sdscat(root_path, "/");
     root_path = sdscat(root_path, UCAFS_REPO_DIR);
+    root_path = sdscat(root_path, "/");
     root_path = sdscat(root_path, metaname);
 
     free(metaname);
 
     return root_path;
+}
+
+const shadow_t * vfs_root_dirnode(const char * path)
+{
+    sds root_path;
+    supernode_entry_t * curr;
+    SLIST_FOREACH(curr, snode_list, next_entry)
+    {
+        if (strstr(path, curr->path)) {
+            return &curr->super->root_dnode;
+        }
+    }
+
+    return NULL;
 }
 
 sds
@@ -156,29 +187,33 @@ vfs_relpath(const char * path, bool dirpath)
     /* if we are here, we have already shown that root_path is a substring
      * of path */
     len1 = strlen(root_path), len2 = strlen(path);
-
-    ptr2 = path + len1;
-    if (*ptr2 == '/') {
-        ptr2++;
-    }
-
     sdsfree(root_path);
 
+    /* now lets find the relative component */
+    ptr1 = path + len1;
+    if (*ptr1 == '/') {
+        ptr1++;
+    }
+
     /* check if the sgx */
-    if (memcmp(UCAFS_WATCH_DIR, ptr2, sizeof(UCAFS_WATCH_DIR) - 1)) {
+    if (memcmp(UCAFS_WATCH_DIR, ptr1, sizeof(UCAFS_WATCH_DIR) - 1)) {
         return NULL;
     }
 
-    ptr2 += sizeof(UCAFS_WATCH_DIR);
-    if (*ptr2 == '/') {
-        ptr2++;
+    ptr1 += sizeof(UCAFS_WATCH_DIR);
+    if (*ptr1 == '/') {
+        ptr1++;
     }
 
-    if ((ptr2 - path) > len2) {
-        return NULL;
+    ptr2 = path + len2;
+    if (!dirpath) {
+        while (*ptr2 != '/' && ptr2 != ptr1) {
+            ptr2--;
+        }
     }
 
-    return sdsnew(ptr2);
+    nchar = ptr2 - ptr1;
+    return nchar > 0 ? sdsnew(ptr2) : sdsnew("");
 }
 
 int

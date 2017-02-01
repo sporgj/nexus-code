@@ -78,10 +78,18 @@ setup_mod()
 
     /* send all the paths */
     for (size_t i = 0; i < global_supernode_count; i++) {
-        if ((ret = ioctl(fno, IOCTL_ADD_PATH, global_supernode_paths[i]))) {
-            uerror("ioctl ADD_PATH (%s) failed\n", global_supernode_paths[i]);
+        sds path = sdsnew(global_supernode_paths[i]);
+        path = sdscat(path, "/");
+        path = sdscat(path, UCAFS_WATCH_DIR);
+        
+        if ((ret = ioctl(fno, IOCTL_ADD_PATH, path))) {
+            sdsfree(path);
+            uerror("ioctl ADD_PATH (%s) failed\n", path);
             return -1;
         }
+
+        log_info("Added: %s", path);
+        sdsfree(path);
     }
 
     while (1) {

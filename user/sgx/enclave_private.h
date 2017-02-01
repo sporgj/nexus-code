@@ -54,7 +54,7 @@ crypto_metadata(crypto_context_t * p_ctx,
                 uc_crypto_op_t op);
 
 struct snode_entry {
-    SLIST_ENTRY(snode_entry);
+    SLIST_ENTRY(snode_entry) next_entry;
     supernode_t super;
 };
 

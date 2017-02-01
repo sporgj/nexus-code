@@ -69,6 +69,8 @@ vfs_relpath(const char * path, bool dirpath);
 sds
 vfs_root_path(const char * path);
 
+const shadow_t * vfs_root_dirnode(const char * path);
+
 sds
 vfs_root_dirnode_path(const char * path);
 

@@ -191,6 +191,7 @@ main(int argc, char * argv[])
     }
 
     supernode_path = ucafs_supernode_path(repo_path);
+    super = global_supernode_object;
 
     uinfo("Logged in :)");
     shell();

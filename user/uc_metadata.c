@@ -134,16 +134,7 @@ _evict_entry(metadata_entry_t * entry)
 uc_dirnode_t *
 metadata_root_dirnode(const char * path)
 {
-    sds fpath = vfs_root_dirnode_path(path);
-    if (fpath) {
-        log_error("vfs_root_dnode_path (%s) returned NULL", path);
-        return NULL;
-    }
-
-    uc_dirnode_t * dirnode = dirnode_from_file(fpath);
-    sdsfree(fpath);
-
-    return dirnode;
+    return metadata_get_dirnode(path, vfs_root_dirnode(path));
 }
 
 uc_dirnode_t *
