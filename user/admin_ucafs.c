@@ -35,7 +35,7 @@ extern "C" {
 
 const char * repo_fname = "profile/repo.datum";
 
-static char repo_path[1024];
+static char * repo_path = NULL;
 
 supernode_t * super = NULL;
 sds supernode_path = NULL;
@@ -90,10 +90,8 @@ initialize_repository(const char * user_root_path)
 
     // lets make sure we have the folder available
     if (stat(repo_path, &st)) {
-        if (mkdir(repo_path, S_IRWXG)) {
-            uerror("mkdir FAILED: %s", repo_path);
-            goto out;
-        }
+        log_error("Folder '%s' does not exist", repo_path);
+        goto out;
     }
 
     repo_path = sdscat(repo_path, "/");
@@ -152,6 +150,7 @@ int
 main(int argc, char * argv[])
 {
     int ret, err, nbytes, updated, opt_index = 0;
+    size_t n, sz;
     char c;
     FILE *fd1, *fd2;
     struct stat st;
@@ -166,7 +165,7 @@ main(int argc, char * argv[])
         return -1;
     }
 
-    nbytes = fread(repo_path, 1, sizeof(repo_path), fd1);
+    sz = getline(&repo_path, &n, fd1);
     repo_path[strlen(repo_path) - 1] = '\0';
 
     while (1) {
