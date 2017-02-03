@@ -122,6 +122,9 @@ setup_mod()
             case UCAFS_MSG_RENAME:
                 status = uc_rpc_rename(xdr_in, xdr_out);
                 break;
+            case UCAFS_MSG_STOREACL:
+                status = uc_rpc_storeacl(xdr_in, xdr_out);
+                break;
             case UCAFS_MSG_XFER_INIT:
                 status = uc_rpc_xfer_init(xdr_in, xdr_out);
                 break;

@@ -18,12 +18,14 @@ startsWith(const char * pre, const char * str)
 
 LIST_HEAD(_watchlist), *watchlist_ptr = &_watchlist;
 
-int add_path_to_watchlist(const char * path)
+int
+add_path_to_watchlist(const char * path)
 {
     watch_path_t * curr;
     int len;
 
-    list_for_each_entry(curr, watchlist_ptr, list) {
+    list_for_each_entry(curr, watchlist_ptr, list)
+    {
         if (strncmp(curr->afs_path, path, curr->path_len) == 0) {
             return 0;
         }
@@ -47,11 +49,13 @@ int add_path_to_watchlist(const char * path)
     return 0;
 }
 
-void clear_watchlist(void)
+void
+clear_watchlist(void)
 {
-    watch_path_t * curr_wp, *prev_wp;
+    watch_path_t *curr_wp, *prev_wp;
 
-    list_for_each_entry_safe(curr_wp, prev_wp, watchlist_ptr, list) {
+    list_for_each_entry_safe(curr_wp, prev_wp, watchlist_ptr, list)
+    {
         list_del(&curr_wp->list);
         kfree(curr_wp);
     }
@@ -128,7 +132,8 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
     print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf),
                    1); */
 
-    list_for_each_entry(curr_entry, watchlist_ptr, list) {
+    list_for_each_entry(curr_entry, watchlist_ptr, list)
+    {
         if (startsWith(curr_entry->afs_path, path)) {
             if (dest) {
                 len = strlen(path);
@@ -284,7 +289,7 @@ ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest)
     int ret = -1, code;
     char * from_path = NULL;
     caddr_t payload;
-    XDR xdrs, * xdr_reply;
+    XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
 
     *dest = NULL;
@@ -497,6 +502,53 @@ out:
     if (ret && *old_shadowname) {
         kfree(*old_shadowname);
         *old_shadowname = NULL;
+    }
+
+    return ret;
+}
+
+int
+ucafs_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data)
+{
+    int ret = -1, code, len;
+    char * path = NULL;
+    caddr_t payload;
+    XDR xdrs;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_vnode_path(avc, &path)) {
+        return ret;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        kfree(path);
+        return -1;
+    }
+
+    len = acl_data->AFSOpaque_len;
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) ||
+        !xdr_int(&xdrs, &len) ||
+        !xdr_opaque(&xdrs, (caddr_t)acl_data->AFSOpaque_val, len)) {
+        ERROR("xdr storeacl failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_STOREACL, &xdrs, &reply, &code) || code) {
+        ERROR("xdr setacl (%s) FAILED\n", path);
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (path) {
+        kfree(path);
+    }
+
+    if (reply) {
+        kfree(reply);
     }
 
     return ret;

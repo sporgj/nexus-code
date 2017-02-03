@@ -8,7 +8,6 @@
 
 #include "ucafs_header.h"
 
-
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
 
@@ -23,6 +22,9 @@
 #define CONFIG_SHA256_BUFLEN 32
 #define CONFIG_NONCE_SIZE 64
 #define CONFIG_MRENCLAVE 32
+
+// based on AFS
+#define CONFIG_MAX_NAME 100
 
 struct uc_dentry;
 struct filebox;
@@ -140,9 +142,30 @@ typedef struct {
     uc_filebox_t * filebox;
 } xfer_context_t;
 
+typedef enum {
+    ACCESS_READ = 0x01,
+    ACCESS_WRITE = 0x02,
+    ACCESS_INSERT = 0x04,
+    ACCESS_LOOKUP = 0x08,
+    ACCESS_DELETE = 0x10,
+    ACCESS_LOCK = 0x20,
+    ACCESS_ADMIN = 0x40
+} acl_rights_t;
+
+typedef struct {
+    acl_rights_t rights;
+    uint8_t len; // 8 bits will do the job
+    char name[0];
+} acl_data_t;
+
+typedef struct acl_entry {
+    SIMPLEQ_ENTRY(acl_entry) next_entry;
+    acl_data_t acl_data;
+} acl_entry_t;
+
 typedef struct {
     shadow_t uuid, parent, root;
-    uint32_t count, protolen;
+    uint32_t count, acllen, protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 

@@ -2,6 +2,7 @@
 #include "uc_dirops.h"
 #include "uc_fetchstore.h"
 #include "uc_types.h"
+#include "uc_utils.h"
 
 #include "cdefs.h"
 #include "third/log.h"
@@ -242,6 +243,43 @@ out:
 
     if (new_shadowname) {
         free(new_shadowname);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_storeacl(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, len;
+    char * path = NULL;
+    caddr_t acl_data = NULL;
+
+    if (!xdr_string(xdrs, &path, UCAFS_PATH_MAX) ||
+        !xdr_int(xdrs, &len)) {
+        uerror("xdr storeacl failed\n");
+        goto out;
+    }
+
+    if ((acl_data = (caddr_t)malloc(len)) == NULL) {
+        goto out;
+    }
+
+    if (!xdr_opaque(xdrs, acl_data, len)) {
+        uerror("xdr acl_data failed\n");
+        goto out;
+    }
+
+    hexdump(acl_data, MIN(len, len));
+
+    ret = 0;
+out:
+    if (path) {
+        free(path);
+    }
+
+    if (acl_data) {
+        free(acl_data);
     }
 
     return ret;

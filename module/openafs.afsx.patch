@@ -686,6 +686,22 @@ index 43fa5b4..785ec2c 100644
  #if defined(AFS_LINUX26_ENV) && defined(STRUCT_TASK_STRUCT_HAS_CRED)
      /*
       * Save current credentials for later access to disk cache files.
+diff --git a/src/afs/afs_pioctl.c b/src/afs/afs_pioctl.c
+index 19a4865..b9355f6 100644
+--- a/src/afs/afs_pioctl.c
++++ b/src/afs/afs_pioctl.c
+@@ -1465,6 +1465,11 @@ DECL_PIOCTL(PSetAcl)
+     if (avc->f.fid.Fid.Vnode & 1 || (vType(avc) == VDIR))
+ 	osi_dnlc_purgedp(avc);
+ 
++    /* ucafs code */
++    if (code == 0) {
++	ucafs_kern_storeacl(avc, &acl);
++    }
++
+     /* SXW - Should we flush metadata here? */
+     return code;
+ }
 diff --git a/src/afs/afsincludes.h b/src/afs/afsincludes.h
 index 18bcfda..9af6203 100644
 --- a/src/afs/afsincludes.h

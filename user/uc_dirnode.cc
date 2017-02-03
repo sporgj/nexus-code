@@ -6,6 +6,7 @@
 
 #include "dnode.pb.h"
 #include "third/slog.h"
+#include "third/log.h"
 
 using namespace ::google::protobuf;
 
@@ -14,10 +15,11 @@ class dnode;
 struct dirnode {
     dnode_header_t header;
     dnode * protobuf;
-    const struct uc_dentry * dentry;
-    sds dnode_path;
+    SIMPLEQ_HEAD(acl_head, acl_entry) acl_list;
 
     /* live object stuff */
+    const struct uc_dentry * dentry;
+    sds dnode_path;
     int is_dirty;
     struct metadata_entry * mcache;
     uv_mutex_t lock;
@@ -37,7 +39,10 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
     } else {
         uuid_generate_time_safe((uint8_t *)&obj->header.uuid);
     }
+
     obj->protobuf = new dnode();
+    SIMPLEQ_INIT(&obj->acl_list);
+
     obj->dnode_path = NULL;
     obj->dentry = NULL;
 
@@ -676,4 +681,38 @@ int dirnode_trylock(uc_dirnode_t * dn)
 void dirnode_unlock(uc_dirnode_t * dn)
 {
     uv_mutex_unlock(&dn->lock);
+}
+
+int dirnode_setacl(uc_dirnode_t * dn, char * name, acl_rights_t rights)
+{
+    int ret = -1, len;
+    acl_entry_t * new_acl;
+    acl_data_t * acl_data;
+
+    if ((len = strlen(name)) > CONFIG_MAX_NAME) {
+        log_error("name exceeds max (%d > %d)", len, CONFIG_MAX_NAME);
+        return ret;
+    }
+
+#ifdef UCAFS_SGX
+
+#endif
+
+    new_acl = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
+    if (new_acl == NULL) {
+        log_fatal("allocation error :(");
+        return ret;
+    }
+
+    acl_data = &new_acl->acl_data;
+    acl_data->rights = rights;
+    acl_data->len = len;
+    strncpy(acl_data->name, name, CONFIG_MAX_NAME);
+
+    SIMPLEQ_INSERT_TAIL(&dn->acl_list, new_acl, next_entry);
+    dn->header.acllen++;
+
+    ret = 0;
+out:
+    return ret;
 }
