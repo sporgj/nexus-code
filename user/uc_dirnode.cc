@@ -12,10 +12,12 @@ using namespace ::google::protobuf;
 
 class dnode;
 
+typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
+
 struct dirnode {
     dnode_header_t header;
     dnode * protobuf;
-    SIMPLEQ_HEAD(acl_head, acl_entry) acl_list;
+    acl_head_t acl_list;
 
     /* live object stuff */
     const struct uc_dentry * dentry;
@@ -683,34 +685,92 @@ void dirnode_unlock(uc_dirnode_t * dn)
     uv_mutex_unlock(&dn->lock);
 }
 
-int dirnode_setacl(uc_dirnode_t * dn, char * name, acl_rights_t rights)
-{
-    int ret = -1, len;
-    acl_entry_t * new_acl;
-    acl_data_t * acl_data;
+struct acl {
+    int dfs;
+    char cell[1025];
+    int nplus;
+    int nminus;
+};
 
-    if ((len = strlen(name)) > CONFIG_MAX_NAME) {
-        log_error("name exceeds max (%d > %d)", len, CONFIG_MAX_NAME);
-        return ret;
+static char * skip_line(char * astr)
+{
+    while (*astr != '\n') {
+        astr++;
     }
+
+    return ++astr;
+}
+
+/* this is copied from openafs/src/venus/fs.c */
+static int
+parseacl(const char * acl_str, acl_head_t * acl_list, size_t * p_buflen, int * p_count)
+{
+    struct acl a, * ta = &a;
+    char * astr = (char *)acl_str, tname[CONFIG_MAX_NAME];
+    acl_rights_t rights;
+    int i = 0, len, ret = -1, cnt = 0;
+    size buflen = 0;
+    acl_data_t * acl_data;
+    acl_entry_t * acl_entry;
+
+    ta->dfs = 0;
+    sscanf(astr, "%d dfs:%d %1024s", &ta->nplus, &ta->dfs, ta->cell);
+    astr = skip_line(astr);
+    sscanf(astr, "%d", &ta->nminus);
+    astr = skip_line(astr);
+
+    for (; i < ta->nplus; i++) {
+        sscanf(astr, "%99s %d", tname, (int *)&rights);
+        astr = skip_line(astr);
+
+        // if there is a colon, it's a group
+        if (strchr(tname, ':')) {
+            continue;
+        }
+
+        len = strlen(tname);
+        acl_entry = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
+        if (acl_entry == NULL) {
+            log_error("allocation error");
+            goto out;
+        }
+
+        acl_data = &acl_entry->acl_data;
+        acl_data->rights = rights;
+        acl_data->len = len;
+        memcpy(acl_data->name, tname, len);
+        acl_data->name[len] = '\0';
+
+        //SIMPLEQ_INSERT_TAIL(acl_list, acl_entry, next_entry);
+        buflen += sizeof(acl_data_t) + len + 1;
+        cnt++;
+    }
+
+    *p_count = cnt;
+    *p_buflen = buflen;
+
+    // TODO what about negative access controls ?
+
+    ret = 0;
+out:
+    // TODO cleanup list on failure
+    return ret;
+}
+
+int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
+{
+    int ret = -1, len, acl_count;
+    size_t buflen;
+    acl_head_t acl_list;
 
 #ifdef UCAFS_SGX
 
 #endif
 
-    new_acl = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
-    if (new_acl == NULL) {
-        log_fatal("allocation error :(");
-        return ret;
+    SIMPLEQ_INIT(&acl_list);
+    if (parseacl(aclstr, &acl_list, &buflen, &acl_count)) {
+        goto out;
     }
-
-    acl_data = &new_acl->acl_data;
-    acl_data->rights = rights;
-    acl_data->len = len;
-    strncpy(acl_data->name, name, CONFIG_MAX_NAME);
-
-    SIMPLEQ_INSERT_TAIL(&dn->acl_list, new_acl, next_entry);
-    dn->header.acllen++;
 
     ret = 0;
 out:

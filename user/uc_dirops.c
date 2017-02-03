@@ -4,14 +4,15 @@
 #include <unistd.h>
 
 #include "third/slog.h"
+#include "third/log.h"
 
-#include "uc_vfs.h"
 #include "uc_dirnode.h"
 #include "uc_dirops.h"
 #include "uc_encode.h"
 #include "uc_filebox.h"
 #include "uc_uspace.h"
 #include "uc_utils.h"
+#include "uc_vfs.h"
 
 int
 dirops_new1(const char * parent_dir,
@@ -729,6 +730,34 @@ out:
 
     if (link_info) {
         free(link_info);
+    }
+
+    return error;
+}
+
+int
+dirops_setacl(const char * path, const char * acl)
+{
+    int error = -1;
+    sds fname = NULL;
+    uc_dirnode_t * dirnode = NULL;
+
+    if ((dirnode = vfs_lookup(path, false)) == NULL) {
+        log_error("dirnode (%s) not found", path);
+        return error;
+    }
+
+    /* send it to the dirnode */
+    if (dirnode_setacl(dirnode, acl)) {
+        goto out;
+    }
+
+    error = 0;
+out:
+    dcache_put(dirnode);
+
+    if (fname) {
+        sdsfree(fname);
     }
 
     return error;

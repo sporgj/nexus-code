@@ -157,6 +157,8 @@ dirnode_rename(uc_dirnode_t * dn,
                link_info_t ** pp_link_info1,
                link_info_t ** pp_link_info2);
 
+int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr);
+
 // internal functions to manage the dirnode in-memory object
 void dirnode_mark_dirty(uc_dirnode_t * dn);
 void dirnode_mark_clean(uc_dirnode_t * dn);

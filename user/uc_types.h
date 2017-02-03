@@ -156,16 +156,16 @@ typedef struct {
     acl_rights_t rights;
     uint8_t len; // 8 bits will do the job
     char name[0];
-} acl_data_t;
+} __attribute__((packed)) acl_data_t;
 
 typedef struct acl_entry {
     SIMPLEQ_ENTRY(acl_entry) next_entry;
     acl_data_t acl_data;
-} acl_entry_t;
+} __attribute__((packed)) acl_entry_t;
 
 typedef struct {
     shadow_t uuid, parent, root;
-    uint32_t count, acllen, protolen;
+    uint32_t count, aclcount, acllen, protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 

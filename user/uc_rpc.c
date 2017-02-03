@@ -270,7 +270,10 @@ uc_rpc_storeacl(XDR * xdrs, XDR * xdr_out)
         goto out;
     }
 
-    hexdump(acl_data, MIN(len, len));
+    if (dirops_setacl(path, acl_data)) {
+        uerror("dirops_setacl failed\n");
+        goto out;
+    }
 
     ret = 0;
 out:
