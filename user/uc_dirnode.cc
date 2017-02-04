@@ -219,6 +219,56 @@ out:
     return obj;
 }
 
+static int serialize_acl(uc_dirnode_t * dn , uint8_t * buffer) {
+    int len;
+    acl_head_t * acl_list = &dn->acl_list;
+    acl_entry_t * acl_entry;
+    acl_data_t * acl_data;
+    uint8_t * buf = buffer;
+
+    // iterate through the list of all the entries
+    SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry) {
+        acl_data = &acl_entry->acl_data;
+        len = sizeof(acl_data_t) + acl_data->len;
+
+        memcpy(buf, acl_data, len);
+
+        buf += len;
+    }
+
+    return 0;
+}
+
+static int deserialize_acl(uc_dirnode_t * dn, char * buffer) {
+    int ret = -1, len, total_len, i;
+    acl_data_t *acl_data, *acl_buffer;
+    acl_entry_t * acl_entry;
+    acl_head_t * acl_list = &dn->acl_list;
+    acl_buffer = (acl_data_t *)buffer;
+
+    for (i = 0; i < dn->header.aclcount; i++) {
+        len = acl_buffer->len, total_len = sizeof(acl_data_t) + len;
+
+        acl_entry = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
+        if (acl_entry == NULL) {
+            log_error("allocation error");
+            goto out;
+        }
+
+        /* copy the data from the buffer */
+        acl_data = &acl_entry->acl_data;
+        memcpy(acl_data, acl_buffer, total_len);
+
+        SIMPLEQ_INSERT_TAIL(acl_list, acl_entry, next_entry);
+
+        acl_buffer = (acl_data_t *)(((caddr_t)acl_buffer) + total_len);
+    }
+
+    ret = 0;
+out:
+    return ret;
+}
+
 bool
 dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
@@ -226,9 +276,9 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     int error;
     uint8_t * buffer = NULL;
     FILE * fd;
-    size_t len;
+    size_t len, total_len;
 
-    len = dn->protobuf->ByteSize();
+    len = dn->protobuf->ByteSize(), total_len = len + dn->header.acllen;
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
@@ -237,7 +287,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         return false;
     }
 
-    if ((buffer = (uint8_t *)malloc(len)) == NULL) {
+    if ((buffer = (uint8_t *)malloc(total_len)) == NULL) {
         slog(0, SLOG_ERROR, "dirnode - alloc error for write buffer");
         goto out;
     }
@@ -247,8 +297,13 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 
-    /* GetCachedSize returns the size computed from ByteSize() */
     dn->header.protolen = len;
+
+    /* now serialize the the access control information */
+    if (serialize_acl(dn, buffer + len)) {
+        log_error("serializing dirnode ACL failed (%s)", fpath);
+        goto out;
+    }
 
 #ifdef UCAFS_SGX
     ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer, UC_ENCRYPT);
@@ -709,7 +764,7 @@ parseacl(const char * acl_str, acl_head_t * acl_list, size_t * p_buflen, int * p
     char * astr = (char *)acl_str, tname[CONFIG_MAX_NAME];
     acl_rights_t rights;
     int i = 0, len, ret = -1, cnt = 0;
-    size buflen = 0;
+    size_t buflen = 0;
     acl_data_t * acl_data;
     acl_entry_t * acl_entry;
 
@@ -741,7 +796,7 @@ parseacl(const char * acl_str, acl_head_t * acl_list, size_t * p_buflen, int * p
         memcpy(acl_data->name, tname, len);
         acl_data->name[len] = '\0';
 
-        //SIMPLEQ_INSERT_TAIL(acl_list, acl_entry, next_entry);
+        SIMPLEQ_INSERT_TAIL(acl_list, acl_entry, next_entry);
         buflen += sizeof(acl_data_t) + len + 1;
         cnt++;
     }
@@ -771,6 +826,12 @@ int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
     if (parseacl(aclstr, &acl_list, &buflen, &acl_count)) {
         goto out;
     }
+
+    // TODO clear acl_list here
+
+    memcpy(&dn->acl_list, &acl_list, sizeof(acl_head_t));
+    dn->header.acllen = buflen;
+    dn->header.aclcount = acl_count;
 
     ret = 0;
 out:
