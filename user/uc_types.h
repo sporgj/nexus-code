@@ -163,6 +163,8 @@ typedef struct acl_entry {
     acl_data_t acl_data;
 } __attribute__((packed)) acl_entry_t;
 
+typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
+
 typedef struct {
     shadow_t uuid, parent, root;
     uint32_t count, aclcount, acllen, protolen;

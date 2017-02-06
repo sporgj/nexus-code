@@ -24,6 +24,9 @@ int
 uc_rpc_storeacl(XDR * xdrs, XDR * xdr_out);
 
 int
+uc_rpc_checkacl(XDR * xdrs, XDR * xdr_out);
+
+int
 uc_rpc_xfer_init(XDR * xdrs, XDR * rsp);
 
 int

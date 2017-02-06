@@ -32,7 +32,10 @@ uc_dirnode_t *
 dirnode_new_alias(const shadow_t * id);
 
 uc_dirnode_t *
-dirnode_default_dnode();
+dirnode_default_dnode(); 
+
+void
+dirnode_set_root(uc_dirnode_t * dirnode, shadow_t * root_dnode);
 
 void
 dirnode_set_parent(uc_dirnode_t * dn, const uc_dirnode_t * parent);

@@ -12,8 +12,6 @@ using namespace ::google::protobuf;
 
 class dnode;
 
-typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
-
 struct dirnode {
     dnode_header_t header;
     dnode * protobuf;
@@ -26,6 +24,12 @@ struct dirnode {
     struct metadata_entry * mcache;
     uv_mutex_t lock;
 };
+
+static int serialize_acl(acl_head_t * acl_list, uint8_t * buffer);
+static int
+deserialize_acl(dnode_header_t * header,
+                acl_head_t * acl_list,
+                uint8_t * buffer);
 
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
@@ -66,6 +70,12 @@ uc_dirnode_t *
 dirnode_new()
 {
     return dirnode_new_alias(NULL);
+}
+
+void
+dirnode_set_root(uc_dirnode_t * dirnode, shadow_t * root_dnode)
+{
+    memcpy(&dirnode->header.root, root_dnode, sizeof(shadow_t));
 }
 
 void
@@ -139,9 +149,10 @@ dirnode_from_file(const sds filepath)
     uc_dirnode_t * obj = NULL;
     dnode * _dnode = NULL;
     dnode_header_t header;
+    acl_head_t acl_list;
     uint8_t * buffer = NULL;
     FILE * fd;
-    size_t nbytes;
+    size_t nbytes, body_len;
     int error = -1;
 
     fd = fopen(filepath, "rb");
@@ -159,36 +170,48 @@ dirnode_from_file(const sds filepath)
     }
 
     _dnode = new dnode();
-    if (header.protolen) {
-        if ((buffer = (uint8_t *)malloc(header.protolen)) == NULL) {
-            slog(0, SLOG_ERROR, "dirnode - allocation for dnode failed");
-            goto out;
-        }
+    SIMPLEQ_INIT(&acl_list);
 
-        if ((nbytes = fread(buffer, 1, header.protolen, fd))
-            != header.protolen) {
-            slog(0, SLOG_ERROR, "dirnode - reading protobuf failed:"
-                                "expected=%u, actual=%u",
-                 header.protolen, nbytes);
-            goto out;
-        }
-
-#ifdef UCAFS_SGX
-        /* decrypt the content with enclave */
-        ecall_crypto_dirnode(global_eid, &error, &header, buffer, UC_DECRYPT);
-        if (error) {
-            slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
-            goto out;
-        }
-#endif
-
-        if (!_dnode->ParseFromArray(buffer, header.protolen)) {
-            slog(0, SLOG_ERROR, "dirnode - parsing protobuf failed: %s",
-                 filepath);
-            goto out;
-        }
+    /* lets try to read the body of the dirnode */
+    body_len = header.protolen + header.acllen;
+    if (!body_len) {
+        goto done;
     }
 
+    if ((buffer = (uint8_t *)malloc(body_len)) == NULL) {
+        log_fatal("allocation for dnode failed");
+        goto out;
+    }
+
+    if ((nbytes = fread(buffer, 1, body_len, fd)) != body_len) {
+        log_error("reading metadata failed: expected=%zu, actual=%zu", body_len,
+                  nbytes);
+        goto out;
+    }
+
+#ifdef UCAFS_SGX
+    /* decrypt the content with enclave */
+    ecall_crypto_dirnode(global_eid, &error, &header, buffer, UC_DECRYPT);
+    if (error) {
+        slog(0, SLOG_ERROR, "dirnode - enclave encryption failed");
+        goto out;
+    }
+#endif
+
+    /* parse the protocol buffer */
+    if (header.protolen && !_dnode->ParseFromArray(buffer, header.protolen)) {
+        slog(0, SLOG_ERROR, "dirnode - parsing protobuf failed: %s", filepath);
+        goto out;
+    }
+
+    /* now read the acl information */
+    if (header.acllen
+        && deserialize_acl(&header, &acl_list, buffer + header.protolen)) {
+        log_error("deserializing dirnode (%s) failed", filepath);
+        goto out;
+    }
+
+done:
     obj = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
     if (obj == NULL) {
         slog(0, SLOG_ERROR, "dirnode - allocating dirnode object failed");
@@ -201,6 +224,7 @@ dirnode_from_file(const sds filepath)
     obj->is_dirty = 0;
     uv_mutex_init(&obj->lock);
     obj->mcache = NULL;
+    memcpy(&obj->acl_list, &acl_list, sizeof(acl_head_t));
 
     memcpy(&obj->header, &header, sizeof(dnode_header_t));
 
@@ -219,9 +243,8 @@ out:
     return obj;
 }
 
-static int serialize_acl(uc_dirnode_t * dn , uint8_t * buffer) {
+static int serialize_acl(acl_head_t * acl_list, uint8_t * buffer) {
     int len;
-    acl_head_t * acl_list = &dn->acl_list;
     acl_entry_t * acl_entry;
     acl_data_t * acl_data;
     uint8_t * buf = buffer;
@@ -239,19 +262,22 @@ static int serialize_acl(uc_dirnode_t * dn , uint8_t * buffer) {
     return 0;
 }
 
-static int deserialize_acl(uc_dirnode_t * dn, char * buffer) {
+static int
+deserialize_acl(dnode_header_t * header,
+                acl_head_t * acl_list,
+                uint8_t * buffer)
+{
     int ret = -1, len, total_len, i;
     acl_data_t *acl_data, *acl_buffer;
     acl_entry_t * acl_entry;
-    acl_head_t * acl_list = &dn->acl_list;
     acl_buffer = (acl_data_t *)buffer;
 
-    for (i = 0; i < dn->header.aclcount; i++) {
+    for (i = 0; i < header->aclcount; i++) {
         len = acl_buffer->len, total_len = sizeof(acl_data_t) + len;
 
         acl_entry = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
         if (acl_entry == NULL) {
-            log_error("allocation error");
+            log_fatal("allocation error");
             goto out;
         }
 
@@ -276,9 +302,10 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     int error;
     uint8_t * buffer = NULL;
     FILE * fd;
-    size_t len, total_len;
+    size_t proto_len, total_len;
 
-    len = dn->protobuf->ByteSize(), total_len = len + dn->header.acllen;
+    proto_len = dn->protobuf->ByteSize(),
+    total_len = proto_len + dn->header.acllen;
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
@@ -292,15 +319,15 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 
-    if (!dn->protobuf->SerializeToArray(buffer, len)) {
+    if (!dn->protobuf->SerializeToArray(buffer, proto_len)) {
         slog(0, SLOG_ERROR, "dirnode - serialization failed");
         goto out;
     }
 
-    dn->header.protolen = len;
+    dn->header.protolen = proto_len;
 
     /* now serialize the the access control information */
-    if (serialize_acl(dn, buffer + len)) {
+    if (serialize_acl(&dn->acl_list, buffer + proto_len)) {
         log_error("serializing dirnode ACL failed (%s)", fpath);
         goto out;
     }
@@ -314,7 +341,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 #endif
 
     fwrite(&dn->header, sizeof(dnode_header_t), 1, fd);
-    fwrite(buffer, dn->header.protolen, 1, fd);
+    fwrite(buffer, total_len, 1, fd);
 
     ret = true;
 out:
@@ -818,10 +845,6 @@ int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
     size_t buflen;
     acl_head_t acl_list;
 
-#ifdef UCAFS_SGX
-
-#endif
-
     SIMPLEQ_INIT(&acl_list);
     if (parseacl(aclstr, &acl_list, &buflen, &acl_count)) {
         goto out;
@@ -832,6 +855,11 @@ int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
     memcpy(&dn->acl_list, &acl_list, sizeof(acl_head_t));
     dn->header.acllen = buflen;
     dn->header.aclcount = acl_count;
+
+    if (dn->is_dirty == 0) {
+        metadata_dirty_dirnode(dn);
+        dn->is_dirty = 1;
+    }
 
     ret = 0;
 out:

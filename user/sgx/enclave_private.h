@@ -56,6 +56,8 @@ crypto_metadata(crypto_context_t * p_ctx,
 struct snode_entry {
     SLIST_ENTRY(snode_entry) next_entry;
     supernode_t super;
+    int len;
+    char username[0]; // the username he is known to be
 };
 
 extern SLIST_HEAD(snode_head, snode_entry) supernode_list_head;

@@ -326,7 +326,7 @@ out:
 static int
 usgx_supernode_mount(supernode_t * super)
 {
-    int err = -1, i = 0, ret, len;
+    int err = -1, i = 0, ret, len, uname_len;
     crypto_mac_t mac;
     crypto_context_t _ctx, *crypto_ctx = &_ctx;
     snode_user_t * curr_user;
@@ -339,36 +339,45 @@ usgx_supernode_mount(supernode_t * super)
     /* 1 - verify that the supernode matches */
     err = supernode_hash(super, crypto_ctx, &mac, SUPERNODE_DECRYPT);
     if (err) {
-        goto out;
+        return err;
     }
 
     /* 2 - check the hash value */
     curr_user = (snode_user_t *)super->users_buffer;
     while (i < super->user_count) {
+        uname_len = curr_user->len;
         len = sizeof(snode_user_t) + curr_user->len;
 
-        ret = memcmp(&curr_user->pubkey_hash, user_pubkey, sizeof(pubkey_t));
-        if (ret != 0) {
+        if (memcmp(&curr_user->pubkey_hash, user_pubkey, sizeof(pubkey_t))) {
             goto next_entry;
         }
 
         /* add the supernode to the map of supernodes */
-        snode_entry = (snode_entry_t *)malloc(sizeof(snode_entry_t));
+        snode_entry
+            = (snode_entry_t *)malloc(sizeof(snode_entry_t) + uname_len + 1);
         memcpy(&snode_entry->super, super, sizeof(supernode_t));
+
+        /* add the username */
+        snode_entry->len = uname_len;
+        memcpy(snode_entry->username, curr_user->username, uname_len);
+        snode_entry->username[uname_len] = '\0';
+
+        /* add the entry and exit */
         SLIST_INSERT_HEAD(snode_list, snode_entry, next_entry);
+        err = 0;
+        goto out;
 
     next_entry:
         curr_user = (snode_user_t *)(((uint8_t *)curr_user) + len);
         i++;
     }
 
-    err = 0;
 out:
     return err;
 }
 
 /**
- * Verfifies if you have access rights to the supernode been mounted
+ * Verifies if you have access rights to the supernode been mounted
  * @param super is the supernode object
  * @return 0 on success
  */
@@ -376,4 +385,64 @@ int
 ecall_supernode_mount(supernode_t * super)
 {
     return usgx_supernode_mount(super);
+}
+
+/**
+ * Checks if the following user has the right to access the file
+ *
+ * @param dnode_head
+ * @param rights
+ * @return 0 if one has access to the file
+ */
+static int
+ugx_check_rights(dnode_header_t * dnode_head,
+                 acl_head_t * acl_list,
+                 acl_rights_t rights)
+{
+    int ret = -1;
+    snode_entry_t * snode_entry;
+    acl_entry_t * acl_entry;
+    acl_data_t * acl_data;
+    supernode_t * super;
+
+    /* 1 - checks if the user owns the folder */
+    if (memcmp(&dnode_head->root, &user_supernode.root_dnode,
+               sizeof(shadow_t)) == 0) {
+        goto done;
+    }
+
+    /* 2 - Find the supernode this believes it */
+    SLIST_FOREACH(snode_entry, snode_list, next_entry) {
+        super = &snode_entry->super;
+        if (memcmp(&dnode_head->root, &super->root_dnode, sizeof(shadow_t))) {
+            continue;
+        }
+
+        // if we are here, the current user is the owner
+        goto check;
+    }
+
+    /* we could not find a user in the supernode list */
+    goto out;
+
+check:
+    /* go through the list of all the dnode acl entries */
+    SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry) {
+        acl_data = &acl_entry->acl_data;
+        if (strncmp(snode_entry->username, acl_data->name, snode_entry->len)) {
+            continue;
+        }
+
+        // check if the rights match
+        ret = (rights & acl_data->rights) == rights;
+        goto out;
+    }
+
+    goto out;
+
+done:
+    ret = 0;
+
+out:
+    return ret;
 }

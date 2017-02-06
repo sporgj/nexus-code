@@ -147,10 +147,10 @@ typedef enum {
     UCAFS_MSG_SYMLINK,
     UCAFS_MSG_RENAME,
     UCAFS_MSG_STOREACL,
-    UCAFS_MSG_ACCESS,
+    UCAFS_MSG_CHECKACL,
     UCAFS_MSG_XFER_INIT,
     UCAFS_MSG_XFER_RUN,
-    UCAFS_MSG_XFER_EXIT
+    UCAFS_MSG_XFER_EXIT,
 } uc_msg_type_t;
 
 typedef struct {

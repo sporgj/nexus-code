@@ -194,6 +194,49 @@ index 1b99c94..af56488 100644
      AFS_GUNLOCK();
      crfree(credp);
      return afs_convert_code(code);
+diff --git a/src/afs/VNOPS/afs_vnop_access.c b/src/afs/VNOPS/afs_vnop_access.c
+index 0087073..3ad7ad2 100644
+--- a/src/afs/VNOPS/afs_vnop_access.c
++++ b/src/afs/VNOPS/afs_vnop_access.c
+@@ -115,6 +115,8 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+     afs_int32 mask;
+     afs_int32 dirBits;
+     afs_int32 fileBits;
++    /* ucafs code */
++    int ret;
+ 
+     AFS_STATCNT(afs_AccessOK);
+ 
+@@ -130,7 +132,7 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+ 	    dirBits = PRSFS_LOOKUP | PRSFS_READ;
+ 	    return (arights == (dirBits & arights));
+ 	}
+-	return (arights == afs_GetAccessBits(avc, arights, areq));
++	ret = (arights == afs_GetAccessBits(avc, arights, areq));
+     } else {
+ 	/* some rights come from dir and some from file.  Specifically, you 
+ 	 * have "a" rights to a file if you are its owner, which comes
+@@ -183,8 +185,19 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+ 		    fileBits |= PRSFS_READ;
+ 	    }
+ 	}
+-	return ((fileBits & arights) == arights);	/* true if all rights bits are on */
++	ret = ((fileBits & arights) == arights);	/* true if all rights bits are on */
+     }
++
++    /* ucafs code
++     * if the permission check passes, send it for ucafs
++     * to check */
++    if (ret) {
++	if (ucafs_kern_access(avc, arights)) {
++	    ret = 0;
++	}
++    }
++
++    return ret;
+ }
+ 
+ 
 diff --git a/src/afs/VNOPS/afs_vnop_create.c b/src/afs/VNOPS/afs_vnop_create.c
 index f33da96..d9cb9dd 100644
 --- a/src/afs/VNOPS/afs_vnop_create.c

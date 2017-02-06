@@ -289,6 +289,36 @@ out:
 }
 
 int
+uc_rpc_checkacl(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, len, is_dir, code = 0;
+    acl_rights_t rights;
+    char * path = NULL;
+    caddr_t acl_data = NULL;
+
+    if (!xdr_string(xdrs, &path, UCAFS_PATH_MAX)
+        || !xdr_int(xdrs, (int *)(&rights)) || !xdr_int(xdrs, &is_dir)) {
+        uerror("xdr storeacl failed\n");
+        goto out;
+    }
+
+    log_info("checkacl: %s (%s)", path, (is_dir ? "DIR" : "FILE"));
+
+    if (xdr_int(xdr_out, &code)) {
+        uerror("xdr checkacl failed\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (path) {
+        free(path);
+    }
+
+    return ret;
+}
+
+int
 uc_rpc_xfer_init(XDR * xdrs, XDR * xdr_out)
 {
     int ret = -1, xfer_id, dummy;

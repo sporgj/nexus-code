@@ -528,8 +528,7 @@ ucafs_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data)
     len = acl_data->AFSOpaque_len;
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
-    if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) ||
-        !xdr_int(&xdrs, &len) ||
+    if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) || !xdr_int(&xdrs, &len) ||
         !xdr_opaque(&xdrs, (caddr_t)acl_data->AFSOpaque_val, len)) {
         ERROR("xdr storeacl failed\n");
         READPTR_UNLOCK();
@@ -549,6 +548,57 @@ out:
 
     if (reply) {
         kfree(reply);
+    }
+
+    return ret;
+}
+
+int
+ucafs_kern_access(struct vcache * avc, afs_int32 rights)
+{
+    // by default, access is always granted
+    int ret = 0, code, is_dir = (vType(avc) == VDIR);
+    char * path = NULL;
+    caddr_t payload;
+    XDR xdrs, *xdr_reply;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_vnode_path(avc, &path)) {
+        return 0;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        kfree(path);
+        return 0;
+    }
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) || !xdr_int(&xdrs, &rights) ||
+        !xdr_int(&xdrs, &is_dir)) {
+        READPTR_UNLOCK();
+        ERROR("xdr kern access failed\n");
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_CHECKACL, &xdrs, &reply, &code) || code) {
+        ERROR("xdr setacl (%s) FAILED\n", path);
+        goto out;
+    }
+
+    /* read in the response into ret */
+    xdr_reply = &reply->xdrs;
+    if (!xdr_int(xdr_reply, &ret)) {
+        ERROR("reading response fails");
+        goto out;
+    }
+
+out:
+    if (reply) {
+        kfree(reply);
+    }
+
+    if (path) {
+        kfree(path);
     }
 
     return ret;
