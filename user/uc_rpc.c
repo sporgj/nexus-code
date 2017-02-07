@@ -302,9 +302,9 @@ uc_rpc_checkacl(XDR * xdrs, XDR * xdr_out)
         goto out;
     }
 
-    log_info("checkacl: %s (%s)", path, (is_dir ? "DIR" : "FILE"));
+    dirops_checkacl(path, rights, is_dir);
 
-    if (xdr_int(xdr_out, &code)) {
+    if (!xdr_int(xdr_out, &code)) {
         uerror("xdr checkacl failed\n");
         goto out;
     }

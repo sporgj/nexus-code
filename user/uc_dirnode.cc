@@ -5,8 +5,8 @@
 #include "uc_uspace.h"
 
 #include "dnode.pb.h"
-#include "third/slog.h"
 #include "third/log.h"
+#include "third/slog.h"
 
 using namespace ::google::protobuf;
 
@@ -25,7 +25,8 @@ struct dirnode {
     uv_mutex_t lock;
 };
 
-static int serialize_acl(acl_head_t * acl_list, uint8_t * buffer);
+static int
+serialize_acl(acl_head_t * acl_list, uint8_t * buffer);
 static int
 deserialize_acl(dnode_header_t * header,
                 acl_head_t * acl_list,
@@ -108,12 +109,14 @@ dirnode_clear_dentry(uc_dirnode_t * dirnode)
     dirnode->dentry = NULL;
 }
 
-struct metadata_entry * dirnode_get_metadata(uc_dirnode_t * dn)
+struct metadata_entry *
+dirnode_get_metadata(uc_dirnode_t * dn)
 {
     return dn->mcache;
 }
 
-void dirnode_set_metadata(uc_dirnode_t * dn, struct metadata_entry * entry)
+void
+dirnode_set_metadata(uc_dirnode_t * dn, struct metadata_entry * entry)
 {
     // XXX get the lock here?
     dn->mcache = entry;
@@ -243,14 +246,17 @@ out:
     return obj;
 }
 
-static int serialize_acl(acl_head_t * acl_list, uint8_t * buffer) {
+static int
+serialize_acl(acl_head_t * acl_list, uint8_t * buffer)
+{
     int len;
     acl_entry_t * acl_entry;
     acl_data_t * acl_data;
     uint8_t * buf = buffer;
 
     // iterate through the list of all the entries
-    SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry) {
+    SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry)
+    {
         acl_data = &acl_entry->acl_data;
         len = sizeof(acl_data_t) + acl_data->len;
 
@@ -757,12 +763,14 @@ dirnode_rename(uc_dirnode_t * dn,
     return -1;
 }
 
-int dirnode_trylock(uc_dirnode_t * dn)
+int
+dirnode_trylock(uc_dirnode_t * dn)
 {
     return uv_mutex_trylock(&dn->lock);
 }
 
-void dirnode_unlock(uc_dirnode_t * dn)
+void
+dirnode_unlock(uc_dirnode_t * dn)
 {
     uv_mutex_unlock(&dn->lock);
 }
@@ -774,7 +782,8 @@ struct acl {
     int nminus;
 };
 
-static char * skip_line(char * astr)
+static char *
+skip_line(char * astr)
 {
     while (*astr != '\n') {
         astr++;
@@ -785,10 +794,13 @@ static char * skip_line(char * astr)
 
 /* this is copied from openafs/src/venus/fs.c */
 static int
-parseacl(const char * acl_str, acl_head_t * acl_list, size_t * p_buflen, int * p_count)
+parseacl(const char * acl_str,
+         acl_head_t * acl_list,
+         size_t * p_buflen,
+         int * p_count)
 {
-    struct acl a, * ta = &a;
-    char * astr = (char *)acl_str, tname[CONFIG_MAX_NAME];
+    struct acl a, *ta = &a;
+    char *astr = (char *)acl_str, tname[CONFIG_MAX_NAME];
     acl_rights_t rights;
     int i = 0, len, ret = -1, cnt = 0;
     size_t buflen = 0;
@@ -839,7 +851,8 @@ out:
     return ret;
 }
 
-int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
+int
+dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
 {
     int ret = -1, len, acl_count;
     size_t buflen;
@@ -860,6 +873,23 @@ int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
         metadata_dirty_dirnode(dn);
         dn->is_dirty = 1;
     }
+
+    ret = 0;
+out:
+    return ret;
+}
+
+int
+dirnode_checkacl(uc_dirnode_t * dn, acl_rights_t rights)
+{
+    int ret = -1;
+
+#ifdef UCAFS_SGX
+    ecall_check_rights(global_eid, &ret, &dn->header, &dn->acl_list, rights);
+    if (ret) {
+        goto out;
+    }
+#endif
 
     ret = 0;
 out:

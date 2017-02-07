@@ -395,7 +395,7 @@ ecall_supernode_mount(supernode_t * super)
  * @return 0 if one has access to the file
  */
 static int
-ugx_check_rights(dnode_header_t * dnode_head,
+usgx_check_rights(dnode_header_t * dnode_head,
                  acl_head_t * acl_list,
                  acl_rights_t rights)
 {
@@ -406,13 +406,14 @@ ugx_check_rights(dnode_header_t * dnode_head,
     supernode_t * super;
 
     /* 1 - checks if the user owns the folder */
-    if (memcmp(&dnode_head->root, &user_supernode.root_dnode,
-               sizeof(shadow_t)) == 0) {
+    if (memcmp(&dnode_head->root, &user_supernode.root_dnode, sizeof(shadow_t))
+        == 0) {
         goto done;
     }
 
     /* 2 - Find the supernode this believes it */
-    SLIST_FOREACH(snode_entry, snode_list, next_entry) {
+    SLIST_FOREACH(snode_entry, snode_list, next_entry)
+    {
         super = &snode_entry->super;
         if (memcmp(&dnode_head->root, &super->root_dnode, sizeof(shadow_t))) {
             continue;
@@ -427,7 +428,8 @@ ugx_check_rights(dnode_header_t * dnode_head,
 
 check:
     /* go through the list of all the dnode acl entries */
-    SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry) {
+    SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry)
+    {
         acl_data = &acl_entry->acl_data;
         if (strncmp(snode_entry->username, acl_data->name, snode_entry->len)) {
             continue;
@@ -445,4 +447,12 @@ done:
 
 out:
     return ret;
+}
+
+int
+ecall_check_rights(dnode_header_t * dnode_head,
+                   acl_head_t * acl_list,
+                   acl_rights_t rights)
+{
+    return usgx_check_rights(dnode_head, acl_list, rights);
 }

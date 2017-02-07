@@ -14,11 +14,6 @@
 #define UC_HARDLINK 0
 #define UC_SOFTLINK 1
 
-#define DEFAULT_REPO_DIRNAME ".afsx"
-#define DEFAULT_DNODE_FNAME "main.dnode"
-
-#define PUBKEY_HASH_LEN 256
-
 #define CONFIG_SHA256_BUFLEN 32
 #define CONFIG_NONCE_SIZE 64
 #define CONFIG_MRENCLAVE 32
@@ -49,6 +44,16 @@ typedef enum {
     CRYPTO_SEAL,
     CRYPTO_UNSEAL
 } seal_op_t;
+
+typedef enum {
+    ACL_READ = 0x1,
+    ACL_WRITE = 0x2,
+    ACL_INSERT = 0x4,
+    ACL_LOOKUP = 0x8,
+    ACL_DELETE = 0x10,
+    ACL_LOCK = 0x20,
+    ACL_ADMINISTER = 0x40
+} acl_type_t;
 
 typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */

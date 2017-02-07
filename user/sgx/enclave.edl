@@ -35,6 +35,11 @@ enclave {
                 seal_op_t op);
 
         public int ecall_supernode_mount([user_check] supernode_t * supernode);
+
+        public int ecall_check_rights([in] dnode_header_t * dnode_head,
+                                      [user_check] acl_head_t * acl_list,
+                                      acl_rights_t rights);
+
     };
 
 };

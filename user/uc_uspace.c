@@ -249,6 +249,12 @@ ucafs_launch(const char * mount_file_path)
     while (((sz = getline(&repo_path, &n, fd1)) != -1)
            && count < MAX_SUPERNODE_PATHS) {
         trim(repo_path);
+
+        if (count == 0 && ucafs_login(repo_path)) {
+            uerror("Could not log in :(");
+            return -1;
+        }
+
         if (vfs_mount(repo_path)) {
             return -1;
         }

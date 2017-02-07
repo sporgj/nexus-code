@@ -762,3 +762,49 @@ out:
 
     return error;
 }
+
+const char rights_str[] = "rwildka";
+
+static char * print_rights(acl_rights_t rights)
+{
+    char * arr = calloc(1, sizeof(rights_str));
+    size_t k = 1, l = 0;
+
+    for (int i = 0; i < sizeof(rights_str) - 1; i++) {
+        if (k & (size_t)rights) {
+            arr[l++] = rights_str[i];
+        }
+
+        k <<= 1;
+    }
+
+    return arr;
+}
+
+int
+dirops_checkacl(const char * path, acl_rights_t rights, int is_dir)
+{
+    int err = -1;
+    uc_dirnode_t * dirnode = NULL;
+    char * str = NULL;
+
+    /* if it's a directory, get the dirnode it points to. Otherwise, for a file
+     * get the parent dirnode */
+    if ((dirnode = vfs_lookup(path, (is_dir ? false : true))) == NULL) {
+        log_error("dirnode (%s) not found", path);
+        return err;
+    }
+
+    if (dirnode_checkacl(dirnode, rights)) {
+        log_error("[check_acl] %s ~> %s", path, (str = print_rights(rights)));
+        goto out;
+    }
+
+    err = 0;
+out:
+    dcache_put(dirnode);
+
+    free(str);
+
+    return err;
+}
