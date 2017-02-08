@@ -342,6 +342,15 @@ usgx_supernode_mount(supernode_t * super)
         return err;
     }
 
+    /* 2 - if the user owns this public key, lets skip all this */
+    err = memcmp(super->owner_pubkey, user_supernode.owner_pubkey,
+                 sizeof(pubkey_t));
+    if (err == 0) {
+        return 0;
+    }
+
+    err = E_ERROR_NOTFOUND;
+
     /* 2 - check the hash value */
     curr_user = (snode_user_t *)super->users_buffer;
     while (i < super->user_count) {

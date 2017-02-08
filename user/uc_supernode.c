@@ -81,7 +81,7 @@ _supernode_to_buffer(supernode_t * super)
 {
     int ret = -1, len;
     snode_user_entry_t * curr;
-    uint8_t * buffer = (uint8_t *)malloc(super->users_buflen), * buf = buffer;
+    uint8_t *buffer = (uint8_t *)malloc(super->users_buflen), *buf = buffer;
 
     if (buffer == NULL) {
         log_fatal("allocation failed");
@@ -168,11 +168,17 @@ int
 supernode_mount(supernode_t * super)
 {
     int ret = -1;
+    const char * e_str = "Enclave operation failed";
 
 #ifdef UCAFS_SGX
     ecall_supernode_mount(global_eid, &ret, super);
-    if (ret) {
-        log_error("enclave operation failed\n");
+    switch (ret) {
+    case E_SUCCESS:
+        break;
+    case E_ERROR_NOTFOUND:
+        e_str = ("Could not find pubkey in supernode");
+    default:
+        log_error("%s", e_str);
         goto out;
     }
 #endif

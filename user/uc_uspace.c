@@ -256,7 +256,16 @@ ucafs_launch(const char * mount_file_path)
         }
 
         if (vfs_mount(repo_path)) {
-            return -1;
+            /* this should almost never happen */
+            if (count == 0) {
+                log_error("Mounting login supernode failed :(, can't continue");
+                return -1;
+            }
+
+            /* for getline to work safely */
+            free(repo_path);
+            repo_path = NULL;
+            continue;
         }
 
         global_supernode_paths[count++] = repo_path;
