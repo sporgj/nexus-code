@@ -595,7 +595,7 @@ index e8b8f9d..48e78dc 100644
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..5a2c4b0 100644
+index f494677..4411e17 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
 @@ -590,6 +590,15 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
@@ -630,12 +630,12 @@ index f494677..5a2c4b0 100644
 +                                       base);
 +
 +                if (ret == 0) {
++		    code = (*ops->close)(rock, &OutStatus, &doProcessFS);
 +		    goto post_dcache_store;
 +		}
 +
 +		/* the next iteration should skip it altogether */
 +		is_ucafs_file = 0;
-+		kfree(path);
 +		goto restart;
 +post_ucafs:
 +
@@ -679,7 +679,7 @@ index f494677..5a2c4b0 100644
      AFS_STATCNT(CacheFetchProc);
  
      XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
-@@ -1156,9 +1201,28 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1156,9 +1201,29 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
       * avc->lock(W) if !setLocks || slowPass
       * adc->lock(W)
       */
@@ -694,6 +694,7 @@ index f494677..5a2c4b0 100644
 +    acall = ((struct rxfs_fetchVariables *)rock)->call;
 +    ret = ucafs_kern_fetch(tc, rxconn, fP, base, adc, avc, length, acall, path);
 +    if (ret == 0) {
++	code = 0;
 +	goto clean_up;
 +    }
 +
@@ -708,7 +709,7 @@ index f494677..5a2c4b0 100644
  #ifndef AFS_NOSTATS
      osi_GetuTime(&xferStartTime);
  #endif /* AFS_NOSTATS */
-@@ -1211,6 +1275,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1211,6 +1276,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
  	}
  	code = 0;
      } while (moredata);
