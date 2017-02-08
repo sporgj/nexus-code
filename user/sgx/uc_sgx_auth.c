@@ -301,22 +301,29 @@ ecall_supernode_crypto(supernode_t * super, seal_op_t op)
 {
     int ret = -1, err = -1;
     supernode_t _super;
-    crypto_context_t _ctx, *crypto_ctx = &_ctx;
+    crypto_context_t * crypto_ctx;
     snode_crypto_t super_op
         = (op == CRYPTO_SEAL ? SUPERNODE_ENCRYPT : SUPERNODE_DECRYPT);
 
-    memcpy(crypto_ctx, &super->crypto_ctx, sizeof(crypto_context_t));
-
     /* copy in the supernode data and unseal the crypto keys */
     memcpy(&_super, super, sizeof(supernode_t));
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+    crypto_ctx = &_super.crypto_ctx;
+
+    if (super_op == SUPERNODE_DECRYPT) {
+        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+    }
 
     if (supernode_hash(&_super, crypto_ctx, &crypto_ctx->mac, super_op)) {
         goto out;
     }
 
-    memcpy(super, &_super, sizeof(supernode_t));
+    /* only copy out data, if we are encrypting */
+    if (super_op == SUPERNODE_ENCRYPT) {
+        enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
+        memcpy(super, &_super, sizeof(supernode_t));
+    }
 
     ret = 0;
 out:
