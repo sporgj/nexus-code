@@ -17,6 +17,8 @@
 #include "cdefs.h"
 #include "uc_uspace.h"
 
+#include "third/log.h"
+
 char * global_supernode_paths[MAX_SUPERNODE_PATHS] = { NULL };
 size_t global_supernode_count = 0;
 
