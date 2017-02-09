@@ -42,8 +42,7 @@ OBJS = uc_dirnode.o\
        uc_fetchstore.o\
        uc_supernode.o\
        uc_utils.o\
-       uc_vfs.o\
-       dnode.pb.o
+       uc_vfs.o
 
 TESTS := test_dirops
 GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a libthird.a\

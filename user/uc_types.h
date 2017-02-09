@@ -171,9 +171,34 @@ typedef struct acl_entry {
 
 typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
 
+// mainly for debug purposes in gdb
+#define DNODE_PAYLOAD \
+    uint8_t type; \
+    uint16_t rec_len; \
+    uint16_t link_len; \
+    shadow_t shadow_name; \
+    uint16_t name_len; \
+    char real_name[0];
+
+typedef struct {
+   DNODE_PAYLOAD;
+} __attribute__((packed)) dnode_dir_payload_t;
+
+typedef struct dnode_dir_entry {
+    char * target;
+    DNODE_PAYLOAD;
+} __attribute__((packed)) dnode_dir_entry_t;
+
+typedef struct dnode_list_entry {
+   SIMPLEQ_ENTRY(dnode_list_entry) next_entry;
+   dnode_dir_entry_t dir_entry;
+} __attribute__((packed)) dnode_list_entry_t;
+
+typedef SIMPLEQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
+
 typedef struct {
     shadow_t uuid, parent, root;
-    uint32_t count, lockbox_count, lockbox_len, protolen;
+    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 

@@ -57,24 +57,9 @@ uc_rpc.o: uc_rpc.c
 	@$(CC) $(CFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-%.o: %.cc %.h
-	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
-	@echo "CXX <= $@"
-
 %.o: %.c
 	@$(CC) -std=gnu11 $(CFLAGS) $(App_C_Flags) $(INCFLAGS) -c $< -o $@
 	@echo "CC <= $@"
-
-uc_dirnode.o: uc_dirnode.cc uc_dirnode.h dnode.pb.cc
-	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
-	@echo "CXX <= $@"
-
-%.pb.o: %.pb.cc
-	@$(CXX) $(CPPFLAGS) $(INCFLAGS) -c $< -o $@
-	@echo "CXX <= $@"
-
-%.pb.cc: %.proto
-	protoc --cpp_out=./ $^
 
 .PHONY: clean
 clean:

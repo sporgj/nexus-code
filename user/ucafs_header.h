@@ -67,11 +67,11 @@ typedef enum {
 } uc_err_t;
 
 typedef enum {
-    UC_FILE = 0x00000001,
-    UC_DIR = 0x00000002,
-    UC_LINK = 0x00000004,
+    UC_FILE = 0x1,
+    UC_DIR = 0x2,
+    UC_LINK = 0x4,
     UC_ANY = UC_FILE | UC_DIR | UC_LINK,
-} ucafs_entry_type;
+} __attribute__((packed)) ucafs_entry_type;
 
 /* prefixes for the different file types */
 #define UC_METADATA_PREFIX "md"
