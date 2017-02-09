@@ -735,33 +735,12 @@ out:
     return error;
 }
 
-int
-dirops_setacl(const char * path, const char * acl)
-{
-    int error = -1;
-    sds fname = NULL;
-    uc_dirnode_t * dirnode = NULL;
-
-    if ((dirnode = vfs_lookup(path, false)) == NULL) {
-        log_error("dirnode (%s) not found", path);
-        return error;
-    }
-
-    /* send it to the dirnode */
-    if (dirnode_setacl(dirnode, acl)) {
-        goto out;
-    }
-
-    error = 0;
-out:
-    dcache_put(dirnode);
-
-    if (fname) {
-        sdsfree(fname);
-    }
-
-    return error;
-}
+struct acl {
+    int dfs;
+    char cell[1025];
+    int nplus;
+    int nminus;
+};
 
 const char rights_str[] = "rwildka";
 
@@ -779,6 +758,75 @@ static char * print_rights(acl_rights_t rights)
     }
 
     return arr;
+}
+
+static char *
+skip_line(char * astr)
+{
+    while (*astr != '\n') {
+        astr++;
+    }
+
+    return ++astr;
+}
+
+/**
+ * Sets the acl in the dirnode structure
+ */
+int
+dirops_setacl(const char * path, const char * afs_acl_str)
+{
+    int error = -1;
+    uc_dirnode_t * dirnode = NULL;
+    struct acl a, *ta = &a;
+    char *astr = (char *)afs_acl_str, tname[CONFIG_MAX_NAME],
+         *acl_print_str = NULL;
+    acl_rights_t rights;
+
+    if ((dirnode = vfs_lookup(path, false)) == NULL) {
+        log_error("dirnode (%s) not found", path);
+        return error;
+    }
+
+    ta->dfs = 0;
+    sscanf(astr, "%d dfs:%d %1024s", &ta->nplus, &ta->dfs, ta->cell);
+    astr = skip_line(astr);
+    sscanf(astr, "%d", &ta->nminus);
+    astr = skip_line(astr);
+
+    /* clear the lockbox and start adding entries */
+    dirnode_lockbox_clear(dirnode);
+
+    for (int i = 0; i < ta->nplus; i++) {
+        sscanf(astr, "%99s %d", tname, (int *)&rights);
+        astr = skip_line(astr);
+
+        // if there is a colon, it's a group
+        if (strchr(tname, ':')) {
+            continue;
+        }
+
+        if (dirnode_lockbox_add(dirnode, tname, rights)) {
+            log_error("ACL (%s, %s) to dirnode (%s)", tname,
+                      (acl_print_str = print_rights(rights)), path);
+            goto out;
+        }
+    }
+
+    if (!dirnode_flush(dirnode)) {
+        log_error("flushing dirnode (%s) failed", path);
+        goto out;
+    }
+
+    error = 0;
+out:
+    dcache_put(dirnode);
+
+    if (acl_print_str) {
+        free(acl_print_str);
+    }
+
+    return error;
 }
 
 int

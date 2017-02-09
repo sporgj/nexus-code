@@ -453,6 +453,9 @@ check:
 
         // check if the rights match
         ret = (rights & acl_data->rights) == rights;
+        if (ret) {
+            ret = 0;
+        }
         goto out;
     }
 

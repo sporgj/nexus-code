@@ -176,7 +176,7 @@ dirnode_from_file(const sds filepath)
     SIMPLEQ_INIT(&acl_list);
 
     /* lets try to read the body of the dirnode */
-    body_len = header.protolen + header.acllen;
+    body_len = header.protolen + header.lockbox_len;
     if (!body_len) {
         goto done;
     }
@@ -208,7 +208,7 @@ dirnode_from_file(const sds filepath)
     }
 
     /* now read the acl information */
-    if (header.acllen
+    if (header.lockbox_len
         && deserialize_acl(&header, &acl_list, buffer + header.protolen)) {
         log_error("deserializing dirnode (%s) failed", filepath);
         goto out;
@@ -278,7 +278,7 @@ deserialize_acl(dnode_header_t * header,
     acl_entry_t * acl_entry;
     acl_buffer = (acl_data_t *)buffer;
 
-    for (i = 0; i < header->aclcount; i++) {
+    for (i = 0; i < header->lockbox_count; i++) {
         len = acl_buffer->len, total_len = sizeof(acl_data_t) + len;
 
         acl_entry = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
@@ -311,7 +311,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     size_t proto_len, total_len;
 
     proto_len = dn->protobuf->ByteSize(),
-    total_len = proto_len + dn->header.acllen;
+    total_len = proto_len + dn->header.lockbox_len;
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
@@ -365,6 +365,13 @@ bool
 dirnode_flush(uc_dirnode_t * dn)
 {
     assert(dn != NULL);
+
+    // TODO probably add lock here
+    if (dn->is_dirty == 0) {
+        metadata_dirty_dirnode(dn);
+        dn->is_dirty = 1;
+    }
+
     return true;
 }
 
@@ -775,108 +782,44 @@ dirnode_unlock(uc_dirnode_t * dn)
     uv_mutex_unlock(&dn->lock);
 }
 
-struct acl {
-    int dfs;
-    char cell[1025];
-    int nplus;
-    int nminus;
-};
-
-static char *
-skip_line(char * astr)
+void
+dirnode_lockbox_clear(uc_dirnode_t * dn)
 {
-    while (*astr != '\n') {
-        astr++;
-    }
-
-    return ++astr;
-}
-
-/* this is copied from openafs/src/venus/fs.c */
-static int
-parseacl(const char * acl_str,
-         acl_head_t * acl_list,
-         size_t * p_buflen,
-         int * p_count)
-{
-    struct acl a, *ta = &a;
-    char *astr = (char *)acl_str, tname[CONFIG_MAX_NAME];
-    acl_rights_t rights;
-    int i = 0, len, ret = -1, cnt = 0;
-    size_t buflen = 0;
-    acl_data_t * acl_data;
     acl_entry_t * acl_entry;
+    acl_head_t * acl_list = &dn->acl_list;
 
-    ta->dfs = 0;
-    sscanf(astr, "%d dfs:%d %1024s", &ta->nplus, &ta->dfs, ta->cell);
-    astr = skip_line(astr);
-    sscanf(astr, "%d", &ta->nminus);
-    astr = skip_line(astr);
-
-    for (; i < ta->nplus; i++) {
-        sscanf(astr, "%99s %d", tname, (int *)&rights);
-        astr = skip_line(astr);
-
-        // if there is a colon, it's a group
-        if (strchr(tname, ':')) {
-            continue;
-        }
-
-        len = strlen(tname);
-        acl_entry = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
-        if (acl_entry == NULL) {
-            log_error("allocation error");
-            goto out;
-        }
-
-        acl_data = &acl_entry->acl_data;
-        acl_data->rights = rights;
-        acl_data->len = len;
-        memcpy(acl_data->name, tname, len);
-        acl_data->name[len] = '\0';
-
-        SIMPLEQ_INSERT_TAIL(acl_list, acl_entry, next_entry);
-        buflen += sizeof(acl_data_t) + len + 1;
-        cnt++;
+    while (!SIMPLEQ_EMPTY(acl_list)) {
+        acl_entry = SIMPLEQ_FIRST(acl_list);
+        SIMPLEQ_REMOVE_HEAD(acl_list, next_entry);
+        free(acl_entry);
     }
 
-    *p_count = cnt;
-    *p_buflen = buflen;
-
-    // TODO what about negative access controls ?
-
-    ret = 0;
-out:
-    // TODO cleanup list on failure
-    return ret;
+    SIMPLEQ_INIT(acl_list);
+    dn->header.lockbox_len = 0;
+    dn->header.lockbox_count = 0;
 }
 
 int
-dirnode_setacl(uc_dirnode_t * dn, const char * aclstr)
+dirnode_lockbox_add(uc_dirnode_t * dn, const char * name, acl_rights_t rights)
 {
-    int ret = -1, len, acl_count;
-    size_t buflen;
-    acl_head_t acl_list;
-
-    SIMPLEQ_INIT(&acl_list);
-    if (parseacl(aclstr, &acl_list, &buflen, &acl_count)) {
-        goto out;
+    int len = strlen(name), total = sizeof(acl_entry_t) + len + 1;
+    acl_data_t * acl_data;
+    acl_entry_t * acl_entry = (acl_entry_t *)malloc(total);
+    if (acl_entry == NULL) {
+        return -1;
     }
 
-    // TODO clear acl_list here
+    acl_data = &acl_entry->acl_data;
+    acl_data->rights = rights;
+    acl_data->len = len;
+    memcpy(acl_data->name, name, len);
+    acl_data->name[len] = '\0';
 
-    memcpy(&dn->acl_list, &acl_list, sizeof(acl_head_t));
-    dn->header.acllen = buflen;
-    dn->header.aclcount = acl_count;
+    SIMPLEQ_INSERT_TAIL(&dn->acl_list, acl_entry, next_entry);
+    dn->header.lockbox_len += sizeof(acl_data_t) + len + 1;
+    dn->header.lockbox_count++;
 
-    if (dn->is_dirty == 0) {
-        metadata_dirty_dirnode(dn);
-        dn->is_dirty = 1;
-    }
-
-    ret = 0;
-out:
-    return ret;
+    return 0;
 }
 
 int

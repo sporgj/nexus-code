@@ -173,7 +173,7 @@ typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
 
 typedef struct {
     shadow_t uuid, parent, root;
-    uint32_t count, aclcount, acllen, protolen;
+    uint32_t count, lockbox_count, lockbox_len, protolen;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 

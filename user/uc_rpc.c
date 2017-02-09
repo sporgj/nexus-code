@@ -275,6 +275,8 @@ uc_rpc_storeacl(XDR * xdrs, XDR * xdr_out)
         goto out;
     }
 
+    log_info("[storeacl] %s", path);
+
     ret = 0;
 out:
     if (path) {

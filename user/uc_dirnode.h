@@ -160,10 +160,14 @@ dirnode_rename(uc_dirnode_t * dn,
                link_info_t ** pp_link_info1,
                link_info_t ** pp_link_info2);
 
-int dirnode_setacl(uc_dirnode_t * dn, const char * aclstr);
-
 int
 dirnode_checkacl(uc_dirnode_t * dn, acl_rights_t rights);
+
+void
+dirnode_lockbox_clear(uc_dirnode_t * dn);
+
+int
+dirnode_lockbox_add(uc_dirnode_t * dn, const char * name, acl_rights_t rights);
 
 // internal functions to manage the dirnode in-memory object
 void dirnode_mark_dirty(uc_dirnode_t * dn);
