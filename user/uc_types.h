@@ -190,11 +190,11 @@ typedef struct dnode_dir_entry {
 } __attribute__((packed)) dnode_dir_entry_t;
 
 typedef struct dnode_list_entry {
-   SIMPLEQ_ENTRY(dnode_list_entry) next_entry;
+   TAILQ_ENTRY(dnode_list_entry) next_entry;
    dnode_dir_entry_t dir_entry;
 } __attribute__((packed)) dnode_list_entry_t;
 
-typedef SIMPLEQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
+typedef TAILQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
 
 typedef struct {
     shadow_t uuid, parent, root;

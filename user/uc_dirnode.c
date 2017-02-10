@@ -45,7 +45,7 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
         uuid_generate_time_safe((uint8_t *)&dn->header.uuid);
     }
 
-    SIMPLEQ_INIT(&dn->dirbox);
+    TAILQ_INIT(&dn->dirbox);
     SIMPLEQ_INIT(&dn->lockbox);
 
     dn->dnode_path = NULL;
@@ -78,10 +78,10 @@ dirnode_free(uc_dirnode_t * dirnode)
     dnode_list_entry_t * list_entry;
 
     /* clear the entries in the entries */
-    while (!SIMPLEQ_EMPTY(list_head)) {
-        list_entry = SIMPLEQ_FIRST(list_head);
-        SIMPLEQ_REMOVE_HEAD(list_head, next_entry);
-        
+    while (!TAILQ_EMPTY(list_head)) {
+        list_entry = TAILQ_FIRST(list_head);
+        TAILQ_REMOVE(list_head, list_entry, next_entry);
+
         // TODO transfer this to a separate function
         if (list_entry->dir_entry.target) {
             free(list_entry->dir_entry.target);
@@ -96,7 +96,6 @@ dirnode_free(uc_dirnode_t * dirnode)
 
     free(dirnode);
 }
-
 
 uc_dirnode_t *
 dirnode_from_file(const sds filepath)
@@ -124,7 +123,7 @@ dirnode_from_file(const sds filepath)
     }
 
     header = &dn->header;
-    SIMPLEQ_INIT((dirbox = &dn->dirbox));
+    TAILQ_INIT((dirbox = &dn->dirbox));
     SIMPLEQ_INIT((lockbox = &dn->lockbox));
 
     /* read the header from the file */
@@ -174,7 +173,9 @@ dirnode_from_file(const sds filepath)
     }
 
 done:
+    dn->dnode_path = sdsdup(filepath);
     error = 0;
+
 out:
     if (error) {
         dirnode_free(dn);
@@ -331,7 +332,74 @@ dirnode_add_alias(uc_dirnode_t * dn,
                   const shadow_t * p_encoded_name,
                   const link_info_t * link_info)
 {
-    return NULL;
+    int ret = -1, len, tlen, rec_len;
+    shadow_t * shdw_name = NULL;
+    dnode_list_entry_t * list_entry = NULL;
+    dnode_dir_entry_t * de;
+
+    if (type == UC_ANY) {
+        return NULL;
+    }
+
+    len = strlen(name) + 1, rec_len = sizeof(dnode_dir_payload_t) + len,
+    tlen = sizeof(dnode_list_entry_t) + len;
+
+    list_entry = (dnode_list_entry_t *)calloc(1, tlen);
+    if (list_entry == NULL) {
+        log_fatal("allocation error");
+        return NULL;
+    }
+
+    de = &list_entry->dir_entry;
+    de->type = (uint8_t)type;
+    if (p_encoded_name) {
+        memcpy(&de->shadow_name, p_encoded_name, sizeof(shadow_t));
+    } else {
+        uuid_generate_time_safe(de->shadow_name.bin);
+    }
+
+    de->name_len = len;
+    memcpy(de->real_name, name, len - 1);
+
+    /* set the link data */
+    if (link_info) {
+        len = link_info->total_len
+            - (sizeof(link_info->total_len) + sizeof(link_info->type));
+
+        if ((de->target = malloc(len)) == NULL) {
+            log_fatal("allocation error");
+            goto out;
+        }
+
+        memcpy(de->target, link_info->target_link, len);
+
+        de->link_len = len;
+        rec_len += de->link_len;
+    }
+
+    de->rec_len = rec_len;
+    dn->header.dirbox_len += rec_len;
+
+    TAILQ_INSERT_TAIL(&dn->dirbox, list_entry, next_entry);
+
+    if ((shdw_name = (shadow_t *)malloc(sizeof(shadow_t))) == NULL) {
+        log_fatal("allocation error");
+        return NULL;
+    }
+
+    memcpy(shdw_name, &de->shadow_name, sizeof(shadow_t));
+
+    ret = 0;
+out:
+    // TODO implement free list_entry
+    if (ret) {
+        if (shdw_name) {
+            free(shdw_name);
+            shdw_name = NULL;
+        }
+    }
+
+    return shdw_name;
 }
 
 shadow_t *
@@ -348,7 +416,42 @@ dirnode_add_link(uc_dirnode_t * dn,
     return dirnode_add_alias(dn, link_name, UC_LINK, NULL, link_info);
 }
 
-// TODO
+static inline dnode_list_entry_t *
+iterate_by_realname(uc_dirnode_t * dn,
+                    const char * realname,
+                    ucafs_entry_type * p_type,
+                    link_info_t ** pp_link_info)
+{
+    dnode_list_entry_t * list_entry;
+    dnode_dir_entry_t * de;
+    link_info_t * link_info;
+
+    int len = strlen(realname) + 1, len1;
+
+    TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry) {
+        de = &list_entry->dir_entry;
+
+        if (len == de->name_len && memcmp(realname, de->real_name, len) == 0) {
+            if (pp_link_info && de->link_len) {
+                len1 = de->link_len + sizeof(link_info_t);
+                link_info = (link_info_t *)malloc(len1);
+                if (link_info == NULL) {
+                    log_fatal("allocation error");
+                    return NULL;
+                }
+
+                memcpy(link_info->target_link, de->target, de->link_len);
+                *pp_link_info = link_info;
+            }
+
+            *p_type = de->type;
+            return list_entry;
+        }
+    }
+ 
+    return NULL;
+}
+
 shadow_t *
 dirnode_rm(uc_dirnode_t * dn,
            const char * realname,
@@ -356,20 +459,41 @@ dirnode_rm(uc_dirnode_t * dn,
            ucafs_entry_type * p_type,
            link_info_t ** pp_link_info)
 {
+    shadow_t * result = NULL;
+    dnode_list_entry_t * list_entry;
+    dnode_dir_entry_t * de;
+    int len1;
+
+    list_entry = iterate_by_realname(dn, realname, p_type, pp_link_info);
+    if (list_entry == NULL) {
+        return NULL;
+    }
+
+    de = &list_entry->dir_entry;
+
+    if ((result = (shadow_t *)malloc(sizeof(shadow_t))) == NULL) {
+        log_fatal("allocation error");
+        return NULL;
+    }
+
+    memcpy(result, &de->shadow_name, sizeof(shadow_t));
+
+    /* TODO: delete from the dentry and metadata */
+    dn->header.dirbox_count--;
+    dn->header.dirbox_len -= de->rec_len;
+
+    TAILQ_REMOVE(&dn->dirbox, list_entry, next_entry);
+    free(list_entry);
+    
+    return result;
+out:
+    if (result) {
+        free(result);
+    }
+
     return NULL;
 }
 
-// TODO
-const char *
-dirnode_enc2raw(uc_dirnode_t * dn,
-                const shadow_t * encoded_name,
-                ucafs_entry_type type,
-                ucafs_entry_type * p_type)
-{
-    return NULL;
-}
-
-// TODO
 static const shadow_t *
 __dirnode_raw2enc(uc_dirnode_t * dn,
                   const char * realname,
@@ -377,7 +501,10 @@ __dirnode_raw2enc(uc_dirnode_t * dn,
                   ucafs_entry_type * p_type,
                   const link_info_t ** pp_link_info)
 {
-    return NULL;
+    dnode_list_entry_t * list_entry = iterate_by_realname(
+        dn, realname, p_type, (link_info_t **)pp_link_info);
+
+    return list_entry ? &list_entry->dir_entry.shadow_name : NULL;
 }
 
 const shadow_t *
@@ -397,6 +524,30 @@ dirnode_traverse(uc_dirnode_t * dn,
                  const link_info_t ** pp_link_info)
 {
     return __dirnode_raw2enc(dn, realname, type, p_type, pp_link_info);
+}
+
+const char *
+dirnode_enc2raw(uc_dirnode_t * dn,
+                const shadow_t * encoded_name,
+                ucafs_entry_type type,
+                ucafs_entry_type * p_type)
+{
+    int ret;
+    dnode_list_entry_t * list_entry;
+    dnode_dir_entry_t * de;
+
+
+    TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry) {
+        de = &list_entry->dir_entry;
+
+        ret = memcmp(&de->shadow_name, encoded_name, sizeof(shadow_t));
+        if (ret == 0) {
+            *p_type = de->type;
+            return de->real_name;
+        }
+    }
+
+    return NULL;
 }
 
 // TODO fix locking
@@ -448,7 +599,8 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
     dnode_list_entry_t * list_entry;
     dnode_dir_entry_t * de;
 
-    SIMPLEQ_FOREACH(list_entry, list_head, next_entry) {
+    TAILQ_FOREACH(list_entry, list_head, next_entry)
+    {
         de = &list_entry->dir_entry;
 
         /* lets write the static data */
@@ -469,7 +621,8 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 static int
 parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 {
-    int len, ret = -1;;
+    int len, ret = -1;
+    ;
     size_t sz;
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
@@ -502,6 +655,8 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
             de->target = NULL;
         }
 
+        TAILQ_INSERT_TAIL(list_head, list_entry, next_entry);
+
         // move to the next entry
         payload = (dnode_dir_payload_t *)buffer;
     }
@@ -511,7 +666,6 @@ out:
     // TODO on error, clear the created entries
     return ret;
 }
-
 
 static int
 serialize_lockbox(uc_dirnode_t * dn, uint8_t * buffer)
