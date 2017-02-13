@@ -42,9 +42,9 @@ const shadow_t *
 dirnode_get_parent(uc_dirnode_t * dn);
 
 void
-dirnode_set_dentry(uc_dirnode_t * dirnode, const struct uc_dentry * dentry);
+dirnode_set_dentry(uc_dirnode_t * dirnode, struct uc_dentry * dentry);
 
-const struct uc_dentry *
+struct uc_dentry *
 dirnode_get_dentry(uc_dirnode_t * dirnode);
 
 void
@@ -173,6 +173,10 @@ void dirnode_mark_clean(uc_dirnode_t * dn);
 bool dirnode_is_dirty(uc_dirnode_t * dn);
 int dirnode_trylock(uc_dirnode_t * dn);
 void dirnode_unlock(uc_dirnode_t * dn);
+
+/** returns the root's shadow name */
+const shadow_t *
+dirnode_get_root(uc_dirnode_t * dirnode);
 
 #ifdef __cplusplus
 }

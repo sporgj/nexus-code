@@ -58,7 +58,7 @@ dirops_new1(const char * parent_dir,
             goto out;
         }
     } else if (type == UC_FILE) {
-        if ((filebox = filebox_new()) == NULL) {
+        if ((filebox = filebox_new2(fname_code, dirnode)) == NULL) {
             slog(0, SLOG_ERROR, "Creating '%s/%s' filebox failed", parent_dir,
                  fname);
             goto out;

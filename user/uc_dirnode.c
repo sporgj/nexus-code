@@ -22,10 +22,9 @@ struct dirnode {
     dnode_list_head_t dirbox;
     acl_head_t lockbox;
 
-    const struct uc_dentry * dentry;
     sds dnode_path;
+    struct uc_dentry * dentry;
     struct metadata_entry * mcache;
-    uv_mutex_t lock;
 };
 
 uc_dirnode_t *
@@ -217,7 +216,6 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
-        uv_mutex_unlock(&dn->lock);
         log_error("file not found: %s", fpath);
         return false;
     }
@@ -758,12 +756,12 @@ dirnode_set_metadata(uc_dirnode_t * dn, struct metadata_entry * entry)
 }
 
 void
-dirnode_set_dentry(uc_dirnode_t * dirnode, const struct uc_dentry * dentry)
+dirnode_set_dentry(uc_dirnode_t * dirnode, struct uc_dentry * dentry)
 {
     dirnode->dentry = dentry;
 }
 
-const struct uc_dentry *
+struct uc_dentry *
 dirnode_get_dentry(uc_dirnode_t * dirnode)
 {
     return dirnode->dentry;
@@ -775,22 +773,16 @@ dirnode_clear_dentry(uc_dirnode_t * dirnode)
     dirnode->dentry = NULL;
 }
 
-int
-dirnode_trylock(uc_dirnode_t * dn)
-{
-    return uv_mutex_trylock(&dn->lock);
-}
-
-void
-dirnode_unlock(uc_dirnode_t * dn)
-{
-    uv_mutex_unlock(&dn->lock);
-}
-
 const sds
 dirnode_get_fpath(uc_dirnode_t * dirnode)
 {
     return dirnode->dnode_path;
+}
+
+const shadow_t *
+dirnode_get_root(uc_dirnode_t * dirnode)
+{
+    return &dirnode->header.root;
 }
 
 bool

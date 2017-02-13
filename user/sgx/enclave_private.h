@@ -13,6 +13,7 @@
 
 #include <mbedtls/aes.h>
 #include <mbedtls/md.h>
+#include <mbedtls/sha256.h>
 
 #ifndef MIN
 #define MIN(a,b) (a<b)?a:b
@@ -36,6 +37,7 @@ extern "C" {
 #endif
 
 extern sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
+extern crypto_ekey_t * __enclave_key__;
 
 extern bool enclave_is_logged_in;
 
@@ -45,7 +47,10 @@ extern supernode_t user_supernode;
 
 extern pubkey_t * user_pubkey;
 
-int enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op);
+int
+enclave_crypto_ekey(crypto_ekey_t * ekey,
+                    crypto_ekey_t * sealing_key,
+                    uc_crypto_op_t op);
 
 struct snode_entry {
     SLIST_ENTRY(snode_entry) next_entry;
@@ -57,6 +62,14 @@ struct snode_entry {
 extern SLIST_HEAD(snode_head, snode_entry) supernode_list_head;
 typedef struct snode_head snode_head_t;
 typedef struct snode_entry snode_entry_t;
+
+supernode_t * find_supernode(shadow_t * root_dnode);
+
+crypto_ekey_t *
+derive_skey2(crypto_ekey_t * rkey, shadow_t * shdw1, shadow_t * shdw2);
+
+crypto_ekey_t *
+derive_skey1(shadow_t * root, shadow_t * part1, shadow_t * par2);
 
 #ifdef __cplusplus
 }

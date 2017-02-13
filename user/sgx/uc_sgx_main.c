@@ -2,6 +2,7 @@
 #include "seqptrmap.h"
 
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
+crypto_ekey_t * __enclave_key__ = (crypto_ekey_t *)&__enclave_encryption_key__;
 
 auth_struct_t enclave_auth_data = { 0 };
 
@@ -47,18 +48,55 @@ out:
     return 0;
 }
 
+crypto_ekey_t *
+derive_skey2(crypto_ekey_t * rkey, shadow_t * shdw1, shadow_t * shdw2)
+{
+    crypto_ekey_t * skey;
+    mbedtls_sha256_context _, *sha256_ctx = &_;
+
+    /* we are going to allocate enough buffer for the sha256 */
+    skey = (crypto_ekey_t *)malloc(CONFIG_SHA256_BUFLEN);
+    if (skey == NULL) {
+        return NULL;
+    }
+
+    mbedtls_sha256_init(sha256_ctx);
+    mbedtls_sha256_update(sha256_ctx, (uint8_t *)rkey, sizeof(crypto_ekey_t));
+    mbedtls_sha256_update(sha256_ctx, (uint8_t *)shdw1, sizeof(shadow_t));
+    mbedtls_sha256_update(sha256_ctx, (uint8_t *)shdw2, sizeof(shadow_t));
+    mbedtls_sha256_finish(sha256_ctx, (uint8_t *)skey);
+    mbedtls_sha256_free(sha256_ctx);
+
+    return skey;
+}
+
+crypto_ekey_t *
+derive_skey1(shadow_t * root, shadow_t * shdw1, shadow_t * shdw2)
+{
+    supernode_t * super;
+
+    /* find the supernode */
+    if ((super = find_supernode(root)) == NULL) {
+        return NULL;
+    }
+
+    return derive_skey2(&super->crypto_ctx.ekey, shdw1, shdw2);
+}
+
 int
-enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op)
+enclave_crypto_ekey(crypto_ekey_t * ekey,
+                    crypto_ekey_t * sealing_key,
+                    uc_crypto_op_t op)
 {
     mbedtls_aes_context ctx;
     mbedtls_aes_init(&ctx);
     if (op == UC_ENCRYPT) {
-        mbedtls_aes_setkey_enc(&ctx, (uint8_t *)&__enclave_encryption_key__,
+        mbedtls_aes_setkey_enc(&ctx, (uint8_t *)sealing_key,
                                CRYPTO_AES_KEY_SIZE_BITS);
         mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT, (uint8_t *)ekey,
                               (uint8_t *)ekey);
     } else {
-        mbedtls_aes_setkey_dec(&ctx, (uint8_t *)&__enclave_encryption_key__,
+        mbedtls_aes_setkey_dec(&ctx, (uint8_t *)sealing_key,
                                CRYPTO_AES_KEY_SIZE_BITS);
         mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_DECRYPT, (uint8_t *)ekey,
                               (uint8_t *)ekey);
@@ -71,6 +109,7 @@ enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op)
 
 static int
 crypto_metadata(crypto_context_t * p_ctx,
+                crypto_ekey_t * sealing_key,
                 void * header,
                 size_t header_len,
                 uint8_t * data,
@@ -106,8 +145,8 @@ crypto_metadata(crypto_context_t * p_ctx,
         sgx_read_rand((uint8_t *)&crypto_ctx, sizeof(crypto_context_t));
     } else {
         /* unseal our encryption key */
-        enclave_crypto_ekey(_ekey, UC_DECRYPT);
-        enclave_crypto_ekey(_mkey, UC_DECRYPT);
+        enclave_crypto_ekey(_ekey, sealing_key, UC_DECRYPT);
+        enclave_crypto_ekey(_mkey, sealing_key, UC_DECRYPT);
     }
 
     memcpy(&iv, &crypto_ctx.iv, sizeof(crypto_iv_t));
@@ -117,8 +156,7 @@ crypto_metadata(crypto_context_t * p_ctx,
                            CRYPTO_AES_KEY_SIZE_BITS);
 
     mbedtls_md_init(&hmac_ctx);
-    mbedtls_md_setup(&hmac_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
-                     1);
+    mbedtls_md_setup(&hmac_ctx, HMAC_TYPE, 1);
     mbedtls_md_hmac_starts(&hmac_ctx, (uint8_t *)_mkey, CRYPTO_MAC_KEY_SIZE);
 
     /* lets hmac the header */
@@ -155,8 +193,8 @@ crypto_metadata(crypto_context_t * p_ctx,
     if (op == UC_ENCRYPT) {
         mbedtls_md_hmac_finish(&hmac_ctx, (uint8_t *)&crypto_ctx.mac);
         // seal the encryption key
-        enclave_crypto_ekey(_ekey, UC_ENCRYPT);
-        enclave_crypto_ekey(_mkey, UC_ENCRYPT);
+        enclave_crypto_ekey(_ekey, sealing_key, UC_ENCRYPT);
+        enclave_crypto_ekey(_mkey, sealing_key, UC_ENCRYPT);
         memcpy(p_ctx, &crypto_ctx, sizeof(crypto_context_t));
     } else {
         mbedtls_md_hmac_finish(&hmac_ctx, (uint8_t *)&mac);
@@ -173,9 +211,22 @@ crypto_metadata(crypto_context_t * p_ctx,
 inline int
 usgx_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
-    return crypto_metadata(&header->crypto_ctx, header,
+    int ret;
+    supernode_t * super;
+    crypto_ekey_t * sealing_key;
+    shadow_t * shdw_name;
+
+    /* super_ekey + root_shdw + fnode_uuid */
+    sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);
+    if (sealing_key == NULL) {
+        return -1;
+    }
+
+    ret = crypto_metadata(&header->crypto_ctx, sealing_key, header,
                            sizeof(dnode_header_t) - sizeof(crypto_context_t),
                            data, header->dirbox_len + header->lockbox_len, op);
+    free(sealing_key);
+    return ret;
 }
 
 int
@@ -188,15 +239,22 @@ inline int
 usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
     int ret;
+    crypto_ekey_t * sealing_key;
     crypto_context_t crypto_ctx;
+    size_t len = sizeof(fbox_header_t) - sizeof(crypto_ekey_t)
+        - sizeof(crypto_context_t);
+
+    /* super_ekey + root_shdw + fnode_uuid */
+    sealing_key = derive_skey1(&header->root, &header->root, &header->uuid);
+    if (sealing_key == NULL) {
+        return -1;
+    }
+
     memcpy(&crypto_ctx.mkey, &header->fbox_mkey, sizeof(crypto_ekey_t));
     memcpy(&crypto_ctx.mac, &header->fbox_mac, sizeof(crypto_mac_t));
 
-    ret = crypto_metadata(&crypto_ctx, header,
-                           sizeof(fbox_header_t) - sizeof(crypto_ekey_t)
-                               - sizeof(crypto_context_t),
-                           data, header->fbox_len, op);
-
+    ret = crypto_metadata(&crypto_ctx, sealing_key, header, len, data,
+                          header->fbox_len, op);
     if (ret == 0) {
         memcpy(&header->fbox_mkey, &crypto_ctx.mkey, sizeof(crypto_ekey_t));
         memcpy(&header->fbox_mac, &crypto_ctx.mac, sizeof(crypto_mac_t));

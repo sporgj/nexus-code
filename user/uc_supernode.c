@@ -17,6 +17,7 @@ supernode_new()
         return NULL;
     }
 
+    uuid_generate_time_safe((uint8_t *)&super->uuid);
     uuid_generate_time_safe((uint8_t *)&super->root_dnode);
     SIMPLEQ_INIT(&super->users_list);
 

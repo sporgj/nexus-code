@@ -2,13 +2,15 @@
 #include <stdlib.h>
 
 #include "third/slog.h"
+#include "third/log.h"
 
+#include "uc_dirnode.h"
 #include "uc_encode.h"
 #include "uc_filebox.h"
 #include "uc_sgx.h"
 #include "uc_types.h"
-#include "uc_utils.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 
 struct filebox {
     uc_fbox_t * fbox;
@@ -16,12 +18,12 @@ struct filebox {
 };
 
 uc_filebox_t *
-filebox_new()
+filebox_new2(shadow_t * id, uc_dirnode_t * dirnode)
 {
     uc_fbox_t * fbox;
     uc_filebox_t * filebox = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
     if (filebox == NULL) {
-        slog(0, SLOG_FATAL, "allocation error");
+        log_fatal("allocation error");
         return NULL;
     }
 
@@ -29,22 +31,36 @@ filebox_new()
 
     // instantiate a default fbox
     if ((fbox = (uc_fbox_t *)calloc(1, sizeof(uc_fbox_t))) == NULL) {
-        slog(0, SLOG_FATAL, "allocating fbox failed");
+        log_fatal("allocating fbox failed");
         free(filebox);
         return NULL;
     }
 
-    fbox->magic = UCAFS_FBOX_MAGIC;
     fbox->chunk_count = 1;
     fbox->chunk_size = UCAFS_CHUNK_SIZE;
     fbox->fbox_len = FBOX_DEFAULT_LEN;
     fbox->file_size = 0;
     fbox->link_count = 1;
-    uuid_generate_time_safe(fbox->uuid);
+
+    if (id) {
+        memcpy(&fbox->uuid, id, sizeof(shadow_t));
+    } else {
+        uuid_generate_time_safe(fbox->uuid.bin);
+    }
+
+    if (dirnode) {
+        memcpy(&fbox->root, dirnode_get_root(dirnode), sizeof(shadow_t));
+    }
 
     filebox->fbox = fbox;
 
     return filebox;
+}
+
+uc_filebox_t *
+filebox_new()
+{
+    return filebox_new2(NULL, NULL);
 }
 
 uc_fbox_t *
@@ -83,22 +99,21 @@ filebox_from_file2(const sds filepath, size_t size_hint)
 
     fd = fopen(filepath, "rb");
     if (fd == NULL) {
-        slog(0, SLOG_ERROR, "could not open: %s", filepath);
+        log_error("could not open: %s", filepath);
         return NULL;
     }
 
     /* read the header from the file */
     nbytes = fread(&header, sizeof(fbox_header_t), 1, fd);
     if (!nbytes) {
-        slog(0, SLOG_ERROR, "could not read header: %s (nbytes=%u)", filepath,
-             nbytes);
+        log_error("could not read header: %s (nbytes=%u)", filepath, nbytes);
         goto out;
     }
 
     /* now detect how much data to allocate */
     len = MAX(size_hint, header.fbox_len);
     if ((fbox = (uc_fbox_t *)malloc(len)) == NULL) {
-        slog(0, SLOG_FATAL, "allocation failed. len=%u", len);
+        log_fatal("allocation failed. len=%u", len);
         goto out;
     }
 
@@ -107,14 +122,21 @@ filebox_from_file2(const sds filepath, size_t size_hint)
     len = header.fbox_len - sizeof(fbox_header_t);
 
     if ((nbytes = fread(buffer, 1, len, fd)) != len) {
-        slog(0, SLOG_ERROR, "reading fbox failed exp=%d, nbytes=%d", len,
-             nbytes);
+        log_error("reading fbox failed exp=%d, nbytes=%d", len, nbytes);
         goto out;
     }
 
+#ifdef UCAFS_SGX
+    ecall_crypto_filebox(global_eid, &ret, &header, buffer, UC_DECRYPT);
+    if (ret) {
+        log_error("ecall_crypto_filebox %d", ret);
+        goto out;
+    }
+#endif
+
     obj = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
     if (obj == NULL) {
-        slog(0, SLOG_ERROR, "allocating dirnode object failed");
+        log_error("allocating dirnode object failed");
         goto out;
     }
 
@@ -145,8 +167,11 @@ filebox_from_file(const sds filepath)
 bool
 filebox_write(uc_filebox_t * filebox, const char * fpath)
 {
+    int error;
     bool ret = false;
     FILE * fd;
+    uc_fbox_t * fbox1 = NULL;
+    size_t len = sizeof(fbox_header_t) + filebox->fbox->fbox_len;
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
@@ -154,9 +179,25 @@ filebox_write(uc_filebox_t * filebox, const char * fpath)
         return false;
     }
 
-    // TODO add sgx sealing here
+    // copy in a seperate buffer here
+    fbox1 = (uc_fbox_t *)calloc(1, len);
+    if (fbox1 == NULL) {
+        log_fatal("allocation error");
+        return false;
+    }
 
-    if (fwrite(filebox->fbox, filebox->fbox->fbox_len, 1, fd) != 1) {
+    memcpy(fbox1, filebox->fbox, len);
+
+#ifdef UCAFS_SGX
+    ecall_crypto_filebox(global_eid, &error, (fbox_header_t *)fbox1,
+                         (void *)&fbox1->chunks, UC_ENCRYPT);
+    if (error) {
+        log_error("ecall_crypto_filebox %d", ret);
+        goto out;
+    }
+#endif
+
+    if (fwrite(fbox1, len, 1, fd) != 1) {
         slog(0, SLOG_ERROR, "filebox write failed");
         goto out;
     }

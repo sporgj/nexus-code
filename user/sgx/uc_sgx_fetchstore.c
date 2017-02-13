@@ -81,6 +81,7 @@ update_crypto_ctx(enclave_context_t * context,
                   xfer_context_t * xfer_ctx,
                   int chunk_num)
 {
+    crypto_ekey_t * skey;
     crypto_mac_t mac_bytes, *p_mac;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
@@ -99,8 +100,8 @@ update_crypto_ctx(enclave_context_t * context,
     } else {
         memcpy(crypto_ctx, &xfer_ctx->fbox->chunks[chunk_num],
                sizeof(crypto_context_t));
-        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_DECRYPT);
     }
 
     memcpy(&context->_iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
@@ -231,6 +232,7 @@ close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
     crypto_mac_t * mac;
+    crypto_ekey_t * skey;
 
     crypto_ctx = &context->curr_crypto_ctx;
     aes_ctx = &context->aes_ctx;
@@ -243,8 +245,8 @@ close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
     mbedtls_aes_free(aes_ctx);
 
     /* now seal everything and send it over */
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
+    enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_ENCRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_ENCRYPT);
 
     memcpy(xfer_ctx->fbox, &context->fbox_hdr, sizeof(fbox_header_t));
     dest_crypto_ctx = &xfer_ctx->fbox->chunks[context->chunk_num];

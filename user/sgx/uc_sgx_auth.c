@@ -58,6 +58,33 @@ typedef enum {
     SUPERNODE_DECRYPT
 } snode_crypto_t;
 
+supernode_t *
+find_supernode(shadow_t * root_dnode)
+{
+    int ret;
+    supernode_t * super;
+    snode_entry_t * snode_entry;
+
+    ret = memcmp(root_dnode, &user_supernode.root_dnode, sizeof(shadow_t));
+    if (ret == 0) {
+        return &user_supernode;
+    }
+
+    /* iterate supernodes and find the suitable one */
+    SLIST_FOREACH(snode_entry, snode_list, next_entry)
+    {
+        super = &snode_entry->super;
+        if (memcmp(root_dnode, &super->root_dnode, sizeof(shadow_t))) {
+            continue;
+        }
+
+        // if we are here, the current user is the owner
+        return super;
+    }
+
+    return NULL;
+}
+
 /* store the hash of the user's public key */
 static int
 sha256_pubkey(mbedtls_pk_context * user_pubkey_ctx, uint8_t * pubkey_hash)
@@ -151,6 +178,7 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
 {
     int err = -1, len;
     supernode_t _super;
+    crypto_ekey_t * skey;
     crypto_context_t * crypto_ctx = &_super.crypto_ctx;
 
     /* initialize the data */
@@ -167,10 +195,17 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
         return E_ERROR_CRYPTO;
     }
 
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
+    skey = derive_skey2(__enclave_key__, &_super.root_dnode, &_super.uuid);
+    if (skey == NULL) {
+        return -1;
+    }
+
+    enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_ENCRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_ENCRYPT);
 
     memcpy(super, &_super, sizeof(supernode_t));
+
+    free(skey);
 
     return 0;
 }
@@ -256,6 +291,7 @@ ecall_ucafs_response(supernode_t * super,
     int err = E_ERROR_ERROR, len;
     crypto_context_t _ctx, *crypto_ctx = &_ctx;
     crypto_mac_t mac;
+    crypto_ekey_t * skey = NULL;
     unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c, hash[CONFIG_SHA256_BUFLEN];
 
     if (auth_stage != RESPONSE || sig_len > MBEDTLS_MPI_MAX_SIZE) {
@@ -270,10 +306,16 @@ ecall_ucafs_response(supernode_t * super,
 
     /* 2 - Verify the supernode has not been tampered and was created with the
      * specified public key */
+
+    skey = derive_skey2(__enclave_key__, &super->root_dnode, &super->uuid);
+    if (skey == NULL) {
+        return -1;
+    }
+
     err = E_ERROR_LOGIN;
     memcpy(crypto_ctx, &super->crypto_ctx, sizeof(crypto_context_t));
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+    enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_DECRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_DECRYPT);
 
     supernode_hash(super, crypto_ctx, &mac, SUPERNODE_NONE);
     if (memcmp(&crypto_ctx->mac, &mac, sizeof(crypto_mac_t))) {
@@ -293,6 +335,10 @@ ecall_ucafs_response(supernode_t * super,
 
     err = 0;
 out:
+    if (skey) {
+        free(skey);
+    }
+
     return err;
 }
 
@@ -309,9 +355,15 @@ ecall_supernode_crypto(supernode_t * super, seal_op_t op)
     memcpy(&_super, super, sizeof(supernode_t));
     crypto_ctx = &_super.crypto_ctx;
 
+    crypto_ekey_t * skey
+        = derive_skey2(__enclave_key__, &_super.root_dnode, &_super.uuid);
+    if (skey == NULL) {
+        return -1;
+    }
+
     if (super_op == SUPERNODE_DECRYPT) {
-        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_DECRYPT);
     }
 
     if (supernode_hash(&_super, crypto_ctx, &crypto_ctx->mac, super_op)) {
@@ -320,13 +372,14 @@ ecall_supernode_crypto(supernode_t * super, seal_op_t op)
 
     /* only copy out data, if we are encrypting */
     if (super_op == SUPERNODE_ENCRYPT) {
-        enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
-        enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
+        enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_ENCRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_ENCRYPT);
         memcpy(super, &_super, sizeof(supernode_t));
     }
 
     ret = 0;
 out:
+    free(skey);
     return ret;
 }
 
@@ -339,21 +392,28 @@ usgx_supernode_mount(supernode_t * super)
     snode_user_t * curr_user;
     snode_entry_t * snode_entry;
 
+    /* derive the sealing key */
+    crypto_ekey_t * skey
+        = derive_skey2(__enclave_key__, &super->root_dnode, &super->uuid);
+    if (skey == NULL) {
+        return -1;
+    }
+
     memcpy(crypto_ctx, &super->crypto_ctx, sizeof(crypto_context_t));
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+    enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_DECRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_DECRYPT);
 
     /* 1 - verify that the supernode matches */
     err = supernode_hash(super, crypto_ctx, &mac, SUPERNODE_DECRYPT);
     if (err) {
-        return err;
+        goto out;
     }
 
     /* 2 - if the user owns this public key, lets skip all this */
     err = memcmp(super->owner_pubkey, user_supernode.owner_pubkey,
                  sizeof(pubkey_t));
     if (err == 0) {
-        return 0;
+        goto out;
     }
 
     err = E_ERROR_NOTFOUND;
@@ -389,6 +449,7 @@ usgx_supernode_mount(supernode_t * super)
     }
 
 out:
+    free(skey);
     return err;
 }
 
@@ -412,8 +473,8 @@ ecall_supernode_mount(supernode_t * super)
  */
 static int
 usgx_check_rights(dnode_header_t * dnode_head,
-                 acl_head_t * acl_list,
-                 acl_rights_t rights)
+                  acl_head_t * acl_list,
+                  acl_rights_t rights)
 {
     int ret = -1;
     snode_entry_t * snode_entry;
@@ -422,8 +483,9 @@ usgx_check_rights(dnode_header_t * dnode_head,
     supernode_t * super;
 
     /* 1 - checks if the user owns the folder */
-    if (memcmp(&dnode_head->root, &user_supernode.root_dnode, sizeof(shadow_t))
-        == 0) {
+    ret = memcmp(&dnode_head->root, &user_supernode.root_dnode,
+                 sizeof(shadow_t));
+    if (ret == 0) {
         goto done;
     }
 

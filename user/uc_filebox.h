@@ -15,6 +15,9 @@ extern "C" {
 uc_filebox_t *
 filebox_new();
 
+uc_filebox_t *
+filebox_new2(shadow_t * id, uc_dirnode_t * dirnode);
+
 /**
  * Initialize a new filebox from the specified path
  * @param file_path is the absolute path to the filebox file

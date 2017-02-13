@@ -22,6 +22,7 @@
 #define CONFIG_MAX_NAME 100
 
 struct uc_dentry;
+struct metadata_entry;
 struct filebox;
 typedef struct filebox uc_filebox_t;
 
@@ -97,15 +98,13 @@ typedef struct {
 } __attribute__((packed)) pubkey_t;
 
 /* File box information */
-#define UCAFS_FBOX_MAGIC 0xfb015213
 #define UCAFS_FBOX_HEADER                                                      \
-    uint32_t magic;                                                            \
     uint8_t link_count;                                                        \
     uint16_t chunk_count;                                                      \
     uint32_t chunk_size;                                                       \
     uint32_t file_size;                                                        \
     uint16_t fbox_len;                                                         \
-    uuid_t uuid;                                                               \
+    shadow_t uuid, root;                                                       \
     crypto_ekey_t fbox_mkey;                                                   \
     crypto_mac_t fbox_mac;
 
@@ -129,6 +128,7 @@ UCAFS_FBOX_SIZE(int file_size)
         + UCAFS_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
 }
 
+/* data transfer for fbox */
 typedef struct {
     int xfer_id;
     int enclave_crypto_id;
@@ -148,6 +148,7 @@ typedef struct {
     uc_filebox_t * filebox;
 } xfer_context_t;
 
+/* access control stuff */
 typedef enum {
     ACCESS_READ = 0x01,
     ACCESS_WRITE = 0x02,
@@ -172,15 +173,15 @@ typedef struct acl_entry {
 typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
 
 // mainly for debug purposes in gdb
-#define DNODE_PAYLOAD \
-    union { \
-    uint8_t type; \
-    uint8_t static_data; \
-    };\
-    uint16_t rec_len; \
-    uint16_t link_len; \
-    shadow_t shadow_name; \
-    uint16_t name_len; \
+#define DNODE_PAYLOAD                                                          \
+    union {                                                                    \
+        uint8_t type;                                                          \
+        uint8_t static_data;                                                   \
+    };                                                                         \
+    uint16_t rec_len;                                                          \
+    uint16_t link_len;                                                         \
+    shadow_t shadow_name;                                                      \
+    uint16_t name_len;                                                         \
     char real_name[0];
 
 typedef struct {
@@ -211,26 +212,27 @@ typedef struct {
     char username[0];
 } __attribute__((packed)) snode_user_t;
 
-struct snode_user_entry {
+typedef struct snode_user_entry {
     SIMPLEQ_ENTRY(snode_user_entry) next_user;
     snode_user_t user_data;
-} __attribute__((packed));
+} __attribute__((packed)) snode_user_entry_t;
 
 typedef struct snode_user_entry snode_user_entry_t;
 
 /* structs for supernode stuff */
-#define SUPERNODE_PAYLOAD \
-    uint32_t user_count; \
-    uint32_t users_buflen; \
-    shadow_t root_dnode; \
+#define SUPERNODE_PAYLOAD                                                      \
+    uint32_t user_count;                                                       \
+    uint32_t users_buflen;                                                     \
+    shadow_t uuid;                                                             \
+    shadow_t root_dnode;                                                       \
     uint8_t owner_pubkey[CONFIG_SHA256_BUFLEN];
 
 typedef struct {
     SUPERNODE_PAYLOAD;
 } __attribute__((packed)) supernode_payload_t;
 
-#define SUPERNODE_HEADER \
-    SUPERNODE_PAYLOAD; \
+#define SUPERNODE_HEADER                                                       \
+    SUPERNODE_PAYLOAD;                                                         \
     crypto_context_t crypto_ctx;
 
 typedef struct {
