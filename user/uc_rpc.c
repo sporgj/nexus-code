@@ -4,7 +4,6 @@
 #include "uc_types.h"
 #include "uc_utils.h"
 
-#include "cdefs.h"
 #include "third/log.h"
 
 int

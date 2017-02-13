@@ -4,18 +4,14 @@
  * @author judicael
  *
  */
-#include <iostream>
-#include <fstream>
-
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "uc_dirnode.h"
 #include "uc_vfs.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 #include "uc_sgx.h"
-
-using namespace std;
 
 #define REPO_DATUM "profile/repo.datum"
 
@@ -23,7 +19,7 @@ FILE * global_mod_fid = NULL;
 
 sgx_enclave_id_t global_eid = 0;
 
-extern "C" int setup_mod();
+int setup_mod();
 
 int main(int argc, char ** argv)
 {
@@ -35,21 +31,21 @@ int main(int argc, char ** argv)
     }
 
     if (ucafs_launch(REPO_DATUM)) {
-        cout << "launching repo failed" << endl;
+        uerror("launching repo failed");
         return -1;
     }
 
     if (ucafs_init_uspace()) {
-        cout << "init uspace subsystem failed" << endl;
+        uerror("init uspace subsystem failed");
         return -1;
     }
 
     if (setup_mod()) {
-        cout << " ! Could not access module" << endl;
+        uerror(" ! Could not access module");
         return -1;
     }
 
-    cout << "Done..." << endl;
+    uinfo("Done...");
 
     while(1);
 

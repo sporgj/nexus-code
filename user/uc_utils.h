@@ -13,6 +13,8 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
 #include "third/sds.h"
 
 sds do_get_fname(const char * fpath);
@@ -37,6 +39,31 @@ hash_string(const char * keystring);
 
 uint32_t
 murmurhash(const char * key, uint32_t len, uint32_t seed);
+
+#define uerror(...)                   \
+    {                                 \
+        fprintf(stderr, " ! ");       \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n");        \
+    }
+#define ufatal(...)                                       \
+    {                                                     \
+        fprintf(stderr, " ! %s:%d ", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__);                     \
+        fprintf(stderr, "\n");                            \
+    }
+#define udebug(...)                                       \
+    {                                                     \
+        fprintf(stderr, " ! %s %s:%d ", __FUNCTION__,  __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__);                     \
+        fprintf(stderr, "\n");                            \
+    }
+#define uinfo(...)                    \
+    {                                 \
+        fprintf(stdout, " . ");       \
+        fprintf(stdout, __VA_ARGS__); \
+        fprintf(stdout, "\n");        \
+    }
 
 #ifdef __cplusplus
 }

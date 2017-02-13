@@ -10,11 +10,11 @@
 #include "third/xdr.h"
 #include "third/xdr_prototypes.h"
 
-#include "cdefs.h"
 #include "ucafs_header.h"
 
 #include "uc_rpc.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 
 #define UCAFS_MOD_FILE "/dev/ucafs_mod"
 

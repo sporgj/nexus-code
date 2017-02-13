@@ -6,7 +6,7 @@ OBJS := uc_mod.o uc_rpc.o enclave_u.o $(OBJS)
 CFLAGS += $(App_C_Flags) -std=gnu11
 CPPFLAGS += $(App_Cpp_Flags)
 
-all: ucafs
+all: ucafs admin_ucafs
 
 copyconfig:
 	cp mbedtls-config.h mbedtls/include/mbedtls/config.h
@@ -15,7 +15,7 @@ cryptolib: copyconfig
 	cd mbedtls/library && make clean && make SHARED=t DEBUG=t
 
 admin_ucafs: admin_ucafs.c libucafs.a
-	@$(CXX) $(CPPFLAGS)  $^ libthird.a $(LIBS) $(App_Link_Flags) -lmbedcrypto -o $@
+	@$(CC) $(CFLAGS) $^ $(LIBS) $(App_Link_Flags) -lmbedcrypto -o $@
 	@echo "GEN => $@"
 
 enclave_u.c: sgx/enclave.edl
@@ -26,8 +26,8 @@ enclave_u.o: enclave_u.c
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC <= $^"
 
-ucafs: main.cc libucafs.a
-	@$(CXX) $(CPPFLAGS) $^ $(LIBS) $(App_Link_Flags) -o $@
+ucafs: main.c libucafs.a
+	@$(CC) $(CFLAGS) $^ $(LIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
 third/libthird.a:
@@ -40,16 +40,8 @@ libucafs.a: $(OBJS) libthird.a
 	@ar cr $@ $(OBJS) third/*.o
 	@echo "ar => $@"
 
-uc_mod.o: uc_mod.c
-	@$(CC) $(CFLAGS) -c $< -o $@
-	@echo "CC <= $@"
-
-uc_rpc.o: uc_rpc.c
-	@$(CC) $(CFLAGS) -c $< -o $@
-	@echo "CC <= $@"
-
 %.o: %.c
-	@$(CC) -std=gnu11 $(CFLAGS) $(App_C_Flags) -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
 .PHONY: clean

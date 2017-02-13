@@ -16,7 +16,6 @@
 extern "C" {
 #endif
 
-#include "cdefs.h"
 #include "third/linenoise.h"
 #include "third/log.h"
 #include "third/sds.h"
@@ -25,6 +24,7 @@ extern "C" {
 #include "uc_encode.h"
 #include "uc_sgx.h"
 #include "uc_supernode.h"
+#include "uc_utils.h"
 #include "ucafs_header.h"
 
 #ifdef __cplusplus

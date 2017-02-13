@@ -14,8 +14,8 @@
 #include "uc_supernode.h"
 #include "uc_vfs.h"
 
-#include "cdefs.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 
 #include "third/log.h"
 
