@@ -111,7 +111,7 @@ typedef struct {
 
 typedef struct {
     UCAFS_FBOX_HEADER;
-} __attribute__((packed)) uc_fbox_header_t;
+} __attribute__((packed)) fbox_header_t;
 
 typedef struct uc_fbox {
     UCAFS_FBOX_HEADER;
@@ -125,7 +125,7 @@ typedef struct uc_fbox {
 static inline int
 UCAFS_FBOX_SIZE(int file_size)
 {
-    return sizeof(uc_fbox_header_t)
+    return sizeof(fbox_header_t)
         + UCAFS_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
 }
 
@@ -173,7 +173,10 @@ typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
 
 // mainly for debug purposes in gdb
 #define DNODE_PAYLOAD \
+    union { \
     uint8_t type; \
+    uint8_t static_data; \
+    };\
     uint16_t rec_len; \
     uint16_t link_len; \
     shadow_t shadow_name; \
@@ -201,15 +204,6 @@ typedef struct {
     uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
-
-typedef struct {
-    uint16_t link_count;
-    uuid_t uuid;
-    uint32_t chunk_count;
-    uint32_t filelen;
-    uint32_t protolen;
-    crypto_context_t crypto_ctx;
-} __attribute__((packed)) fbox_header_t;
 
 typedef struct {
     uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN];

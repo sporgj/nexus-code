@@ -1,18 +1,9 @@
 include header.mk
 include sgx_defs.mk
 
-OPENAFS_PATH := $(HOME)/openafs
-OPENAFS_INC := $(OPENAFS_PATH)/include
-OPENAFS_SRC := $(OPENAFS_PATH)/src
-OPENAFS_LIB := $(OPENAFS_PATH)/lib
-
 OBJS := uc_mod.o uc_rpc.o enclave_u.o $(OBJS)
-RXGEN = $(OPENAFS_SRC)/rxgen/rxgen
 
-RXINC := -I$(OPENAFS_INC)
-RXLIBS := $(OPENAFS_LIB)/librx.a $(OPENAFS_LIB)/liblwp.a #-L$(OPENAFS_LIB) -lrx -llwp
-
-CFLAGS += $(App_C_Flags)
+CFLAGS += $(App_C_Flags) -std=gnu11
 CPPFLAGS += $(App_Cpp_Flags)
 
 all: ucafs
@@ -58,7 +49,7 @@ uc_rpc.o: uc_rpc.c
 	@echo "CC <= $@"
 
 %.o: %.c
-	@$(CC) -std=gnu11 $(CFLAGS) $(App_C_Flags) $(INCFLAGS) -c $< -o $@
+	@$(CC) -std=gnu11 $(CFLAGS) $(App_C_Flags) -c $< -o $@
 	@echo "CC <= $@"
 
 .PHONY: clean

@@ -3,7 +3,7 @@
 
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 
-auth_struct_t enclave_auth_data = {0};
+auth_struct_t enclave_auth_data = { 0 };
 
 int
 ecall_init_enclave()
@@ -69,10 +69,12 @@ enclave_crypto_ekey(crypto_ekey_t * ekey, uc_crypto_op_t op)
     return 0;
 }
 
-int
+static int
 crypto_metadata(crypto_context_t * p_ctx,
-                size_t protolen,
+                void * header,
+                size_t header_len,
                 uint8_t * data,
+                size_t data_len,
                 uc_crypto_op_t op)
 {
     int error = E_ERROR_ERROR, bytes_left, len;
@@ -85,10 +87,6 @@ crypto_metadata(crypto_context_t * p_ctx,
     crypto_iv_t iv;
     crypto_ekey_t _CONFIDENTIAL *_ekey, *_mkey;
     uint8_t stream_block[16] = { 0 };
-
-    if (protolen == 0) {
-        return E_SUCCESS;
-    }
 
     p_input = (uint8_t *)malloc(E_CRYPTO_BUFFER_LEN);
     if (p_input == NULL) {
@@ -123,8 +121,11 @@ crypto_metadata(crypto_context_t * p_ctx,
                      1);
     mbedtls_md_hmac_starts(&hmac_ctx, (uint8_t *)_mkey, CRYPTO_MAC_KEY_SIZE);
 
+    /* lets hmac the header */
+    mbedtls_md_hmac_update(&hmac_ctx, header, header_len);
+
     p_data = data;
-    bytes_left = protolen;
+    bytes_left = data_len;
 
     while (bytes_left > 0) {
         len = MIN(bytes_left, E_CRYPTO_BUFFER_LEN);
@@ -169,14 +170,43 @@ crypto_metadata(crypto_context_t * p_ctx,
     return error;
 }
 
+inline int
+usgx_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
+{
+    return crypto_metadata(&header->crypto_ctx, header,
+                           sizeof(dnode_header_t) - sizeof(crypto_context_t),
+                           data, header->dirbox_len + header->lockbox_len, op);
+}
+
 int
 ecall_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
-    return crypto_metadata(&header->crypto_ctx, header->protolen, data, op);
+    return usgx_crypto_dirnode(header, data, op);
+}
+
+inline int
+usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
+{
+    int ret;
+    crypto_context_t crypto_ctx;
+    memcpy(&crypto_ctx.mkey, &header->fbox_mkey, sizeof(crypto_ekey_t));
+    memcpy(&crypto_ctx.mac, &header->fbox_mac, sizeof(crypto_mac_t));
+
+    ret = crypto_metadata(&crypto_ctx, header,
+                           sizeof(fbox_header_t) - sizeof(crypto_ekey_t)
+                               - sizeof(crypto_context_t),
+                           data, header->fbox_len, op);
+
+    if (ret == 0) {
+        memcpy(&header->fbox_mkey, &crypto_ctx.mkey, sizeof(crypto_ekey_t));
+        memcpy(&header->fbox_mac, &crypto_ctx.mac, sizeof(crypto_mac_t));
+    }
+
+    return ret;
 }
 
 int
 ecall_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
-    return crypto_metadata(&header->crypto_ctx, header->protolen, data, op);
+    return usgx_crypto_filebox(header, data, op);
 }

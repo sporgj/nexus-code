@@ -15,10 +15,10 @@ tests: $(TESTS)
 libucafs.a: ../libucafs.a
 		make -C ../ && cp $< $@
 
-test_structs: test_structs.cc ucafs_tests.h libucafs.a
-		@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
+test_structs: test_structs.cc libucafs.a
+		$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS)  -o $@
 		@echo "$(CXX) => $@"
 
 .PHONY: clean
 clean:
-	rm $(TESTS) *.a *.o
+	rm -f $(TESTS) *.a *.o

@@ -15,7 +15,7 @@ typedef struct {
     uint8_t nonce[16];
     uint8_t * input_buffer;
     uint8_t * output_buffer;
-    uc_fbox_header_t fbox_hdr;
+    fbox_header_t fbox_hdr;
 } enclave_context_t;
 
 static struct seqptrmap * xfer_context_map = NULL;
@@ -128,7 +128,7 @@ int
 ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, file_size = xfer_ctx->total_len;
-    uc_fbox_header_t * fbox_hdr;
+    fbox_header_t * fbox_hdr;
     crypto_context_t * crypto_ctx;
     enclave_context_t * context;
 
@@ -140,7 +140,7 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 
     /* copy the fbox information */
     fbox_hdr = &context->fbox_hdr;
-    memcpy(fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
+    memcpy(fbox_hdr, xfer_ctx->fbox, sizeof(fbox_header_t));
     fbox_hdr->chunk_count = UCAFS_CHUNK_COUNT(file_size);
     fbox_hdr->chunk_size = UCAFS_CHUNK_SIZE;
     fbox_hdr->fbox_len = UCAFS_FBOX_SIZE(file_size);
@@ -246,7 +246,7 @@ close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
     enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
     enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
 
-    memcpy(xfer_ctx->fbox, &context->fbox_hdr, sizeof(uc_fbox_header_t));
+    memcpy(xfer_ctx->fbox, &context->fbox_hdr, sizeof(fbox_header_t));
     dest_crypto_ctx = &xfer_ctx->fbox->chunks[context->chunk_num];
 
     if (context->xfer_op == UCAFS_STORE) {

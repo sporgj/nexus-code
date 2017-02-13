@@ -13,7 +13,6 @@
 #include "uc_dirnode.h"
 #include "uc_encode.h"
 #include "uc_filebox.h"
-#include "uc_metadata.h"
 #include "uc_uspace.h"
 #include "uc_utils.h"
 

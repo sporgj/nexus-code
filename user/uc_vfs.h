@@ -86,6 +86,20 @@ vfs_get_filebox(const char * path, size_t hint);
 uc_dirnode_t *
 vfs_lookup(const char * path, bool dirpath);
 
+/**
+ * Returns the dirnode from the metadata
+ * @param is shadow name
+ */
+uc_dirnode_t * metadata_get_dirnode(const char * path, const shadow_t *);
+
+/**
+ * Returns the root dirnode from the repo path
+ */
+uc_dirnode_t * metadata_root_dirnode(const char * path);
+
+void
+metadata_update_entry(struct metadata_entry * entry);
+
 #ifdef __cplusplus
 };
 #endif

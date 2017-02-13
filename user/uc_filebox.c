@@ -74,7 +74,7 @@ uc_filebox_t *
 filebox_from_file2(const sds filepath, size_t size_hint)
 {
     uc_filebox_t * obj = NULL;
-    uc_fbox_header_t header;
+    fbox_header_t header;
     uc_fbox_t * fbox;
     int len, nbytes;
     uint8_t * buffer;
@@ -88,7 +88,7 @@ filebox_from_file2(const sds filepath, size_t size_hint)
     }
 
     /* read the header from the file */
-    nbytes = fread(&header, sizeof(uc_fbox_header_t), 1, fd);
+    nbytes = fread(&header, sizeof(fbox_header_t), 1, fd);
     if (!nbytes) {
         slog(0, SLOG_ERROR, "could not read header: %s (nbytes=%u)", filepath,
              nbytes);
@@ -102,9 +102,9 @@ filebox_from_file2(const sds filepath, size_t size_hint)
         goto out;
     }
 
-    memcpy(fbox, &header, sizeof(uc_fbox_header_t));
-    buffer = ((uint8_t *)fbox) + sizeof(uc_fbox_header_t);
-    len = header.fbox_len - sizeof(uc_fbox_header_t);
+    memcpy(fbox, &header, sizeof(fbox_header_t));
+    buffer = ((uint8_t *)fbox) + sizeof(fbox_header_t);
+    len = header.fbox_len - sizeof(fbox_header_t);
 
     if ((nbytes = fread(buffer, 1, len, fd)) != len) {
         slog(0, SLOG_ERROR, "reading fbox failed exp=%d, nbytes=%d", len,

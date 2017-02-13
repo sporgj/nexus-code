@@ -215,7 +215,7 @@ ucafs_init_enclave()
     ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated,
                              &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
-        uerror("Could not open enclave: ret=%d", ret);
+        uerror("Could not open enclave: ret=%#x", ret);
         return -1;
     }
 

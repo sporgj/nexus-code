@@ -1,6 +1,5 @@
-#include "uc_dirnode.h"
+#include "uc_vfs.h"
 #include "uc_encode.h"
-#include "uc_metadata.h"
 #include "uc_sgx.h"
 #include "uc_uspace.h"
 
@@ -25,7 +24,6 @@ struct dirnode {
 
     const struct uc_dentry * dentry;
     sds dnode_path;
-    int is_dirty;
     struct metadata_entry * mcache;
     uv_mutex_t lock;
 };
@@ -55,6 +53,21 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
         memcpy(&dn->header.parent, &parent->header.uuid, sizeof(shadow_t));
         memcpy(&dn->header.root, &parent->header.root, sizeof(shadow_t));
     }
+
+    return dn;
+}
+
+uc_dirnode_t *
+dirnode_new_root(const shadow_t * id)
+{
+    uc_dirnode_t * dn ;
+    if ((dn = dirnode_new2(id, NULL)) == NULL) {
+        return NULL;
+    }
+
+    /* make sure we put stuff that makes it lok like root */
+    memcpy(&dn->header.parent, id, sizeof(shadow_t));
+    memcpy(&dn->header.root, id, sizeof(shadow_t));
 
     return dn;
 }
@@ -127,7 +140,7 @@ dirnode_from_file(const sds filepath)
     SIMPLEQ_INIT((lockbox = &dn->lockbox));
 
     /* read the header from the file */
-    nbytes = fread(&header, sizeof(dnode_header_t), 1, fd);
+    nbytes = fread(header, sizeof(dnode_header_t), 1, fd);
     if (!nbytes) {
         log_error("reading header: %s (nbytes=%zu, exp=%lu)", filepath, nbytes,
                   sizeof(dnode_header_t));
@@ -214,13 +227,13 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 
-    if (!serialize_dirbox(dn, buffer)) {
+    if (serialize_dirbox(dn, buffer)) {
         log_error("serialization failed");
         goto out;
     }
 
     /* now serialize the the access control information */
-    if (serialize_dirbox(dn, buffer + proto_len)) {
+    if (serialize_lockbox(dn, buffer + proto_len)) {
         log_error("serializing dirnode ACL failed (%s)", fpath);
         goto out;
     }
@@ -244,27 +257,24 @@ out:
         free(buffer);
     }
 
-    dn->is_dirty = 0;
-
     return ret;
 }
 
 bool
 dirnode_flush(uc_dirnode_t * dn)
 {
-    // TODO probably add lock here
-    if (dn->is_dirty == 0) {
-        metadata_dirty_dirnode(dn);
-        dn->is_dirty = 1;
+    bool ret = dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
+    if (ret && dn->mcache) {
+        metadata_update_entry(dn->mcache);
     }
 
-    return true;
+    return ret;
 }
 
 bool
 dirnode_fsync(uc_dirnode_t * dn)
 {
-    return dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
+    return dirnode_flush(dn);
 }
 
 void
@@ -379,6 +389,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
 
     de->rec_len = rec_len;
     dn->header.dirbox_len += rec_len;
+    dn->header.dirbox_count++;
 
     TAILQ_INSERT_TAIL(&dn->dirbox, list_entry, next_entry);
 
@@ -605,7 +616,7 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
         /* lets write the static data */
         len = de->rec_len - de->link_len;
-        memcpy(buffer, &de->type, len);
+        memcpy(buffer, &de->static_data, len);
         buffer += len;
 
         /* write out the link info */
@@ -622,7 +633,6 @@ static int
 parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 {
     int len, ret = -1;
-    ;
     size_t sz;
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
@@ -641,7 +651,7 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
         de = &list_entry->dir_entry;
         // copy the static data
-        memcpy(de, buffer, len);
+        memcpy(&de->static_data, buffer, len);
         buffer += len;
 
         if ((len = payload->link_len)) {

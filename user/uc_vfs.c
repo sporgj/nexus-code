@@ -200,7 +200,7 @@ vfs_relpath(const char * path, bool dirpath)
         return NULL;
     }
 
-    ptr1 += sizeof(UCAFS_WATCH_DIR);
+    ptr1 += sizeof(UCAFS_WATCH_DIR) - 1;
     if (*ptr1 == '/') {
         ptr1++;
     }

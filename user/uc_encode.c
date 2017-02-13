@@ -173,10 +173,8 @@ static inline void
 compute_encoded_str_size()
 {
     shadow_t code;
-    if (encoded_str_size == 0) {
-        ecryptfs_encode_for_filename(NULL, &encoded_str_size, (uint8_t *)&code,
+    ecryptfs_encode_for_filename(NULL, &encoded_str_size, (uint8_t *)&code,
                                      sizeof(shadow_t));
-    }
 }
 
 static char *
@@ -185,7 +183,10 @@ encode_bin2str(const shadow_t * code, char * prefix, size_t prefix_len)
     char * result = NULL;
     size_t sz;
 
-    compute_encoded_str_size();
+    if (encoded_str_size == 0) {
+        compute_encoded_str_size();
+    }
+
     result = (char *)malloc(prefix_len + encoded_str_size + 1);
     if (result == NULL) {
         return NULL;
@@ -226,7 +227,7 @@ encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
         return NULL;
     }
 
-    shadow_t * code = (shadow_t *)malloc(sizeof(shadow_t));
+    shadow_t * code = (shadow_t *)malloc(sizeof(shadow_t) + 1);
     if (code == NULL) {
         return NULL;
     }

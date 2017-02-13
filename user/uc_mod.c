@@ -42,7 +42,6 @@ typedef struct xdr_inata {
 typedef struct xdr_outsp {
     XDR xdrs;
     ucrpc_msg_t msg;
-    uint8_t data[0];
 } xdr_rsp_t;
 
 #define XDROUT_DATALEN 64
@@ -50,7 +49,7 @@ typedef struct xdr_outsp {
 
 /** we are going to have 3 buffers */
 uint8_t in_buffer[UCAFS_DATA_BUFLEN], out_buffer[UCAFS_DATA_BUFLEN];
-ucrpc_msg_t in_rpc;
+ucrpc_msg_t in_rpc = {0};
 
 int
 setup_mod()
@@ -100,7 +99,7 @@ setup_mod()
 
             /* create our XDR data */
             xdrmem_create(xdr_in, (caddr_t) x_data->data, in_msg->len, XDR_DECODE);
-            xdrmem_create(xdr_out, (caddr_t) x_rsp->data, PAGE_SIZE, XDR_ENCODE);
+            xdrmem_create(xdr_out, x_rsp->msg.payload, PAGE_SIZE, XDR_ENCODE);
 
             /* dispatch to the corresponding function */
             switch (in_msg->type) {

@@ -106,8 +106,7 @@ initialize_repository(const char * user_root_path)
     }
 
     /* noe lets create the main dnode */
-    dirnode = dirnode_new_alias(&super->root_dnode);
-    dirnode_set_root(dirnode, &super->root_dnode);
+    dirnode = dirnode_new_root(&super->root_dnode);
     if (!dirnode_write(dirnode, dnode_path)) {
         uerror("dirnode_write() failed");
         goto out;
