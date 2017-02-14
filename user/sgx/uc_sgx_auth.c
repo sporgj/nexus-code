@@ -1,4 +1,4 @@
-#include "enclave_private.h"
+#include "ucafs_sgx.h"
 
 #include <mbedtls/aes.h>
 #include <mbedtls/ctr_drbg.h>
@@ -8,9 +8,9 @@
 
 #define RSA_PUB_DER_MAX_BYTES 38 + 2 * MBEDTLS_MPI_MAX_SIZE
 
-bool enclave_is_logged_in = false;
+bool enclave_is_logged_in = false, is_admin_program_running = false;
 
-supernode_t user_supernode;
+supernode_t user_supernode = { 0 }, init_supernode = { 0 };
 pubkey_t * user_pubkey = (pubkey_t *)&user_supernode.owner_pubkey;
 
 snode_head_t supernode_list_head = SLIST_HEAD_INITIALIZER(NULL),
@@ -80,6 +80,11 @@ find_supernode(shadow_t * root_dnode)
 
         // if we are here, the current user is the owner
         return super;
+    }
+
+    // then return the init supernode
+    if (is_admin_program_running) {
+        return &init_supernode;
     }
 
     return NULL;
@@ -200,10 +205,15 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
         return -1;
     }
 
+    // TODO add flag for init sessions
+    memcpy(&init_supernode, &_super, sizeof(supernode_t));
+    is_admin_program_running = true;
+
     enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_ENCRYPT);
     enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_ENCRYPT);
 
     memcpy(super, &_super, sizeof(supernode_t));
+
 
     free(skey);
 

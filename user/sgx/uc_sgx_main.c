@@ -1,4 +1,4 @@
-#include "enclave_private.h"
+#include "ucafs_sgx.h"
 #include "seqptrmap.h"
 
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
@@ -241,8 +241,6 @@ usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
     int ret;
     crypto_ekey_t * sealing_key;
     crypto_context_t crypto_ctx;
-    size_t len = sizeof(fbox_header_t) - sizeof(crypto_ekey_t)
-        - sizeof(crypto_context_t);
 
     /* super_ekey + root_shdw + fnode_uuid */
     sealing_key = derive_skey1(&header->root, &header->root, &header->uuid);
@@ -250,16 +248,11 @@ usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
         return -1;
     }
 
-    memcpy(&crypto_ctx.mkey, &header->fbox_mkey, sizeof(crypto_ekey_t));
-    memcpy(&crypto_ctx.mac, &header->fbox_mac, sizeof(crypto_mac_t));
+    ret = crypto_metadata(&header->crypto_ctx, sealing_key, header,
+                           sizeof(fbox_header_t) - sizeof(crypto_context_t),
+                           data, header->fbox_len, op);
 
-    ret = crypto_metadata(&crypto_ctx, sealing_key, header, len, data,
-                          header->fbox_len, op);
-    if (ret == 0) {
-        memcpy(&header->fbox_mkey, &crypto_ctx.mkey, sizeof(crypto_ekey_t));
-        memcpy(&header->fbox_mac, &crypto_ctx.mac, sizeof(crypto_mac_t));
-    }
-
+    free(sealing_key);
     return ret;
 }
 

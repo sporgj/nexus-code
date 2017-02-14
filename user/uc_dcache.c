@@ -450,7 +450,7 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     }
 
     fbox_path = vfs_metadata_path(path, codename);
-    fb = filebox_from_file(fbox_path);
+    fb = filebox_from_file2(fbox_path, hint);
     sdsfree(fbox_path);
 out:
     sdsfree(fname);

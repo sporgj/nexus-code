@@ -38,7 +38,7 @@ filebox_new2(shadow_t * id, uc_dirnode_t * dirnode)
 
     fbox->chunk_count = 1;
     fbox->chunk_size = UCAFS_CHUNK_SIZE;
-    fbox->fbox_len = FBOX_DEFAULT_LEN;
+    fbox->fbox_len = sizeof(fbox->chunks);
     fbox->file_size = 0;
     fbox->link_count = 1;
 
@@ -91,7 +91,7 @@ filebox_from_file2(const sds filepath, size_t size_hint)
 {
     uc_filebox_t * obj = NULL;
     fbox_header_t header;
-    uc_fbox_t * fbox;
+    uc_fbox_t * fbox = NULL;
     int len, nbytes;
     uint8_t * buffer;
     FILE * fd;
@@ -111,7 +111,7 @@ filebox_from_file2(const sds filepath, size_t size_hint)
     }
 
     /* now detect how much data to allocate */
-    len = MAX(size_hint, header.fbox_len);
+    len = sizeof(fbox_header_t) + (MAX(size_hint, header.fbox_len));
     if ((fbox = (uc_fbox_t *)malloc(len)) == NULL) {
         log_fatal("allocation failed. len=%u", len);
         goto out;
@@ -119,7 +119,7 @@ filebox_from_file2(const sds filepath, size_t size_hint)
 
     memcpy(fbox, &header, sizeof(fbox_header_t));
     buffer = ((uint8_t *)fbox) + sizeof(fbox_header_t);
-    len = header.fbox_len - sizeof(fbox_header_t);
+    len = header.fbox_len;
 
     if ((nbytes = fread(buffer, 1, len, fd)) != len) {
         log_error("reading fbox failed exp=%d, nbytes=%d", len, nbytes);

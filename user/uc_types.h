@@ -105,8 +105,7 @@ typedef struct {
     uint32_t file_size;                                                        \
     uint16_t fbox_len;                                                         \
     shadow_t uuid, root;                                                       \
-    crypto_ekey_t fbox_mkey;                                                   \
-    crypto_mac_t fbox_mac;
+    crypto_context_t crypto_ctx;
 
 typedef struct {
     UCAFS_FBOX_HEADER;
@@ -124,8 +123,7 @@ typedef struct uc_fbox {
 static inline int
 UCAFS_FBOX_SIZE(int file_size)
 {
-    return sizeof(fbox_header_t)
-        + UCAFS_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
+    return UCAFS_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
 }
 
 /* data transfer for fbox */
