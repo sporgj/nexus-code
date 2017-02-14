@@ -18,7 +18,7 @@ PROGRAM = ucafs
 CXX = g++
 CC = gcc
 FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
-	-fno-builtin-free
+	-fno-builtin-free -ltcmalloc
 
 
 CPPFLAGS = $(FLAGS)
