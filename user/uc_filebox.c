@@ -175,7 +175,7 @@ filebox_write(uc_filebox_t * filebox, const char * fpath)
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
-        slog(0, SLOG_ERROR, "file not found: %s", fpath);
+        log_error("file not found: %s", fpath);
         return false;
     }
 
@@ -197,13 +197,14 @@ filebox_write(uc_filebox_t * filebox, const char * fpath)
     }
 #endif
 
-    if (fwrite(fbox1, len, 1, fd) != 1) {
-        slog(0, SLOG_ERROR, "filebox write failed");
+    if (fwrite(fbox1, 1, len, fd) != len) {
+        log_error("filebox write failed");
         goto out;
     }
 
     ret = true;
 out:
+    free(fbox1);
     fclose(fd);
     return ret;
 }
