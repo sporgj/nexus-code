@@ -1,7 +1,5 @@
-#include "enclave_private.h"
 #include "seqptrmap.h"
-
-#define HMAC_TYPE mbedtls_md_info_from_type(MBEDTLS_MD_SHA256)
+#include "ucafs_sgx.h"
 
 typedef struct {
     uc_xfer_op_t xfer_op;
@@ -17,7 +15,8 @@ typedef struct {
     uint8_t nonce[16];
     uint8_t * input_buffer;
     uint8_t * output_buffer;
-    uc_fbox_header_t fbox_hdr;
+    fbox_header_t fbox_hdr;
+    crypto_ekey_t skey; // the sealing key
 } enclave_context_t;
 
 static struct seqptrmap * xfer_context_map = NULL;
@@ -39,6 +38,8 @@ ecall_fetchstore_init(xfer_context_t * xfer_ctx)
     enclave_context_t __SECRET * context = NULL;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
+    crypto_ekey_t * sealing_key;
+    fbox_header_t * fbox_hdr;
 
     context = (enclave_context_t *)calloc(1, sizeof(enclave_context_t));
     if (context == NULL) {
@@ -57,7 +58,7 @@ ecall_fetchstore_init(xfer_context_t * xfer_ctx)
     context->offset = xfer_ctx->offset;
 
     /* initialize the crypto contexts */
-        if (xfer_context_map == NULL
+    if (xfer_context_map == NULL
         && (xfer_context_map = seqptrmap_init()) == NULL) {
         error = E_ERROR_ALLOC;
         goto out;
@@ -83,6 +84,7 @@ update_crypto_ctx(enclave_context_t * context,
                   xfer_context_t * xfer_ctx,
                   int chunk_num)
 {
+    crypto_ekey_t * skey = &context->skey;
     crypto_mac_t mac_bytes, *p_mac;
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
@@ -101,8 +103,8 @@ update_crypto_ctx(enclave_context_t * context,
     } else {
         memcpy(crypto_ctx, &xfer_ctx->fbox->chunks[chunk_num],
                sizeof(crypto_context_t));
-        enclave_crypto_ekey(&crypto_ctx->ekey, UC_DECRYPT);
-        enclave_crypto_ekey(&crypto_ctx->mkey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->ekey, skey, UC_DECRYPT);
+        enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_DECRYPT);
     }
 
     memcpy(&context->_iv, &crypto_ctx->iv, sizeof(crypto_iv_t));
@@ -130,9 +132,10 @@ int
 ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 {
     int error = E_ERROR_ERROR, file_size = xfer_ctx->total_len;
-    uc_fbox_header_t * fbox_hdr;
+    fbox_header_t * fbox_hdr;
     crypto_context_t * crypto_ctx;
     enclave_context_t * context;
+    crypto_ekey_t * fnode_sealing_key;
 
     context = (enclave_context_t *)seqptrmap_get(xfer_context_map,
                                                  xfer_ctx->enclave_crypto_id);
@@ -142,11 +145,23 @@ ecall_fetchstore_start(xfer_context_t * xfer_ctx)
 
     /* copy the fbox information */
     fbox_hdr = &context->fbox_hdr;
-    memcpy(fbox_hdr, xfer_ctx->fbox, sizeof(uc_fbox_header_t));
+    memcpy(fbox_hdr, xfer_ctx->fbox, sizeof(fbox_header_t));
     fbox_hdr->chunk_count = UCAFS_CHUNK_COUNT(file_size);
     fbox_hdr->chunk_size = UCAFS_CHUNK_SIZE;
     fbox_hdr->fbox_len = UCAFS_FBOX_SIZE(file_size);
     fbox_hdr->file_size = file_size;
+
+    /* generate the sealing key */
+    fnode_sealing_key
+        = derive_skey1(&fbox_hdr->root, &fbox_hdr->root, &fbox_hdr->uuid);
+    if (fnode_sealing_key == NULL) {
+        return E_ERROR_CRYPTO;
+    }
+
+    /* decrypt the sealed key of the filenode and use it as the filebox
+     * sealing key */
+    enclave_crypto_ekey(&context->skey, fnode_sealing_key, UC_DECRYPT);
+    free(fnode_sealing_key);
 
     // TODO instantiate crypto data for fbox here
     update_crypto_ctx(context, xfer_ctx, context->chunk_num);
@@ -233,6 +248,7 @@ close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
     mbedtls_aes_context * aes_ctx;
     mbedtls_md_context_t * hmac_ctx;
     crypto_mac_t * mac;
+    crypto_ekey_t * skey;
 
     crypto_ctx = &context->curr_crypto_ctx;
     aes_ctx = &context->aes_ctx;
@@ -245,10 +261,10 @@ close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
     mbedtls_aes_free(aes_ctx);
 
     /* now seal everything and send it over */
-    enclave_crypto_ekey(&crypto_ctx->ekey, UC_ENCRYPT);
-    enclave_crypto_ekey(&crypto_ctx->mkey, UC_ENCRYPT);
+    enclave_crypto_ekey(&crypto_ctx->ekey, &context->skey, UC_ENCRYPT);
+    enclave_crypto_ekey(&crypto_ctx->mkey, &context->skey, UC_ENCRYPT);
 
-    memcpy(xfer_ctx->fbox, &context->fbox_hdr, sizeof(uc_fbox_header_t));
+    memcpy(xfer_ctx->fbox, &context->fbox_hdr, sizeof(fbox_header_t));
     dest_crypto_ctx = &xfer_ctx->fbox->chunks[context->chunk_num];
 
     if (context->xfer_op == UCAFS_STORE) {

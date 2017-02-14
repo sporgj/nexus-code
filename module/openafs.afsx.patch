@@ -194,6 +194,49 @@ index 1b99c94..af56488 100644
      AFS_GUNLOCK();
      crfree(credp);
      return afs_convert_code(code);
+diff --git a/src/afs/VNOPS/afs_vnop_access.c b/src/afs/VNOPS/afs_vnop_access.c
+index 0087073..3ad7ad2 100644
+--- a/src/afs/VNOPS/afs_vnop_access.c
++++ b/src/afs/VNOPS/afs_vnop_access.c
+@@ -115,6 +115,8 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+     afs_int32 mask;
+     afs_int32 dirBits;
+     afs_int32 fileBits;
++    /* ucafs code */
++    int ret;
+ 
+     AFS_STATCNT(afs_AccessOK);
+ 
+@@ -130,7 +132,7 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+ 	    dirBits = PRSFS_LOOKUP | PRSFS_READ;
+ 	    return (arights == (dirBits & arights));
+ 	}
+-	return (arights == afs_GetAccessBits(avc, arights, areq));
++	ret = (arights == afs_GetAccessBits(avc, arights, areq));
+     } else {
+ 	/* some rights come from dir and some from file.  Specifically, you 
+ 	 * have "a" rights to a file if you are its owner, which comes
+@@ -183,8 +185,19 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+ 		    fileBits |= PRSFS_READ;
+ 	    }
+ 	}
+-	return ((fileBits & arights) == arights);	/* true if all rights bits are on */
++	ret = ((fileBits & arights) == arights);	/* true if all rights bits are on */
+     }
++
++    /* ucafs code
++     * if the permission check passes, send it for ucafs
++     * to check */
++    if (ret) {
++	if (ucafs_kern_access(avc, arights)) {
++	    ret = 0;
++	}
++    }
++
++    return ret;
+ }
+ 
+ 
 diff --git a/src/afs/VNOPS/afs_vnop_create.c b/src/afs/VNOPS/afs_vnop_create.c
 index f33da96..d9cb9dd 100644
 --- a/src/afs/VNOPS/afs_vnop_create.c
@@ -552,7 +595,7 @@ index e8b8f9d..48e78dc 100644
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..5a2c4b0 100644
+index f494677..4411e17 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
 @@ -590,6 +590,15 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
@@ -587,12 +630,12 @@ index f494677..5a2c4b0 100644
 +                                       base);
 +
 +                if (ret == 0) {
++		    code = (*ops->close)(rock, &OutStatus, &doProcessFS);
 +		    goto post_dcache_store;
 +		}
 +
 +		/* the next iteration should skip it altogether */
 +		is_ucafs_file = 0;
-+		kfree(path);
 +		goto restart;
 +post_ucafs:
 +
@@ -636,7 +679,7 @@ index f494677..5a2c4b0 100644
      AFS_STATCNT(CacheFetchProc);
  
      XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
-@@ -1156,9 +1201,28 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1156,9 +1201,29 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
       * avc->lock(W) if !setLocks || slowPass
       * adc->lock(W)
       */
@@ -651,6 +694,7 @@ index f494677..5a2c4b0 100644
 +    acall = ((struct rxfs_fetchVariables *)rock)->call;
 +    ret = ucafs_kern_fetch(tc, rxconn, fP, base, adc, avc, length, acall, path);
 +    if (ret == 0) {
++	code = 0;
 +	goto clean_up;
 +    }
 +
@@ -665,7 +709,7 @@ index f494677..5a2c4b0 100644
  #ifndef AFS_NOSTATS
      osi_GetuTime(&xferStartTime);
  #endif /* AFS_NOSTATS */
-@@ -1211,6 +1275,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1211,6 +1276,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
  	}
  	code = 0;
      } while (moredata);
@@ -686,6 +730,22 @@ index 43fa5b4..785ec2c 100644
  #if defined(AFS_LINUX26_ENV) && defined(STRUCT_TASK_STRUCT_HAS_CRED)
      /*
       * Save current credentials for later access to disk cache files.
+diff --git a/src/afs/afs_pioctl.c b/src/afs/afs_pioctl.c
+index 19a4865..b9355f6 100644
+--- a/src/afs/afs_pioctl.c
++++ b/src/afs/afs_pioctl.c
+@@ -1465,6 +1465,11 @@ DECL_PIOCTL(PSetAcl)
+     if (avc->f.fid.Fid.Vnode & 1 || (vType(avc) == VDIR))
+ 	osi_dnlc_purgedp(avc);
+ 
++    /* ucafs code */
++    if (code == 0) {
++	ucafs_kern_storeacl(avc, &acl);
++    }
++
+     /* SXW - Should we flush metadata here? */
+     return code;
+ }
 diff --git a/src/afs/afsincludes.h b/src/afs/afsincludes.h
 index 18bcfda..9af6203 100644
 --- a/src/afs/afsincludes.h

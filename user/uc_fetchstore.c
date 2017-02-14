@@ -10,7 +10,7 @@
 #include "third/seqptrmap.h"
 #include "third/slog.h"
 
-#include "uc_dcache.h"
+#include "uc_vfs.h"
 #include "uc_dirnode.h"
 #include "uc_fetchstore.h"
 #include "uc_filebox.h"
@@ -19,7 +19,7 @@
 
 static struct seqptrmap * xfer_context_array = NULL;
 
-static int
+static void
 free_xfer_context(xfer_context_t * xfer_ctx)
 {
     if (xfer_ctx->xfer_id != -1) {
@@ -51,8 +51,13 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     ucafs_entry_type atype;
     int chunk_count;
 
+    /* TODO move this to an init function */
+    if (xfer_context_array == NULL) {
+        xfer_context_array = seqptrmap_init();
+    }
+
     /* lets find the dirnode object first */
-    filebox = dcache_get_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
+    filebox = vfs_get_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
     if (filebox == NULL) {
         slog(0, SLOG_ERROR, "finding filebox failed: '%s'", fpath);
         return ret;
@@ -81,11 +86,6 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(rq->offset);
     xfer_ctx->fbox = filebox_fbox(filebox);
     xfer_ctx->filebox = filebox;
-
-    /* TODO move this to an init function */
-    if (xfer_context_array == NULL) {
-        xfer_context_array = seqptrmap_init();
-    }
 
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {

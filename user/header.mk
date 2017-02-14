@@ -14,8 +14,6 @@ else
        FLAGS += -UUCAFS_DEV
 endif
 
-KERNSRC_PATH = ../kernel
-
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
@@ -25,7 +23,7 @@ FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
 
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
-LIBS = -L/usr/local/lib /usr/local/lib/libprotobuf.a -pthread -luuid -luv
+LIBS = -luuid -luv -lmbedcrypto
 
 ifeq ($(UCAFS_PROFILER), 1)
        LIBS += -lprofiler
@@ -41,9 +39,8 @@ OBJS = uc_dirnode.o\
        uc_uspace.o\
        uc_encode.o\
        uc_fetchstore.o\
+       uc_supernode.o\
        uc_utils.o\
-       dnode.pb.o
+       uc_vfs.o
 
-TESTS := test_dirops
-GENS := afsx.h afsx.cs.c afsx.ss.c *.pb.h *.pb.cc libucafs.a libthird.a\
-	   enclave_u.*
+GENS := *.a enclave_u.*

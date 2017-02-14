@@ -1,5 +1,3 @@
-#include <stdbool.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,6 +18,9 @@ struct metadata_entry;
 uc_dirnode_t *
 dirnode_new();
 
+uc_dirnode_t *
+dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent);
+
 /**
  * Generates a new dirnode object with a pregenerated name
  * @param id is the ID of the dirnode, NULL if you want the ID randomly
@@ -29,7 +30,10 @@ uc_dirnode_t *
 dirnode_new_alias(const shadow_t * id);
 
 uc_dirnode_t *
-dirnode_default_dnode();
+dirnode_new_root(const shadow_t * id); 
+
+void
+dirnode_set_root(uc_dirnode_t * dirnode, shadow_t * root_dnode);
 
 void
 dirnode_set_parent(uc_dirnode_t * dn, const uc_dirnode_t * parent);
@@ -38,9 +42,9 @@ const shadow_t *
 dirnode_get_parent(uc_dirnode_t * dn);
 
 void
-dirnode_set_dentry(uc_dirnode_t * dirnode, const struct uc_dentry * dentry);
+dirnode_set_dentry(uc_dirnode_t * dirnode, struct uc_dentry * dentry);
 
-const struct uc_dentry *
+struct uc_dentry *
 dirnode_get_dentry(uc_dirnode_t * dirnode);
 
 void
@@ -56,9 +60,6 @@ void dirnode_set_metadata(uc_dirnode_t *, struct metadata_entry *);
  */
 uc_dirnode_t *
 dirnode_from_file(const sds file_path);
-
-uc_dirnode_t *
-dirnode_from_shadow_name(const shadow_t * shdw_name);
 
 void
 dirnode_free(uc_dirnode_t * dirnode);
@@ -157,12 +158,25 @@ dirnode_rename(uc_dirnode_t * dn,
                link_info_t ** pp_link_info1,
                link_info_t ** pp_link_info2);
 
+int
+dirnode_checkacl(uc_dirnode_t * dn, acl_rights_t rights);
+
+void
+dirnode_lockbox_clear(uc_dirnode_t * dn);
+
+int
+dirnode_lockbox_add(uc_dirnode_t * dn, const char * name, acl_rights_t rights);
+
 // internal functions to manage the dirnode in-memory object
 void dirnode_mark_dirty(uc_dirnode_t * dn);
 void dirnode_mark_clean(uc_dirnode_t * dn);
 bool dirnode_is_dirty(uc_dirnode_t * dn);
 int dirnode_trylock(uc_dirnode_t * dn);
 void dirnode_unlock(uc_dirnode_t * dn);
+
+/** returns the root's shadow name */
+const shadow_t *
+dirnode_get_root(uc_dirnode_t * dirnode);
 
 #ifdef __cplusplus
 }

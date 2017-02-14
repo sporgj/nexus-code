@@ -107,6 +107,12 @@ dirops_move1(const char * from_fpath,
              ucafs_entry_type type,
              char ** ptr_oldname,
              char ** ptr_newname);
+
+int
+dirops_setacl(const char * path, const char * acl);
+
+int
+dirops_checkacl(const char * path, acl_rights_t rights, int is_dir);
 #ifdef __cplusplus
 }
 #endif

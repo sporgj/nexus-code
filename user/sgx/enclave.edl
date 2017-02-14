@@ -18,6 +18,28 @@ enclave {
         public int ecall_fetchstore_crypto([in, out] xfer_context_t * xfer_ctx);
 
         public int ecall_fetchstore_finish([in, out] xfer_context_t * xfer_ctx);
+
+        /* authentication */
+        public int ecall_initialize([user_check] supernode_t * supernode,
+                                    [user_check] mbedtls_pk_context * rsa_ctx);
+
+        public int ecall_ucafs_challenge([user_check] uint8_t * nonce_a,
+                                         [user_check] auth_struct_t * auth);
+
+        public int ecall_ucafs_response([in] supernode_t * super,
+                                        [user_check] mbedtls_pk_context * pk,
+                                        [user_check] uint8_t * user_signature,
+                                        size_t sig_len);
+
+        public int ecall_supernode_crypto([user_check] supernode_t * supernode,
+                seal_op_t op);
+
+        public int ecall_supernode_mount([user_check] supernode_t * supernode);
+
+        public int ecall_check_rights([in] dnode_header_t * dnode_head,
+                                      [user_check] acl_head_t * acl_list,
+                                      acl_rights_t rights);
+
     };
 
 };

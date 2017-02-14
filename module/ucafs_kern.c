@@ -9,6 +9,60 @@ static const uint32_t afs_prefix_len = 4;
 static char * watch_dirs[] = {UCAFS_PATH_KERN "/" UC_AFS_WATCH};
 static const int watch_dir_len[] = {sizeof(watch_dirs[0]) - 1};
 
+bool
+startsWith(const char * pre, const char * str)
+{
+    size_t lenpre = strlen(pre), lenstr = strlen(str);
+    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
+}
+
+LIST_HEAD(_watchlist), *watchlist_ptr = &_watchlist;
+
+int
+add_path_to_watchlist(const char * path)
+{
+    watch_path_t * curr;
+    int len;
+
+    list_for_each_entry(curr, watchlist_ptr, list)
+    {
+        if (strncmp(curr->afs_path, path, curr->path_len) == 0) {
+            return 0;
+        }
+    }
+
+    /* if we are here, we need to add the entry to the list */
+    len = strnlen(path, UCAFS_PATH_MAX);
+    curr = (watch_path_t *)kzalloc(sizeof(watch_path_t) + len, GFP_KERNEL);
+    if (curr == NULL) {
+        ERROR("allocation error, cannot add path to list");
+        return -1;
+    }
+
+    curr->path_len = len;
+    if (startsWith(afs_prefix, path)) {
+        strncpy(curr->afs_path, path + afs_prefix_len, len - afs_prefix_len);
+    }
+
+    list_add(&curr->list, watchlist_ptr);
+
+    return 0;
+}
+
+void
+clear_watchlist(void)
+{
+    watch_path_t *curr_wp, *prev_wp;
+
+    list_for_each_entry_safe(curr_wp, prev_wp, watchlist_ptr, list)
+    {
+        list_del(&curr_wp->list);
+        kfree(curr_wp);
+    }
+
+    INIT_LIST_HEAD(watchlist_ptr);
+}
+
 int
 UCAFS_DISCONNECTED()
 {
@@ -48,19 +102,13 @@ vnode_type(const struct vcache * vnode)
     return UC_ANY;
 }
 
-bool
-startsWith(const char * pre, const char * str)
-{
-    size_t lenpre = strlen(pre), lenstr = strlen(str);
-    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
-}
-
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 {
-    int len, i, total_len;
-    char *path, *curr_dir, *result;
+    int len, total_len;
+    char *path, *result;
     char buf[512];
+    watch_path_t * curr_entry;
 
     if (dentry == NULL) {
         return 1;
@@ -84,12 +132,9 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
     print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf),
                    1); */
 
-    for (i = 0; i < sizeof(watch_dirs) / sizeof(char *); i++) {
-        curr_dir = watch_dirs[i];
-
-        if (startsWith(curr_dir, path)) {
-            // TODO maybe check the prefix on the name
-            // we're good
+    list_for_each_entry(curr_entry, watchlist_ptr, list)
+    {
+        if (startsWith(curr_entry->afs_path, path)) {
             if (dest) {
                 len = strlen(path);
                 total_len = afs_prefix_len + len;
@@ -99,6 +144,7 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
                 result[total_len] = '\0';
                 *dest = result;
             }
+
             return 0;
         }
     }
@@ -243,7 +289,7 @@ ucafs_kern_symlink(struct dentry * dp, char * target, char ** dest)
     int ret = -1, code;
     char * from_path = NULL;
     caddr_t payload;
-    XDR xdrs, * xdr_reply;
+    XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
 
     *dest = NULL;
@@ -456,6 +502,103 @@ out:
     if (ret && *old_shadowname) {
         kfree(*old_shadowname);
         *old_shadowname = NULL;
+    }
+
+    return ret;
+}
+
+int
+ucafs_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data)
+{
+    int ret = -1, code, len;
+    char * path = NULL;
+    caddr_t payload;
+    XDR xdrs;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_vnode_path(avc, &path)) {
+        return ret;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        kfree(path);
+        return -1;
+    }
+
+    len = acl_data->AFSOpaque_len;
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) || !xdr_int(&xdrs, &len) ||
+        !xdr_opaque(&xdrs, (caddr_t)acl_data->AFSOpaque_val, len)) {
+        ERROR("xdr storeacl failed\n");
+        READPTR_UNLOCK();
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_STOREACL, &xdrs, &reply, &code) || code) {
+        ERROR("xdr setacl (%s) FAILED\n", path);
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (path) {
+        kfree(path);
+    }
+
+    if (reply) {
+        kfree(reply);
+    }
+
+    return ret;
+}
+
+int
+ucafs_kern_access(struct vcache * avc, afs_int32 rights)
+{
+    // by default, access is always granted
+    int ret = 0, code, is_dir = (vType(avc) == VDIR);
+    char * path = NULL;
+    caddr_t payload;
+    XDR xdrs, *xdr_reply;
+    reply_data_t * reply = NULL;
+
+    if (ucafs_vnode_path(avc, &path)) {
+        return 0;
+    }
+
+    if ((payload = READPTR_LOCK()) == 0) {
+        kfree(path);
+        return 0;
+    }
+
+    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
+    if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) || !xdr_int(&xdrs, &rights) ||
+        !xdr_int(&xdrs, &is_dir)) {
+        READPTR_UNLOCK();
+        ERROR("xdr kern access failed\n");
+        goto out;
+    }
+
+    if (ucafs_mod_send(UCAFS_MSG_CHECKACL, &xdrs, &reply, &code) || code) {
+        ERROR("xdr setacl (%s) FAILED\n", path);
+        goto out;
+    }
+
+    /* read in the response into ret */
+    xdr_reply = &reply->xdrs;
+    if (!xdr_int(xdr_reply, &ret)) {
+        ERROR("reading response fails");
+        goto out;
+    }
+
+out:
+    if (reply) {
+        kfree(reply);
+    }
+
+    if (path) {
+        kfree(path);
     }
 
     return ret;

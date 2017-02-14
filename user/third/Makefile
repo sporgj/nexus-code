@@ -1,4 +1,5 @@
-OBJS := hashmap.o slog.o sds.o seqptrmap.o elasticqueue.o elasticarray.o xdr.o xdr_mem.o
+OBJS := hashmap.o slog.o sds.o seqptrmap.o elasticqueue.o elasticarray.o xdr.o xdr_mem.o\
+	linenoise.o
 CC := gcc
 
 all: libthird.a

@@ -38,6 +38,7 @@ ucafs_m_release(struct inode * inode, struct file * fp)
     /* grab the lock, reset all variables */
     dev->daemon = NULL;
     atomic_inc(&ucafs_m_available);
+    clear_watchlist();
 
     return 0;
 }
@@ -45,6 +46,8 @@ ucafs_m_release(struct inode * inode, struct file * fp)
 static int
 ucafs_p_show(struct seq_file * sf, void * v)
 {
+    watch_path_t * curr;
+
     if (dev->daemon == NULL) {
         seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon->pid);
     } else {
@@ -52,6 +55,11 @@ ucafs_p_show(struct seq_file * sf, void * v)
     }
 
     seq_printf(sf, "outb=%zu, inb=%zu\n", dev->outb_len, dev->inb_len);
+
+    seq_printf(sf, "paths:\n");
+    list_for_each_entry(curr, watchlist_ptr, list) {
+        seq_printf(sf, "%s\n", curr->afs_path);
+    }
 
     return 0;
 }
@@ -107,7 +115,55 @@ ucafs_m_write(struct file * fp,
     return count;
 }
 
+static long
+ucafs_m_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
+{
+    int err = 0, len;
+    char * path;
+
+    if (_IOC_TYPE(cmd) != UCAFS_IOC_MAGIC) {
+        return -ENOTTY;
+    }
+
+    if (_IOC_NR(cmd) > UCAFS_IOC_MAXNR) {
+        return -ENOTTY;
+    }
+
+    switch (cmd) {
+    case IOCTL_ADD_PATH:
+        len = strlen_user((char *)arg);
+        path = (char *)kmalloc(len + 1, GFP_KERNEL);
+        if (path == NULL) {
+            err = -1;
+            ERROR("allocation error");
+            return -ENOMEM;
+        }
+
+        if (copy_from_user(path, (char *)arg, len)) {
+            ERROR("copy_from_user failed\n");
+            return -EFAULT;
+        }
+
+        path[len] = '\0';
+        printk(KERN_INFO "path: %s\n", path);
+
+        if (add_path_to_watchlist(path)) {
+            ERROR("adding '%s' FAILED\n", path);
+            err = -1;
+        }
+
+        kfree(path);
+        break;
+
+    default:
+        err = -1;
+    }
+
+    return err;
+}
+
 const struct file_operations ucafs_mod_fops = {.owner = THIS_MODULE,
+                                               .unlocked_ioctl = ucafs_m_ioctl,
                                                .open = ucafs_m_open,
                                                .release = ucafs_m_release,
                                                .write = ucafs_m_write,

@@ -3,13 +3,14 @@
  *
  * @author Judicael Briand
  */
-#include "uc_metadata.h"
 #include "uc_utils.h"
+#include "uc_vfs.h"
 
 #include "third/hashmap.h"
 #include "third/queue.h"
 #include "third/sds.h"
 #include "third/slog.h"
+#include "third/log.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -41,35 +42,6 @@ static uv_mutex_t dirty_list_lock;
 static size_t dirty_list_count = 0;
 
 static Hashmap * metadata_hashmap;
-
-int
-metadata_dirty_dirnode(uc_dirnode_t * dn)
-{
-    metadata_entry_t * entry = dirnode_get_metadata(dn);
-    // XXX assert(entry != NULL)
-
-    /* create the list entry and add our new guy */
-    dirty_item_t * dirty_item = (dirty_item_t *)malloc(sizeof(dirty_item_t));
-    if (dirty_item == NULL) {
-        slog(0, SLOG_ERROR, "could not create new entry for the dirty item");
-        // TODO remove item from the cache?
-        return -1;
-    }
-
-    dirty_item->entry = entry;
-
-    uv_mutex_lock(&entry->lock);
-    entry->dirty_item = dirty_item;
-    uv_mutex_unlock(&entry->lock);
-
-    /* add it to the dirty list */
-    uv_mutex_lock(&dirty_list_lock);
-    TAILQ_INSERT_TAIL(dirty_list_head, dirty_item, next_item);
-    dirty_list_count++;
-    uv_mutex_unlock(&dirty_list_lock);
-
-    return 0;
-}
 
 static int
 _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
@@ -129,14 +101,26 @@ _evict_entry(metadata_entry_t * entry)
     free(entry);
 }
 
+void
+metadata_update_entry(struct metadata_entry * entry)
+{
+    entry->epoch = time(NULL);
+}
+
 uc_dirnode_t *
-metadata_get_dirnode(const shadow_t * shadow_name)
+metadata_root_dirnode(const char * path)
+{
+    return metadata_get_dirnode(path, vfs_root_dirnode(path));
+}
+
+uc_dirnode_t *
+metadata_get_dirnode(const char * path, const shadow_t * shadow_name)
 {
     uc_dirnode_t * dn = NULL;
     metadata_entry_t * entry;
     struct stat st;
     int * hashval;
-    sds fpath;
+    sds fpath = NULL;
 
     /* check if the item is in the cache */
     entry
@@ -146,7 +130,18 @@ metadata_get_dirnode(const shadow_t * shadow_name)
     }
 
     /* if found, check the on-disk time */
+    if ((fpath = vfs_metadata_path(path, shadow_name)) == NULL) {
+        log_error("vfs_metadata_path returned NULL (%s)", fpath);
+        goto out;
+    }
+
+    if (stat(fpath, &st)) {
+        log_error("file '%s' does not exist", fpath);
+        goto out;
+    }
+
     if (difftime(st.st_mtime, entry->epoch) > 0) {
+        // implicitly deletes the dirnode object
         _evict_entry(entry);
         goto load_from_disk;
     }
@@ -156,79 +151,29 @@ metadata_get_dirnode(const shadow_t * shadow_name)
     goto out;
 
 load_from_disk:
-    dn = dirnode_from_shadow_name(shadow_name);
-    if (dn == NULL) {
+    if (fpath == NULL
+        && (fpath = vfs_metadata_path(path, shadow_name)) == NULL) {
+        log_error("vfs_metadata_path returned NULL (%s)", fpath);
+        goto out;
+    }
+
+    /* load it from disk */
+    if ((dn = dirnode_from_file(fpath)) == NULL) {
         goto out;
     }
 
     // add it to the metadata cache
     if (_create_entry(dn, shadow_name)) {
-        goto cleanup;
+        dirnode_free(dn);
+        dn = NULL;
     }
 
 out:
+    if (fpath) {
+        sdsfree(fpath);
+    }
+
     return dn;
-
-cleanup:
-    dirnode_free(dn);
-    return NULL;
-}
-
-static uv_timer_t flush_timer;
-static uv_thread_t flush_thread;
-static uv_loop_t _fl, * flush_loop = &_fl;
-
-static void
-metadata_flush(uv_timer_t * handle)
-{
-    int i = 0, j = 0, k = 0;
-    uc_dirnode_t * dn;
-    metadata_entry_t * entry;
-    dirty_item_t *var, *tvar;
-
-    uv_mutex_lock(&dirty_list_lock);
-    TAILQ_FOREACH_SAFE(var, dirty_list_head, next_item, tvar)
-    {
-        k++;
-        entry = var->entry, dn = entry->dn;
-
-        if (dirnode_trylock(dn)) {
-            j++;
-            continue;
-        }
-
-        if (dirnode_fsync(dn) == false) {
-            goto unlock;
-        }
-
-        /* remove it from the dirty list */
-        TAILQ_REMOVE(dirty_list_head, var, next_item);
-        uv_mutex_lock(&entry->lock);
-        entry->dirty_item = NULL;
-        uv_mutex_unlock(&entry->lock);
-
-        i++;
-        free(var);
-    unlock:
-        dirnode_unlock(dn);
-    }
-
-    dirty_list_count -= i;
-    if (i || j || k) {
-        printf(":: flush_entries(): size=%zu, flushed=%d, skipped=%d, seen=%d\n",
-                dirty_list_count, i, j, k);
-    }
-    fflush(stdout);
-    uv_mutex_unlock(&dirty_list_lock);
-}
-
-static void
-start_flush_thread()
-{
-    uv_loop_init(flush_loop);
-    uv_timer_init(flush_loop, &flush_timer);
-    uv_timer_start(&flush_timer, metadata_flush, 5000, 2000);
-    uv_run(flush_loop, UV_RUN_DEFAULT);
 }
 
 static int
@@ -254,20 +199,11 @@ metadata_init()
 
     TAILQ_INIT(dirty_list_head);
 
-    // add the default dnode to the cache
-    if (metadata_get_dirnode(&uc_root_dirnode_shadow_name) == NULL) {
-        slog(0, SLOG_ERROR, "metadata_get_dirnode root failed");
-        return -1;
-    }
-
-    uv_thread_create(&flush_thread, start_flush_thread, NULL);
-
     return 0;
 }
 
 void
 metadata_exit()
 {
-    uv_stop(flush_loop);
     // TODO clear all data here
 }

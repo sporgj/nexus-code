@@ -130,6 +130,9 @@ ucafs_store_write(store_context_t * context,
             goto out;
         }
 
+        print_hex_dump(KERN_ERR, "OK", DUMP_PREFIX_NONE, 16, 1, buf,
+                       MIN(32, size), 0);
+
         buf += size;
         bytes_left -= size;
         *byteswritten += size;
@@ -168,6 +171,9 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
             ERROR("xdr store_xfer failed\n");
             goto out;
         }
+
+        print_hex_dump(KERN_ERR, "OK", DUMP_PREFIX_NONE, 16, 1, context->buffer,
+                       MIN(32, size), 0);
 
         ret = ucafs_mod_send(UCAFS_MSG_XFER_RUN, &xdrs, &reply, &code);
         if (ret || code) {

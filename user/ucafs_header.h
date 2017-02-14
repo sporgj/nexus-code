@@ -15,6 +15,22 @@ typedef struct {
 #include <stdlib.h>
 #endif
 
+#ifndef UCPRIV_ENCLAVE
+#include <linux/ioctl.h>
+
+#define UCAFS_IOC_MAGIC 'W'
+
+#define IOCTL_ADD_PATH _IOW(UCAFS_IOC_MAGIC, 1, char *)
+
+#define UCAFS_IOC_MAXNR 1
+
+typedef struct {
+    int len;
+    char path[0];
+} watchlist_path_t;
+#endif
+
+
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
 #endif
@@ -35,6 +51,15 @@ typedef struct {
 
 #define UC_AFS_WATCH "sgx"
 
+#define UCAFS_SUPER_FNAME "ucafs"
+#define UCAFS_REPO_DIR ".afsx"
+#define UCAFS_WATCH_DIR "sgx"
+#define UCAFS_METADATA_DIR UCAFS_REPO_DIR
+
+#define CONFIG_PUBKEY   "profile/public_key"
+#define CONFIG_PRIVKEY  "profile/private_key"
+#define CONFIG_ENCLAVE_PUBKEY   "profile/enclave_pubkey"
+
 typedef enum {
     UC_STATUS_GOOD = 0,
     UC_STATUS_NOOP,
@@ -42,11 +67,11 @@ typedef enum {
 } uc_err_t;
 
 typedef enum {
-    UC_FILE = 0x00000001,
-    UC_DIR = 0x00000002,
-    UC_LINK = 0x00000004,
+    UC_FILE = 0x1,
+    UC_DIR = 0x2,
+    UC_LINK = 0x4,
     UC_ANY = UC_FILE | UC_DIR | UC_LINK,
-} ucafs_entry_type;
+} __attribute__((packed)) ucafs_entry_type;
 
 /* prefixes for the different file types */
 #define UC_METADATA_PREFIX "md"
@@ -121,9 +146,11 @@ typedef enum {
     UCAFS_MSG_HARDLINK,
     UCAFS_MSG_SYMLINK,
     UCAFS_MSG_RENAME,
+    UCAFS_MSG_STOREACL,
+    UCAFS_MSG_CHECKACL,
     UCAFS_MSG_XFER_INIT,
     UCAFS_MSG_XFER_RUN,
-    UCAFS_MSG_XFER_EXIT
+    UCAFS_MSG_XFER_EXIT,
 } uc_msg_type_t;
 
 typedef struct {

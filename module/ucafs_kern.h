@@ -85,3 +85,9 @@ ucafs_kern_fetch(struct afs_conn * tc,
                  afs_int32 size,
                  struct rx_call * acall,
                  char * path);
+
+int
+ucafs_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data);
+
+int
+ucafs_kern_access(struct vcache * avc, afs_int32 rights);

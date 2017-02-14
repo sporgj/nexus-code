@@ -2,16 +2,19 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <sys/ioctl.h>
+
 #include <uv.h>
 
 #include "third/log.h"
 #include "third/xdr.h"
 #include "third/xdr_prototypes.h"
 
-#include "cdefs.h"
 #include "ucafs_header.h"
 
 #include "uc_rpc.h"
+#include "uc_uspace.h"
+#include "uc_utils.h"
 
 #define UCAFS_MOD_FILE "/dev/ucafs_mod"
 
@@ -39,7 +42,6 @@ typedef struct xdr_inata {
 typedef struct xdr_outsp {
     XDR xdrs;
     ucrpc_msg_t msg;
-    uint8_t data[0];
 } xdr_rsp_t;
 
 #define XDROUT_DATALEN 64
@@ -47,12 +49,12 @@ typedef struct xdr_outsp {
 
 /** we are going to have 3 buffers */
 uint8_t in_buffer[UCAFS_DATA_BUFLEN], out_buffer[UCAFS_DATA_BUFLEN];
-ucrpc_msg_t in_rpc;
+ucrpc_msg_t in_rpc = {0};
 
 int
 setup_mod()
 {
-    int len, status;
+    int len, status, ret, fno;
     size_t nbytes;
     xdr_data_t * x_data = (xdr_data_t *)in_buffer;
     xdr_rsp_t * x_rsp = (xdr_rsp_t *)out_buffer;
@@ -71,6 +73,24 @@ setup_mod()
         return -1;
     }
 
+    fno = fileno(ucafs_mod_fid);
+
+    /* send all the paths */
+    for (size_t i = 0; i < global_supernode_count; i++) {
+        sds path = sdsnew(global_supernode_paths[i]);
+        path = sdscat(path, "/");
+        path = sdscat(path, UCAFS_WATCH_DIR);
+        
+        if ((ret = ioctl(fno, IOCTL_ADD_PATH, path))) {
+            sdsfree(path);
+            uerror("ioctl ADD_PATH (%s) failed\n", path);
+            return -1;
+        }
+
+        log_info("Added: %s", path);
+        sdsfree(path);
+    }
+
     while (1) {
         nbytes = fread(in_msg, 1, sizeof(ucrpc_msg_t), ucafs_mod_fid);
         if (nbytes == sizeof(ucrpc_msg_t)) {
@@ -78,8 +98,8 @@ setup_mod()
             fread(x_data->data, 1, in_msg->len, ucafs_mod_fid);
 
             /* create our XDR data */
-            xdrmem_create(xdr_in, x_data->data, in_msg->len, XDR_DECODE);
-            xdrmem_create(xdr_out, x_rsp->data, PAGE_SIZE, XDR_ENCODE);
+            xdrmem_create(xdr_in, (caddr_t) x_data->data, in_msg->len, XDR_DECODE);
+            xdrmem_create(xdr_out, x_rsp->msg.payload, PAGE_SIZE, XDR_ENCODE);
 
             /* dispatch to the corresponding function */
             switch (in_msg->type) {
@@ -100,6 +120,12 @@ setup_mod()
                 break;
             case UCAFS_MSG_RENAME:
                 status = uc_rpc_rename(xdr_in, xdr_out);
+                break;
+            case UCAFS_MSG_STOREACL:
+                status = uc_rpc_storeacl(xdr_in, xdr_out);
+                break;
+            case UCAFS_MSG_CHECKACL:
+                status = uc_rpc_checkacl(xdr_in, xdr_out);
                 break;
             case UCAFS_MSG_XFER_INIT:
                 status = uc_rpc_xfer_init(xdr_in, xdr_out);

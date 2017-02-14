@@ -1,8 +1,9 @@
 #include "uc_rpc.h"
 #include "uc_dirops.h"
+#include "uc_fetchstore.h"
 #include "uc_types.h"
+#include "uc_utils.h"
 
-#include "cdefs.h"
 #include "third/log.h"
 
 int
@@ -241,6 +242,78 @@ out:
 
     if (new_shadowname) {
         free(new_shadowname);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_storeacl(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, len;
+    char * path = NULL;
+    caddr_t acl_data = NULL;
+
+    if (!xdr_string(xdrs, &path, UCAFS_PATH_MAX) ||
+        !xdr_int(xdrs, &len)) {
+        uerror("xdr storeacl failed\n");
+        goto out;
+    }
+
+    if ((acl_data = (caddr_t)malloc(len)) == NULL) {
+        goto out;
+    }
+
+    if (!xdr_opaque(xdrs, acl_data, len)) {
+        uerror("xdr acl_data failed\n");
+        goto out;
+    }
+
+    if (dirops_setacl(path, acl_data)) {
+        uerror("dirops_setacl failed\n");
+        goto out;
+    }
+
+    log_info("[storeacl] %s", path);
+
+    ret = 0;
+out:
+    if (path) {
+        free(path);
+    }
+
+    if (acl_data) {
+        free(acl_data);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_checkacl(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, len, is_dir, code = 0;
+    acl_rights_t rights;
+    char * path = NULL;
+    caddr_t acl_data = NULL;
+
+    if (!xdr_string(xdrs, &path, UCAFS_PATH_MAX)
+        || !xdr_int(xdrs, (int *)(&rights)) || !xdr_int(xdrs, &is_dir)) {
+        uerror("xdr storeacl failed\n");
+        goto out;
+    }
+
+    code = dirops_checkacl(path, rights, is_dir);
+
+    if (!xdr_int(xdr_out, &code)) {
+        uerror("xdr checkacl failed\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (path) {
+        free(path);
     }
 
     return ret;

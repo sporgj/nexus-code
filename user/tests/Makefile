@@ -6,32 +6,19 @@ include $(UCAFS_DIR)/sgx_defs.mk
 
 LIBS += $(App_Link_Flags) -lgtest -lgtest_main
 
-TESTS = test_dirops #test_fetchstore test_dirops test_dcache
+TESTS = test_structs
 
-all: clean tests
+all: tests
 
 tests: $(TESTS)
 
 libucafs.a: ../libucafs.a
-	make -C ../ && cp $< $@
+		make -C ../ && cp $< $@
 
-test_%: test_%.cc uc_test.h libucafs.a
-	@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS) -o $@
-	@echo "$(CXX) => $@"
-
-#define make-test-target
-#$(1): $(1).c libucafs.a
-#	$(CXX) -DTEST_ENV $$(CPPFLAGS) -I./ $$(INCFLAGS) $(1).c\
-#		libucafs.a $$(LIBS) $$(App_Link_Flags) -lcheck -o $(1)
-#	@echo "CXX <= $(1)"
-#endef
-
-#$(foreach element,$(TESTS),$(eval $(call make-test-target,tests/$(element))))
-#tests: $(addprefix tests/, $(TESTS))
+test_structs: test_structs.cc libucafs.a
+		$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS)  -o $@
+		@echo "$(CXX) => $@"
 
 .PHONY: clean
-clean: repo/.afsx
-	rm -rf repo/.afsx/* *.o *.a
-
-repo/.afsx:
-	mkdir -p $@
+clean:
+	rm -f $(TESTS) *.a *.o
