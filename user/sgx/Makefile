@@ -38,7 +38,7 @@ enclave_t.o: enclave_t.c
 	@echo "CC => $@"
 
 enclave.so: enclave_t.o $(OBJS) libmbedcrypto.a
-	$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+	$(CC) $^ -o $@ $(Enclave_Link_Flags)
 	@echo "LINK => $@"
 
 enclave.signed.so: enclave.so private_key.pem

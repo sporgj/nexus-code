@@ -7,6 +7,7 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/md.h>
+#include <mbedtls/platform.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
 
@@ -91,8 +92,10 @@ ucafs_login(const char * user_root_path)
 {
 #ifdef UCAFS_SGX
     int err = -1;
-    size_t olen = 0;
-    uint8_t hash[32], buf[MBEDTLS_MPI_MAX_SIZE], nonce_a[CONFIG_NONCE_SIZE];
+    size_t olen = 0, nbytes, keylen;
+    const char * pubkey_fname = CONFIG_PUBKEY;
+    uint8_t hash[32], buf[MBEDTLS_MPI_MAX_SIZE], nonce_a[CONFIG_NONCE_SIZE],
+        *pubkey_buf = NULL;
     sds snode_path = NULL;
     auth_struct_t auth;
     mbedtls_sha256_context sha256_ctx;
@@ -161,8 +164,13 @@ ucafs_login(const char * user_root_path)
 
     // now lets respond to the enclave
     /* parse the public key */
+    if ((err = mbedtls_pk_load_file(pubkey_fname, &pubkey_buf, &keylen))) {
+        uerror("mbedtls_pk_load_file returned %#x", err);
+        return -1;
+    }
+
     mbedtls_pk_init(public_k);
-    if ((err = mbedtls_pk_parse_public_keyfile(public_k, CONFIG_PUBKEY))) {
+    if ((err = mbedtls_pk_parse_public_key(public_k, pubkey_buf, keylen))) {
         uerror("mbedtls_pk_parse_public_keyfile returned %d", err);
         goto out;
     }
@@ -182,7 +190,8 @@ ucafs_login(const char * user_root_path)
         goto out;
     }
 
-    ecall_ucafs_response(global_eid, &err, super, public_k, buf, olen);
+    ecall_ucafs_response(global_eid, &err, super, pubkey_buf, keylen, buf,
+                         olen);
     if (err) {
         uerror("ecall_ucafs_response returned %d", err);
         goto out;
@@ -197,6 +206,10 @@ ucafs_login(const char * user_root_path)
 out:
     if (snode_path) {
         sdsfree(snode_path);
+    }
+
+    if (pubkey_buf) {
+        mbedtls_free(pubkey_buf);
     }
 
     return err;

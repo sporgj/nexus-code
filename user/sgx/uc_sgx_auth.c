@@ -90,11 +90,12 @@ find_supernode(shadow_t * root_dnode)
     return NULL;
 }
 
+unsigned char buf[RSA_PUB_DER_MAX_BYTES];
 /* store the hash of the user's public key */
 static int
 sha256_pubkey(mbedtls_pk_context * user_pubkey_ctx, uint8_t * pubkey_hash)
 {
-    unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c;
+    unsigned char * c;
     int len = mbedtls_pk_write_pubkey_der(user_pubkey_ctx, buf, sizeof(buf));
     if (len < 0) {
         return E_ERROR_CRYPTO;
@@ -179,10 +180,11 @@ out:
 }
 
 int
-ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
+ecall_initialize(supernode_t * super, char * pubkey_str, size_t keylen)
 {
     int err = -1, len;
     supernode_t _super;
+    mbedtls_pk_context _, * user_pubkey_ctx = &_;
     crypto_ekey_t * skey;
     crypto_context_t * crypto_ctx = &_super.crypto_ctx;
 
@@ -192,7 +194,14 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
     _super.users_buflen = 0;
     sgx_read_rand((uint8_t *)crypto_ctx, sizeof(crypto_context_t));
 
-    sha256_pubkey(pk_ctx, _super.owner_pubkey);
+    /* parse the public key string */
+    mbedtls_pk_init(user_pubkey_ctx);
+    if (mbedtls_pk_parse_public_key(user_pubkey_ctx, pubkey_str, keylen)) {
+        return -1;
+    }
+
+    sha256_pubkey(user_pubkey_ctx, _super.owner_pubkey);
+    mbedtls_pk_free(user_pubkey_ctx);
 
     /* hash it */
     if (supernode_hash(&_super, crypto_ctx, &crypto_ctx->mac,
@@ -213,7 +222,6 @@ ecall_initialize(supernode_t * super, mbedtls_pk_context * pk_ctx)
     enclave_crypto_ekey(&crypto_ctx->mkey, skey, UC_ENCRYPT);
 
     memcpy(super, &_super, sizeof(supernode_t));
-
 
     free(skey);
 
@@ -292,19 +300,27 @@ out:
     return err;
 }
 
-int
-ecall_ucafs_response(supernode_t * super,
-                     mbedtls_pk_context * user_pubkey_ctx,
-                     uint8_t * user_signature,
-                     size_t sig_len)
+static int
+usgx_ucafs_response(supernode_t * super,
+                    char * pubkey_str,
+                    size_t keylen,
+                    uint8_t * user_signature,
+                    size_t sig_len)
 {
     int err = E_ERROR_ERROR, len;
     crypto_context_t _ctx, *crypto_ctx = &_ctx;
     crypto_mac_t mac;
     crypto_ekey_t * skey = NULL;
-    unsigned char buf[RSA_PUB_DER_MAX_BYTES], *c, hash[CONFIG_SHA256_BUFLEN];
+    mbedtls_pk_context _, * user_pubkey_ctx = &_;
+    unsigned char hash[CONFIG_SHA256_BUFLEN];
 
     if (auth_stage != RESPONSE || sig_len > MBEDTLS_MPI_MAX_SIZE) {
+        return -1;
+    }
+
+    /* parse the public key string */
+    mbedtls_pk_init(user_pubkey_ctx);
+    if (mbedtls_pk_parse_public_key(user_pubkey_ctx, pubkey_str, keylen)) {
         return -1;
     }
 
@@ -332,6 +348,7 @@ ecall_ucafs_response(supernode_t * super,
         goto out;
     }
 
+    // TODO this might be an overkill, we could just use pubkey_str
     sha256_pubkey(user_pubkey_ctx, hash);
     if (memcmp(&super->owner_pubkey, hash, sizeof(hash))) {
         goto out;
@@ -349,7 +366,20 @@ out:
         free(skey);
     }
 
+    mbedtls_pk_free(user_pubkey_ctx);
+
     return err;
+}
+
+int
+ecall_ucafs_response(supernode_t * super,
+                     char * pubkey_str,
+                     size_t keylen,
+                     uint8_t * user_signature,
+                     size_t sig_len)
+{
+    return usgx_ucafs_response(super, pubkey_str, keylen, user_signature,
+                               sig_len);
 }
 
 int

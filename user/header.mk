@@ -26,7 +26,7 @@ CFLAGS = $(FLAGS)
 LIBS = -luuid -luv -lmbedcrypto
 
 ifeq ($(UCAFS_PROFILER), 1)
-       LIBS += -lprofiler
+       LIBS += -lprofiler -ltcmalloc
 endif
 
 INCFLAGS = -I/usr/local/include

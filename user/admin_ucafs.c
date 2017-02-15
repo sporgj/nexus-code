@@ -10,6 +10,7 @@
 #include <mbedtls/entropy.h>
 #include <mbedtls/md.h>
 #include <mbedtls/pk.h>
+#include <mbedtls/platform.h>
 #include <mbedtls/sha256.h>
 
 #ifdef __cplusplus
@@ -54,11 +55,19 @@ static int
 initialize_repository(const char * user_root_path)
 {
     int err = -1;
+    size_t keylen, nbytes;
     sds snode_path = NULL, dnode_path = NULL, repo_path;
+    const char * pubkey_fname = CONFIG_PUBKEY;
+    uint8_t * pubkey_buf = NULL;
     char * main_dnode_fname = NULL;
     mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
     uc_dirnode_t * dirnode = NULL;
     struct stat st;
+
+    if ((err = mbedtls_pk_load_file(pubkey_fname, &pubkey_buf, &keylen))) {
+        uerror("mbedtls_pk_load_file returned %#x", err);
+        return -1;
+    }
 
     supernode_t * super = supernode_new();
     if (super == NULL) {
@@ -67,14 +76,15 @@ initialize_repository(const char * user_root_path)
     }
 
     mbedtls_pk_init(pk_ctx);
-    if (mbedtls_pk_parse_public_keyfile(pk_ctx, CONFIG_PUBKEY)) {
+    if ((err = mbedtls_pk_parse_public_key(pk_ctx, pubkey_buf, keylen))) {
+        mbedtls_free(pubkey_buf);
         supernode_free(super);
-        uerror("mbedtls_pk_parse_public_keyfile returned an error");
+        uerror("mbedtls_pk_parse_public_key returned (%#x)", err);
         return -1;
     }
 
 #ifdef UCAFS_SGX
-    ecall_initialize(global_eid, &err, super, pk_ctx);
+    ecall_initialize(global_eid, &err, super, pubkey_buf, keylen);
     if (err) {
         uerror("ecall_initialize returned %d", err);
         goto out;
@@ -132,6 +142,10 @@ out:
 
     if (main_dnode_fname) {
         free(main_dnode_fname);
+    }
+
+    if (pubkey_buf) {
+        mbedtls_free(pubkey_buf);
     }
 
     return err;

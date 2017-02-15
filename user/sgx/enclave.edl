@@ -21,13 +21,15 @@ enclave {
 
         /* authentication */
         public int ecall_initialize([user_check] supernode_t * supernode,
-                                    [user_check] mbedtls_pk_context * rsa_ctx);
+                                    [user_check] char * pubkey_str,
+                                    size_t keylen);
 
         public int ecall_ucafs_challenge([user_check] uint8_t * nonce_a,
                                          [user_check] auth_struct_t * auth);
 
         public int ecall_ucafs_response([in] supernode_t * super,
-                                        [user_check] mbedtls_pk_context * pk,
+                                        [user_check] char * pubkey_str,
+                                        size_t keylen,
                                         [user_check] uint8_t * user_signature,
                                         size_t sig_len);
 
