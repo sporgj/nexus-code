@@ -6,7 +6,6 @@
 
 static int
 ucafs_store_exit(store_context_t * context,
-                 struct AFSFetchStatus * out,
                  int error,
                  int * do_processfs)
 {
@@ -184,6 +183,8 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
 
         bytes_left -= size;
         *xferred += size;
+
+        // TODO add special handling for files locked on the server
     }
 
     ret = 0;
@@ -211,7 +212,9 @@ ucafs_kern_store(struct vcache * avc,
                  int nomore,
                  struct rx_call * afs_call,
                  char * path,
-                 int base)
+                 int base,
+                 struct storeOps * ops,
+                 void * rock)
 {
     int ret = -1, i, nbytes, bytes_stored = 0;
     struct page * page = NULL;
@@ -224,8 +227,9 @@ ucafs_kern_store(struct vcache * avc,
     context->afs_call = afs_call;
 
     /* 1 - instantiate the context */
+    // TODO return special code for a NOOP
     if (ucafs_store_init(context, avc, bytes, base)) {
-        return -1;
+        goto out;
     }
 
     /* 2 - pin the user pages and start the transfer */
@@ -243,6 +247,8 @@ ucafs_kern_store(struct vcache * avc,
 
     /* 3 - lets start uploading stuff */
     for (i = 0; i < nchunks; i++) {
+        avc->f.truncPos = AFS_NOTRUNC;
+
         // TODO add code for afs_wakeup for cases file is locked at the server
         if (ucafs_store_xfer(context, dclist[i], &nbytes)) {
             ERROR("ucafs_store_xfer error :(");
@@ -259,7 +265,13 @@ ucafs_kern_store(struct vcache * avc,
               (int)bytes);
     }
 
-    ret = 0;
+    // close the connection
+    ret = (*ops->close)(rock, OutStatus, doProcessFS);
+
+    if (*doProcessFS) {
+        hadd32(*anewDV, 1);
+    }
+
 out1:
     /* unpin the page and release everything */
     kunmap(page);
@@ -270,7 +282,11 @@ out1:
     }
 
 out:
-    ucafs_store_exit(context, OutStatus, ret, doProcessFS);
+    ucafs_store_exit(context, ret, doProcessFS);
+
+    if (ops) {
+        ret = (*ops->destroy)(&rock, ret);
+    }
 
     return ret;
 }

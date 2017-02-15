@@ -195,7 +195,7 @@ index 1b99c94..af56488 100644
      crfree(credp);
      return afs_convert_code(code);
 diff --git a/src/afs/VNOPS/afs_vnop_access.c b/src/afs/VNOPS/afs_vnop_access.c
-index 0087073..3ad7ad2 100644
+index 0087073..6b0f105 100644
 --- a/src/afs/VNOPS/afs_vnop_access.c
 +++ b/src/afs/VNOPS/afs_vnop_access.c
 @@ -115,6 +115,8 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
@@ -216,7 +216,7 @@ index 0087073..3ad7ad2 100644
      } else {
  	/* some rights come from dir and some from file.  Specifically, you 
  	 * have "a" rights to a file if you are its owner, which comes
-@@ -183,8 +185,19 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
+@@ -183,8 +185,21 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
  		    fileBits |= PRSFS_READ;
  	    }
  	}
@@ -227,11 +227,13 @@ index 0087073..3ad7ad2 100644
 +    /* ucafs code
 +     * if the permission check passes, send it for ucafs
 +     * to check */
-+    if (ret) {
++    if (ret && !UCAFS_DISCONNECTED()) {
 +	if (ucafs_kern_access(avc, arights)) {
 +	    ret = 0;
 +	}
 +    }
++
++    printk(KERN_ERR "permission: %d\n", ret);
 +
 +    return ret;
  }
@@ -595,7 +597,7 @@ index e8b8f9d..48e78dc 100644
  	/* things to do every 20 seconds or less - required by protocol spec */
  	if (afs_nfsexporter)
 diff --git a/src/afs/afs_fetchstore.c b/src/afs/afs_fetchstore.c
-index f494677..4411e17 100644
+index f494677..231a9c5 100644
 --- a/src/afs/afs_fetchstore.c
 +++ b/src/afs/afs_fetchstore.c
 @@ -590,6 +590,15 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
@@ -627,10 +629,10 @@ index f494677..4411e17 100644
 +		acall = ((struct rxfs_storeVariables*)rock)->call;
 +                ret = ucafs_kern_store(avc, dclist, bytes, anewDV, &doProcessFS,
 +                                       &OutStatus, nchunks, nomore, acall, path,
-+                                       base);
-+
-+                if (ret == 0) {
-+		    code = (*ops->close)(rock, &OutStatus, &doProcessFS);
++                                       base, ops, rock);
++		if (ret == 0) {
++		    // then we can proceed
++		    code = 0;
 +		    goto post_dcache_store;
 +		}
 +
@@ -650,7 +652,21 @@ index f494677..4411e17 100644
  #ifdef AFS_64BIT_CLIENT
  		if (code == RXGEN_OPCODE && !afs_serverHasNo64Bit(tc)) {
  		    afs_serverSetNo64Bit(tc);
-@@ -720,6 +752,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
+@@ -697,8 +729,12 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
+ 		/* Keep last (max) size of file on server to see if
+ 		 * we need to call afs_StoreMini to extend the file.
+ 		 */
+-		if (!moredata)
++		if (!moredata) {
++		    printk(KERN_ERR "length: avc=%d, status=%d\n",
++			    (int)avc->f.m.Length,
++			    (int)OutStatus.Length);
+ 		    *amaxStoredLength = OutStatus.Length;
++		}
+ 		ConvertWToSLock(&avc->lock);
+ 		doProcessFS = 0;
+ 	    }
+@@ -720,6 +756,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
  	}
      }
  
@@ -662,7 +678,7 @@ index f494677..4411e17 100644
      return code;
  }
  
-@@ -1145,7 +1182,15 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1145,7 +1186,15 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      osi_timeval_t xferStartTime;	/*FS xfer start time */
      afs_size_t bytesToXfer = 0, bytesXferred = 0;
  #endif
@@ -679,7 +695,7 @@ index f494677..4411e17 100644
      AFS_STATCNT(CacheFetchProc);
  
      XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
-@@ -1156,9 +1201,29 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1156,9 +1205,29 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
       * avc->lock(W) if !setLocks || slowPass
       * adc->lock(W)
       */
@@ -692,9 +708,9 @@ index f494677..4411e17 100644
 +    }
 +
 +    acall = ((struct rxfs_fetchVariables *)rock)->call;
-+    ret = ucafs_kern_fetch(tc, rxconn, fP, base, adc, avc, length, acall, path);
++    ret = ucafs_kern_fetch(tc, rxconn, fP, base, adc, avc, length, acall, path,
++			    tsmall, &ops, rock);
 +    if (ret == 0) {
-+	code = 0;
 +	goto clean_up;
 +    }
 +
@@ -709,14 +725,19 @@ index f494677..4411e17 100644
  #ifndef AFS_NOSTATS
      osi_GetuTime(&xferStartTime);
  #endif /* AFS_NOSTATS */
-@@ -1211,6 +1276,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
+@@ -1211,10 +1280,8 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
  	}
  	code = 0;
      } while (moredata);
+-    if (!code)
+-	code = (*ops->close)(rock, avc, adc, tsmall);
+-    if (ops)
+-	(*ops->destroy)(&rock, code);
++
 +clean_up:
-     if (!code)
- 	code = (*ops->close)(rock, avc, adc, tsmall);
-     if (ops)
+ 
+ #ifndef AFS_NOSTATS
+     FillStoreStats(code, AFS_STATS_FS_XFERIDX_FETCHDATA, &xferStartTime,
 diff --git a/src/afs/afs_init.c b/src/afs/afs_init.c
 index 43fa5b4..785ec2c 100644
 --- a/src/afs/afs_init.c

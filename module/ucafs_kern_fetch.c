@@ -209,7 +209,10 @@ ucafs_kern_fetch(struct afs_conn * tc,
                  struct vcache * avc,
                  afs_int32 size,
                  struct rx_call * acall,
-                 char * path)
+                 char * path,
+                 struct afs_FetchOutput * tsmall,
+                 struct fetchOps * ops,
+                 void * rock)
 {
     int ret = -1, nbytes;
     struct page * page = NULL;
@@ -244,7 +247,7 @@ ucafs_kern_fetch(struct afs_conn * tc,
         goto out1;
     }
 
-    ret = 0;
+    ret = (*ops->close)(rock, avc, adc, tsmall);
 out1:
     /* unpin the page and release everything */
     kunmap(page);
@@ -254,6 +257,9 @@ out1:
     }
 
 out:
-    ret = ucafs_fetch_exit(context, ret);
+    ret = (*ops->destroy)(&rock, ret);
+
+    ucafs_fetch_exit(context, ret);
+    // TODO if the userspace returns an error, erase the tdc contents
     return ret;
 }
