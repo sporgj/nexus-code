@@ -2,10 +2,11 @@
 
 sgx_enclave_id_t global_eid;
 
-TEST(DIRNODE, test1) {
+TEST(DIRNODE, test1)
+{
     uc_dirnode_t * dirnode = dirnode_new();
-    shadow_t * shdw1 = NULL, * shdw2;
-    const char * fname = "test", * str1;
+    shadow_t *shdw1 = NULL, *shdw2;
+    const char *fname = "test", *str1;
     char * temp1;
     ucafs_entry_type atype;
 
@@ -39,13 +40,15 @@ TEST(DIRNODE, test1) {
     free(temp1);
 }
 
-TEST(DIRNODE, test2) {
-    uc_dirnode_t * dirnode = dirnode_new(), * dirnode2;
-    shadow_t * shdw1 = NULL, * shdw2;
-    const char * tpl = "file%d.txt", *fname = "dirnode.txt";
+TEST(DIRNODE, test2)
+{
+    uc_dirnode_t *dirnode = dirnode_new(), *dirnode2;
+    shadow_t *shdw1 = NULL, *shdw2;
+    const char *tpl = "file%d.txt", *fname = "dirnode.txt";
     char buffer[30];
 
-    ASSERT_EQ(0, ucafs_init_enclave()) << "Enclave failed: " << ENCLAVE_FILENAME;
+    ASSERT_EQ(0, ucafs_init_enclave()) << "Enclave failed: "
+                                       << ENCLAVE_FILENAME;
 
     for (size_t i = 1; i < 6; i++) {
         snprintf(buffer, sizeof(buffer), tpl, i);
@@ -62,4 +65,39 @@ TEST(DIRNODE, test2) {
     ASSERT_FALSE(dirnode2 == NULL) << "dirnode_from_file returned NULL";
 
     dirnode_free(dirnode);
+}
+
+TEST(DIRNODE, test3)
+{
+    uc_dirnode_t *dirnode1 = dirnode_new(), *dirnode2;
+    shadow_t * shdw1 = NULL;
+    const shadow_t * shdw2 = NULL;
+    ucafs_entry_type atype;
+    const char *link_fname = "link.txt", *fname = "dummy_dirnode",
+               *target_path = "./dell.txt";
+    int len, link_info_len;
+    link_info_t * link_info = NULL;
+    const link_info_t * link_info1;
+
+    len = strlen(target_path);
+    link_info_len = len + sizeof(link_info_t) + 1;
+    link_info = (link_info_t *)calloc(1, link_info_len);
+
+    ASSERT_FALSE(link_info == NULL) << "allocation failed";
+
+    link_info->total_len = link_info_len;
+    link_info->type = UC_SOFTLINK;
+    /* the meta file is useless */
+    memcpy(&link_info->target_link, target_path, len);
+
+    /* 5 - add it to the dirnode */
+    shdw1 = dirnode_add_link(dirnode1, link_fname, link_info);
+    ASSERT_FALSE(shdw1 == NULL) << "dirnode_add_link FAILED :(";
+
+    shdw2 = dirnode_traverse(dirnode1, link_fname, UC_LINK, &atype, &link_info1);
+    ASSERT_FALSE(shdw2 == NULL);
+
+    ASSERT_TRUE(dirnode_write(dirnode1, fname));
+
+    dirnode_free(dirnode1);
 }

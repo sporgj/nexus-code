@@ -16,7 +16,7 @@ libucafs.a: ../libucafs.a
 		make -C ../ && cp $< $@
 
 test_structs: test_structs.cc libucafs.a
-		$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS)  -o $@
+		@$(CXX) $(CPPFLAGS) $(App_Cpp_Flags) -I$(UCAFS_DIR) $< ../libucafs.a $(LIBS)  -o $@
 		@echo "$(CXX) => $@"
 
 .PHONY: clean

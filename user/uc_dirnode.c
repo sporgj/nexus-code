@@ -83,6 +83,16 @@ dirnode_new()
     return dirnode_new_alias(NULL);
 }
 
+static inline void
+free_list_entry(dnode_list_entry_t * list_entry)
+{
+    if (list_entry->dir_entry.target) {
+        free(list_entry->dir_entry.target);
+    }
+
+    free(list_entry);
+}
+
 void
 dirnode_free(uc_dirnode_t * dirnode)
 {
@@ -94,12 +104,7 @@ dirnode_free(uc_dirnode_t * dirnode)
         list_entry = TAILQ_FIRST(list_head);
         TAILQ_REMOVE(list_head, list_entry, next_entry);
 
-        // TODO transfer this to a separate function
-        if (list_entry->dir_entry.target) {
-            free(list_entry->dir_entry.target);
-        }
-
-        free(list_entry);
+        free_list_entry(list_entry);
     }
 
     if (dirnode->dnode_path) {
@@ -371,8 +376,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
 
     /* set the link data */
     if (link_info) {
-        len = link_info->total_len
-            - (sizeof(link_info->total_len) + sizeof(link_info->type));
+        len = link_info->total_len - sizeof(link_info_t);
 
         if ((de->target = malloc(len)) == NULL) {
             log_fatal("allocation error");
@@ -441,14 +445,18 @@ iterate_by_realname(uc_dirnode_t * dn,
         de = &list_entry->dir_entry;
 
         if (len == de->name_len && memcmp(realname, de->real_name, len) == 0) {
+            /* XXX this needs to be deprecated. */
             if (pp_link_info && de->link_len) {
                 len1 = de->link_len + sizeof(link_info_t);
-                link_info = (link_info_t *)malloc(len1);
-                if (link_info == NULL) {
+
+                if ((link_info = (link_info_t *)malloc(len1)) == NULL) {
                     log_fatal("allocation error");
                     return NULL;
                 }
 
+                link_info->total_len = len1;
+                link_info->type
+                    = (de->type == UC_LINK) ? UC_SOFTLINK : UC_HARDLINK;
                 memcpy(link_info->target_link, de->target, de->link_len);
                 *pp_link_info = link_info;
             }
@@ -492,7 +500,7 @@ dirnode_rm(uc_dirnode_t * dn,
     dn->header.dirbox_len -= de->rec_len;
 
     TAILQ_REMOVE(&dn->dirbox, list_entry, next_entry);
-    free(list_entry);
+    free_list_entry(list_entry);
     
     return result;
 out:
@@ -619,7 +627,7 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
         /* write out the link info */
         if ((len = de->link_len)) {
-            memcpy(buffer, &de->target, len);
+            memcpy(buffer, de->target, len);
             buffer += len;
         }
     }
@@ -658,6 +666,7 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
                 goto out;
             }
 
+            memcpy(de->target, buffer, len);
             buffer += len;
         } else {
             de->target = NULL;
