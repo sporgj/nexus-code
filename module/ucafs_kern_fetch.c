@@ -209,10 +209,7 @@ ucafs_kern_fetch(struct afs_conn * tc,
                  struct vcache * avc,
                  afs_int32 size,
                  struct rx_call * acall,
-                 char * path,
-                 struct afs_FetchOutput * tsmall,
-                 struct fetchOps * ops,
-                 void * rock)
+                 char * path)
 {
     int ret = -1, nbytes;
     struct page * page = NULL;
@@ -227,6 +224,10 @@ ucafs_kern_fetch(struct afs_conn * tc,
     /* 1 - initialize the context */
     if (ucafs_fetch_init(context, avc, base, size)) {
         goto out;
+    }
+
+    if (adc) {
+        adc->validPos = base;
     }
 
     /* 2 - Pin the user pages and start tranferring */
@@ -247,7 +248,6 @@ ucafs_kern_fetch(struct afs_conn * tc,
         goto out1;
     }
 
-    ret = (*ops->close)(rock, avc, adc, tsmall);
 out1:
     /* unpin the page and release everything */
     kunmap(page);
@@ -257,8 +257,6 @@ out1:
     }
 
 out:
-    ret = (*ops->destroy)(&rock, ret);
-
     ucafs_fetch_exit(context, ret);
     // TODO if the userspace returns an error, erase the tdc contents
     return ret;

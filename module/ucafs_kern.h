@@ -86,10 +86,7 @@ ucafs_kern_fetch(struct afs_conn * tc,
                  struct vcache * avc,
                  afs_int32 size,
                  struct rx_call * acall,
-                 char * path,
-                 struct afs_FetchOutput * tsmall,
-                 struct fetchOps * ops,
-                 void * rock);
+                 char * path);
 
 int
 ucafs_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data);
