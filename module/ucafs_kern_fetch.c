@@ -151,7 +151,7 @@ ucafs_fetch_xfer(fetch_context_t * context,
     XDR xdrs;
     caddr_t buf_ptr;
 
-    *xferred = fp->offset = 0;
+    *xferred = 0;
     while (bytes_left > 0) {
         size = MIN(bytes_left, context->buflen);
 
@@ -182,11 +182,16 @@ ucafs_fetch_xfer(fetch_context_t * context,
         reply = NULL;
 
         /* move our pointers and copy the data into the tdc file */
+        nbytes = afs_osi_Write(fp, -1, (void *)context->buffer, size);
+        if (nbytes != size) {
+            ERROR("nbytes=%d, size=%d\n", nbytes, size);
+            goto out;
+        }
+
         pos += size;
         bytes_left -= size;
         *xferred += size;
 
-        afs_osi_Write(fp, -1, (void *)context->buffer, nbytes);
         adc->validPos = pos;
         afs_osi_Wakeup(&adc->validPos);
     }
@@ -248,6 +253,7 @@ ucafs_kern_fetch(struct afs_conn * tc,
         goto out1;
     }
 
+    ret = 0;
 out1:
     /* unpin the page and release everything */
     kunmap(page);
