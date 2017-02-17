@@ -71,8 +71,8 @@ uc_rpc_dirops(uc_msg_type_t msg_type, XDR * xdrs, XDR * xdr_out)
     }
 
     if (tor->func(parent_dir, name, type, &shdw_name)) {
-        log_error("[%s (%s)] %s/%s FAILED", tor->name, TYPE_TO_STR(msg_type),
-                  parent_dir, name);
+        /*log_error("[%s (%s)] %s/%s FAILED", tor->name, TYPE_TO_STR(msg_type),
+                  parent_dir, name);*/
         goto out;
     }
 

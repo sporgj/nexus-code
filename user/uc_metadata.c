@@ -9,7 +9,6 @@
 #include "third/hashmap.h"
 #include "third/queue.h"
 #include "third/sds.h"
-#include "third/slog.h"
 #include "third/log.h"
 
 #include <sys/stat.h>
@@ -51,7 +50,7 @@ _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
     metadata_entry_t * entry
         = (metadata_entry_t *)malloc(sizeof(metadata_entry_t));
     if (entry == NULL) {
-        slog(0, SLOG_ERROR, "allocation failed for metadata_entry_t");
+        log_fatal("allocation failed for metadata_entry_t");
         return -1;
     }
 
@@ -193,7 +192,7 @@ metadata_init()
 {
     metadata_hashmap = hashmapCreate(64, _hash_func, _hash_eq);
     if (metadata_hashmap == NULL) {
-        slog(0, SLOG_ERROR, "hashmapCreate returns NULL");
+        log_fatal("hashmapCreate returns NULL");
         return -1;
     }
 

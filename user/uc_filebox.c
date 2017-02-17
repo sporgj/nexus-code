@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "third/slog.h"
 #include "third/log.h"
 
 #include "uc_dirnode.h"

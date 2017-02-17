@@ -3,7 +3,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "third/slog.h"
 #include "third/log.h"
 
 #include "uc_dirnode.h"
@@ -28,19 +27,19 @@ dirops_new1(const char * parent_dir,
 
     /* lets get the directory entry */
     if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
-        slog(0, SLOG_ERROR, "Error loading dirnode: %s", parent_dir);
+        log_error("Error loading dirnode: %s", parent_dir);
         return error;
     }
 
     /* Get filename and add it to DirNode */
     if ((fname_code = dirnode_add(dirnode, fname, type)) == NULL) {
-        slog(0, SLOG_ERROR, "Add file operation failed: %s", parent_dir);
+        log_error("Add file operation failed: %s", parent_dir);
         goto out;
     }
 
     // 3 - Flush to disk
     if (!dirnode_flush(dirnode)) {
-        slog(0, SLOG_ERROR, "Flushing '%s' failed", parent_dir);
+        log_error("Flushing '%s' failed", parent_dir);
         goto out;
     }
 
@@ -48,24 +47,24 @@ dirops_new1(const char * parent_dir,
 
     if (type == UC_DIR) {
         if ((dirnode1 = dirnode_new2(fname_code, dirnode)) == NULL) {
-            slog(0, SLOG_ERROR, "new dirnode failed: %s/%s", parent_dir, fname);
+            log_error("new dirnode failed: %s/%s", parent_dir, fname);
             goto out;
         }
 
         if (!dirnode_write(dirnode1, path1)) {
-            slog(0, SLOG_ERROR, "Creating: '%s/%s' dirnode failed", parent_dir,
+            log_error("Creating: '%s/%s' dirnode failed", parent_dir,
                  fname);
             goto out;
         }
     } else if (type == UC_FILE) {
         if ((filebox = filebox_new2(fname_code, dirnode)) == NULL) {
-            slog(0, SLOG_ERROR, "Creating '%s/%s' filebox failed", parent_dir,
+            log_error("Creating '%s/%s' filebox failed", parent_dir,
                  fname);
             goto out;
         }
 
         if (!filebox_write(filebox, path1)) {
-            slog(0, SLOG_ERROR, "Writing filebox to '%s' failed", path1);
+            log_error("Writing filebox to '%s' failed", path1);
             goto out;
         }
     }
@@ -97,12 +96,12 @@ dirops_new(const char * fpath, ucafs_entry_type type, char ** encoded_name_dest)
     sds fname = NULL, dir_path = NULL;
 
     if ((fname = do_get_fname(fpath)) == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
+        log_error("Error getting file name: %s", fpath);
         return UC_STATUS_NOOP;
     }
 
     if ((dir_path = do_get_dir(fpath)) == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath);
+        log_error("Error getting file name: %s", fpath);
         sdsfree(fname);
         return UC_STATUS_NOOP;
     }
@@ -190,21 +189,21 @@ dirops_move(const char * from_dir,
         if (dirnode_rename(dirnode1, oldname, newname, type, &atype,
                            &shadow1_bin, &shadow2_bin, &link_info1,
                            &link_info2)) {
-            slog(0, SLOG_ERROR, "rename (%s) %s -> %s FAILED", from_dir,
+            log_error("rename (%s) %s -> %s FAILED", from_dir,
                  oldname, newname);
             goto out;
         }
 
         /* now write out the dirnode object */
         if (!dirnode_flush(dirnode1)) {
-            slog(0, SLOG_ERROR, "flushing dirnode (%s) FAILED", from_dir);
+            log_error("flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
     } else {
         /* get the shadow names */
         shadow1_bin = dirnode_rm(dirnode1, oldname, type, &atype, &link_info1);
         if (shadow1_bin == NULL) {
-            slog(0, SLOG_ERROR, "finding '%s' failed", oldname);
+            log_error("finding '%s' failed", oldname);
             goto out;
         }
 
@@ -213,18 +212,18 @@ dirops_move(const char * from_dir,
         shadow2_bin
             = dirnode_add_alias(dirnode2, newname, atype, NULL, link_info1);
         if (shadow2_bin == NULL) {
-            slog(0, SLOG_ERROR, "adding '%s' to dirnode FAILED", newname);
+            log_error("adding '%s' to dirnode FAILED", newname);
             goto out;
         }
 
         /* write the dirnode object */
         if (!dirnode_flush(dirnode1)) {
-            slog(0, SLOG_ERROR, "flushing dirnode (%s) FAILED", from_dir);
+            log_error("flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
 
         if (!dirnode_flush(dirnode2)) {
-            slog(0, SLOG_ERROR, "flushing dirnode (%s)", to_dir);
+            log_error("flushing dirnode (%s)", to_dir);
             goto out;
         }
     }
@@ -233,7 +232,7 @@ dirops_move(const char * from_dir,
     shadow1_str = filename_bin2str(shadow1_bin);
     shadow2_str = filename_bin2str(shadow2_bin);
     if (shadow1_str == NULL || shadow2_str == NULL) {
-        slog(0, SLOG_ERROR, "converting shadowname to str");
+        log_error("converting shadowname to str");
         goto out;
     }
 
@@ -244,25 +243,24 @@ dirops_move(const char * from_dir,
     /* move the metadata file */
     if (atype != UC_LINK) {
         if (rename(path1, path2)) {
-            slog(0, SLOG_ERROR, "renaming metadata file failed");
+            log_error("renaming metadata file failed");
             goto out;
         }
     } else {
-        slog(0, SLOG_INFO, "renaming link (%s) %s -> %s", from_dir, oldname,
-             newname);
+        log_info("renaming link (%s) %s -> %s", from_dir, oldname, newname);
     }
 
     /* last step is to update the moved entry's parent directory. */
     if (atype == UC_DIR) {
         if ((dirnode3 = dirnode_from_file(path2)) == NULL) {
-            slog(0, SLOG_INFO, "loading dirnode file failed(%s)", path3);
+            log_info("loading dirnode file failed(%s)", path3);
             goto out;
         }
 
         dirnode_set_parent(dirnode3, dirnode2);
 
         if (!dirnode_flush(dirnode3)) {
-            slog(0, SLOG_ERROR, "flushing dirnode (%s) failed", path3);
+            log_error("flushing dirnode (%s) failed", path3);
             goto out;
         }
     }
@@ -361,13 +359,13 @@ dirops_symlink(const char * link_path,
 
     /* 1 - get the respective dirnode */
     if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
-        slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
+        log_error("dirnode (%s) not found", link_path);
         return error;
     }
 
     /* 2 - Find the link to the file */
     if ((link_fname = do_get_fname(link_path)) == NULL) {
-        slog(0, SLOG_ERROR, "getting fname (%s) FAILED", target_path);
+        log_error("getting fname (%s) FAILED", target_path);
         goto out;
     }
 
@@ -377,7 +375,7 @@ dirops_symlink(const char * link_path,
     len = strlen(target_path);
     link_info_len = len + sizeof(link_info_t) + 1;
     if ((link_info = (link_info_t *)calloc(1, link_info_len)) == NULL) {
-        slog(0, SLOG_ERROR, "allocation failed for link_info");
+        log_error("allocation failed for link_info");
         goto out;
     }
 
@@ -389,12 +387,12 @@ dirops_symlink(const char * link_path,
     /* 5 - add it to the dirnode */
     shadow_name2 = dirnode_add_link(link_dnode, link_fname, link_info);
     if (shadow_name2 == NULL) {
-        slog(0, SLOG_ERROR, "adding link (%s) FAILED", link_path);
+        log_error("adding link (%s) FAILED", link_path);
         goto out;
     }
 
     if (!dirnode_flush(link_dnode)) {
-        slog(0, SLOG_ERROR, "saving dirnode (%s) FAILED", link_path);
+        log_error("saving dirnode (%s) FAILED", link_path);
         goto out;
     }
 
@@ -440,18 +438,18 @@ dirops_hardlink(const char * target_path,
 
     /* 1 - Get the dirnodes for both link and target */
     if ((target_fbox = vfs_get_filebox(target_path, 0)) == NULL) {
-        slog(0, SLOG_ERROR, "filebox (%s) not found", target_path);
+        log_error("filebox (%s) not found", target_path);
         return error;
     }
 
     if ((target_dnode = vfs_lookup(target_path, false)) == NULL) {
-        slog(0, SLOG_ERROR, "dirnode (%s) not found", target_path);
+        log_error("dirnode (%s) not found", target_path);
         filebox_free(target_fbox);
         return error;
     }
 
     if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
-        slog(0, SLOG_ERROR, "dirnode (%s) not found", link_path);
+        log_error("dirnode (%s) not found", link_path);
         filebox_free(target_fbox);
         dcache_put(target_dnode);
         return error;
@@ -459,19 +457,19 @@ dirops_hardlink(const char * target_path,
 
     /* 2 - get the filenames */
     if ((target_fname = do_get_fname(target_path)) == NULL) {
-        slog(0, SLOG_ERROR, "getting fname (%s) FAILED", target_path);
+        log_error("getting fname (%s) FAILED", target_path);
         goto out;
     }
 
     if ((link_fname = do_get_fname(link_path)) == NULL) {
-        slog(0, SLOG_ERROR, "getting fname (%s) FAILED", link_path);
+        log_error("getting fname (%s) FAILED", link_path);
         goto out;
     }
 
     /* 3 - get shadow name of the target */
     shadow_name1 = dirnode_raw2enc(target_dnode, target_fname, UC_ANY, &atype);
     if (shadow_name1 == NULL) {
-        slog(0, SLOG_ERROR, "finding entry in (%s) FAILED", target_fname);
+        log_error("finding entry in (%s) FAILED", target_fname);
         goto out;
     }
 
@@ -479,7 +477,7 @@ dirops_hardlink(const char * target_path,
     len = sizeof(shadow_t);
     link_info_len = len + sizeof(link_info_t) + 1;
     if ((link_info = (link_info_t *)calloc(1, link_info_len)) == NULL) {
-        slog(0, SLOG_ERROR, "allocation failed for link_info");
+        log_error("allocation failed for link_info");
         goto out;
     }
 
@@ -491,7 +489,7 @@ dirops_hardlink(const char * target_path,
     shadow_name2
         = dirnode_add_alias(link_dnode, link_fname, UC_FILE, NULL, link_info);
     if (shadow_name2 == NULL) {
-        slog(0, SLOG_ERROR, "adding link (%s) FAILED", link_path);
+        log_error("adding link (%s) FAILED", link_path);
         goto out;
     }
 
@@ -499,12 +497,12 @@ dirops_hardlink(const char * target_path,
 
     /* 6 - save the dirnodes */
     if (!filebox_flush(target_fbox)) {
-        slog(0, SLOG_ERROR, "saving filebox (%s) FAILED", target_path);
+        log_error("saving filebox (%s) FAILED", target_path);
         goto out;
     }
 
     if (!dirnode_flush(link_dnode)) {
-        slog(0, SLOG_ERROR, "saving dirnode (%s) FAILED", link_path);
+        log_error("saving dirnode (%s) FAILED", link_path);
         goto out;
     }
 
@@ -544,12 +542,12 @@ dirops_plain2code(const char * fpath_raw,
     sds fname, dir_path;
 
     if ((fname = do_get_fname(fpath_raw)) == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        log_error("Error getting file name: %s", fpath_raw);
         return UC_STATUS_NOOP;
     }
 
     if ((dir_path = do_get_dir(fpath_raw)) == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        log_error("Error getting file name: %s", fpath_raw);
         sdsfree(fname);
         return UC_STATUS_NOOP;
     }
@@ -580,7 +578,7 @@ dirops_plain2code1(const char * parent_path,
     /* Perform the operation */
     fname_code = dirnode_raw2enc(dirnode, fname, type, &atype);
     if (fname_code == NULL) {
-        slog(0, SLOG_WARN, "%s not found (%s)", fname, parent_path);
+        log_warn("%s not found (%s)", fname, parent_path);
         goto out;
     }
 
@@ -605,20 +603,20 @@ __delete_metadata_file(const char * parent_dir,
     if (is_filebox) {
         /* instatiate, update ref count and delete */
         if ((filebox = filebox_from_file(metadata_path)) == NULL) {
-            slog(0, SLOG_ERROR, "loading filebox (%s) FAILED", metadata_path);
+            log_error("loading filebox (%s) FAILED", metadata_path);
             goto out;
         }
 
         if (filebox_decr_link_count(filebox) == 0) {
             if (unlink(metadata_path)) {
-                slog(0, SLOG_ERROR, "deleting filebox (%s) FAILED",
+                log_error("deleting filebox (%s) FAILED",
                      metadata_path);
                 goto out;
             }
         } else {
             // write it to disk
             if (!filebox_flush(filebox)) {
-                slog(0, SLOG_ERROR, "writing filebox (%s) FAILED",
+                log_error("writing filebox (%s) FAILED",
                      metadata_path);
                 goto out;
             }
@@ -628,7 +626,7 @@ __delete_metadata_file(const char * parent_dir,
          * directories,
          * they only have one ref count. */
         if (unlink(metadata_path)) {
-            slog(0, SLOG_ERROR, "deleting dirnode (%s) FAILED", metadata_path);
+            log_error("deleting dirnode (%s) FAILED", metadata_path);
             goto out;
         }
     }
@@ -659,12 +657,12 @@ dirops_remove(const char * fpath_raw,
     sds fname = NULL, dir_path = NULL;
 
     if ((fname = do_get_fname(fpath_raw)) == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        log_error("Error getting file name: %s", fpath_raw);
         return UC_STATUS_NOOP;
     }
 
     if ((dir_path = do_get_dir(fpath_raw)) == NULL) {
-        slog(0, SLOG_ERROR, "Error getting file name: %s", fpath_raw);
+        log_error("Error getting file name: %s", fpath_raw);
         sdsfree(fname);
         return UC_STATUS_NOOP;
     }
@@ -689,7 +687,7 @@ dirops_remove1(const char * parent_dir,
     ucafs_entry_type atype;
 
     if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
-        slog(0, SLOG_ERROR, "dirnode (%s) not found", parent_dir);
+        log_error("dirnode (%s) not found", parent_dir);
         return error;
     }
 
@@ -699,13 +697,13 @@ dirops_remove1(const char * parent_dir,
     /* delete and get the info */
     shadow_name = dirnode_rm(dirnode, fname, type, &atype, &link_info);
     if (shadow_name == NULL) {
-        slog(0, SLOG_ERROR, "shadow file (%s) not found", fname);
+        log_error("shadow file (%s) not found", fname);
         goto out;
     }
 
     /* write the dirnode containing the file entry */
     if (!dirnode_flush(dirnode)) {
-        slog(0, SLOG_ERROR, "flushing dirnode (%s) failed", parent_dir);
+        log_error("flushing dirnode (%s) failed", parent_dir);
         goto out;
     }
 

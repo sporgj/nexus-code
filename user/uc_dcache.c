@@ -7,7 +7,7 @@
 #include "third/hashmap.h"
 #include "third/log.h"
 #include "third/queue.h"
-#include "third/slog.h"
+#include "third/log.h"
 
 #include "uc_vfs.h"
 #include "uc_dirnode.h"
@@ -123,7 +123,7 @@ dcache_new(const char * name,
     struct uc_dentry * dentry;
     dentry = (struct uc_dentry *)calloc(1, sizeof(struct uc_dentry));
     if (dentry == NULL) {
-        slog(0, SLOG_ERROR, "allocation error on new uc_dentry");
+        log_fatal("allocation error on new uc_dentry");
         return NULL;
     }
 
@@ -177,7 +177,7 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
     Hashmap * hashmap = dentry->dentry_tree->hashmap;
     dcache_item_t * entry = (dcache_item_t *)malloc(sizeof(dcache_item_t));
     if (entry == NULL) {
-        slog(0, SLOG_ERROR, "allocation on new dlist_item");
+        log_warn("allocation on new dlist_item");
         return;
     }
 
@@ -376,7 +376,7 @@ dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath)
     sds temp_path, relpath;
 
     if ((relpath = vfs_relpath(path, dirpath)) == NULL) {
-        slog(0, SLOG_ERROR, "getting relpath `%s` FAILED", path);
+        log_warn("getting relpath `%s` FAILED", path);
         return NULL;
     }
 
@@ -465,7 +465,7 @@ dcache_put(uc_dirnode_t * dn)
     atomic_fetch_sub(&dentry->count, 1);
 
     if (dentry->count < 0) {
-        slog(0, SLOG_ERROR, "dentry ref count is negative (%d)", dentry->count);
+        log_warn("dentry ref count is negative (%d)", dentry->count);
         return;
     }
 

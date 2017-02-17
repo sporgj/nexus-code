@@ -6,7 +6,6 @@
 #include "uc_supernode.h"
 
 #include "third/log.h"
-#include "third/slog.h"
 
 supernode_t *
 supernode_new()
@@ -110,7 +109,7 @@ supernode_from_file(const char * path)
 
     fd = fopen(path, "rb");
     if (fd == NULL) {
-        slog(0, SLOG_ERROR, "could not open %s", path);
+        log_error("could not open %s", path);
         return NULL;
     }
 
@@ -122,7 +121,7 @@ supernode_from_file(const char * path)
 
     nbytes = fread(super, sizeof(supernode_header_t), 1, fd);
     if (!nbytes) {
-        slog(0, SLOG_ERROR, "superblock format error: %s", path);
+        log_error("superblock format error: %s", path);
         goto out;
     }
 
@@ -211,7 +210,7 @@ supernode_write(supernode_t * super, const char * path)
 
     fd = fopen(path, "wb");
     if (fd == NULL) {
-        slog(0, SLOG_ERROR, "could not open %s", path);
+        log_error("could not open %s", path);
         return false;
     }
 
@@ -225,20 +224,20 @@ supernode_write(supernode_t * super, const char * path)
     // seal info here
     ecall_supernode_crypto(global_eid, &ret, super, CRYPTO_SEAL);
     if (ret) {
-        slog(0, SLOG_ERROR, "sealing supernode failed");
+        log_error("sealing supernode failed");
         goto out;
     }
 #endif
 
     nbytes = fwrite(super, sizeof(supernode_header_t), 1, fd);
     if (!nbytes) {
-        slog(0, SLOG_ERROR, "writing superblock %s failed", path);
+        log_error("writing superblock %s failed", path);
         goto out;
     }
 
     nbytes = fwrite(buffer, 1, super->users_buflen, fd);
     if (nbytes != super->users_buflen) {
-        slog(0, SLOG_ERROR, "writing superblock body failed: %s", path);
+        log_error("writing superblock body failed: %s", path);
         goto out;
     }
 
@@ -289,13 +288,13 @@ supernode_add(supernode_t * super,
     {
         user = &curr->user_data;
         if (strncmp(user->username, username, user->len) == 0) {
-            slog(0, SLOG_ERROR, "user '%s' already exists in superblock",
+            log_error("user '%s' already exists in superblock",
                  username);
             goto out;
         }
 
         if (memcmp(user->pubkey_hash, hash, CONFIG_SHA256_BUFLEN) == 0) {
-            slog(0, SLOG_ERROR, "user '%s', already has public key",
+            log_error("user '%s', already has public key",
                  user->username);
             goto out;
         }
@@ -306,7 +305,7 @@ supernode_add(supernode_t * super,
     curr = (struct snode_user_entry *)calloc(1, sizeof(struct snode_user_entry)
                                                  + len);
     if (curr == NULL) {
-        slog(0, SLOG_ERROR, "memory allocation failed");
+        log_error("memory allocation failed");
         goto out;
     }
 

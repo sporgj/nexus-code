@@ -8,7 +8,7 @@
 
 #include "third/sds.h"
 #include "third/seqptrmap.h"
-#include "third/slog.h"
+#include "third/log.h"
 
 #include "uc_vfs.h"
 #include "uc_dirnode.h"
@@ -59,19 +59,19 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     /* lets find the dirnode object first */
     filebox = vfs_get_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
     if (filebox == NULL) {
-        slog(0, SLOG_ERROR, "finding filebox failed: '%s'", fpath);
+        log_error("finding filebox failed: '%s'", fpath);
         return ret;
     }
 
     xfer_ctx = (xfer_context_t *)calloc(1, sizeof(xfer_context_t));
     if (xfer_ctx == NULL) {
-        slog(0, SLOG_FATAL, "fileops - memory allocation failed");
+        log_fatal("fileops - memory allocation failed");
         goto out;
     }
 
     // XXX sometimes, we don't need a whole page just for data
     if (posix_memalign((void **)&xfer_ctx->buffer, PAGE_SIZE, 2 * PAGE_SIZE)) {
-        slog(0, SLOG_FATAL, "fetchstore - memory allocatio failed");
+        log_fatal("fetchstore - memory allocatio failed");
         goto out;
     }
 
@@ -90,20 +90,20 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {
         // TODO delete context from enclave space
-        slog(0, SLOG_ERROR, "fileops - Adding to list failed");
+        log_error("fileops - Adding to list failed");
         goto out;
     }
 
 #ifdef UCAFS_SGX
     ecall_fetchstore_init(global_eid, &ret, xfer_ctx);
     if (ret) {
-        slog(0, SLOG_ERROR, "Enclave error");
+        log_error("Enclave error");
         goto out;
     }
 
     ecall_fetchstore_start(global_eid, &ret, xfer_ctx);
     if (ret) {
-        slog(0, SLOG_FATAL, "enclave error");
+        log_fatal("enclave error");
         goto out;
     }
 #endif
@@ -129,7 +129,7 @@ fetchstore_run(int id, size_t valid_buflen)
     xfer_context_t * xfer_ctx
         = (xfer_context_t *)seqptrmap_get(xfer_context_array, id);
     if (xfer_ctx == NULL) {
-        slog(0, SLOG_ERROR, "xfer_ctx id=%d not found", id);
+        log_warn("xfer_ctx id=%d not found", id);
         return -1;
     }
 
@@ -138,7 +138,7 @@ fetchstore_run(int id, size_t valid_buflen)
 #ifdef UCAFS_SGX
     ecall_fetchstore_crypto(global_eid, &ret, xfer_ctx);
     if (ret) {
-        slog(0, SLOG_FATAL, "enclave error");
+        log_fatal("enclave error");
         goto out;
     }
 #endif
@@ -155,21 +155,21 @@ fetchstore_finish(int id)
     xfer_context_t * xfer_ctx
         = (xfer_context_t *)seqptrmap_get(xfer_context_array, id);
     if (xfer_ctx == NULL) {
-        slog(0, SLOG_ERROR, "xfer_ctx id=%d not found", id);
+        log_error("xfer_ctx id=%d not found", id);
         return -1;
     }
 
 #ifdef UCAFS_SGX
     ecall_fetchstore_finish(global_eid, &ret, xfer_ctx);
     if (ret) {
-        slog(0, SLOG_ERROR, "enclave reports error");
+        log_error("enclave reports error");
         // TODO have proper handling here
         goto out;
     }
 #endif
 
     if (!filebox_flush(xfer_ctx->filebox)) {
-        slog(0, SLOG_ERROR, "committing the filebox to disk failed");
+        log_error("committing the filebox to disk failed");
         goto out;
     }
 

@@ -9,24 +9,24 @@ ifeq ($(UCAFS_SGX), 1)
 endif
 
 ifeq ($(UCAFS_DEV), 1)
-       FLAGS += -DUCAFS_DEV
+       FLAGS += -DUCAFS_DEV -O0 -g
 else
-       FLAGS += -UUCAFS_DEV
+       FLAGS += -UUCAFS_DEV -DLOGLEVEL=1 -O2
 endif
 
 PROGRAM = ucafs
 CXX = g++
 CC = gcc
 FLAGS += -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc\
-	-fno-builtin-free -ltcmalloc
+	-fno-builtin-free
 
 
 CPPFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS)
-LIBS = -luuid -luv -lmbedcrypto
+LIBS = -luuid -luv -lmbedcrypto -ltcmalloc
 
 ifeq ($(UCAFS_PROFILER), 1)
-       LIBS += -lprofiler -ltcmalloc
+       LIBS += -lprofiler
 endif
 
 INCFLAGS = -I/usr/local/include

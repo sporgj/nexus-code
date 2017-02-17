@@ -95,7 +95,7 @@ setup_mod()
         nbytes = fread(in_msg, 1, sizeof(ucrpc_msg_t), ucafs_mod_fid);
         if (nbytes == sizeof(ucrpc_msg_t)) {
             /* read the data on the wire */
-            fread(x_data->data, 1, in_msg->len, ucafs_mod_fid);
+            nbytes = fread(x_data->data, 1, in_msg->len, ucafs_mod_fid);
 
             /* create our XDR data */
             xdrmem_create(xdr_in, (caddr_t) x_data->data, in_msg->len, XDR_DECODE);
