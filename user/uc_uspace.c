@@ -7,8 +7,8 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/md.h>
-#include <mbedtls/platform.h>
 #include <mbedtls/pk.h>
+#include <mbedtls/platform.h>
 #include <mbedtls/sha256.h>
 
 #include "uc_sgx.h"
@@ -18,6 +18,7 @@
 #include "uc_uspace.h"
 #include "uc_utils.h"
 
+#include "third/json.h"
 #include "third/log.h"
 
 char * global_supernode_paths[MAX_SUPERNODE_PATHS] = { NULL };
@@ -293,3 +294,68 @@ ucafs_launch(const char * mount_file_path)
     fclose(fd1);
     return 0;
 }
+
+#if 0
+ucafs_config_t *
+ucafs_parse_config(const char * config_file)
+{
+    int ret = -1;
+    size_t sz;
+    FILE * fd = NULL;
+    ucafs_config_t * config = NULL;
+    struct stat st;
+    char * buffer = NULL;
+    struct json_value_s *root = NULL, *curr = NULL;
+    struct json_object_s * object = NULL;
+
+    if (stat(config_file, &st)) {
+        log_error("stat '%s' FAILED", config_file);
+        return NULL;
+    }
+
+    sz = st.file_size;
+
+    fd = fopen(config_file, "rb");
+    if (fd == NULL) {
+        log_error("opening '%s' FAILED", config_file);
+        return NULL;
+    }
+
+    config = (ucafs_config_t *)calloc(1, sizeof(ucafs_config_t));
+    if (config == NULL) {
+        fclose(fd);
+        log_fatal("allocation error");
+        return NULL;
+    }
+
+    if ((buffer = (char *)malloc(sz)) == NULL) {
+        log_fatal("allocation error");
+        goto out;
+    }
+
+    nbytes = fread(buffer, 1, sz, fd);
+
+    root = json_parse(buffer, sz);
+
+    ret = 0;
+out:
+    if (buffer) {
+        free(buffer);
+    }
+
+    if (ret) {
+        for (size_t i = 0; i < MAX_SUPERNODE_PATHS; i++) {
+            if (config->mounts[i] == NULL) {
+                break;
+            }
+
+            free(config->mounts[i]);
+        }
+
+        free(config);
+        config = NULL;
+    }
+
+    return config;
+}
+#endif

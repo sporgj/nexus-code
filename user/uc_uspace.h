@@ -1,14 +1,19 @@
+#pragma once
+
 #include <stdbool.h>
 
 #include "third/sds.h"
 
 #include "uc_types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define MAX_SUPERNODE_PATHS 20
+
+typedef struct {
+    char * root_ucafs;
+    char * pubkey;
+    char * privkey;
+    char * mounts[MAX_SUPERNODE_PATHS];
+} ucafs_config_t;
 
 extern char * global_supernode_paths[MAX_SUPERNODE_PATHS];
 
@@ -54,7 +59,3 @@ ucafs_metadata_path(const char * root_path, const char * meta_fname);
 
 int
 ucafs_launch(const char * mount_file_path);
-
-#ifdef __cplusplus
-}
-#endif

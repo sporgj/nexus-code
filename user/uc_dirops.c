@@ -781,7 +781,7 @@ dirops_setacl(const char * path, const char * afs_acl_str)
          *acl_print_str = NULL;
     acl_rights_t rights;
 
-    if ((dirnode = vfs_lookup(path, false)) == NULL) {
+    if ((dirnode = vfs_lookup(path, true)) == NULL) {
         log_error("dirnode (%s) not found", path);
         return error;
     }
@@ -836,7 +836,7 @@ dirops_checkacl(const char * path, acl_rights_t rights, int is_dir)
 
     /* if it's a directory, get the dirnode it points to. Otherwise, for a file
      * get the parent dirnode */
-    if ((dirnode = vfs_lookup(path, (is_dir ? false : true))) == NULL) {
+    if ((dirnode = vfs_lookup(path, (is_dir ? true : false))) == NULL) {
         log_error("dirnode (%s) not found", path);
         return err;
     }

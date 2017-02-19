@@ -439,11 +439,9 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
                 path_link = do_get_dir(path);
                 path_link = sdscat(path_link, "/");
                 path_link = sdscat(path_link, link_info->target_link);
-                temp2 = do_absolute_path(path_link);
 
-                fb = dcache_get_filebox(tree, temp2, hint);
+                fb = dcache_get_filebox(tree, path_link, hint);
                 sdsfree(path_link);
-                free(temp2);
                 goto out;
             }
         }
@@ -453,6 +451,10 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     fb = filebox_from_file2(fbox_path, hint);
     sdsfree(fbox_path);
 out:
+    if (link_info) {
+        free((link_info_t *)link_info);
+    }
+
     sdsfree(fname);
     return fb;
 }

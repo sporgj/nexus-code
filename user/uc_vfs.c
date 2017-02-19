@@ -213,7 +213,7 @@ vfs_relpath(const char * path, bool dirpath)
     }
 
     nchar = ptr2 - ptr1;
-    return nchar > 0 ? sdsnew(ptr2) : sdsnew("");
+    return nchar > 0 ? sdsnewlen(ptr1, nchar) : sdsnew("");
 }
 
 int
