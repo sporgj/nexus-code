@@ -54,7 +54,7 @@ msg_func_and_string(uc_msg_type_t mtype)
 int
 uc_rpc_dirops(uc_msg_type_t msg_type, XDR * xdrs, XDR * xdr_out)
 {
-    int ret;
+    int ret = -1;
     afs_int32 type;
     char *parent_dir = NULL, *name = NULL, *shdw_name = NULL;
     dirops_str_and_func_t * tor = msg_func_and_string(msg_type);
@@ -105,7 +105,7 @@ out:
 int
 uc_rpc_symlink(XDR * xdrs, XDR * xdr_out)
 {
-    int ret;
+    int ret = -1;
     char *from_path = NULL, *target_link = NULL, *shdw_name = NULL;
 
     // get the strings
@@ -147,7 +147,7 @@ out:
 int
 uc_rpc_hardlink(XDR * xdrs, XDR * xdr_out)
 {
-    int ret;
+    int ret = -1;
     char *from_path = NULL, *to_path = NULL, *shdw_name = NULL;
 
     // get the strings

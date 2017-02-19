@@ -238,7 +238,7 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
     /* read the response */
     xdr_reply = &reply->xdrs;
     if (!xdr_string(xdr_reply, shadow_name, UCAFS_FNAME_MAX)) {
-        ERROR("parsing shadow_name failed");
+        ERROR("parsing shadow_name failed (type=%d)\n", (int)type);
         goto out;
     }
 
