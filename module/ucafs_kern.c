@@ -1,5 +1,10 @@
 #include "ucafs_module.h"
 
+#include <linux/list.h>
+#include <linux/string.h>
+
+#define PATH_CACHE_CAPACITY 20
+
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_kern: " fmt, ##args)
 
@@ -17,6 +22,126 @@ startsWith(const char * pre, const char * str)
 }
 
 LIST_HEAD(_watchlist), *watchlist_ptr = &_watchlist;
+
+typedef struct {
+    char *shdw_name, *parent_path, *fname;
+    struct list_head list;
+} cached_path_t;
+
+// for the list of all the paths stored
+LIST_HEAD(_pathlist), *pathlist_ptr = &_pathlist;
+static size_t path_cache_size = 0;
+
+static inline void free_cache_entry(cached_path_t * curr)
+{
+    kfree(curr->shdw_name);
+    kfree(curr->parent_path);
+    kfree(curr->fname);
+    kfree(curr);
+}
+
+void
+add_path_to_cache(const char * shadow_name,
+                  const char * parent_path,
+                  const char * fname)
+{
+    cached_path_t * cached_file;
+    struct list_head * last_el = pathlist_ptr->prev;
+
+    /* lets make sure we still have page in our cache */
+    if (path_cache_size == PATH_CACHE_CAPACITY) {
+        list_del(last_el);
+        free_cache_entry(list_entry(last_el, cached_path_t, list));
+        path_cache_size--;
+    }
+
+    cached_file = (cached_path_t *)kmalloc(sizeof(cached_path_t), GFP_KERNEL);
+    if (cached_file == NULL) {
+        return;
+    }
+
+    cached_file->shdw_name =
+        (char *)kstrndup(shadow_name, UCAFS_FNAME_MAX, GFP_KERNEL);
+    cached_file->parent_path =
+        (char *)kstrndup(parent_path, UCAFS_PATH_MAX, GFP_KERNEL);
+    cached_file->fname =
+        (char *)kstrndup(fname, UCAFS_FNAME_MAX, GFP_KERNEL);
+
+    if (!cached_file->shdw_name || !cached_file->parent_path ||
+        !cached_file->fname) {
+        ERROR("!cached_file->shdw_name || !cached_file->plain_path\n");
+        return;
+    }
+
+    list_add(&cached_file->list, pathlist_ptr);
+    path_cache_size++;
+}
+
+void
+remove_shdw_name(const char * shadow_name)
+{
+    cached_path_t * curr;
+
+    list_for_each_entry(curr, pathlist_ptr, list)
+    {
+        if (strncmp(curr->shdw_name, shadow_name, UCAFS_FNAME_MAX)) {
+            continue;
+        }
+
+        list_del(&curr->list);
+        free_cache_entry(curr);
+        path_cache_size--;
+        break;
+    }
+}
+
+void
+clear_pathlist_cache(const char * shadow_name)
+{
+    cached_path_t * curr;
+
+    list_for_each_entry(curr, pathlist_ptr, list)
+    {
+        list_del(&curr->list);
+        free_cache_entry(curr);
+        path_cache_size--;
+    }
+}
+
+char *
+lookup_shdw_name(const char * shadow_name)
+{
+    cached_path_t * curr;
+
+    list_for_each_entry(curr, pathlist_ptr, list)
+    {
+        if (strncmp(curr->shdw_name, shadow_name, UCAFS_FNAME_MAX)) {
+            continue;
+        }
+
+        return kstrdup(curr->fname, GFP_KERNEL);
+    }
+
+    return NULL;
+}
+
+char *
+lookup_path_name(const char * parent_path, const char * fname)
+{
+    cached_path_t * curr;
+
+    list_for_each_entry(curr, pathlist_ptr, list)
+    {
+        if (strncmp(curr->fname, fname, UCAFS_FNAME_MAX) ||
+            strncmp(curr->parent_path, parent_path, UCAFS_PATH_MAX)) {
+            continue;
+        }
+
+        return kstrdup(curr->shdw_name, GFP_KERNEL);
+    }
+
+    return NULL;
+}
 
 int
 add_path_to_watchlist(const char * path)
@@ -402,9 +527,16 @@ ucafs_kern_filldir(char * parent_dir,
                    char ** real_name)
 {
     int err = -1, code;
+    char * fname = NULL;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
     caddr_t payload;
+
+    // check if it's in the cache
+    if ((fname = lookup_shdw_name(shadow_name))) {
+        *real_name = fname;
+        return 0;
+    }
 
     if ((payload = READPTR_LOCK()) == 0) {
         return -1;
@@ -431,6 +563,9 @@ ucafs_kern_filldir(char * parent_dir,
         ERROR("parsing shadow_name failed\n");
         goto out;
     }
+
+    /* add it to the cache */
+    add_path_to_cache(shadow_name, parent_dir, *real_name);
 
     err = 0;
 out:
