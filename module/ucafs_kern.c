@@ -3,7 +3,7 @@
 #include <linux/list.h>
 #include <linux/string.h>
 
-#define PATH_CACHE_CAPACITY 20
+#define PATH_CACHE_CAPACITY 64
 
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_kern: " fmt, ##args)
@@ -39,6 +39,19 @@ static inline void free_cache_entry(cached_path_t * curr)
     kfree(curr->fname);
     kfree(curr);
 }
+
+#if 0
+// copied from linux/.../scripts/basic/fixdep.c
+static unsigned int strhash(const char * str, unsigned int sz)
+{
+    /* fnv32 hash */
+    unsigned int i, hash = 2166136251U;
+
+    for (i = 0; i < sz; i++)
+        hash = (hash ^ str[i]) * 0x01000193;
+    return hash;
+}
+#endif
 
 void
 add_path_to_cache(const char * shadow_name,
@@ -96,7 +109,26 @@ remove_shdw_name(const char * shadow_name)
 }
 
 void
-clear_pathlist_cache(const char * shadow_name)
+remove_path_name(const char * parent_path, const char * fname)
+{
+    cached_path_t * curr;
+
+    list_for_each_entry(curr, pathlist_ptr, list)
+    {
+        if (strncmp(curr->fname, fname, UCAFS_FNAME_MAX) ||
+            strncmp(curr->parent_path, parent_path, UCAFS_PATH_MAX)) {
+            continue;
+        }
+
+        list_del(&curr->list);
+        free_cache_entry(curr);
+        path_cache_size--;
+        break;
+    }
+}
+
+void
+clear_pathlist_cache(void)
 {
     cached_path_t * curr;
 
@@ -342,6 +374,7 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
         return -1;
     }
 
+
     if ((payload = READPTR_LOCK()) == 0) {
         kfree(path);
         return -1;
@@ -365,6 +398,12 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
     if (!xdr_string(xdr_reply, shadow_name, UCAFS_FNAME_MAX)) {
         ERROR("parsing shadow_name failed (type=%d)\n", (int)type);
         goto out;
+    }
+
+    /* XXX create: should create remove the match? */
+    if (msg_type == UCAFS_MSG_REMOVE) {
+        // remove it from the cache
+        remove_shdw_name(*shadow_name);
     }
 
     ret = 0;
@@ -619,6 +658,9 @@ ucafs_kern_rename(struct vcache * from_vnode,
         ERROR("parsing rename response failed\n");
         goto out;
     }
+
+    remove_path_name(from_path, oldname);
+    remove_path_name(to_path, newname);
 
     ret = 0;
 out:
