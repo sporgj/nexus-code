@@ -55,6 +55,7 @@ typedef struct {
 #define UCAFS_REPO_DIR ".afsx"
 #define UCAFS_WATCH_DIR "sgx"
 #define UCAFS_METADATA_DIR UCAFS_REPO_DIR
+#define UCAFS_ROOT_DIRNODE  "root"
 
 #define CONFIG_PUBKEY   "profile/public_key"
 #define CONFIG_PRIVKEY  "profile/private_key"
@@ -74,8 +75,8 @@ typedef enum {
 } __attribute__((packed)) ucafs_entry_type;
 
 /* prefixes for the different file types */
-#define UC_METADATA_PREFIX "md"
-#define UC_FILEDATA_PREFIX "fd"
+#define UC_METADATA_PREFIX ".md"
+#define UC_FILEDATA_PREFIX ""
 #define UC_PREFIX_LEN(x) sizeof(x) - 1
 
 #define UC_ENCRYPT 0x00000001

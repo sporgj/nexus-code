@@ -93,6 +93,7 @@ free_list_entry(dnode_list_entry_t * list_entry)
     free(list_entry);
 }
 
+// FIXME remove ACL entries
 void
 dirnode_free(uc_dirnode_t * dirnode)
 {

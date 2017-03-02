@@ -154,7 +154,13 @@ vfs_root_dirnode_path(const char * path)
     {
         if (strstr(path, curr->path)) {
             root_path = sdsdup(curr->path);
-            return vfs_append(root_path, &curr->super->root_dnode);
+
+            /* to return the root, return the path and root */
+            root_path = sdscat(root_path, "/");
+            root_path = sdscat(root_path, UCAFS_REPO_DIR);
+            root_path = sdscat(root_path, "/");
+            root_path = sdscat(root_path, UCAFS_ROOT_DIRNODE);
+            return root_path;
         }
     }
 
@@ -169,7 +175,13 @@ vfs_metadata_path(const char * path, const shadow_t * shdw_name)
         return NULL;
     }
 
-    return vfs_append(root_path, shdw_name);
+    char * metaname = metaname_bin2str(shdw_name);
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, metaname);
+
+    free(metaname);
+
+    return root_path;
 }
 
 sds

@@ -59,7 +59,6 @@ initialize_repository(const char * user_root_path)
     sds snode_path = NULL, dnode_path = NULL, repo_path;
     const char * pubkey_fname = CONFIG_PUBKEY;
     uint8_t * pubkey_buf = NULL;
-    char * main_dnode_fname = NULL;
     mbedtls_pk_context _ctx, *pk_ctx = &_ctx;
     uc_dirnode_t * dirnode = NULL;
     struct stat st;
@@ -91,8 +90,6 @@ initialize_repository(const char * user_root_path)
     }
 #endif
 
-    main_dnode_fname = metaname_bin2str(&super->root_dnode);
-
     /* create the paths for the dnode and the supernode */
     repo_path = sdsnew(user_root_path);
     repo_path = sdscat(repo_path, "/");
@@ -108,7 +105,7 @@ initialize_repository(const char * user_root_path)
     snode_path = repo_path, dnode_path = sdsdup(repo_path);
 
     snode_path = sdscat(snode_path, UCAFS_SUPER_FNAME);
-    dnode_path = sdscat(dnode_path, main_dnode_fname);
+    dnode_path = sdscat(dnode_path, UCAFS_ROOT_DIRNODE);
 
     if (!supernode_write(super, snode_path)) {
         uerror("supernode_write() failed");
@@ -138,10 +135,6 @@ out:
 
     if (dnode_path) {
         sdsfree(dnode_path);
-    }
-
-    if (main_dnode_fname) {
-        free(main_dnode_fname);
     }
 
     if (pubkey_buf) {
