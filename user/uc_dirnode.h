@@ -1,3 +1,5 @@
+#pragma once
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,11 +17,62 @@ typedef struct dirnode uc_dirnode_t;
 struct uc_dentry;
 struct metadata_entry;
 
+typedef struct dirnode {
+    dnode_header_t header;
+    dnode_list_head_t dirbox;
+    acl_list_head_t lockbox;
+    journal_list_head_t journal;
+
+    sds dnode_path;
+    struct uc_dentry * dentry;
+    struct metadata_entry * mcache;
+} uc_dirnode_t;
+
 uc_dirnode_t *
 dirnode_new();
 
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent);
+
+static inline void
+dirnode_set_path(uc_dirnode_t * dirnode, const char * path)
+{
+    if (dirnode->dnode_path) {
+        sdsfree(dirnode->dnode_path);
+    }
+
+    dirnode->dnode_path = sdsnew(path);
+}
+
+/* set of operartions for the on-demand journaling */
+int
+dirnode_add_to_journal(uc_dirnode_t * dirnode,
+                       const shadow_t * shdw,
+                       journal_op_t op);
+
+void
+dirnode_rm_from_journal(uc_dirnode_t * dirnode, const shadow_t * shdw);
+
+/**
+ * Returns if the dirnode has any entries that need to be garbage collected
+ * @param dirnode
+ * @return true if any
+ */
+bool
+dirnode_has_garbage(uc_dirnode_t * dirnode);
+
+const shadow_t *
+dirnode_peek_garbage(uc_dirnode_t * dirnode);
+
+/**
+ * Search the journal and find if the entry is present
+ *
+ * @return 0 if found
+ */
+int
+dirnode_search_journal(uc_dirnode_t * dn,
+                       const shadow_t * shdw,
+                       journal_op_t * op);
 
 /**
  * Generates a new dirnode object with a pregenerated name

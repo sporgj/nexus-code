@@ -244,7 +244,7 @@ traverse(struct uc_dentry * root_dentry,
     char *metaname_str, *nch, *pch;
     const link_info_t * link_info;
     const shadow_t * shadow_name;
-    uc_dirnode_t *dn = NULL;
+    uc_dirnode_t *dn = NULL, *dn2;
     bool found_in_cache;
 
     /* the string builder */
@@ -282,10 +282,15 @@ traverse(struct uc_dentry * root_dentry,
         }
 
         /* 2 - We have to do a real fetch from disk */
-        if (dn == NULL
-            && !(dn = metadata_get_dirnode(curr_path,
-                                           &parent_dentry->shdw_name))) {
-            break;
+        if (dn == NULL) {
+            const shadow_t * shdw2
+                = ((parent_dentry == root_dentry) ? NULL
+                                                  : &parent_dentry->shdw_name);
+
+            dn = metadata_get_dirnode(curr_path, shdw2, &dentry->shdw_name);
+            if (dn == NULL) {
+                break;
+            }
         }
 
         shadow_name = dirnode_traverse(dn, nch, UC_ANY, &atype, &link_info);
@@ -391,7 +396,7 @@ dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath)
     if (strlen(relpath)) {
         dentry = real_lookup(dentry, tree->root_path, path, relpath, &dirnode);
     } else {
-        dirnode = metadata_get_dirnode(path, &dentry->shdw_name);
+        dirnode = metadata_get_dirnode(path, NULL, &dentry->shdw_name);
     }
 
     /* increase the ref count */
@@ -408,6 +413,9 @@ done:
 uc_filebox_t *
 dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
 {
+    int err;
+    bool in_journal;
+    journal_op_t jrnl_op;
     const shadow_t * codename;
     char *fname = NULL, *temp = NULL, *temp2 = NULL;
     sds path_link = NULL, fbox_path = NULL;
@@ -455,9 +463,50 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     }
 
     fbox_path = vfs_metadata_path(path, codename);
+
+    /* check if the file is on disk */
+    err = dirnode_search_journal(dirnode, codename, &jrnl_op);
+    in_journal = (err == 0 && jrnl_op == CREATE_FILE);
+    if (!in_journal) {
+        goto load_from_disk;
+    }
+
+    /* then we have to create the filebox */
+    if ((fb = filebox_new2(codename, dirnode)) == NULL) {
+        log_error("filebox_new2 failed");
+        goto cleanup;
+    }
+
+    if (!filebox_write(fb, fbox_path)) {
+        log_error("filebox_write (%s) FAILED", fbox_path);
+        goto cleanup;
+    }
+
+    /* delete the entry from the dirnode
+     * XXX should we flush it now or later ? */
+    dirnode_rm_from_journal(dirnode, codename);
+    if (!dirnode_flush(dirnode)) {
+        log_error("dirnode_flush (%s) FAILED", path);
+        goto cleanup;
+    }
+
+    /* set the path to allow flushing the filebox */
+    filebox_set_path(fb, fbox_path);
+    goto out;
+
+load_from_disk:
     fb = filebox_from_file2(fbox_path, hint);
-    sdsfree(fbox_path);
+    goto out;
+
+cleanup:
+    if (fb) {
+        filebox_free(fb);
+        fb = NULL;
+    }
+
 out:
+    sdsfree(fbox_path);
+
     if (link_info) {
         free((link_info_t *)link_info);
     }

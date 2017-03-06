@@ -37,6 +37,13 @@ dirops_new1(const char * parent_dir,
         goto out;
     }
 
+    /* add it to the journal */
+    journal_op_t jrnl_op = (type == UC_DIR ? CREATE_DIR : CREATE_FILE);
+    if ((dirnode_add_to_journal(dirnode, fname_code, jrnl_op))) {
+        log_error("add_to_journal failed: %s", parent_dir);
+        goto out;
+    }
+
     // 3 - Flush to disk
     if (!dirnode_flush(dirnode)) {
         log_error("Flushing '%s' failed", parent_dir);
@@ -45,6 +52,7 @@ dirops_new1(const char * parent_dir,
 
     path1 = vfs_metadata_path(parent_dir, fname_code);
 
+    /*
     if (type == UC_DIR) {
         if ((dirnode1 = dirnode_new2(fname_code, dirnode)) == NULL) {
             log_error("new dirnode failed: %s/%s", parent_dir, fname);
@@ -68,6 +76,7 @@ dirops_new1(const char * parent_dir,
             goto out;
         }
     }
+    */
 
     /* Set the encoded name */
     *shadow_name_dest = filename_bin2str(fname_code);
@@ -150,6 +159,7 @@ out:
     return error;
 }
 
+// TODO for the journal entry
 int
 dirops_move(const char * from_dir,
             const char * oldname,
@@ -421,6 +431,7 @@ out:
     return error;
 }
 
+// TODO for the journal entry
 int
 dirops_hardlink(const char * target_path,
                 const char * link_path,
@@ -590,16 +601,34 @@ out:
 }
 
 static int
-__delete_metadata_file(const char * parent_dir,
+__delete_metadata_file(uc_dirnode_t * parent_dirnode,
+                       const char * parent_dir,
                        const shadow_t * shadowname_bin,
                        int is_filebox)
 {
-    int error = -1;
-    uc_dirnode_t * dirnode = NULL;
+    int error = -1, ret;
+    journal_op_t journal_op;
+    bool in_journal;
     uc_filebox_t * filebox = NULL;
+    sds metadata_path = NULL;
 
-    sds metadata_path = vfs_metadata_path(parent_dir, shadowname_bin);
+    /* check if the entry is in the journal */
+    ret = dirnode_search_journal(parent_dirnode, shadowname_bin, &journal_op);
+    in_journal
+        = (ret == 0 && (journal_op == CREATE_FILE || journal_op == CREATE_DIR));
 
+    if (in_journal) {
+        // we have to delete this entry from the journal and save the dirnode
+        dirnode_rm_from_journal(parent_dirnode, shadowname_bin);
+        if (!dirnode_flush(parent_dirnode)) {
+            log_error("flushing parent dirnode failed\n");
+            goto out;
+        }
+
+        return 0;
+    }
+
+    metadata_path = vfs_metadata_path(parent_dir, shadowname_bin);
     if (is_filebox) {
         /* instatiate, update ref count and delete */
         if ((filebox = filebox_from_file(metadata_path)) == NULL) {
@@ -608,11 +637,18 @@ __delete_metadata_file(const char * parent_dir,
         }
 
         if (filebox_decr_link_count(filebox) == 0) {
+            goto journal;
+            /*
+             * We ne not do this anymore. By doing an add to journal "REMOVE", we added
+             * the file to the garbage collector. The collector is thread which will
+             * iterate through every garbage entry and delete the file on the disk
+             *
             if (unlink(metadata_path)) {
                 log_error("deleting filebox (%s) FAILED",
                      metadata_path);
                 goto out;
             }
+            */
         } else {
             // write it to disk
             if (!filebox_flush(filebox)) {
@@ -625,20 +661,35 @@ __delete_metadata_file(const char * parent_dir,
         /* directories are a lot simpler. Since no hardlinks can't point to
          * directories,
          * they only have one ref count. */
+        /*
+         * SEE ABOVE FOR FILEBOX
+         *
         if (unlink(metadata_path)) {
             log_error("deleting dirnode (%s) FAILED", metadata_path);
             goto out;
         }
+        */
+        goto journal;
+    }
+    // if we're here, we only had to flush a filebox with hardlinks
+    goto done;
+journal:
+    // lets save some filesystem calls here
+    if (dirnode_add_to_journal(parent_dirnode, shadowname_bin, DELETE_FILE)) {
+        log_error("adding to journal (%s)", parent_dir);
+        goto out;
     }
 
+    if (!dirnode_flush(parent_dirnode)) {
+        log_error("flushing dirnode (%s) FAILED", parent_dir);
+        goto out;
+    }
+
+done:
     error = 0;
 out:
     if (filebox) {
         filebox_free(filebox);
-    }
-
-    if (dirnode) {
-        dirnode_free(dirnode);
     }
 
     if (metadata_path) {
@@ -710,11 +761,11 @@ dirops_remove1(const char * parent_dir,
     /* we only need to call for hardlinks */
     if (link_info) {
         if (link_info->type == UC_HARDLINK) {
-            __delete_metadata_file(parent_dir, &link_info->meta_file, 1);
+            __delete_metadata_file(dirnode, parent_dir, &link_info->meta_file, 1);
         }
     } else {
         // delete a normal file or directory
-        __delete_metadata_file(parent_dir, shadow_name, atype == UC_FILE);
+        __delete_metadata_file(dirnode, parent_dir, shadow_name, atype == UC_FILE);
     }
 
     *encoded_fname_dest = filename_bin2str(shadow_name);
@@ -854,3 +905,4 @@ out:
 
     return err;
 }
+

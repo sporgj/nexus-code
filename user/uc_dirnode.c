@@ -1,7 +1,7 @@
-#include "uc_vfs.h"
 #include "uc_encode.h"
 #include "uc_sgx.h"
 #include "uc_uspace.h"
+#include "uc_vfs.h"
 
 #include "third/log.h"
 
@@ -17,15 +17,11 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 static int
 parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 
-struct dirnode {
-    dnode_header_t header;
-    dnode_list_head_t dirbox;
-    acl_head_t lockbox;
+static int
+serialize_journal(uc_dirnode_t * dn, uint8_t * buffer);
 
-    sds dnode_path;
-    struct uc_dentry * dentry;
-    struct metadata_entry * mcache;
-};
+static int
+parse_journal(uc_dirnode_t * dn, uint8_t * buffer);
 
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
@@ -44,6 +40,7 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 
     TAILQ_INIT(&dn->dirbox);
     SIMPLEQ_INIT(&dn->lockbox);
+    TAILQ_INIT(&dn->journal);
 
     dn->dnode_path = NULL;
     dn->dentry = NULL;
@@ -59,7 +56,7 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 uc_dirnode_t *
 dirnode_new_root(const shadow_t * id)
 {
-    uc_dirnode_t * dn ;
+    uc_dirnode_t * dn;
     if ((dn = dirnode_new2(id, NULL)) == NULL) {
         return NULL;
     }
@@ -86,26 +83,40 @@ dirnode_new()
 static inline void
 free_list_entry(dnode_list_entry_t * list_entry)
 {
-    if (list_entry->dir_entry.target) {
-        free(list_entry->dir_entry.target);
+    if (list_entry->dnode_data.target) {
+        free(list_entry->dnode_data.target);
     }
 
     free(list_entry);
 }
 
-// FIXME remove ACL entries
 void
 dirnode_free(uc_dirnode_t * dirnode)
 {
-    dnode_list_head_t * list_head = &dirnode->dirbox;
-    dnode_list_entry_t * list_entry;
+    dnode_list_head_t * dir_head = &dirnode->dirbox;
+    acl_list_head_t * acl_head = &dirnode->lockbox;
+    journal_list_head_t * journal_head = &dirnode->journal;
+
+    dnode_list_entry_t * dnode_data;
+    acl_list_entry_t * acl_entry;
+    journal_list_entry_t * journal_entry;
 
     /* clear the entries in the entries */
-    while (!TAILQ_EMPTY(list_head)) {
-        list_entry = TAILQ_FIRST(list_head);
-        TAILQ_REMOVE(list_head, list_entry, next_entry);
+    while ((dnode_data = TAILQ_FIRST(dir_head))) {
+        TAILQ_REMOVE(dir_head, dnode_data, next_entry);
+        free_list_entry(dnode_data);
+    }
 
-        free_list_entry(list_entry);
+    /* clear lockbox entries */
+    while ((acl_entry = SIMPLEQ_FIRST(acl_head))) {
+        SIMPLEQ_REMOVE_HEAD(acl_head, next_entry);
+        free(acl_entry);
+    }
+
+    /* clear the journal entries */
+    while ((journal_entry = TAILQ_FIRST(journal_head))) {
+        TAILQ_REMOVE(journal_head, journal_entry, next_entry);
+        free(journal_entry);
     }
 
     if (dirnode->dnode_path) {
@@ -121,8 +132,9 @@ dirnode_from_file(const sds filepath)
     uc_dirnode_t * dn = NULL;
     dnode_header_t * header;
     dnode_list_head_t * dirbox;
-    acl_head_t * lockbox;
-    uint8_t * buffer = NULL;
+    acl_list_head_t * lockbox;
+    journal_list_head_t * journal;
+    uint8_t *buffer = NULL, *offset_ptr = NULL;
     FILE * fd;
     size_t nbytes, body_len;
     int error = -1;
@@ -141,8 +153,13 @@ dirnode_from_file(const sds filepath)
     }
 
     header = &dn->header;
-    TAILQ_INIT((dirbox = &dn->dirbox));
-    SIMPLEQ_INIT((lockbox = &dn->lockbox));
+    dirbox = &dn->dirbox;
+    lockbox = &dn->lockbox;
+    journal = &dn->journal;
+
+    TAILQ_INIT(dirbox);
+    SIMPLEQ_INIT(lockbox);
+    TAILQ_INIT(journal);
 
     /* read the header from the file */
     nbytes = fread(header, sizeof(dnode_header_t), 1, fd);
@@ -154,7 +171,7 @@ dirnode_from_file(const sds filepath)
 
     /* lets try to read the body of the dirnode */
     // TODO maybe check when body_len is ridiculous?
-    body_len = header->dirbox_len + header->lockbox_len;
+    body_len = header->dirbox_len + header->lockbox_len + header->journal_len;
     if (!body_len) {
         goto done;
     }
@@ -180,13 +197,21 @@ dirnode_from_file(const sds filepath)
 #endif
 
     /* parse the body */
-    if (header->dirbox_len && parse_dirbox(dn, buffer)) {
+    offset_ptr = buffer;
+    if (header->dirbox_len && parse_dirbox(dn, offset_ptr)) {
         log_error("parsing dirbox failed: %s", filepath);
         goto out;
     }
 
-    if (header->lockbox_len && parse_lockbox(dn, buffer + header->dirbox_len)) {
+    offset_ptr += header->dirbox_len;
+    if (header->lockbox_len && parse_lockbox(dn, offset_ptr)) {
         log_error("parsing lockbox failed: %s", filepath);
+        goto out;
+    }
+
+    offset_ptr += header->lockbox_len;
+    if (header->journal_len && parse_journal(dn, offset_ptr)) {
+        log_error("parsing journal failed: %s", filepath);
         goto out;
     }
 
@@ -213,12 +238,12 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
     bool ret = false;
     int error;
-    uint8_t * buffer = NULL;
+    uint8_t *buffer = NULL, *offset_ptr = NULL;
     FILE * fd;
     size_t proto_len, total_len;
 
-    proto_len = dn->header.dirbox_len;
-    total_len = proto_len + dn->header.lockbox_len;
+    total_len = dn->header.dirbox_len + dn->header.lockbox_len
+        + dn->header.journal_len;
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
@@ -231,14 +256,22 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 
-    if (serialize_dirbox(dn, buffer)) {
+    offset_ptr = buffer;
+    if (serialize_dirbox(dn, offset_ptr)) {
         log_error("serialization failed");
         goto out;
     }
 
     /* now serialize the the access control information */
-    if (serialize_lockbox(dn, buffer + proto_len)) {
+    offset_ptr += dn->header.journal_len;
+    if (serialize_lockbox(dn, offset_ptr)) {
         log_error("serializing dirnode ACL failed (%s)", fpath);
+        goto out;
+    }
+
+    offset_ptr += dn->header.lockbox_len;
+    if (serialize_journal(dn, offset_ptr)) {
+        log_error("serializing dirnode journal failed (%s)", fpath);
         goto out;
     }
 
@@ -284,8 +317,8 @@ dirnode_fsync(uc_dirnode_t * dn)
 void
 dirnode_lockbox_clear(uc_dirnode_t * dn)
 {
-    acl_entry_t * acl_entry;
-    acl_head_t * acl_list = &dn->lockbox;
+    acl_list_entry_t * acl_entry;
+    acl_list_head_t * acl_list = &dn->lockbox;
 
     while (!SIMPLEQ_EMPTY(acl_list)) {
         acl_entry = SIMPLEQ_FIRST(acl_list);
@@ -301,9 +334,9 @@ dirnode_lockbox_clear(uc_dirnode_t * dn)
 int
 dirnode_lockbox_add(uc_dirnode_t * dn, const char * name, acl_rights_t rights)
 {
-    int len = strlen(name), total = sizeof(acl_entry_t) + len + 1;
+    int len = strlen(name), total = sizeof(acl_list_entry_t) + len + 1;
     acl_data_t * acl_data;
-    acl_entry_t * acl_entry = (acl_entry_t *)malloc(total);
+    acl_list_entry_t * acl_entry = (acl_list_entry_t *)malloc(total);
     if (acl_entry == NULL) {
         return -1;
     }
@@ -349,7 +382,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
     int ret = -1, len, tlen, rec_len;
     shadow_t * shdw_name = NULL;
     dnode_list_entry_t * list_entry = NULL;
-    dnode_dir_entry_t * de;
+    dnode_data_t * de;
 
     if (type == UC_ANY) {
         return NULL;
@@ -364,7 +397,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
         return NULL;
     }
 
-    de = &list_entry->dir_entry;
+    de = &list_entry->dnode_data;
     de->type = (uint8_t)type;
     if (p_encoded_name) {
         memcpy(&de->shadow_name, p_encoded_name, sizeof(shadow_t));
@@ -437,13 +470,14 @@ iterate_by_realname(uc_dirnode_t * dn,
                     link_info_t ** pp_link_info)
 {
     dnode_list_entry_t * list_entry;
-    dnode_dir_entry_t * de;
+    dnode_data_t * de;
     link_info_t * link_info;
 
     int len = strlen(realname) + 1, len1;
 
-    TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry) {
-        de = &list_entry->dir_entry;
+    TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry)
+    {
+        de = &list_entry->dnode_data;
 
         if (len == de->name_len && memcmp(realname, de->real_name, len) == 0) {
             /* XXX this needs to be deprecated. */
@@ -466,7 +500,7 @@ iterate_by_realname(uc_dirnode_t * dn,
             return list_entry;
         }
     }
- 
+
     return NULL;
 }
 
@@ -479,7 +513,7 @@ dirnode_rm(uc_dirnode_t * dn,
 {
     shadow_t * result = NULL;
     dnode_list_entry_t * list_entry;
-    dnode_dir_entry_t * de;
+    dnode_data_t * de;
     int len1;
 
     list_entry = iterate_by_realname(dn, realname, p_type, pp_link_info);
@@ -487,7 +521,7 @@ dirnode_rm(uc_dirnode_t * dn,
         return NULL;
     }
 
-    de = &list_entry->dir_entry;
+    de = &list_entry->dnode_data;
 
     if ((result = (shadow_t *)malloc(sizeof(shadow_t))) == NULL) {
         log_fatal("allocation error");
@@ -502,7 +536,7 @@ dirnode_rm(uc_dirnode_t * dn,
 
     TAILQ_REMOVE(&dn->dirbox, list_entry, next_entry);
     free_list_entry(list_entry);
-    
+
     return result;
 out:
     if (result) {
@@ -522,7 +556,7 @@ __dirnode_raw2enc(uc_dirnode_t * dn,
     dnode_list_entry_t * list_entry = iterate_by_realname(
         dn, realname, p_type, (link_info_t **)pp_link_info);
 
-    return list_entry ? &list_entry->dir_entry.shadow_name : NULL;
+    return list_entry ? &list_entry->dnode_data.shadow_name : NULL;
 }
 
 const shadow_t *
@@ -552,11 +586,11 @@ dirnode_enc2raw(uc_dirnode_t * dn,
 {
     int ret;
     dnode_list_entry_t * list_entry;
-    dnode_dir_entry_t * de;
+    dnode_data_t * de;
 
-
-    TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry) {
-        de = &list_entry->dir_entry;
+    TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry)
+    {
+        de = &list_entry->dnode_data;
 
         ret = memcmp(&de->shadow_name, encoded_name, sizeof(shadow_t));
         if (ret == 0) {
@@ -615,11 +649,11 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
     int len;
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
-    dnode_dir_entry_t * de;
+    dnode_data_t * de;
 
     TAILQ_FOREACH(list_entry, list_head, next_entry)
     {
-        de = &list_entry->dir_entry;
+        de = &list_entry->dnode_data;
 
         /* lets write the static data */
         len = de->rec_len - de->link_len;
@@ -643,7 +677,7 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
     size_t sz;
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
-    dnode_dir_entry_t * de;
+    dnode_data_t * de;
     dnode_dir_payload_t * payload = (dnode_dir_payload_t *)buffer;
 
     for (size_t i = 0; i < dn->header.dirbox_count; i++) {
@@ -656,7 +690,7 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
             goto out;
         }
 
-        de = &list_entry->dir_entry;
+        de = &list_entry->dnode_data;
         // copy the static data
         memcpy(&de->static_data, buffer, len);
         buffer += len;
@@ -689,10 +723,10 @@ static int
 serialize_lockbox(uc_dirnode_t * dn, uint8_t * buffer)
 {
     int len;
-    acl_entry_t * acl_entry;
+    acl_list_entry_t * acl_entry;
     acl_data_t * acl_data;
     uint8_t * buf = buffer;
-    acl_head_t * acl_list = &dn->lockbox;
+    acl_list_head_t * acl_list = &dn->lockbox;
 
     // iterate through the list of all the entries
     SIMPLEQ_FOREACH(acl_entry, acl_list, next_entry)
@@ -712,15 +746,16 @@ static int
 parse_lockbox(uc_dirnode_t * dn, uint8_t * buffer)
 {
     int ret = -1, len, total_len, i, count = dn->header.lockbox_count;
-    acl_head_t * acl_list = &dn->lockbox;
+    acl_list_head_t * acl_list = &dn->lockbox;
     acl_data_t *acl_data, *acl_buffer;
-    acl_entry_t * acl_entry;
+    acl_list_entry_t * acl_entry;
     acl_buffer = (acl_data_t *)buffer;
 
     for (i = 0; i < count; i++) {
         len = acl_buffer->len, total_len = sizeof(acl_data_t) + len;
 
-        acl_entry = (acl_entry_t *)malloc(sizeof(acl_entry_t) + len + 1);
+        acl_entry
+            = (acl_list_entry_t *)malloc(sizeof(acl_list_entry_t) + len + 1);
         if (acl_entry == NULL) {
             log_fatal("allocation error");
             goto out;
@@ -737,6 +772,166 @@ parse_lockbox(uc_dirnode_t * dn, uint8_t * buffer)
 
     ret = 0;
 out:
+    return ret;
+}
+
+bool
+dirnode_has_garbage(uc_dirnode_t * dirnode)
+{
+    return dirnode->header.garbage_count > 0;
+}
+
+const shadow_t *
+dirnode_peek_garbage(uc_dirnode_t * dirnode)
+{
+    // XXX please improve this
+    journal_list_entry_t * list_entry;
+    journal_list_head_t * list_head = &dirnode->journal;
+
+    TAILQ_FOREACH(list_entry, list_head, next_entry)
+    {
+        if (list_entry->jrnl_data.op == DELETE_FILE) {
+            return &list_entry->jrnl_data.shdw;
+        }
+    }
+
+    return NULL;
+}
+
+int
+dirnode_search_journal(uc_dirnode_t * dn,
+                       const shadow_t * shdw,
+                       journal_op_t * op)
+{
+    journal_data_t * je;
+    journal_list_entry_t * list_entry;
+    journal_list_head_t * list_head = &dn->journal;
+
+    // iterate to find an existing entry
+    TAILQ_FOREACH(list_entry, list_head, next_entry) {
+        je = &list_entry->jrnl_data;
+
+        if (memcmp(shdw, &je->shdw, sizeof(shadow_t)) == 0) {
+            *op = je->op;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int
+dirnode_add_to_journal(uc_dirnode_t * dn,
+                       const shadow_t * shdw,
+                       journal_op_t op)
+{
+    journal_data_t * je;
+    journal_list_entry_t * list_entry;
+    journal_list_head_t * list_head = &dn->journal;
+
+    // iterate to find an existing entry
+    TAILQ_FOREACH(list_entry, list_head, next_entry)
+    {
+        je = &list_entry->jrnl_data;
+
+        if (memcmp(shdw, &je->shdw, sizeof(shadow_t)) == 0) {
+            if (je->op == CREATE_FILE && op == DELETE_FILE) {
+                // then we've to delete the entry
+                TAILQ_REMOVE(list_head, list_entry, next_entry);
+                dn->header.journal_count--;
+
+                free(list_entry);
+            }
+
+            // if we're here, we're either adding a duplicate entry (same op)
+            // or removing a previous CREATE because we are adding a delete.
+            // Either way, this becomes a noop
+            return 0;
+        }
+    }
+
+    list_entry = (journal_list_entry_t *)malloc(sizeof(journal_list_entry_t));
+    if (list_entry == NULL) {
+        return -1;
+    }
+
+    je = &list_entry->jrnl_data;
+    memcpy(&je->shdw, shdw, sizeof(shadow_t));
+    je->op = op;
+
+    // add it to the dirnode
+    TAILQ_INSERT_TAIL(&dn->journal, list_entry, next_entry);
+    dn->header.journal_count++;
+    dn->header.journal_len += sizeof(journal_data_t);
+    dn->header.garbage_count += (op == DELETE_FILE);
+
+    return 0;
+}
+
+void
+dirnode_rm_from_journal(uc_dirnode_t * dn, const shadow_t * shdw)
+{
+    journal_list_entry_t * list_entry;
+    journal_list_head_t * list_head = &dn->journal;
+    journal_data_t * je;
+
+    TAILQ_FOREACH(list_entry, list_head, next_entry)
+    {
+        je = &list_entry->jrnl_data;
+        if (memcmp(&je->shdw, shdw, sizeof(shadow_t)) == 0) {
+            // bingo
+            dn->header.garbage_count -= (je->op == DELETE_FILE);
+            dn->header.journal_count--;
+
+            TAILQ_REMOVE(list_head, list_entry, next_entry);
+            free(list_entry);
+        }
+    }
+}
+
+static int
+serialize_journal(uc_dirnode_t * dn, uint8_t * buffer)
+{
+    int len = sizeof(journal_data_t);
+    journal_list_entry_t * list_entry;
+    journal_list_head_t * list_head = &dn->journal;
+    journal_data_t * je;
+
+    TAILQ_FOREACH(list_entry, list_head, next_entry)
+    {
+        je = &list_entry->jrnl_data;
+        memcpy(buffer, je, len);
+        buffer += len;
+    }
+
+    return 0;
+}
+
+static int
+parse_journal(uc_dirnode_t * dn, uint8_t * buffer)
+{
+    int ret = -1, len = sizeof(journal_data_t);
+    journal_list_entry_t * list_entry;
+    journal_list_head_t * list_head = &dn->journal;
+    journal_data_t * je;
+
+    for (size_t i = 0; i < dn->header.journal_count; i++) {
+        list_entry
+            = (journal_list_entry_t *)malloc(sizeof(journal_list_entry_t));
+        if (list_entry == NULL) {
+            log_fatal("allocation error");
+            goto out;
+        }
+
+        memcpy(&list_entry->jrnl_data, buffer, len);
+        buffer += len;
+
+        TAILQ_INSERT_TAIL(list_head, list_entry, next_entry);
+    }
+
+    ret = 0;
+out:
+    // TODO on error, clear created entries
     return ret;
 }
 
@@ -800,3 +995,4 @@ dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2)
 {
     return memcmp(&dn1->header, &dn2->header, sizeof(dnode_header_t)) == 0;
 }
+

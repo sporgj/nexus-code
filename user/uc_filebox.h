@@ -1,3 +1,4 @@
+#pragma once
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -8,6 +9,11 @@ extern "C" {
 
 #include "uc_types.h"
 
+struct filebox {
+    uc_fbox_t * fbox;
+    sds fbox_path;
+};
+
 /**
  * Creates a new filebox with a default segments
  * @return NULL if we run out of memory
@@ -16,7 +22,17 @@ uc_filebox_t *
 filebox_new();
 
 uc_filebox_t *
-filebox_new2(shadow_t * id, uc_dirnode_t * dirnode);
+filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode);
+
+static inline void
+filebox_set_path(uc_filebox_t * filebox, const char * path)
+{
+    if (filebox->fbox_path) {
+        sdsfree(filebox->fbox_path);
+    }
+
+    filebox->fbox_path = sdsnew(path);
+}
 
 /**
  * Initialize a new filebox from the specified path

@@ -11,13 +11,8 @@
 #include "uc_uspace.h"
 #include "uc_utils.h"
 
-struct filebox {
-    uc_fbox_t * fbox;
-    sds fbox_path;
-};
-
 uc_filebox_t *
-filebox_new2(shadow_t * id, uc_dirnode_t * dirnode)
+filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode)
 {
     uc_fbox_t * fbox;
     uc_filebox_t * filebox = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));

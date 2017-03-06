@@ -107,8 +107,13 @@ metadata_update_entry(struct metadata_entry * entry)
 }
 
 uc_dirnode_t *
-metadata_get_dirnode(const char * path, const shadow_t * shdw)
+metadata_get_dirnode(const char * path,
+                     uc_dirnode_t * parent_dirnode,
+                     const shadow_t * shdw)
 {
+    int err;
+    bool in_journal;
+    journal_op_t journal_op;
     uc_dirnode_t * dn = NULL;
     metadata_entry_t * entry;
     struct stat st;
@@ -149,6 +154,38 @@ load_from_disk:
         goto out;
     }
 
+    if (parent_dirnode) {
+        err = dirnode_search_journal(parent_dirnode, shdw, &journal_op);
+        in_journal = (err == 0 && journal_op == CREATE_FILE);
+
+        if (in_journal) {
+            // then let's create a new dirnode and return
+            if ((dn = dirnode_new2(shdw, parent_dirnode)) == NULL) {
+                log_error("new dirnode failed: %s", fpath);
+                goto out;
+            }
+
+            // XXX might be wiser to check if the file already exists on disk
+            if (!dirnode_write(dn, fpath)) {
+                log_error("Creating: '%s' dirnode FAILED", fpath);
+                goto out;
+            }
+
+            /* now we can delete the entry from the journal.
+             * XXX do we need to flush the dirnode immediately? */
+            dirnode_rm_from_journal(parent_dirnode, shdw);
+            if (!dirnode_flush(parent_dirnode)) {
+                log_error("flushing parent dirnode failed\n");
+                goto out;
+            }
+
+            /* lets not forget to set the path */
+            dn->dnode_path = sdsnew(fpath);
+            dirnode_set_path(dn, fpath);
+            goto create_entry;
+        }
+    }
+
     /* just in case fpath was not NULL */
     fpath1 = fpath;
 
@@ -157,6 +194,7 @@ load_from_disk:
         goto out;
     }
 
+create_entry:
     // add it to the metadata cache
     if (_create_entry(dn, shdw)) {
         dirnode_free(dn);

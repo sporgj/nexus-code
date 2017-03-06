@@ -94,7 +94,8 @@ vfs_dirnode_path(const char * path, const shadow_t * shdw);
  * Returns the dirnode from the metadata
  * @param is shadow name
  */
-uc_dirnode_t * metadata_get_dirnode(const char * path, const shadow_t *);
+uc_dirnode_t *
+metadata_get_dirnode(const char * path, uc_dentry_t *, const shadow_t *);
 
 void
 metadata_update_entry(struct metadata_entry * entry);

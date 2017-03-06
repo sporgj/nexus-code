@@ -153,12 +153,31 @@ typedef struct {
     char name[0];
 } __attribute__((packed)) acl_data_t;
 
-typedef struct acl_entry {
-    SIMPLEQ_ENTRY(acl_entry) next_entry;
+typedef struct acl_list_entry {
+    SIMPLEQ_ENTRY(acl_list_entry) next_entry;
     acl_data_t acl_data;
-} __attribute__((packed)) acl_entry_t;
+} __attribute__((packed)) acl_list_entry_t;
 
-typedef SIMPLEQ_HEAD(acl_head, acl_entry) acl_head_t;
+typedef SIMPLEQ_HEAD(acl_head, acl_list_entry) acl_list_head_t;
+
+typedef enum {
+    CREATE_FILE = 0,
+    CREATE_DIR,
+    DELETE_FILE,
+    DELETE_DIR
+} journal_op_t;
+
+typedef struct {
+    uint8_t op;
+    shadow_t shdw;
+} __attribute__((packed)) journal_data_t;
+
+typedef struct journal_list_entry {
+    TAILQ_ENTRY(journal_list_entry) next_entry;
+    journal_data_t jrnl_data;
+} __attribute__((packed)) journal_list_entry_t;
+
+typedef TAILQ_HEAD(journal_list_head, journal_list_entry) journal_list_head_t;
 
 // mainly for debug purposes in gdb
 #define DNODE_PAYLOAD                                                          \
@@ -176,21 +195,22 @@ typedef struct {
    DNODE_PAYLOAD;
 } __attribute__((packed)) dnode_dir_payload_t;
 
-typedef struct dnode_dir_entry {
+typedef struct dnode_data {
     char * target;
     DNODE_PAYLOAD;
-} __attribute__((packed)) dnode_dir_entry_t;
+} __attribute__((packed)) dnode_data_t;
 
 typedef struct dnode_list_entry {
    TAILQ_ENTRY(dnode_list_entry) next_entry;
-   dnode_dir_entry_t dir_entry;
+   dnode_data_t dnode_data;
 } __attribute__((packed)) dnode_list_entry_t;
 
 typedef TAILQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
 
 typedef struct {
     shadow_t uuid, parent, root;
-    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
+    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len,
+        journal_count, journal_len, garbage_count;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 
