@@ -107,30 +107,23 @@ metadata_update_entry(struct metadata_entry * entry)
 }
 
 uc_dirnode_t *
-metadata_root_dirnode(const char * path)
-{
-    return metadata_get_dirnode(path, vfs_root_dirnode(path));
-}
-
-uc_dirnode_t *
-metadata_get_dirnode(const char * path, const shadow_t * shadow_name)
+metadata_get_dirnode(const char * path, const shadow_t * shdw)
 {
     uc_dirnode_t * dn = NULL;
     metadata_entry_t * entry;
     struct stat st;
     int * hashval;
-    sds fpath = NULL;
+    sds fpath = NULL, fpath1 = NULL;
 
     /* check if the item is in the cache */
-    entry
-        = (metadata_entry_t *)hashmapGet(metadata_hashmap, (void *)shadow_name);
+    entry = (metadata_entry_t *)hashmapGet(metadata_hashmap, (void *)shdw);
     if (entry == NULL) {
         goto load_from_disk;
     }
 
     /* if found, check the on-disk time */
-    if ((fpath = vfs_metadata_path(path, shadow_name)) == NULL) {
-        log_error("vfs_metadata_path returned NULL (%s)", fpath);
+    if ((fpath = dirnode_get_fpath(entry->dn)) == NULL) {
+        log_error("dirnode_get_fpath returned NULL (%s)", fpath);
         goto out;
     }
 
@@ -151,10 +144,13 @@ metadata_get_dirnode(const char * path, const shadow_t * shadow_name)
 
 load_from_disk:
     if (fpath == NULL
-        && (fpath = vfs_metadata_path(path, shadow_name)) == NULL) {
-        log_error("vfs_metadata_path returned NULL (%s)", fpath);
+        && (fpath = fpath1 = vfs_dirnode_path(path, shdw)) == NULL) {
+        log_error("vfs_dirnode_path returned NULL (%s)", fpath);
         goto out;
     }
+
+    /* just in case fpath was not NULL */
+    fpath1 = fpath;
 
     /* load it from disk */
     if ((dn = dirnode_from_file(fpath)) == NULL) {
@@ -162,14 +158,14 @@ load_from_disk:
     }
 
     // add it to the metadata cache
-    if (_create_entry(dn, shadow_name)) {
+    if (_create_entry(dn, shdw)) {
         dirnode_free(dn);
         dn = NULL;
     }
 
 out:
-    if (fpath) {
-        sdsfree(fpath);
+    if (fpath1) {
+        sdsfree(fpath1);
     }
 
     return dn;

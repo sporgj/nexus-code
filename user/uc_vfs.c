@@ -20,6 +20,9 @@ typedef struct supernode_entry supernode_entry_t;
 static SLIST_HEAD(_list, supernode_entry) _s = SLIST_HEAD_INITIALIZER(NULL),
                                           *snode_list = &_s;
 
+static sds
+_append_root_dirnode_path(sds root_path);
+
 uc_filebox_t *
 vfs_get_filebox(const char * path, size_t hint)
 {
@@ -86,7 +89,7 @@ vfs_mount(const char * path)
 
     // initialize the root dentry
     root_dnode_path = vfs_append(sdsnew(path), &super->root_dnode);
-    snode_entry->dentry_tree = dcache_new_root(&super->root_dnode);
+    snode_entry->dentry_tree = dcache_new_root(&super->root_dnode, path);
 
     ret = 0;
 out:
@@ -103,18 +106,28 @@ out:
     return ret;
 }
 
-sds
-vfs_get_root_path(const char * path)
+static sds
+_vfs_get_root_path(const char * path, const shadow_t ** root_shdw)
 {
     supernode_entry_t * curr;
     SLIST_FOREACH(curr, snode_list, next_entry)
     {
         if (strstr(path, curr->path)) {
+            if (root_shdw) {
+                *root_shdw = &curr->super->root_dnode;
+            }
+
             return sdsdup(curr->path);
         }
     }
 
     return NULL;
+}
+
+sds
+vfs_get_root_path(const char * path)
+{
+    return _vfs_get_root_path(path, NULL);
 }
 
 sds
@@ -156,11 +169,7 @@ vfs_root_dirnode_path(const char * path)
             root_path = sdsdup(curr->path);
 
             /* to return the root, return the path and root */
-            root_path = sdscat(root_path, "/");
-            root_path = sdscat(root_path, UCAFS_REPO_DIR);
-            root_path = sdscat(root_path, "/");
-            root_path = sdscat(root_path, UCAFS_ROOT_DIRNODE);
-            return root_path;
+            return _append_root_dirnode_path(root_path);
         }
     }
 
@@ -170,18 +179,46 @@ vfs_root_dirnode_path(const char * path)
 sds
 vfs_metadata_path(const char * path, const shadow_t * shdw_name)
 {
-    sds root_path = vfs_get_root_path(path);
+    return vfs_dirnode_path(path, shdw_name);
+}
+
+static inline sds
+_append_root_dirnode_path(sds root_path)
+{
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, UCAFS_REPO_DIR);
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, UCAFS_ROOT_DIRNODE);
+    return root_path;
+}
+
+sds
+vfs_dirnode_path(const char * path, const shadow_t * shdw)
+{
+    const shadow_t * root_shdw;
+    char * metadata_path = NULL;
+    sds root_path = _vfs_get_root_path(path, &root_shdw), new_path;
     if (root_path == NULL) {
         return NULL;
     }
 
-    char * metaname = metaname_bin2str(shdw_name);
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, metaname);
+    /* if it's a root dirnode, let's return it as if */
+    if (memcmp(root_shdw, shdw, sizeof(shadow_t)) == 0) {
+        return _append_root_dirnode_path(root_path);
+    }
 
-    free(metaname);
+    sdsfree(root_path);
 
-    return root_path;
+    // derive the metadata name
+    metadata_path = metaname_bin2str(shdw);
+
+    // the metadata file will reside in the same folder as the parent dir
+    new_path = sdsnew(path);
+    new_path = sdscat(new_path, "/");
+    new_path = sdscat(new_path, metadata_path);
+    free(metadata_path);
+
+    return new_path;
 }
 
 sds

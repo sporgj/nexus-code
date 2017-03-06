@@ -42,6 +42,7 @@ struct dentry_tree {
     Hashmap * hashmap;
     struct uc_dentry * root_dentry;
     uv_mutex_t dcache_lock;
+    sds root_path;
 };
 
 uc_dirnode_t *
@@ -57,7 +58,7 @@ uc_filebox_t *
 dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint);
 
 struct dentry_tree *
-dcache_new_root(shadow_t * root_shdw);
+dcache_new_root(shadow_t * root_shdw, const char * root_path);
 
 /* vfs */
 sds
@@ -86,16 +87,14 @@ vfs_get_filebox(const char * path, size_t hint);
 uc_dirnode_t *
 vfs_lookup(const char * path, bool dirpath);
 
+sds
+vfs_dirnode_path(const char * path, const shadow_t * shdw);
+
 /**
  * Returns the dirnode from the metadata
  * @param is shadow name
  */
 uc_dirnode_t * metadata_get_dirnode(const char * path, const shadow_t *);
-
-/**
- * Returns the root dirnode from the repo path
- */
-uc_dirnode_t * metadata_root_dirnode(const char * path);
 
 void
 metadata_update_entry(struct metadata_entry * entry);

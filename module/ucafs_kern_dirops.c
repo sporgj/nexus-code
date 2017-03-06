@@ -267,13 +267,13 @@ ucafs_kern_rename(struct vcache * from_vnode,
                   char ** old_shadowname,
                   char ** new_shadowname)
 {
-    int ret = -1, code;
+    int ret = -1, code, len1 = strlen(oldname), len2 = strlen(newname);
     char *from_path = NULL, *to_path = NULL;
     caddr_t payload;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
 
-    if (is_md_file(oldname) || is_md_file(newname)) {
+    if (is_md_file(oldname, len1) || is_md_file(newname, len2)) {
         return -1;
     }
 
@@ -388,9 +388,16 @@ ucafs_kern_access(struct vcache * avc, afs_int32 rights)
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
 
+    // if it's a lookup, just return it's ok
+    if (rights == ACL_LOOKUP || (is_dir && rights == ACL_READ)) {
+        return 0;
+    }
+
     if (ucafs_vnode_path(avc, &path)) {
         return 0;
     }
+
+    ERROR("access=%s (%d)\n", path, rights);
 
     if ((payload = READPTR_LOCK()) == 0) {
         kfree(path);
@@ -418,6 +425,7 @@ ucafs_kern_access(struct vcache * avc, afs_int32 rights)
     }
 
 out:
+    ERROR("ACCESS=%s (%d)\n", path, rights);
     if (reply) {
         kfree(reply);
     }

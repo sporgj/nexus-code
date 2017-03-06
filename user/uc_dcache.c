@@ -70,9 +70,10 @@ start_stats_thread()
 }
 
 struct dentry_tree *
-dcache_new_root(shadow_t * root_shdw)
+dcache_new_root(shadow_t * root_shdw, const char * path)
 {
     int err = -1;
+    sds root_path;
     struct dentry_tree * tree = NULL;
     if ((tree = calloc(1, sizeof(struct dentry_tree))) == NULL) {
         log_fatal("allocation failed");
@@ -85,6 +86,11 @@ dcache_new_root(shadow_t * root_shdw)
         log_fatal("allocation failed");
         goto out;
     }
+
+    root_path = sdsnew(path);
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, UCAFS_WATCH_DIR);
+    tree->root_path = root_path;
 
     uv_mutex_init(&tree->dcache_lock);
 
@@ -228,6 +234,7 @@ hash_lookup(const struct uc_dentry * parent, const char * name)
 static struct uc_dentry *
 traverse(struct uc_dentry * root_dentry,
          struct uc_dentry * parent_dentry,
+         sds root_path,
          const char * canonical_path,
          char * path_cstr,
          uc_dirnode_t ** p_dest_dn)
@@ -237,8 +244,11 @@ traverse(struct uc_dentry * root_dentry,
     char *metaname_str, *nch, *pch;
     const link_info_t * link_info;
     const shadow_t * shadow_name;
-    uc_dirnode_t *dn = NULL, *alias_dn = NULL;
+    uc_dirnode_t *dn = NULL;
     bool found_in_cache;
+
+    /* the string builder */
+    sds curr_path = sdsdup(root_path);
 
     /* start tokenizing */
     nch = strtok_r(path_cstr, "/", &pch);
@@ -272,17 +282,10 @@ traverse(struct uc_dentry * root_dentry,
         }
 
         /* 2 - We have to do a real fetch from disk */
-        if (dn == NULL) {
-            if (parent_dentry == root_dentry) {
-                dn = metadata_root_dirnode(canonical_path);
-            } else {
-                dn = metadata_get_dirnode(canonical_path,
-                                          &parent_dentry->shdw_name);
-            }
-
-            if (dn == NULL) {
-                break;
-            }
+        if (dn == NULL
+            && !(dn = metadata_get_dirnode(curr_path,
+                                           &parent_dentry->shdw_name))) {
+            break;
         }
 
         shadow_name = dirnode_traverse(dn, nch, UC_ANY, &atype, &link_info);
@@ -294,8 +297,8 @@ traverse(struct uc_dentry * root_dentry,
         if (atype == UC_LINK) {
             /* get the link and recursively traverse */
             char * link_cstr = strdup(link_info->target_link);
-            dentry = traverse(root_dentry, parent_dentry, canonical_path,
-                              link_cstr, &dn);
+            dentry = traverse(root_dentry, parent_dentry, curr_path,
+                              canonical_path, link_cstr, &dn);
             free(link_cstr);
 
             if (dentry) {
@@ -307,15 +310,13 @@ traverse(struct uc_dentry * root_dentry,
     next:
         /* get the path to the dnode */
         if (found_in_cache == false) {
-            alias_dn = dn;
-            dn = metadata_get_dirnode(canonical_path, shadow_name);
-            if (dn == NULL) {
+            if ((dn = metadata_get_dirnode(curr_path, shadow_name)) == NULL) {
                 break;
             }
 
             /* lets add the entry to the dirnode */
             dentry = dcache_new(nch, shadow_name, parent_dentry,
-                                parent_dentry->dentry_tree);
+                    parent_dentry->dentry_tree);
             if (dentry == NULL) {
                 log_error("dcache_new returned NULL");
                 break;
@@ -324,28 +325,34 @@ traverse(struct uc_dentry * root_dentry,
             dcache_add(dentry, parent_dentry);
         }
 
-        if (alias_dn) {
-            alias_dn = NULL;
-        }
     next1:
+        /* move the path to the next component */
+        // FIXME potential issues with .. and .
+        curr_path = sdscat(curr_path, "/");
+        curr_path = sdscat(curr_path, nch);
+
         parent_dentry = dentry;
         nch = strtok_r(NULL, "/", &pch);
     }
 
     /* now return the entry */
-    if (nch == NULL) {
-        *p_dest_dn = (dn == NULL)
-            ? metadata_get_dirnode(canonical_path, &parent_dentry->shdw_name)
-            : dn;
-        return dentry;
+    /* if it's not null, it means we haven't parsed to the end of the string */
+    if (nch) {
+        sdsfree(curr_path);
+        *p_dest_dn = NULL;
+        return NULL;
     }
 
-    *p_dest_dn = NULL;
-    return NULL;
+    *p_dest_dn
+        = dn ?: metadata_get_dirnode(curr_path, &parent_dentry->shdw_name);
+    sdsfree(curr_path);
+
+    return dentry;
 }
 
 static struct uc_dentry *
 real_lookup(struct uc_dentry * root_dentry,
+            sds root_path,
             const char * canonical_path,
             const char * rel_path,
             uc_dirnode_t ** dn)
@@ -354,8 +361,8 @@ real_lookup(struct uc_dentry * root_dentry,
     struct uc_dentry * result_dentry;
     char * path_cstr = strdup(rel_path);
 
-    result_dentry
-        = traverse(root_dentry, root_dentry, canonical_path, path_cstr, dn);
+    result_dentry = traverse(root_dentry, root_dentry, root_path,
+                             canonical_path, path_cstr, dn);
 
     free(path_cstr);
     return result_dentry;
@@ -373,7 +380,7 @@ dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath)
     struct uc_dentry * dentry = tree->root_dentry;
     uc_dirnode_t * dirnode = NULL;
     char * temp;
-    sds temp_path, relpath;
+    sds relpath;
 
     if ((relpath = vfs_relpath(path, dirpath)) == NULL) {
         log_warn("getting relpath `%s` FAILED", path);
@@ -382,9 +389,9 @@ dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath)
 
     // just return the root dirnode
     if (strlen(relpath)) {
-        dentry = real_lookup(dentry, path, relpath, &dirnode);
+        dentry = real_lookup(dentry, tree->root_path, path, relpath, &dirnode);
     } else {
-        dirnode = metadata_root_dirnode(path);
+        dirnode = metadata_get_dirnode(path, &dentry->shdw_name);
     }
 
     /* increase the ref count */

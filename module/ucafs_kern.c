@@ -226,7 +226,7 @@ UCAFS_DISCONNECTED()
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 {
-    int len, total_len, count, min_len;
+    int len, total_len, count;
     char *path, *result, *temp;
     char buf[512];
     watch_path_t * curr_entry;

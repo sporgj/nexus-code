@@ -47,16 +47,6 @@ typedef enum {
     CRYPTO_UNSEAL
 } seal_op_t;
 
-typedef enum {
-    ACL_READ = 0x1,
-    ACL_WRITE = 0x2,
-    ACL_INSERT = 0x4,
-    ACL_LOOKUP = 0x8,
-    ACL_DELETE = 0x10,
-    ACL_LOCK = 0x20,
-    ACL_ADMINISTER = 0x40
-} acl_type_t;
-
 typedef struct {
     uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
     uint8_t type; /* 0 for soft, 1 for hard */

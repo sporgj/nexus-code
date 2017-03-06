@@ -74,6 +74,16 @@ typedef enum {
     UC_ANY = UC_FILE | UC_DIR | UC_LINK,
 } __attribute__((packed)) ucafs_entry_type;
 
+typedef enum {
+    ACL_READ = 0x1,
+    ACL_WRITE = 0x2,
+    ACL_INSERT = 0x4,
+    ACL_LOOKUP = 0x8,
+    ACL_DELETE = 0x10,
+    ACL_LOCK = 0x20,
+    ACL_ADMINISTER = 0x40
+} acl_type_t;
+
 /* prefixes for the different file types */
 #define UC_METADATA_PREFIX ".md"
 #define UC_FILEDATA_PREFIX ""
