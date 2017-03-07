@@ -4,16 +4,35 @@
 extern "C" {
 #endif
 
+#include <stdatomic.h>
+
 #include "uc_dirnode.h"
 #include "uc_filebox.h"
 
 #include "third/hashmap.h"
+#include "third/queue.h"
 
 #define MAP_INIT_SIZE 2 << 12
 
-typedef int ref_t;
+typedef atomic_int ref_t;
 
 struct dentry_tree;
+struct metadata_entry;
+
+typedef struct dentry_list_entry {
+    struct uc_dentry * dentry;
+    SLIST_ENTRY(dentry_list_entry) next_item;
+} dentry_list_entry_t;
+
+typedef SLIST_HEAD(dentry_head, dentry_list_entry) dentry_list_head_t;
+
+typedef struct metadata_entry {
+    uc_dirnode_t * dn;
+    time_t epoch;
+    shadow_t shdw_name;
+    uv_mutex_t lock; /* locking the whole structure */
+    dentry_list_head_t d_entries;
+} metadata_entry_t;
 
 typedef struct {
     const struct uc_dentry * parent;
@@ -21,9 +40,9 @@ typedef struct {
     sds name;
 } dcache_key_t;
 
-typedef struct dcache_item_t {
+typedef struct dcache_item {
     struct uc_dentry * dentry;
-    SLIST_ENTRY(dcache_item_t) next_dptr;
+    SLIST_ENTRY(dcache_item) next_dptr;
 } dcache_item_t;
 
 struct uc_dentry {
@@ -31,8 +50,9 @@ struct uc_dentry {
     ref_t count; /* number of references to the dentry */
     shadow_t shdw_name; /* the dirnode file name */
     dcache_key_t key;
-    SLIST_HEAD(dcache_list_t, dcache_item_t) children;
+    SLIST_HEAD(dcache_list_t, dcache_item) children;
     struct dentry_tree * dentry_tree;
+    struct metadata_entry * metadata;
 
     uv_mutex_t v_lock; /* required to change valid */
     uv_mutex_t c_lock; /* to change the children */
@@ -95,7 +115,7 @@ vfs_dirnode_path(const char * path, const shadow_t * shdw);
  * @param is shadow name
  */
 uc_dirnode_t *
-metadata_get_dirnode(const char * path, uc_dentry_t *, const shadow_t *);
+metadata_get_dirnode(const char * path, struct uc_dentry *);
 
 void
 metadata_update_entry(struct metadata_entry * entry);

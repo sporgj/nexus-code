@@ -215,6 +215,7 @@ usgx_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
     supernode_t * super;
     crypto_ekey_t * sealing_key;
     shadow_t * shdw_name;
+    size_t total = header->dirbox_len + header->lockbox_len + header->journal_len;
 
     /* super_ekey + root_shdw + fnode_uuid */
     sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);
@@ -224,7 +225,7 @@ usgx_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
 
     ret = crypto_metadata(&header->crypto_ctx, sealing_key, header,
                            sizeof(dnode_header_t) - sizeof(crypto_context_t),
-                           data, header->dirbox_len + header->lockbox_len, op);
+                           data, total, op);
     free(sealing_key);
     return ret;
 }

@@ -20,44 +20,23 @@
 
 struct dirty_item;
 
-typedef struct metadata_entry {
-    uc_dirnode_t * dn;
-    time_t epoch;
-    shadow_t shdw_name; // XXX not necessary, can get it from dirnode
-    struct dirty_item * dirty_item;
-    uv_mutex_t lock; /* locking the whole structure */
-} metadata_entry_t;
-
-typedef struct dirty_item {
-    metadata_entry_t * entry;
-    TAILQ_ENTRY(dirty_item) next_item;
-} dirty_item_t;
-
-/* our lists */
-TAILQ_HEAD(dirty_list_t, dirty_item);
-
-static struct dirty_list_t _l, *dirty_list_head = &_l;
-static uv_mutex_t dirty_list_lock;
-static size_t dirty_list_count = 0;
-
 static Hashmap * metadata_hashmap;
 
-static int
+static metadata_entry_t *
 _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
 {
     int ret = -1, *hash;
     void * ptr;
     metadata_entry_t * entry
-        = (metadata_entry_t *)malloc(sizeof(metadata_entry_t));
+        = (metadata_entry_t *)calloc(1, sizeof(metadata_entry_t));
     if (entry == NULL) {
         log_fatal("allocation failed for metadata_entry_t");
-        return -1;
+        return NULL;
     }
 
     entry->dn = dn;
     entry->epoch = time(NULL);
     memcpy(&entry->shdw_name, shdw, sizeof(shadow_t));
-    entry->dirty_item = NULL;
     uv_mutex_init(&entry->lock);
 
     dirnode_set_metadata(dn, entry);
@@ -71,11 +50,15 @@ _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
 out:
     if (ret) {
         free(entry);
+        entry = NULL;
     }
 
-    return ret;
+    return entry;
 }
 
+/**
+ * Removes the dirnode in the entry
+ */
 static void
 _evict_entry(metadata_entry_t * entry)
 {
@@ -88,15 +71,6 @@ _evict_entry(metadata_entry_t * entry)
 
     dirnode_free(entry->dn);
 
-    uv_mutex_lock(&dirty_list_lock);
-    uv_mutex_lock(&entry->lock);
-    if (entry->dirty_item) {
-        TAILQ_REMOVE(dirty_list_head, entry->dirty_item, next_item);
-        dirty_list_count--;
-    }
-    uv_mutex_unlock(&entry->lock);
-    uv_mutex_unlock(&dirty_list_lock);
-
     free(entry);
 }
 
@@ -106,19 +80,113 @@ metadata_update_entry(struct metadata_entry * entry)
     entry->epoch = time(NULL);
 }
 
+static inline void
+_update_entry(struct metadata_entry * entry, uc_dirnode_t * dn)
+{
+    if (entry->dn) {
+        dirnode_free(entry->dn);
+    }
+
+    entry->dn = dn;
+}
+
+static inline void
+_free_entry(metadata_entry_t * entry)
+{
+    if (entry->dn) {
+        dirnode_free(entry->dn);
+    }
+
+    entry->dn = NULL;
+
+    free(entry);
+}
+
+/**
+ * Checks for journal section of the parent dirnode to create on-disk file
+ * @param parent_dentry
+ * @param fpath is the path to the new dirnode
+ * @param p_dirnode would be the destination pointer for the new dirnode
+ * @return 0 on success
+ */
+static int
+_metadata_on_demand(struct uc_dentry * parent_dentry,
+                    const shadow_t * shdw,
+                    const char * fpath,
+                    uc_dirnode_t ** p_dirnode)
+{
+    int err = -1, ret = -1;
+    journal_op_t journal_op;
+    uc_dirnode_t *dn = NULL, *parent_dirnode = parent_dentry->metadata->dn;
+    *p_dirnode = NULL;
+
+    if (parent_dirnode == NULL) {
+        // then we have to load it from the metadata
+        // TODO include code here to call metadata_get_dirnode()
+        // will need to implement dentry_path()
+        log_fatal("parent_dirnode == NULL");
+        goto out;
+    }
+
+    /* if we don't find the entry in the dirnode's journal or if it's not a
+     * CREATE_DIR, just leave */
+    err = dirnode_search_journal(parent_dirnode, shdw, &journal_op);
+    if (!(err == 0 && journal_op == CREATE_DIR)) {
+        return 0;
+    }
+
+    // then let's create a new dirnode and return
+    if ((dn = dirnode_new2(shdw, parent_dirnode)) == NULL) {
+        log_error("new dirnode failed: %s", fpath);
+        goto out;
+    }
+
+    // XXX might be wiser to check if the file already exists on disk
+    if (!dirnode_write(dn, fpath)) {
+        log_error("Creating: '%s' dirnode FAILED", fpath);
+        goto out;
+    }
+
+    /* now we can delete the entry from the journal.
+     * XXX do we need to flush the dirnode immediately? */
+    dirnode_rm_from_journal(parent_dirnode, shdw);
+    if (!dirnode_flush(parent_dirnode)) {
+        log_error("flushing parent dirnode failed\n");
+        goto out;
+    }
+
+    /* lets not forget to set the path */
+    dirnode_set_path(dn, fpath);
+    *p_dirnode = dn;
+
+    ret = 0;
+out:
+    if (ret && dn) {
+        dirnode_free(dn);
+    }
+
+    return ret;
+}
+
+/**
+ * Loads the dirnode associated with a particular shadow
+ * @param path is the path to the file being loaded
+ * @param dentry is the element's parent dentry
+ * @param shdw is the shadow name to load
+ */
 uc_dirnode_t *
 metadata_get_dirnode(const char * path,
-                     uc_dirnode_t * parent_dirnode,
-                     const shadow_t * shdw)
+                     struct uc_dentry * dentry)
 {
     int err;
     bool in_journal;
-    journal_op_t journal_op;
     uc_dirnode_t * dn = NULL;
     metadata_entry_t * entry;
     struct stat st;
     int * hashval;
-    sds fpath = NULL, fpath1 = NULL;
+    sds fpath = NULL;
+    struct uc_dentry * parent_dentry = (struct uc_dentry *)dentry->key.parent;
+    const shadow_t * shdw = &dentry->shdw_name;
 
     /* check if the item is in the cache */
     entry = (metadata_entry_t *)hashmapGet(metadata_hashmap, (void *)shdw);
@@ -127,8 +195,8 @@ metadata_get_dirnode(const char * path,
     }
 
     /* if found, check the on-disk time */
-    if ((fpath = dirnode_get_fpath(entry->dn)) == NULL) {
-        log_error("dirnode_get_fpath returned NULL (%s)", fpath);
+    if ((fpath = dirnode_get_path(entry->dn)) == NULL) {
+        log_error("dirnode_get_path returned NULL (%s)", fpath);
         goto out;
     }
 
@@ -138,8 +206,9 @@ metadata_get_dirnode(const char * path,
     }
 
     if (difftime(st.st_mtime, entry->epoch) > 0) {
-        // implicitly deletes the dirnode object
-        _evict_entry(entry);
+        /* frees the dirnode object and load it from disk */
+        dirnode_free(entry->dn);
+        entry->dn = NULL;
         goto load_from_disk;
     }
 
@@ -148,62 +217,44 @@ metadata_get_dirnode(const char * path,
     goto out;
 
 load_from_disk:
-    if (fpath == NULL
-        && (fpath = fpath1 = vfs_dirnode_path(path, shdw)) == NULL) {
+    if (fpath == NULL && (fpath = vfs_dirnode_path(path, shdw)) == NULL) {
         log_error("vfs_dirnode_path returned NULL (%s)", fpath);
         goto out;
     }
 
-    if (parent_dirnode) {
-        err = dirnode_search_journal(parent_dirnode, shdw, &journal_op);
-        in_journal = (err == 0 && journal_op == CREATE_FILE);
-
-        if (in_journal) {
-            // then let's create a new dirnode and return
-            if ((dn = dirnode_new2(shdw, parent_dirnode)) == NULL) {
-                log_error("new dirnode failed: %s", fpath);
-                goto out;
-            }
-
-            // XXX might be wiser to check if the file already exists on disk
-            if (!dirnode_write(dn, fpath)) {
-                log_error("Creating: '%s' dirnode FAILED", fpath);
-                goto out;
-            }
-
-            /* now we can delete the entry from the journal.
-             * XXX do we need to flush the dirnode immediately? */
-            dirnode_rm_from_journal(parent_dirnode, shdw);
-            if (!dirnode_flush(parent_dirnode)) {
-                log_error("flushing parent dirnode failed\n");
-                goto out;
-            }
-
-            /* lets not forget to set the path */
-            dn->dnode_path = sdsnew(fpath);
-            dirnode_set_path(dn, fpath);
-            goto create_entry;
-        }
+    /* this is the code for on-demand loading of the dirnode */
+    if (parent_dentry && _metadata_on_demand(parent_dentry, shdw, fpath, &dn)) {
+        log_error("creating metadata failed (%s)", path);
+        goto out;
     }
-
-    /* just in case fpath was not NULL */
-    fpath1 = fpath;
 
     /* load it from disk */
     if ((dn = dirnode_from_file(fpath)) == NULL) {
         goto out;
     }
 
-create_entry:
     // add it to the metadata cache
-    if (_create_entry(dn, shdw)) {
-        dirnode_free(dn);
-        dn = NULL;
+    if (entry == NULL) { 
+        /* associate it to the dentry */
+         entry = _create_entry(dn, shdw);
+    } else {
+        /* if entry already exists, just update it */
+        _update_entry(entry, dn);
     }
 
+    if (entry == NULL) {
+        log_error("metadata entry could not be created");
+        dirnode_free(dn);
+        dn = NULL;
+        goto out;
+    }
+
+    /* lets not forget to add it to the dentry */
+    // TODO add to dentry to metadata's list
+    dentry->metadata = entry;
 out:
-    if (fpath1) {
-        sdsfree(fpath1);
+    if (fpath) {
+        sdsfree(fpath);
     }
 
     return dn;
@@ -229,8 +280,6 @@ metadata_init()
         log_fatal("hashmapCreate returns NULL");
         return -1;
     }
-
-    TAILQ_INIT(dirty_list_head);
 
     return 0;
 }

@@ -232,12 +232,12 @@ hash_lookup(const struct uc_dentry * parent, const char * name)
  * @return NULL if the dentry is not found
  */
 static struct uc_dentry *
-traverse(struct uc_dentry * root_dentry,
-         struct uc_dentry * parent_dentry,
-         sds root_path,
-         const char * canonical_path,
-         char * path_cstr,
-         uc_dirnode_t ** p_dest_dn)
+dcache_traverse(struct uc_dentry * root_dentry,
+                struct uc_dentry * parent_dentry,
+                sds root_path,
+                const char * canonical_path,
+                char * path_cstr,
+                sds * final_path)
 {
     struct uc_dentry * dentry = parent_dentry;
     ucafs_entry_type atype;
@@ -273,26 +273,20 @@ traverse(struct uc_dentry * root_dentry,
             }
         }
 
-        /* 1 - hash_lookup */
+        /* 1 - hash_lookup: checks if the entry was already created */
         if ((dentry = hash_lookup(parent_dentry, nch))) {
             found_in_cache = true;
             /* let's jump to the next one */
             shadow_name = &dentry->shdw_name;
-            goto next;
+            goto next1;
         }
 
-        /* 2 - We have to do a real fetch from disk */
-        if (dn == NULL) {
-            const shadow_t * shdw2
-                = ((parent_dentry == root_dentry) ? NULL
-                                                  : &parent_dentry->shdw_name);
-
-            dn = metadata_get_dirnode(curr_path, shdw2, &dentry->shdw_name);
-            if (dn == NULL) {
-                break;
-            }
+        /* 2 - Fetch the parent dirnode from disk */
+        if ((dn = metadata_get_dirnode(curr_path, parent_dentry)) == NULL) {
+            break;
         }
 
+        /* 3 - load the shadow name of the new dentry */
         shadow_name = dirnode_traverse(dn, nch, UC_ANY, &atype, &link_info);
         if (shadow_name == NULL || atype == UC_FILE) {
             break;
@@ -301,34 +295,30 @@ traverse(struct uc_dentry * root_dentry,
         /* special care for our symlinks :( */
         if (atype == UC_LINK) {
             /* get the link and recursively traverse */
+            sds temp_path = NULL;
             char * link_cstr = strdup(link_info->target_link);
-            dentry = traverse(root_dentry, parent_dentry, curr_path,
-                              canonical_path, link_cstr, &dn);
+            dentry = dcache_traverse(root_dentry, parent_dentry, curr_path,
+                                     canonical_path, link_cstr, &temp_path);
+            sdsfree(curr_path);
             free(link_cstr);
+
+            /* make the curr path point to the new temp_path */
+            curr_path = temp_path;
 
             if (dentry) {
                 goto next1;
             }
         }
 
-        found_in_cache = false;
-    next:
-        /* get the path to the dnode */
-        if (found_in_cache == false) {
-            if ((dn = metadata_get_dirnode(curr_path, shadow_name)) == NULL) {
-                break;
-            }
-
-            /* lets add the entry to the dirnode */
-            dentry = dcache_new(nch, shadow_name, parent_dentry,
-                    parent_dentry->dentry_tree);
-            if (dentry == NULL) {
-                log_error("dcache_new returned NULL");
-                break;
-            }
-
-            dcache_add(dentry, parent_dentry);
+        /* 4 - now create the new entry */
+        dentry = dcache_new(nch, shadow_name, parent_dentry,
+                            parent_dentry->dentry_tree);
+        if (dentry == NULL) {
+            log_error("dcache_new returned NULL");
+            break;
         }
+
+        dcache_add(dentry, parent_dentry);
 
     next1:
         /* move the path to the next component */
@@ -336,21 +326,19 @@ traverse(struct uc_dentry * root_dentry,
         curr_path = sdscat(curr_path, "/");
         curr_path = sdscat(curr_path, nch);
 
-        parent_dentry = dentry;
+        parent_dentry = (struct uc_dentry *)dentry->key.parent;
         nch = strtok_r(NULL, "/", &pch);
     }
 
     /* now return the entry */
     /* if it's not null, it means we haven't parsed to the end of the string */
     if (nch) {
+        *final_path = NULL;
         sdsfree(curr_path);
-        *p_dest_dn = NULL;
         return NULL;
     }
 
-    *p_dest_dn
-        = dn ?: metadata_get_dirnode(curr_path, &parent_dentry->shdw_name);
-    sdsfree(curr_path);
+    *final_path = curr_path;
 
     return dentry;
 }
@@ -360,17 +348,24 @@ real_lookup(struct uc_dentry * root_dentry,
             sds root_path,
             const char * canonical_path,
             const char * rel_path,
-            uc_dirnode_t ** dn)
+            uc_dirnode_t ** pp_dirnode)
 {
-    /* first, lets get the parent dnode */
-    struct uc_dentry * result_dentry;
+    struct uc_dentry * dentry;
+    sds curr_path = NULL;
     char * path_cstr = strdup(rel_path);
 
-    result_dentry = traverse(root_dentry, root_dentry, root_path,
-                             canonical_path, path_cstr, dn);
+    dentry = dcache_traverse(root_dentry, root_dentry, root_path,
+                             canonical_path, path_cstr, &curr_path);
+
+    /* dentry points to the entry we're interested in. Now, we have to load its
+     * associated dirnode */
+    if (dentry) {
+        *pp_dirnode = metadata_get_dirnode(curr_path, dentry);
+        sdsfree(curr_path);
+    }
 
     free(path_cstr);
-    return result_dentry;
+    return dentry;
 }
 
 /**
@@ -396,7 +391,7 @@ dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath)
     if (strlen(relpath)) {
         dentry = real_lookup(dentry, tree->root_path, path, relpath, &dirnode);
     } else {
-        dirnode = metadata_get_dirnode(path, NULL, &dentry->shdw_name);
+        dirnode = metadata_get_dirnode(path, dentry);
     }
 
     /* increase the ref count */

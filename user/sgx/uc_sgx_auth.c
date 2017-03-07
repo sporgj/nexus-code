@@ -513,12 +513,12 @@ ecall_supernode_mount(supernode_t * super)
  */
 static int
 usgx_check_rights(dnode_header_t * dnode_head,
-                  acl_head_t * acl_list,
+                  acl_list_head_t * acl_list,
                   acl_rights_t rights)
 {
     int ret = -1;
     snode_entry_t * snode_entry;
-    acl_entry_t * acl_entry;
+    acl_list_entry_t * acl_entry;
     acl_data_t * acl_data;
     supernode_t * super;
 
@@ -572,7 +572,7 @@ out:
 
 int
 ecall_check_rights(dnode_header_t * dnode_head,
-                   acl_head_t * acl_list,
+                   acl_list_head_t * acl_list,
                    acl_rights_t rights)
 {
     return usgx_check_rights(dnode_head, acl_list, rights);

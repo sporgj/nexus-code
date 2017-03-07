@@ -50,9 +50,9 @@ dirops_new1(const char * parent_dir,
         goto out;
     }
 
+    /*
     path1 = vfs_metadata_path(parent_dir, fname_code);
 
-    /*
     if (type == UC_DIR) {
         if ((dirnode1 = dirnode_new2(fname_code, dirnode)) == NULL) {
             log_error("new dirnode failed: %s/%s", parent_dir, fname);

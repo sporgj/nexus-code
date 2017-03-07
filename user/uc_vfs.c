@@ -195,8 +195,10 @@ _append_root_dirnode_path(sds root_path)
 sds
 vfs_dirnode_path(const char * path, const shadow_t * shdw)
 {
+    int i = 0, len1, len2;
     const shadow_t * root_shdw;
     char * metadata_path = NULL;
+    const char * path1;
     sds root_path = _vfs_get_root_path(path, &root_shdw), new_path;
     if (root_path == NULL) {
         return NULL;
@@ -209,12 +211,17 @@ vfs_dirnode_path(const char * path, const shadow_t * shdw)
 
     sdsfree(root_path);
 
+    len1 = strlen(path), len2 = 0;
+    path1 = path + len1;
+    while (*path1 != '/') {
+        path1--;
+    }
+
     // derive the metadata name
     metadata_path = metaname_bin2str(shdw);
 
     // the metadata file will reside in the same folder as the parent dir
-    new_path = sdsnew(path);
-    new_path = sdscat(new_path, "/");
+    new_path = sdsnewlen(path, (path1 - path + 1)); /* +1 to include '/' */
     new_path = sdscat(new_path, metadata_path);
     free(metadata_path);
 

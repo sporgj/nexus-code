@@ -44,6 +44,12 @@ dirnode_set_path(uc_dirnode_t * dirnode, const char * path)
     dirnode->dnode_path = sdsnew(path);
 }
 
+static inline sds
+dirnode_get_path(uc_dirnode_t * dirnode)
+{
+    return dirnode->dnode_path ? sdsdup(dirnode->dnode_path) : NULL;
+}
+
 /* set of operartions for the on-demand journaling */
 int
 dirnode_add_to_journal(uc_dirnode_t * dirnode,
@@ -116,9 +122,6 @@ dirnode_from_file(const sds file_path);
 
 void
 dirnode_free(uc_dirnode_t * dirnode);
-
-const sds
-dirnode_get_fpath(uc_dirnode_t * dirnode);
 
 /**
  * Writes the dnode to disk
