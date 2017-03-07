@@ -307,7 +307,7 @@ ucafs_kern_ping(void)
     reply_data_t * reply = NULL;
     caddr_t payload;
 
-    if ((payload = READPTR_LOCK()) == 0) {
+    if ((payload = READPTR_TRYLOCK()) == 0) {
         return;
     }
 

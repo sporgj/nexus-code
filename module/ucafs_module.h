@@ -114,6 +114,21 @@ READPTR_LOCK(void)
     return (caddr_t)(((char *)dev->outb) + sizeof(ucrpc_msg_t));
 }
 
+static inline caddr_t
+READPTR_TRYLOCK(void)
+{
+    /* trylock returns 0 on failure */
+    if (!mutex_trylock(&dev->send_mut)) {
+        return 0;
+    }
+
+    /* for trylock, we only drop the glock if it's successfully acquired */
+    AFS_GUNLOCK();
+
+    memset(dev->outb, 0, sizeof(ucrpc_msg_t));
+    return (caddr_t)(((char *)dev->outb) + sizeof(ucrpc_msg_t));
+}
+
 static inline void
 READPTR_TRY_UNLOCK(void)
 {
