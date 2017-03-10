@@ -245,7 +245,6 @@ dcache_traverse(struct uc_dentry * root_dentry,
     const link_info_t * link_info;
     const shadow_t * shadow_name;
     uc_dirnode_t *dn = NULL, *dn2;
-    bool found_in_cache;
 
     /* the string builder */
     sds curr_path = sdsdup(root_path);
@@ -275,9 +274,7 @@ dcache_traverse(struct uc_dentry * root_dentry,
 
         /* 1 - hash_lookup: checks if the entry was already created */
         if ((dentry = hash_lookup(parent_dentry, nch))) {
-            found_in_cache = true;
             /* let's jump to the next one */
-            shadow_name = &dentry->shdw_name;
             goto next1;
         }
 
@@ -326,7 +323,7 @@ dcache_traverse(struct uc_dentry * root_dentry,
         curr_path = sdscat(curr_path, "/");
         curr_path = sdscat(curr_path, nch);
 
-        parent_dentry = (struct uc_dentry *)dentry->key.parent;
+        parent_dentry = dentry;
         nch = strtok_r(NULL, "/", &pch);
     }
 
