@@ -110,6 +110,9 @@ vfs_lookup(const char * path, bool dirpath);
 sds
 vfs_dirnode_path(const char * path, const shadow_t * shdw);
 
+sds
+vfs_filebox_path(const char * path, const shadow_t * shdw);
+
 /**
  * Returns the dirnode from the metadata
  * @param is shadow name

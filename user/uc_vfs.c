@@ -20,8 +20,8 @@ typedef struct supernode_entry supernode_entry_t;
 static SLIST_HEAD(_list, supernode_entry) _s = SLIST_HEAD_INITIALIZER(NULL),
                                           *snode_list = &_s;
 
-static sds
-_append_root_dirnode_path(sds root_path);
+static inline sds
+_append_root_dirnode_path(sds root_path, const char * metadata_fname);
 
 uc_filebox_t *
 vfs_get_filebox(const char * path, size_t hint)
@@ -169,7 +169,7 @@ vfs_root_dirnode_path(const char * path)
             root_path = sdsdup(curr->path);
 
             /* to return the root, return the path and root */
-            return _append_root_dirnode_path(root_path);
+            return _append_root_dirnode_path(root_path, UCAFS_ROOT_DIRNODE);
         }
     }
 
@@ -183,22 +183,19 @@ vfs_metadata_path(const char * path, const shadow_t * shdw_name)
 }
 
 static inline sds
-_append_root_dirnode_path(sds root_path)
+_append_root_dirnode_path(sds root_path, const char * metadata_fname)
 {
     root_path = sdscat(root_path, "/");
     root_path = sdscat(root_path, UCAFS_REPO_DIR);
     root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, UCAFS_ROOT_DIRNODE);
+    root_path = sdscat(root_path, metadata_fname);
     return root_path;
 }
 
 sds
 vfs_dirnode_path(const char * path, const shadow_t * shdw)
 {
-    int i = 0, len1, len2;
     const shadow_t * root_shdw;
-    char * metadata_path = NULL;
-    const char * path1;
     sds root_path = _vfs_get_root_path(path, &root_shdw), new_path;
     if (root_path == NULL) {
         return NULL;
@@ -206,26 +203,21 @@ vfs_dirnode_path(const char * path, const shadow_t * shdw)
 
     /* if it's a root dirnode, let's return it as if */
     if (memcmp(root_shdw, shdw, sizeof(shadow_t)) == 0) {
-        return _append_root_dirnode_path(root_path);
-    }
-
-    sdsfree(root_path);
-
-    len1 = strlen(path), len2 = 0;
-    path1 = path + len1;
-    while (*path1 != '/') {
-        path1--;
+        return _append_root_dirnode_path(root_path, UCAFS_ROOT_DIRNODE);
     }
 
     // derive the metadata name
-    metadata_path = metaname_bin2str(shdw);
-
-    // the metadata file will reside in the same folder as the parent dir
-    new_path = sdsnewlen(path, (path1 - path + 1)); /* +1 to include '/' */
-    new_path = sdscat(new_path, metadata_path);
+    char * metadata_path = metaname_bin2str(shdw);
+    root_path = _append_root_dirnode_path(root_path, metadata_path);
     free(metadata_path);
 
     return new_path;
+}
+
+sds
+vfs_filebox_path(const char * path, const shadow_t * shdw)
+{
+    return vfs_dirnode_path(path, shdw);
 }
 
 sds
