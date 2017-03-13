@@ -215,7 +215,7 @@ usgx_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
     supernode_t * super;
     crypto_ekey_t * sealing_key;
     shadow_t * shdw_name;
-    size_t total = header->dirbox_len + header->lockbox_len + header->journal_len;
+    size_t total = header->dirbox_len + header->lockbox_len;
 
     /* super_ekey + root_shdw + fnode_uuid */
     sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);

@@ -161,34 +161,22 @@ typedef struct acl_list_entry {
 typedef SIMPLEQ_HEAD(acl_head, acl_list_entry) acl_list_head_t;
 
 typedef enum {
-    CREATE_FILE = 0,
-    CREATE_DIR,
-    DELETE_FILE,
-    DELETE_DIR
-} journal_op_t;
+   JRNL_NOOP = 0,
+   JRNL_CREATE = 1
+} jrnl_op_t;
 
 typedef struct {
-    uint8_t op;
-    shadow_t shdw;
-} __attribute__((packed)) journal_data_t;
-
-typedef struct journal_list_entry {
-    TAILQ_ENTRY(journal_list_entry) next_entry;
-    journal_data_t jrnl_data;
-} __attribute__((packed)) journal_list_entry_t;
-
-typedef TAILQ_HEAD(journal_list_head, journal_list_entry) journal_list_head_t;
+   uint8_t type: 1;
+   uint8_t jrnl: 1;
+} entry_info_t;
 
 // mainly for debug purposes in gdb
 #define DNODE_PAYLOAD                                                          \
-    union {                                                                    \
-        uint8_t type;                                                          \
-        uint8_t static_data;                                                   \
-    };                                                                         \
+    entry_info_t info;                                                         \
     uint16_t rec_len;                                                          \
     uint16_t link_len;                                                         \
     shadow_t shadow_name;                                                      \
-    uint16_t name_len;                                                         \
+    uint8_t name_len;                                                          \
     char real_name[0];
 
 typedef struct {
@@ -209,8 +197,7 @@ typedef TAILQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
 
 typedef struct {
     shadow_t uuid, parent, root;
-    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len,
-        journal_count, journal_len, garbage_count;
+    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
     crypto_context_t crypto_ctx;
 } __attribute__((packed)) dnode_header_t;
 

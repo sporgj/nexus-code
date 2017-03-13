@@ -17,12 +17,6 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 static int
 parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 
-static int
-serialize_journal(uc_dirnode_t * dn, uint8_t * buffer);
-
-static int
-parse_journal(uc_dirnode_t * dn, uint8_t * buffer);
-
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 {
@@ -40,7 +34,6 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 
     TAILQ_INIT(&dn->dirbox);
     SIMPLEQ_INIT(&dn->lockbox);
-    TAILQ_INIT(&dn->journal);
 
     dn->dnode_path = NULL;
     dn->dentry = NULL;
@@ -95,11 +88,9 @@ dirnode_free(uc_dirnode_t * dirnode)
 {
     dnode_list_head_t * dir_head = &dirnode->dirbox;
     acl_list_head_t * acl_head = &dirnode->lockbox;
-    journal_list_head_t * journal_head = &dirnode->journal;
 
     dnode_list_entry_t * dnode_data;
     acl_list_entry_t * acl_entry;
-    journal_list_entry_t * journal_entry;
 
     /* clear the entries in the entries */
     while ((dnode_data = TAILQ_FIRST(dir_head))) {
@@ -111,12 +102,6 @@ dirnode_free(uc_dirnode_t * dirnode)
     while ((acl_entry = SIMPLEQ_FIRST(acl_head))) {
         SIMPLEQ_REMOVE_HEAD(acl_head, next_entry);
         free(acl_entry);
-    }
-
-    /* clear the journal entries */
-    while ((journal_entry = TAILQ_FIRST(journal_head))) {
-        TAILQ_REMOVE(journal_head, journal_entry, next_entry);
-        free(journal_entry);
     }
 
     if (dirnode->dnode_path) {
@@ -133,7 +118,6 @@ dirnode_from_file(const sds filepath)
     dnode_header_t * header;
     dnode_list_head_t * dirbox;
     acl_list_head_t * lockbox;
-    journal_list_head_t * journal;
     uint8_t *buffer = NULL, *offset_ptr = NULL;
     FILE * fd;
     size_t nbytes, body_len;
@@ -155,11 +139,9 @@ dirnode_from_file(const sds filepath)
     header = &dn->header;
     dirbox = &dn->dirbox;
     lockbox = &dn->lockbox;
-    journal = &dn->journal;
 
     TAILQ_INIT(dirbox);
     SIMPLEQ_INIT(lockbox);
-    TAILQ_INIT(journal);
 
     /* read the header from the file */
     nbytes = fread(header, sizeof(dnode_header_t), 1, fd);
@@ -171,7 +153,7 @@ dirnode_from_file(const sds filepath)
 
     /* lets try to read the body of the dirnode */
     // TODO maybe check when body_len is ridiculous?
-    body_len = header->dirbox_len + header->lockbox_len + header->journal_len;
+    body_len = header->dirbox_len + header->lockbox_len;
     if (!body_len) {
         goto done;
     }
@@ -209,12 +191,6 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 
-    offset_ptr += header->lockbox_len;
-    if (header->journal_len && parse_journal(dn, offset_ptr)) {
-        log_error("parsing journal failed: %s", filepath);
-        goto out;
-    }
-
 done:
     dn->dnode_path = sdsdup(filepath);
     error = 0;
@@ -242,8 +218,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     FILE * fd;
     size_t proto_len, total_len;
 
-    total_len = dn->header.dirbox_len + dn->header.lockbox_len
-        + dn->header.journal_len;
+    total_len = dn->header.dirbox_len + dn->header.lockbox_len;
 
     fd = fopen(fpath, "wb");
     if (fd == NULL) {
@@ -263,15 +238,9 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     }
 
     /* now serialize the the access control information */
-    offset_ptr += dn->header.journal_len;
+    offset_ptr += dn->header.dirbox_len;
     if (serialize_lockbox(dn, offset_ptr)) {
         log_error("serializing dirnode ACL failed (%s)", fpath);
-        goto out;
-    }
-
-    offset_ptr += dn->header.lockbox_len;
-    if (serialize_journal(dn, offset_ptr)) {
-        log_error("serializing dirnode journal failed (%s)", fpath);
         goto out;
     }
 
@@ -371,11 +340,11 @@ out:
     return ret;
 }
 
-// TODO
 shadow_t *
 dirnode_add_alias(uc_dirnode_t * dn,
                   const char * name,
                   ucafs_entry_type type,
+                  int jrnl,
                   const shadow_t * p_encoded_name,
                   const link_info_t * link_info)
 {
@@ -398,7 +367,8 @@ dirnode_add_alias(uc_dirnode_t * dn,
     }
 
     de = &list_entry->dnode_data;
-    de->type = (uint8_t)type;
+    de->info.type = (uint8_t)type;
+    de->info.jrnl = (uint8_t)jrnl;
     if (p_encoded_name) {
         memcpy(&de->shadow_name, p_encoded_name, sizeof(shadow_t));
     } else {
@@ -450,9 +420,12 @@ out:
 }
 
 shadow_t *
-dirnode_add(uc_dirnode_t * dn, const char * name, ucafs_entry_type type)
+dirnode_add(uc_dirnode_t * dn,
+            const char * name,
+            ucafs_entry_type type,
+            int jrnl)
 {
-    return dirnode_add_alias(dn, name, type, NULL, NULL);
+    return dirnode_add_alias(dn, name, type, jrnl, NULL, NULL);
 }
 
 shadow_t *
@@ -460,13 +433,14 @@ dirnode_add_link(uc_dirnode_t * dn,
                  const char * link_name,
                  const link_info_t * link_info)
 {
-    return dirnode_add_alias(dn, link_name, UC_LINK, NULL, link_info);
+    return dirnode_add_alias(dn, link_name, UC_LINK, 0, NULL, link_info);
 }
 
 static inline dnode_list_entry_t *
 iterate_by_realname(uc_dirnode_t * dn,
                     const char * realname,
                     ucafs_entry_type * p_type,
+                    int * p_journal,
                     link_info_t ** pp_link_info)
 {
     dnode_list_entry_t * list_entry;
@@ -491,12 +465,13 @@ iterate_by_realname(uc_dirnode_t * dn,
 
                 link_info->total_len = len1;
                 link_info->type
-                    = (de->type == UC_LINK) ? UC_SOFTLINK : UC_HARDLINK;
+                    = (de->info.type == UC_LINK) ? UC_SOFTLINK : UC_HARDLINK;
                 memcpy(link_info->target_link, de->target, de->link_len);
                 *pp_link_info = link_info;
             }
 
-            *p_type = de->type;
+            *p_type = de->info.type;
+            *p_journal = de->info.type;
             return list_entry;
         }
     }
@@ -509,6 +484,7 @@ dirnode_rm(uc_dirnode_t * dn,
            const char * realname,
            ucafs_entry_type type,
            ucafs_entry_type * p_type,
+           int * p_journal,
            link_info_t ** pp_link_info)
 {
     shadow_t * result = NULL;
@@ -516,7 +492,7 @@ dirnode_rm(uc_dirnode_t * dn,
     dnode_data_t * de;
     int len1;
 
-    list_entry = iterate_by_realname(dn, realname, p_type, pp_link_info);
+    list_entry = iterate_by_realname(dn, realname, p_type, p_journal, pp_link_info);
     if (list_entry == NULL) {
         return NULL;
     }
@@ -546,15 +522,16 @@ out:
     return NULL;
 }
 
-static const shadow_t *
+static const inline shadow_t *
 __dirnode_raw2enc(uc_dirnode_t * dn,
                   const char * realname,
                   ucafs_entry_type type,
                   ucafs_entry_type * p_type,
+                  int * p_journal,
                   const link_info_t ** pp_link_info)
 {
     dnode_list_entry_t * list_entry = iterate_by_realname(
-        dn, realname, p_type, (link_info_t **)pp_link_info);
+        dn, realname, p_type, p_journal, (link_info_t **)pp_link_info);
 
     return list_entry ? &list_entry->dnode_data.shadow_name : NULL;
 }
@@ -565,7 +542,8 @@ dirnode_raw2enc(uc_dirnode_t * dn,
                 ucafs_entry_type type,
                 ucafs_entry_type * p_type)
 {
-    return __dirnode_raw2enc(dn, realname, type, p_type, NULL);
+    int journal;
+    return __dirnode_raw2enc(dn, realname, type, p_type, &journal, NULL);
 }
 
 const shadow_t *
@@ -573,9 +551,10 @@ dirnode_traverse(uc_dirnode_t * dn,
                  const char * realname,
                  ucafs_entry_type type,
                  ucafs_entry_type * p_type,
+                 int * p_journal,
                  const link_info_t ** pp_link_info)
 {
-    return __dirnode_raw2enc(dn, realname, type, p_type, pp_link_info);
+    return __dirnode_raw2enc(dn, realname, type, p_type, p_journal, pp_link_info);
 }
 
 const char *
@@ -594,7 +573,7 @@ dirnode_enc2raw(uc_dirnode_t * dn,
 
         ret = memcmp(&de->shadow_name, encoded_name, sizeof(shadow_t));
         if (ret == 0) {
-            *p_type = de->type;
+            *p_type = de->info.type;
             return de->real_name;
         }
     }
@@ -616,23 +595,24 @@ dirnode_rename(uc_dirnode_t * dn,
 {
     shadow_t * shadow2_bin;
     ucafs_entry_type atype, atype1;
+    int jrnl;
 
     *ptr_shadow2_bin = NULL;
 
-    *ptr_shadow1_bin = dirnode_rm(dn, oldname, type, &atype, pp_link_info1);
+    *ptr_shadow1_bin = dirnode_rm(dn, oldname, type, &atype, &jrnl, pp_link_info1);
     if (*ptr_shadow1_bin) {
         // it is necessary to return the codename of the existing entry
         // otherwise, we get a lingering file in the AFS server
         //
         // Pass the UNKOWN flag to ensure any copy of the existing file is
         // erased
-        shadow2_bin = dirnode_rm(dn, newname, UC_ANY, &atype1, pp_link_info2);
+        shadow2_bin = dirnode_rm(dn, newname, UC_ANY, &atype1, &jrnl, pp_link_info2);
         if (shadow2_bin == NULL) {
-            shadow2_bin = dirnode_add(dn, newname, atype);
+            shadow2_bin = dirnode_add(dn, newname, atype, jrnl);
         } else {
             // in case the source was a link, its information gets carried over
-            shadow2_bin = dirnode_add_alias(dn, newname, atype, shadow2_bin,
-                                            *pp_link_info1);
+            shadow2_bin = dirnode_add_alias(dn, newname, atype, jrnl,
+                                            shadow2_bin, *pp_link_info1);
         }
 
         *p_type = atype;
@@ -657,7 +637,7 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
         /* lets write the static data */
         len = de->rec_len - de->link_len;
-        memcpy(buffer, &de->static_data, len);
+        memcpy(buffer, &de->info, len);
         buffer += len;
 
         /* write out the link info */
@@ -692,7 +672,7 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
         de = &list_entry->dnode_data;
         // copy the static data
-        memcpy(&de->static_data, buffer, len);
+        memcpy(&de->info, buffer, len);
         buffer += len;
 
         if ((len = payload->link_len)) {
@@ -775,164 +755,21 @@ out:
     return ret;
 }
 
-bool
-dirnode_has_garbage(uc_dirnode_t * dirnode)
-{
-    return dirnode->header.garbage_count > 0;
-}
-
-const shadow_t *
-dirnode_peek_garbage(uc_dirnode_t * dirnode)
-{
-    // XXX please improve this
-    journal_list_entry_t * list_entry;
-    journal_list_head_t * list_head = &dirnode->journal;
-
-    TAILQ_FOREACH(list_entry, list_head, next_entry)
-    {
-        if (list_entry->jrnl_data.op == DELETE_FILE) {
-            return &list_entry->jrnl_data.shdw;
-        }
-    }
-
-    return NULL;
-}
-
-int
-dirnode_search_journal(uc_dirnode_t * dn,
-                       const shadow_t * shdw,
-                       journal_op_t * op)
-{
-    journal_data_t * je;
-    journal_list_entry_t * list_entry;
-    journal_list_head_t * list_head = &dn->journal;
-
-    // iterate to find an existing entry
-    TAILQ_FOREACH(list_entry, list_head, next_entry) {
-        je = &list_entry->jrnl_data;
-
-        if (memcmp(shdw, &je->shdw, sizeof(shadow_t)) == 0) {
-            *op = je->op;
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
-int
-dirnode_add_to_journal(uc_dirnode_t * dn,
-                       const shadow_t * shdw,
-                       journal_op_t op)
-{
-    journal_data_t * je;
-    journal_list_entry_t * list_entry;
-    journal_list_head_t * list_head = &dn->journal;
-
-    // iterate to find an existing entry
-    TAILQ_FOREACH(list_entry, list_head, next_entry)
-    {
-        je = &list_entry->jrnl_data;
-
-        if (memcmp(shdw, &je->shdw, sizeof(shadow_t)) == 0) {
-            if (je->op == CREATE_FILE && op == DELETE_FILE) {
-                // then we've to delete the entry
-                TAILQ_REMOVE(list_head, list_entry, next_entry);
-                dn->header.journal_count--;
-
-                free(list_entry);
-            }
-
-            // if we're here, we're either adding a duplicate entry (same op)
-            // or removing a previous CREATE because we are adding a delete.
-            // Either way, this becomes a noop
-            return 0;
-        }
-    }
-
-    list_entry = (journal_list_entry_t *)malloc(sizeof(journal_list_entry_t));
-    if (list_entry == NULL) {
-        return -1;
-    }
-
-    je = &list_entry->jrnl_data;
-    memcpy(&je->shdw, shdw, sizeof(shadow_t));
-    je->op = op;
-
-    // add it to the dirnode
-    TAILQ_INSERT_TAIL(&dn->journal, list_entry, next_entry);
-    dn->header.journal_count++;
-    dn->header.journal_len += sizeof(journal_data_t);
-    dn->header.garbage_count += (op == DELETE_FILE);
-
-    return 0;
-}
-
 void
-dirnode_rm_from_journal(uc_dirnode_t * dn, const shadow_t * shdw)
+dirnode_rm_from_journal(uc_dirnode_t * dirnode, const shadow_t * shdw)
 {
-    journal_list_entry_t * list_entry;
-    journal_list_head_t * list_head = &dn->journal;
-    journal_data_t * je;
+    dnode_list_entry_t * list_entry = NULL;
+    dnode_data_t * de;
 
-    TAILQ_FOREACH(list_entry, list_head, next_entry)
+    TAILQ_FOREACH(list_entry, &dirnode->dirbox, next_entry)
     {
-        je = &list_entry->jrnl_data;
-        if (memcmp(&je->shdw, shdw, sizeof(shadow_t)) == 0) {
-            // bingo
-            dn->header.garbage_count -= (je->op == DELETE_FILE);
-            dn->header.journal_count--;
+        de = &list_entry->dnode_data;
 
-            TAILQ_REMOVE(list_head, list_entry, next_entry);
-            free(list_entry);
+        if (memcmp(&de->shadow_name, shdw, sizeof(shadow_t)) == 0) {
+            de->info.type = JRNL_NOOP;
+            break;
         }
     }
-}
-
-static int
-serialize_journal(uc_dirnode_t * dn, uint8_t * buffer)
-{
-    int len = sizeof(journal_data_t);
-    journal_list_entry_t * list_entry;
-    journal_list_head_t * list_head = &dn->journal;
-    journal_data_t * je;
-
-    TAILQ_FOREACH(list_entry, list_head, next_entry)
-    {
-        je = &list_entry->jrnl_data;
-        memcpy(buffer, je, len);
-        buffer += len;
-    }
-
-    return 0;
-}
-
-static int
-parse_journal(uc_dirnode_t * dn, uint8_t * buffer)
-{
-    int ret = -1, len = sizeof(journal_data_t);
-    journal_list_entry_t * list_entry;
-    journal_list_head_t * list_head = &dn->journal;
-    journal_data_t * je;
-
-    for (size_t i = 0; i < dn->header.journal_count; i++) {
-        list_entry
-            = (journal_list_entry_t *)malloc(sizeof(journal_list_entry_t));
-        if (list_entry == NULL) {
-            log_fatal("allocation error");
-            goto out;
-        }
-
-        memcpy(&list_entry->jrnl_data, buffer, len);
-        buffer += len;
-
-        TAILQ_INSERT_TAIL(list_head, list_entry, next_entry);
-    }
-
-    ret = 0;
-out:
-    // TODO on error, clear created entries
-    return ret;
 }
 
 void

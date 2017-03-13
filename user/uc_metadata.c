@@ -56,24 +56,6 @@ out:
     return entry;
 }
 
-/**
- * Removes the dirnode in the entry
- */
-static void
-_evict_entry(metadata_entry_t * entry)
-{
-    void * ptr;
-
-    hashmapLock(metadata_hashmap);
-    ptr = hashmapGet(metadata_hashmap, (void *)&entry->shdw_name);
-    hashmapUnlock(metadata_hashmap);
-    // TODO check for the value of ptr
-
-    dirnode_free(entry->dn);
-
-    free(entry);
-}
-
 void
 metadata_update_entry(struct metadata_entry * entry)
 {
@@ -102,6 +84,21 @@ _free_entry(metadata_entry_t * entry)
     free(entry);
 }
 
+void
+metadata_rm_dirnode(const shadow_t * shdw)
+{
+    metadata_entry_t * entry;
+
+    /* check if the item is in the cache */
+    entry = (metadata_entry_t *)hashmapRemove(metadata_hashmap, (void *)shdw);
+    if (entry == NULL) {
+        return;
+    }
+
+    dirnode_free(entry->dn);
+    free(entry);
+}
+
 /**
  * Checks for journal section of the parent dirnode to create on-disk file
  * @param parent_dentry
@@ -116,7 +113,6 @@ _metadata_on_demand(struct uc_dentry * parent_dentry,
                     uc_dirnode_t ** p_dirnode)
 {
     int err = -1, ret = -1;
-    journal_op_t journal_op;
     uc_dirnode_t *dn = NULL, *parent_dirnode = parent_dentry->metadata->dn;
     *p_dirnode = NULL;
 
@@ -126,13 +122,6 @@ _metadata_on_demand(struct uc_dentry * parent_dentry,
         // will need to implement dentry_path()
         log_fatal("parent_dirnode == NULL");
         goto out;
-    }
-
-    /* if we don't find the entry in the dirnode's journal or if it's not a
-     * CREATE_DIR, just leave */
-    err = dirnode_search_journal(parent_dirnode, shdw, &journal_op);
-    if (!(err == 0 && journal_op == CREATE_DIR)) {
-        return 0;
     }
 
     // then let's create a new dirnode and return
@@ -252,6 +241,7 @@ load_from_disk:
     /* lets not forget to add it to the dentry */
     // TODO add to dentry to metadata's list
     dentry->metadata = entry;
+    dentry->negative = false;
 out:
     if (fpath) {
         sdsfree(fpath);

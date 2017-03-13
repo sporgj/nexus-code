@@ -85,7 +85,7 @@ typedef enum {
 } acl_type_t;
 
 /* prefixes for the different file types */
-#define UC_METADATA_PREFIX ".md"
+#define UC_METADATA_PREFIX "md"
 #define UC_FILEDATA_PREFIX ""
 #define UC_PREFIX_LEN(x) sizeof(x) - 1
 

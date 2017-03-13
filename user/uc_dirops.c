@@ -20,7 +20,7 @@ dirops_new1(const char * parent_dir,
             char ** shadow_name_dest)
 {
     int error = -1; // TODO change this
-    uc_dirnode_t *dirnode = NULL, *dirnode1 = NULL;
+    uc_dirnode_t *dirnode = NULL;
     uc_filebox_t * filebox = NULL;
     shadow_t * fname_code = NULL;
     sds path1 = NULL;
@@ -32,15 +32,8 @@ dirops_new1(const char * parent_dir,
     }
 
     /* Get filename and add it to DirNode */
-    if ((fname_code = dirnode_add(dirnode, fname, type)) == NULL) {
+    if ((fname_code = dirnode_add(dirnode, fname, type, JRNL_CREATE)) == NULL) {
         log_error("Add file operation failed: %s", parent_dir);
-        goto out;
-    }
-
-    /* add it to the journal */
-    journal_op_t jrnl_op = (type == UC_DIR ? CREATE_DIR : CREATE_FILE);
-    if ((dirnode_add_to_journal(dirnode, fname_code, jrnl_op))) {
-        log_error("add_to_journal failed: %s", parent_dir);
         goto out;
     }
 
@@ -49,34 +42,6 @@ dirops_new1(const char * parent_dir,
         log_error("Flushing '%s' failed", parent_dir);
         goto out;
     }
-
-    /*
-    path1 = vfs_metadata_path(parent_dir, fname_code);
-
-    if (type == UC_DIR) {
-        if ((dirnode1 = dirnode_new2(fname_code, dirnode)) == NULL) {
-            log_error("new dirnode failed: %s/%s", parent_dir, fname);
-            goto out;
-        }
-
-        if (!dirnode_write(dirnode1, path1)) {
-            log_error("Creating: '%s/%s' dirnode failed", parent_dir,
-                 fname);
-            goto out;
-        }
-    } else if (type == UC_FILE) {
-        if ((filebox = filebox_new2(fname_code, dirnode)) == NULL) {
-            log_error("Creating '%s/%s' filebox failed", parent_dir,
-                 fname);
-            goto out;
-        }
-
-        if (!filebox_write(filebox, path1)) {
-            log_error("Writing filebox to '%s' failed", path1);
-            goto out;
-        }
-    }
-    */
 
     /* Set the encoded name */
     *shadow_name_dest = filename_bin2str(fname_code);
@@ -88,8 +53,6 @@ out:
         filebox_free(filebox);
     if (dirnode)
         dcache_put(dirnode);
-    if (dirnode1)
-        dirnode_free(dirnode1);
     if (path1)
         sdsfree(path1);
     if (fname_code)
@@ -169,7 +132,7 @@ dirops_move(const char * from_dir,
             char ** ptr_oldname,
             char ** ptr_newname)
 {
-    int error = UC_STATUS_NOOP;
+    int error = UC_STATUS_NOOP, jrnl;
     ucafs_entry_type atype;
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
@@ -211,16 +174,17 @@ dirops_move(const char * from_dir,
         }
     } else {
         /* get the shadow names */
-        shadow1_bin = dirnode_rm(dirnode1, oldname, type, &atype, &link_info1);
+        shadow1_bin
+            = dirnode_rm(dirnode1, oldname, type, &atype, &jrnl, &link_info1);
         if (shadow1_bin == NULL) {
             log_error("finding '%s' failed", oldname);
             goto out;
         }
 
         // the new file might still exist in the dirnode
-        dirnode_rm(dirnode2, newname, UC_ANY, &atype, &link_info2);
-        shadow2_bin
-            = dirnode_add_alias(dirnode2, newname, atype, NULL, link_info1);
+        dirnode_rm(dirnode2, newname, UC_ANY, &atype, &jrnl, &link_info2);
+        shadow2_bin = dirnode_add_alias(dirnode2, newname, atype, jrnl, NULL,
+                                        link_info1);
         if (shadow2_bin == NULL) {
             log_error("adding '%s' to dirnode FAILED", newname);
             goto out;
@@ -497,8 +461,9 @@ dirops_hardlink(const char * target_path,
     memcpy(&link_info->meta_file, shadow_name1, sizeof(shadow_t));
 
     /* 5 - add it to the dirnode */
-    shadow_name2
-        = dirnode_add_alias(link_dnode, link_fname, UC_FILE, NULL, link_info);
+    /* to hardlink, there must be an existing on-disk filebox */
+    shadow_name2 = dirnode_add_alias(link_dnode, link_fname, UC_FILE, JRNL_NOOP,
+                                     NULL, link_info);
     if (shadow_name2 == NULL) {
         log_error("adding link (%s) FAILED", link_path);
         goto out;
@@ -604,27 +569,16 @@ static int
 __delete_metadata_file(uc_dirnode_t * parent_dirnode,
                        const char * parent_dir,
                        const shadow_t * shadowname_bin,
+                       int jrnl,
                        int is_filebox)
 {
-    int error = -1, ret;
-    journal_op_t journal_op;
-    bool in_journal;
+    int error = -1;
     uc_filebox_t * filebox = NULL;
     sds metadata_path = NULL;
 
     /* check if the entry is in the journal */
-    ret = dirnode_search_journal(parent_dirnode, shadowname_bin, &journal_op);
-    in_journal
-        = (ret == 0 && (journal_op == CREATE_FILE || journal_op == CREATE_DIR));
-
-    if (in_journal) {
-        // we have to delete this entry from the journal and save the dirnode
-        dirnode_rm_from_journal(parent_dirnode, shadowname_bin);
-        if (!dirnode_flush(parent_dirnode)) {
-            log_error("flushing parent dirnode failed\n");
-            goto out;
-        }
-
+    if (jrnl != JRNL_NOOP) {
+        /* then we know there's no on-disk metadata file */
         return 0;
     }
 
@@ -637,18 +591,11 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
         }
 
         if (filebox_decr_link_count(filebox) == 0) {
-            goto journal;
-            /*
-             * We ne not do this anymore. By doing an add to journal "REMOVE", we added
-             * the file to the garbage collector. The collector is thread which will
-             * iterate through every garbage entry and delete the file on the disk
-             *
             if (unlink(metadata_path)) {
                 log_error("deleting filebox (%s) FAILED",
                      metadata_path);
                 goto out;
             }
-            */
         } else {
             // write it to disk
             if (!filebox_flush(filebox)) {
@@ -659,33 +606,13 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
         }
     } else {
         /* directories are a lot simpler. Since no hardlinks can't point to
-         * directories,
-         * they only have one ref count. */
-        /*
-         * SEE ABOVE FOR FILEBOX
-         *
+         * directories, they only have one ref count. */
         if (unlink(metadata_path)) {
             log_error("deleting dirnode (%s) FAILED", metadata_path);
             goto out;
         }
-        */
-        goto journal;
-    }
-    // if we're here, we only had to flush a filebox with hardlinks
-    goto done;
-journal:
-    // lets save some filesystem calls here
-    if (dirnode_add_to_journal(parent_dirnode, shadowname_bin, DELETE_FILE)) {
-        log_error("adding to journal (%s)", parent_dir);
-        goto out;
     }
 
-    if (!dirnode_flush(parent_dirnode)) {
-        log_error("flushing dirnode (%s) FAILED", parent_dir);
-        goto out;
-    }
-
-done:
     error = 0;
 out:
     if (filebox) {
@@ -731,7 +658,7 @@ dirops_remove1(const char * parent_dir,
                ucafs_entry_type type,
                char ** encoded_fname_dest)
 {
-    int error = UC_STATUS_ERROR;
+    int error = UC_STATUS_ERROR, jrnl;
     link_info_t * link_info = NULL;
     shadow_t * shadow_name = NULL;
     uc_dirnode_t * dirnode = NULL;
@@ -746,7 +673,7 @@ dirops_remove1(const char * parent_dir,
     dcache_rm(dirnode, fname);
 
     /* delete and get the info */
-    shadow_name = dirnode_rm(dirnode, fname, type, &atype, &link_info);
+    shadow_name = dirnode_rm(dirnode, fname, type, &atype, &jrnl, &link_info);
     if (shadow_name == NULL) {
         log_error("shadow file (%s) not found", fname);
         goto out;
@@ -758,14 +685,21 @@ dirops_remove1(const char * parent_dir,
         goto out;
     }
 
+    /* if it's a directory, remove it from the metadata cache */
+    if (atype == UC_DIR) {
+        metadata_rm_dirnode(shadow_name);
+    }
+
     /* we only need to call for hardlinks */
     if (link_info) {
         if (link_info->type == UC_HARDLINK) {
-            __delete_metadata_file(dirnode, parent_dir, &link_info->meta_file, 1);
+            __delete_metadata_file(dirnode, parent_dir, &link_info->meta_file,
+                                   jrnl, 1);
         }
     } else {
         // delete a normal file or directory
-        __delete_metadata_file(dirnode, parent_dir, shadow_name, atype == UC_FILE);
+        __delete_metadata_file(dirnode, parent_dir, shadow_name, jrnl,
+                               atype == UC_FILE);
     }
 
     *encoded_fname_dest = filename_bin2str(shadow_name);

@@ -130,15 +130,21 @@ vfs_get_root_path(const char * path)
     return _vfs_get_root_path(path, NULL);
 }
 
+static inline sds
+_append_root_dirnode_path(sds root_path, const char * metadata_fname)
+{
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, UCAFS_REPO_DIR);
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, metadata_fname);
+    return root_path;
+}
+
 sds
 vfs_append(sds root_path, const shadow_t * shdw_name)
 {
     char * metaname = metaname_bin2str(shdw_name);
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, UCAFS_REPO_DIR);
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, metaname);
-
+    root_path = _append_root_dirnode_path(root_path, metaname);
     free(metaname);
 
     return root_path;
@@ -176,27 +182,11 @@ vfs_root_dirnode_path(const char * path)
     return NULL;
 }
 
-sds
-vfs_metadata_path(const char * path, const shadow_t * shdw_name)
-{
-    return vfs_dirnode_path(path, shdw_name);
-}
-
-static inline sds
-_append_root_dirnode_path(sds root_path, const char * metadata_fname)
-{
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, UCAFS_REPO_DIR);
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, metadata_fname);
-    return root_path;
-}
-
-sds
+inline sds
 vfs_dirnode_path(const char * path, const shadow_t * shdw)
 {
     const shadow_t * root_shdw;
-    sds root_path = _vfs_get_root_path(path, &root_shdw), new_path;
+    sds root_path = _vfs_get_root_path(path, &root_shdw);
     if (root_path == NULL) {
         return NULL;
     }
@@ -211,7 +201,13 @@ vfs_dirnode_path(const char * path, const shadow_t * shdw)
     root_path = _append_root_dirnode_path(root_path, metadata_path);
     free(metadata_path);
 
-    return new_path;
+    return root_path;
+}
+
+sds
+vfs_metadata_path(const char * path, const shadow_t * shdw_name)
+{
+    return vfs_dirnode_path(path, shdw_name);
 }
 
 sds

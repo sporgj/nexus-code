@@ -46,7 +46,7 @@ typedef struct dcache_item {
 } dcache_item_t;
 
 struct uc_dentry {
-    bool valid; /* if the entry is valid */
+    bool valid, negative; /* if the entry is valid */
     ref_t count; /* number of references to the dentry */
     shadow_t shdw_name; /* the dirnode file name */
     dcache_key_t key;
@@ -83,6 +83,9 @@ dcache_new_root(shadow_t * root_shdw, const char * root_path);
 /* vfs */
 sds
 vfs_metadata_path(const char * path, const shadow_t * shdw_name);
+
+void
+metadata_rm_dirnode(const shadow_t * shdw);
 
 sds
 vfs_relpath(const char * path, bool dirpath);

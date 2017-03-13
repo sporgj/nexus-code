@@ -245,6 +245,7 @@ dcache_traverse(struct uc_dentry * root_dentry,
     const link_info_t * link_info;
     const shadow_t * shadow_name;
     uc_dirnode_t *dn = NULL, *dn2;
+    int jrnl;
 
     /* the string builder */
     sds curr_path = sdsdup(root_path);
@@ -284,7 +285,8 @@ dcache_traverse(struct uc_dentry * root_dentry,
         }
 
         /* 3 - load the shadow name of the new dentry */
-        shadow_name = dirnode_traverse(dn, nch, UC_ANY, &atype, &link_info);
+        shadow_name
+            = dirnode_traverse(dn, nch, UC_ANY, &atype, &jrnl, &link_info);
         if (shadow_name == NULL || atype == UC_FILE) {
             break;
         }
@@ -314,6 +316,10 @@ dcache_traverse(struct uc_dentry * root_dentry,
             log_error("dcache_new returned NULL");
             break;
         }
+
+        /* minor optimisation to prevent iterating the parent dirnode entries
+         * many times */
+        dentry->negative = (jrnl != JRNL_NOOP);
 
         dcache_add(dentry, parent_dentry);
 
@@ -405,9 +411,7 @@ done:
 uc_filebox_t *
 dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
 {
-    int err;
-    bool in_journal;
-    journal_op_t jrnl_op;
+    int err, jrnl;
     const shadow_t * codename;
     char *fname = NULL, *temp = NULL, *temp2 = NULL;
     sds path_link = NULL, fbox_path = NULL;
@@ -425,7 +429,7 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     }
 
     /* get the entry in the file */
-    codename = dirnode_traverse(dirnode, fname, UC_ANY, &atype, &link_info);
+    codename = dirnode_traverse(dirnode, fname, UC_ANY, &atype, &jrnl, &link_info);
     if (codename == NULL) {
         goto out;
     }
@@ -457,9 +461,7 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     fbox_path = vfs_metadata_path(path, codename);
 
     /* check if the file is on disk */
-    err = dirnode_search_journal(dirnode, codename, &jrnl_op);
-    in_journal = (err == 0 && jrnl_op == CREATE_FILE);
-    if (!in_journal) {
+    if (jrnl == JRNL_NOOP) {
         goto load_from_disk;
     }
 

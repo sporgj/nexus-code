@@ -21,7 +21,6 @@ typedef struct dirnode {
     dnode_header_t header;
     dnode_list_head_t dirbox;
     acl_list_head_t lockbox;
-    journal_list_head_t journal;
 
     sds dnode_path;
     struct uc_dentry * dentry;
@@ -50,12 +49,6 @@ dirnode_get_path(uc_dirnode_t * dirnode)
     return dirnode->dnode_path ? sdsdup(dirnode->dnode_path) : NULL;
 }
 
-/* set of operartions for the on-demand journaling */
-int
-dirnode_add_to_journal(uc_dirnode_t * dirnode,
-                       const shadow_t * shdw,
-                       journal_op_t op);
-
 void
 dirnode_rm_from_journal(uc_dirnode_t * dirnode, const shadow_t * shdw);
 
@@ -69,16 +62,6 @@ dirnode_has_garbage(uc_dirnode_t * dirnode);
 
 const shadow_t *
 dirnode_peek_garbage(uc_dirnode_t * dirnode);
-
-/**
- * Search the journal and find if the entry is present
- *
- * @return 0 if found
- */
-int
-dirnode_search_journal(uc_dirnode_t * dn,
-                       const shadow_t * shdw,
-                       journal_op_t * op);
 
 /**
  * Generates a new dirnode object with a pregenerated name
@@ -152,7 +135,10 @@ dirnode_fsync(uc_dirnode_t * dn);
  * @see dinode_add_alias. Sets p_encoded_name and link_info to NULL
  */
 shadow_t *
-dirnode_add(uc_dirnode_t * dn, const char * fname, ucafs_entry_type type);
+dirnode_add(uc_dirnode_t * dn,
+            const char * fname,
+            ucafs_entry_type type,
+            int journal);
 
 shadow_t *
 dirnode_add_link(uc_dirnode_t * dn,
@@ -164,6 +150,7 @@ dirnode_add_link(uc_dirnode_t * dn,
  * @param dn is the dirnode object
  * @param fname is the file name 
  * @param type is the entry type
+ * @param jrnl if the entry we are adding has no on-disk entry
  * @param p_encoded_name if the encoded name has been precomputed
  * @param link_info
  * @return the encoded name. Keep in mind if a p_encoded_name is passed, the
@@ -174,6 +161,7 @@ shadow_t *
 dirnode_add_alias(uc_dirnode_t * dn,
                   const char * fname,
                   ucafs_entry_type type,
+                  int jrnl,
                   const shadow_t * p_encoded_name,
                   const link_info_t * p_link_info);
 
@@ -182,6 +170,7 @@ dirnode_rm(uc_dirnode_t * dn,
            const char * realname,
            ucafs_entry_type type,
            ucafs_entry_type * p_type,
+           int * jrnl,
            link_info_t ** pp_link_info);
 
 const char *
@@ -201,6 +190,7 @@ dirnode_traverse(uc_dirnode_t * dn,
                  const char * realname,
                  ucafs_entry_type type,
                  ucafs_entry_type * p_type,
+                 int * p_journal,
                  const link_info_t ** pp_link_info);
 
 int
