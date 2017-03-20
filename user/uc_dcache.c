@@ -466,15 +466,13 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     }
 
     /* then we have to create the filebox */
-    if ((fb = filebox_new2(codename, dirnode)) == NULL) {
+    if ((fb = filebox_new3(codename, dirnode, hint)) == NULL) {
         log_error("filebox_new2 failed");
         goto cleanup;
     }
 
-    if (!filebox_write(fb, fbox_path)) {
-        log_error("filebox_write (%s) FAILED", fbox_path);
-        goto cleanup;
-    }
+    /* set the path to allow flushing the filebox */
+    filebox_set_path(fb, fbox_path);
 
     /* delete the entry from the dirnode
      * XXX should we flush it now or later ? */
@@ -484,8 +482,6 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
         goto cleanup;
     }
 
-    /* set the path to allow flushing the filebox */
-    filebox_set_path(fb, fbox_path);
     goto out;
 
 load_from_disk:

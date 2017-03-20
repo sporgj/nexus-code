@@ -24,6 +24,9 @@ filebox_new();
 uc_filebox_t *
 filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode);
 
+uc_filebox_t *
+filebox_new3(const shadow_t * id, uc_dirnode_t * dirnode, size_t hint);
+
 static inline void
 filebox_set_path(uc_filebox_t * filebox, const char * path)
 {

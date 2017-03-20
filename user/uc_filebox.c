@@ -12,8 +12,9 @@
 #include "uc_utils.h"
 
 uc_filebox_t *
-filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode)
+filebox_new3(const shadow_t * id, uc_dirnode_t * dirnode, size_t hint)
 {
+    int len;
     uc_fbox_t * fbox;
     uc_filebox_t * filebox = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
     if (filebox == NULL) {
@@ -24,7 +25,8 @@ filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode)
     filebox->fbox_path = NULL;
 
     // instantiate a default fbox
-    if ((fbox = (uc_fbox_t *)calloc(1, sizeof(uc_fbox_t))) == NULL) {
+    len = sizeof(fbox_header_t) + (MAX(hint, sizeof(fbox->chunks)));
+    if ((fbox = (uc_fbox_t *)calloc(1, len)) == NULL) {
         log_fatal("allocating fbox failed");
         free(filebox);
         return NULL;
@@ -49,6 +51,12 @@ filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode)
     filebox->fbox = fbox;
 
     return filebox;
+}
+
+uc_filebox_t *
+filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode)
+{
+    return filebox_new3(id, dirnode, 0);
 }
 
 uc_filebox_t *
