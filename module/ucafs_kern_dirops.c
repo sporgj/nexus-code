@@ -184,8 +184,6 @@ ucafs_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest)
         goto out;
     }
 
-    ERROR("hardlink got; %p vs %p\n", *dest, xdr_reply);
-
     ret = 0;
 out:
     if (from_path) {
@@ -397,8 +395,6 @@ ucafs_kern_access(struct vcache * avc, afs_int32 rights)
         return 0;
     }
 
-    ERROR("access=%s (%d)\n", path, rights);
-
     if ((payload = READPTR_LOCK()) == 0) {
         kfree(path);
         return 0;
@@ -425,7 +421,6 @@ ucafs_kern_access(struct vcache * avc, afs_int32 rights)
     }
 
 out:
-    ERROR("ACCESS=%s (%d)\n", path, rights);
     if (reply) {
         kfree(reply);
     }
