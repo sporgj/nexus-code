@@ -20,6 +20,9 @@ parser.add_argument("--shuffle", dest="randomize", action="store_true",
 parser.add_argument("-r", "--rounds", dest="rounds", default=1, type=int, help="Number of rounds")
 parser.add_argument("--omit-dnode", dest="omit", action="store_false",
                     help="Whether to simulate the 'saving' of the parent dirnode")
+parser.add_argument("--filebox", dest="file_mdata", action="store_true",
+                    help="Fill filebox in b")
+
 args = parser.parse_args()
 
 # parse the arguments
@@ -27,10 +30,12 @@ gbl_filecount = args.file_count
 gbl_randomize = (args.randomize != None)
 gbl_rounds = args.rounds
 gbl_dnode = args.omit
+gbl_filebox = args.file_mdata
 
 # these were derived from the packet trace
 start_size = 179
 entry_size = 37
+empty_fbox_size = 205
 
 (dira, dirb) = ('a', 'b')
 
@@ -63,8 +68,16 @@ def create_files(testdir, files, dnode_file):
             dnode_len += entry_size;
 
         # 2 - Create the metadata file
+        # pregenerate the buffer
+        buf = 'x' * empty_fbox_size
+
         t1 = time.monotonic()
         fd = open('/'.join([testdir, dirb, files[i]]), 'w+')
+
+        # depending on if the user wanted to save data, add it
+        if gbl_filebox:
+            fd.write(buf)
+
         fd.close()
         time_b += time.monotonic() - t1
 
@@ -107,7 +120,7 @@ def remove_files(testdir, files, dnode_file):
         os.remove('/'.join([testdir, dirb, files[i]]))
         time_b += time.monotonic() - t1
 
-        # 3 - Now create the "real" file
+        # 3 - Now remove the "real" file
         t1 = time.monotonic()
         os.remove('/'.join([testdir, dira, files[i]]))
         time_a += time.monotonic() - t1;
@@ -115,27 +128,33 @@ def remove_files(testdir, files, dnode_file):
     return (time_a, time_b, time_dnode)
 
 def run():
-    print ('create_a', 'create_b', 'create_dnode', 'del_a', 'del_b', 'del_dnode')
-    # create the test directory and subdirs
+    print ('create_a', 'create_b', 'create_dnode', 'del_a', 'del_b', 'del_dnode', 'total')
+
     testdir = 'test.' + str(os.getpid())
     subdirs = [os.sep.join([testdir, sd]) for sd in [dira, dirb]]
     for d in subdirs:
         os.makedirs(d)
 
-    # create the array of values
-    filenames = ['file-'+str(i) for i in range(gbl_filecount)];
+    for rnd in range(gbl_rounds):
+        # create the test directory and subdirs
+                # create the array of values
+        filenames = ['file-'+str(i) for i in range(gbl_filecount)];
 
-    dnode_fname = os.sep.join([testdir, dirb, 'dnode']) if gbl_dnode else None
+        dnode_fname = os.sep.join([testdir, dirb, 'dnode']) if gbl_dnode else None
 
-    (ca, cb, cd) = create_files(testdir, filenames, dnode_fname)
+        (ca, cb, cd) = create_files(testdir, filenames, dnode_fname)
 
-    # randomize the entries and then remove them
-    if gbl_randomize:
-        random.shuffle(filenames)
+        # randomize the entries and then remove them
+        if gbl_randomize:
+            random.shuffle(filenames)
 
-    (ra, rb, rd) = remove_files(testdir, filenames, dnode_fname)
+        (ra, rb, rd) = remove_files(testdir, filenames, dnode_fname)
 
-    print('{:.6f}s {:.6f}s {:.6f}s {:.6f}s {:.6f}s {:.6f}s'.format(ca, cb, cd, ra, rb, rd))
+        total = ca + cb + cd + ra + rb + rd
+
+        print('{:.6f}s {:.6f}s {:.6f}s {:.6f}s {:.6f}s {:.6f}s {:.6f}s'\
+                .format(ca, cb, cd, ra, rb, rd, total))
+
     subprocess.call(['rm', '-rf', testdir])
 
 if __name__ == '__main__':
