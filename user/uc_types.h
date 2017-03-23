@@ -188,7 +188,7 @@ typedef struct dirnode_bucket_entry {
    uint8_t * buffer; /* initialized before writing */
 } dirnode_bucket_entry_t;
 
-typedef TAILQ_HEAD(bucket_head, dirnode_bucket_entry) bucket_list_head_t;
+typedef TAILQ_HEAD(bucket_list, dirnode_bucket_entry) bucket_list_head_t;
 
 /* contains the integrity protections of the different buckets */
 typedef struct {

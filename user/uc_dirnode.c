@@ -101,20 +101,32 @@ dirnode_free(uc_dirnode_t * dirnode)
 {
     dnode_list_head_t * dir_head = &dirnode->dirbox;
     acl_list_head_t * acl_head = &dirnode->lockbox;
+    bucket_list_head_t * bucket_head = &dirnode->buckets;
 
     dnode_list_entry_t * dnode_data;
     acl_list_entry_t * acl_entry;
+    dirnode_bucket_entry_t * bucket_entry;
 
     /* clear the entries in the entries */
     while ((dnode_data = TAILQ_FIRST(dir_head))) {
-        TAILQ_REMOVE(dir_head, dnode_data, next_entry);
+        // since, we're cloberring the dirnode, no need to update these
+        // TAILQ_REMOVE(dir_head, dnode_data, next_entry);
         free_list_entry(dnode_data);
     }
 
     /* clear lockbox entries */
     while ((acl_entry = SIMPLEQ_FIRST(acl_head))) {
-        SIMPLEQ_REMOVE_HEAD(acl_head, next_entry);
+        // SIMPLEQ_REMOVE_HEAD(acl_head, next_entry);
         free(acl_entry);
+    }
+
+    /* clear the buckets */
+    TAILQ_FOREACH_REVERSE(bucket_entry, bucket_head, bucket_list, next_entry)
+    {
+        // REMOVE THE ENTRY
+        if (bucket_entry->freeable) {
+            free(bucket_entry);
+        }
     }
 
     if (dirnode->dnode_path) {
@@ -294,15 +306,21 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 #endif
 
     fwrite(&dn->header, sizeof(dirnode_header_t), 1, fd);
-    fwrite(buffer, total_len, 1, fd);
 
-    /* now reset all the buckets */
+    /* now write the chunk information */
     dirnode_bucket_entry_t * bucket_entry;
-    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
-    {
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry) {
+        // copy the iv, tag and count data
+        if (!fwrite(&bucket_entry->bckt, sizeof(dirnode_bucket_t), 1, fd)) {
+            log_error("reading bucket failed (%s)", fpath);
+            goto out;
+        }
+
         bucket_entry->is_dirty = false;
         bucket_entry->buffer = NULL;
     }
+
+    fwrite(buffer, total_len, 1, fd);
 
     ret = true;
 out:
@@ -459,7 +477,8 @@ dirnode_add_alias(uc_dirnode_t * dn,
 
     /* insert in the corresponding bucket */
     dirnode_bucket_entry_t * bucket_var, * bucket_entry = NULL;
-    TAILQ_FOREACH(bucket_var, &dn->buckets, next_entry) {
+    TAILQ_FOREACH_REVERSE(bucket_var, &dn->buckets, bucket_list, next_entry)
+    {
         if (bucket_var->bckt.count < CONFIG_DIRNODE_BUCKET_CAPACITY) {
             bucket_entry = bucket_var;
             break;
