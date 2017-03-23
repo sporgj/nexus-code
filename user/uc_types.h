@@ -21,6 +21,8 @@
 // based on AFS
 #define CONFIG_MAX_NAME 100
 
+#define CONFIG_DIRNODE_BUCKET_CAPACITY 128
+
 struct uc_dentry;
 struct metadata_entry;
 struct filebox;
@@ -86,6 +88,17 @@ typedef struct {
 typedef struct {
     uint8_t bytes[CONFIG_SHA256_BUFLEN];
 } __attribute__((packed)) pubkey_t;
+
+/* cryptographic definitions for GCM */
+typedef uint8_t gcm_iv_t[16];
+typedef uint8_t gcm_ekey_t[16];
+typedef uint8_t gcm_tag_t[16];
+
+typedef struct {
+   gcm_iv_t iv;
+   gcm_ekey_t ekey;
+   gcm_tag_t tag;
+} __attribute__((packed)) gcm_context_t;
 
 /* File box information */
 #define UCAFS_FBOX_HEADER                                                      \
@@ -160,6 +173,32 @@ typedef struct acl_list_entry {
 
 typedef SIMPLEQ_HEAD(acl_head, acl_list_entry) acl_list_head_t;
 
+/** DIRNODE PARTIALS */
+typedef struct {
+   gcm_iv_t iv;
+   gcm_tag_t tag;
+   uint16_t count; /* the number of entries in this bucket */
+   uint32_t length; /* size of the buffer */
+} __attribute__((packed)) dirnode_bucket_t;
+
+typedef struct dirnode_bucket_entry {
+   TAILQ_ENTRY(dirnode_bucket_entry) next_entry;
+   dirnode_bucket_t bckt;
+   bool is_dirty, freeable;
+   uint8_t * buffer; /* initialized before writing */
+} dirnode_bucket_entry_t;
+
+typedef TAILQ_HEAD(bucket_head, dirnode_bucket_entry) bucket_list_head_t;
+
+/* contains the integrity protections of the different buckets */
+typedef struct {
+    shadow_t uuid, parent, root;
+    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
+    gcm_ekey_t ekey;
+    gcm_tag_t tag;
+    uint8_t bucket_count;
+} __attribute__((packed)) dirnode_header_t;
+
 typedef enum {
    JRNL_NOOP = 0,
    JRNL_CREATE = 1
@@ -191,15 +230,10 @@ typedef struct dnode_data {
 typedef struct dnode_list_entry {
    TAILQ_ENTRY(dnode_list_entry) next_entry;
    dnode_data_t dnode_data;
+   dirnode_bucket_entry_t * bucket_entry;
 } __attribute__((packed)) dnode_list_entry_t;
 
 typedef TAILQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
-
-typedef struct {
-    shadow_t uuid, parent, root;
-    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
-    crypto_context_t crypto_ctx;
-} __attribute__((packed)) dnode_header_t;
 
 typedef struct {
     uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN];

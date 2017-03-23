@@ -107,6 +107,7 @@ enclave_crypto_ekey(crypto_ekey_t * ekey,
     return 0;
 }
 
+#if 0
 static int
 crypto_metadata(crypto_context_t * p_ctx,
                 crypto_ekey_t * sealing_key,
@@ -256,9 +257,30 @@ usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
     free(sealing_key);
     return ret;
 }
+#endif
 
 int
 ecall_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
-    return usgx_crypto_filebox(header, data, op);
+    return 0; //usgx_crypto_filebox(header, data, op);
+}
+
+inline int
+usgx_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
+{
+    int ret = -1;
+    gcm_ekey_t * sealing_key;
+
+    /* iterate the buffer entries */
+    //TAILQ_
+
+    ret = 0;
+out:
+    return ret;
+}
+
+int
+ecall_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
+{
+    return ugx_crypto_dirnode(dirnode, op);
 }

@@ -25,7 +25,7 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
         return NULL;
     }
 
-    memset(&dn->header, 0, sizeof(dnode_header_t));
+    memset(&dn->header, 0, sizeof(dirnode_header_t));
     if (id) {
         memcpy(&dn->header.uuid, id, sizeof(shadow_t));
     } else {
@@ -34,9 +34,22 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 
     TAILQ_INIT(&dn->dirbox);
     SIMPLEQ_INIT(&dn->lockbox);
+    TAILQ_INIT(&dn->buckets);
+    dn->bucket_update = false;
 
     dn->dnode_path = NULL;
     dn->dentry = NULL;
+    dn->header.bucket_count = 1;
+
+    /* create the default bucket */
+    dn->bucket0 = calloc(1, sizeof(dirnode_bucket_entry_t));
+    if (dn->bucket0 == NULL) {
+        log_fatal("allocation error");
+        free(dn);
+        return NULL;
+    }
+
+    TAILQ_INSERT_TAIL(&dn->buckets, dn->bucket0, next_entry);
 
     if (parent) {
         memcpy(&dn->header.parent, &parent->header.uuid, sizeof(shadow_t));
@@ -115,9 +128,10 @@ uc_dirnode_t *
 dirnode_from_file(const sds filepath)
 {
     uc_dirnode_t * dn = NULL;
-    dnode_header_t * header;
+    dirnode_header_t * header;
     dnode_list_head_t * dirbox;
     acl_list_head_t * lockbox;
+    bucket_list_head_t * buckets;
     uint8_t *buffer = NULL, *offset_ptr = NULL;
     FILE * fd;
     size_t nbytes, body_len;
@@ -139,17 +153,40 @@ dirnode_from_file(const sds filepath)
     header = &dn->header;
     dirbox = &dn->dirbox;
     lockbox = &dn->lockbox;
+    buckets = &dn->buckets;
 
     TAILQ_INIT(dirbox);
     SIMPLEQ_INIT(lockbox);
+    TAILQ_INIT(buckets);
 
     /* read the header from the file */
-    nbytes = fread(header, sizeof(dnode_header_t), 1, fd);
+    nbytes = fread(header, sizeof(dirnode_header_t), 1, fd);
     if (!nbytes) {
         log_error("reading header: %s (nbytes=%zu, exp=%lu)", filepath, nbytes,
-                  sizeof(dnode_header_t));
+                  sizeof(dirnode_header_t));
         goto out;
     }
+
+    /* initialize the buckets */
+    dirnode_bucket_entry_t * bucket_list = (dirnode_bucket_entry_t *)calloc(
+        header->bucket_count, sizeof(dirnode_bucket_entry_t));
+    if (bucket_list == NULL) {
+        log_fatal("allocation error");
+        goto out;
+    }
+
+    (dn->bucket0 = &bucket_list[0])->freeable = true;
+
+    for (size_t x = 0; x < header->bucket_count; x++) {
+        // copy the iv, tag and count data
+        if (!fread(&bucket_list[x].bckt, sizeof(dirnode_bucket_t), 1, fd)) {
+            log_error("reading bucket failed (%s)", filepath);
+            goto out;
+        }
+
+        TAILQ_INSERT_TAIL(buckets, &bucket_list[x], next_entry);
+    }
+
 
     /* lets try to read the body of the dirnode */
     // TODO maybe check when body_len is ridiculous?
@@ -169,6 +206,7 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 
+#if 0
 #ifdef UCAFS_SGX
     /* decrypt the content with enclave */
     ecall_crypto_dirnode(global_eid, &error, header, buffer, UC_DECRYPT);
@@ -177,17 +215,18 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 #endif
+#endif
 
     /* parse the body */
     offset_ptr = buffer;
-    if (header->dirbox_len && parse_dirbox(dn, offset_ptr)) {
-        log_error("parsing dirbox failed: %s", filepath);
+    if (header->lockbox_len && parse_lockbox(dn, offset_ptr)) {
+        log_error("parsing lockbox failed: %s", filepath);
         goto out;
     }
 
-    offset_ptr += header->dirbox_len;
-    if (header->lockbox_len && parse_lockbox(dn, offset_ptr)) {
-        log_error("parsing lockbox failed: %s", filepath);
+    offset_ptr += header->lockbox_len;
+    if (header->dirbox_len && parse_dirbox(dn, offset_ptr)) {
+        log_error("parsing dirbox failed: %s", filepath);
         goto out;
     }
 
@@ -231,19 +270,20 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 
-    offset_ptr = buffer;
-    if (serialize_dirbox(dn, offset_ptr)) {
-        log_error("serialization failed");
-        goto out;
-    }
-
     /* now serialize the the access control information */
-    offset_ptr += dn->header.dirbox_len;
+    offset_ptr = buffer;
     if (serialize_lockbox(dn, offset_ptr)) {
         log_error("serializing dirnode ACL failed (%s)", fpath);
         goto out;
     }
 
+    offset_ptr += dn->header.lockbox_len;
+    if (serialize_dirbox(dn, offset_ptr)) {
+        log_error("serialization failed");
+        goto out;
+    }
+
+#if 0
 #ifdef UCAFS_SGX
     ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer, UC_ENCRYPT);
     if (error) {
@@ -251,9 +291,18 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 #endif
+#endif
 
-    fwrite(&dn->header, sizeof(dnode_header_t), 1, fd);
+    fwrite(&dn->header, sizeof(dirnode_header_t), 1, fd);
     fwrite(buffer, total_len, 1, fd);
+
+    /* now reset all the buckets */
+    dirnode_bucket_entry_t * bucket_entry;
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
+    {
+        bucket_entry->is_dirty = false;
+        bucket_entry->buffer = NULL;
+    }
 
     ret = true;
 out:
@@ -328,11 +377,13 @@ dirnode_checkacl(uc_dirnode_t * dn, acl_rights_t rights)
 {
     int ret = -1;
 
+#if 0
 #ifdef UCAFS_SGX
     ecall_check_rights(global_eid, &ret, &dn->header, &dn->lockbox, rights);
     if (ret) {
         goto out;
     }
+#endif
 #endif
 
     ret = 0;
@@ -406,6 +457,39 @@ dirnode_add_alias(uc_dirnode_t * dn,
 
     memcpy(shdw_name, &de->shadow_name, sizeof(shadow_t));
 
+    /* insert in the corresponding bucket */
+    dirnode_bucket_entry_t * bucket_var, * bucket_entry = NULL;
+    TAILQ_FOREACH(bucket_var, &dn->buckets, next_entry) {
+        if (bucket_var->bckt.count < CONFIG_DIRNODE_BUCKET_CAPACITY) {
+            bucket_entry = bucket_var;
+            break;
+        }
+    }
+
+    /* if we found an entry, we can proceed to updating references */
+    if (bucket_entry) {
+        goto update_refs;
+    }
+
+    bucket_entry
+        = (dirnode_bucket_entry_t *)calloc(1, sizeof(dirnode_bucket_entry_t));
+    if (bucket_entry == NULL) {
+        log_fatal("allocation error");
+        goto out;
+    }
+
+    bucket_entry->freeable = true;
+
+    dn->bucket_update = true;
+
+update_refs:
+    /* update the references */
+    bucket_entry->bckt.count++;
+    bucket_entry->bckt.length += rec_len;
+    bucket_entry->is_dirty = true;
+
+    list_entry->bucket_entry = bucket_entry;
+
     ret = 0;
 out:
     // TODO implement free list_entry
@@ -413,6 +497,10 @@ out:
         if (shdw_name) {
             free(shdw_name);
             shdw_name = NULL;
+        }
+
+        if (list_entry) {
+            free_list_entry(list_entry);
         }
     }
 
@@ -509,6 +597,14 @@ dirnode_rm(uc_dirnode_t * dn,
     /* TODO: delete from the dentry and metadata */
     dn->header.dirbox_count--;
     dn->header.dirbox_len -= de->rec_len;
+
+    /* update the corresponding bucket */
+    dirnode_bucket_entry_t * bucket_entry = list_entry->bucket_entry;
+    bucket_entry->bckt.count--;
+    bucket_entry->bckt.length -= de->rec_len;
+    bucket_entry->is_dirty = true;
+
+    // XXX compact here?
 
     TAILQ_REMOVE(&dn->dirbox, list_entry, next_entry);
     free_list_entry(list_entry);
@@ -630,10 +726,18 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
     dnode_data_t * de;
+    dirnode_bucket_entry_t * prev_bckt, * curr_bckt = NULL;
 
     TAILQ_FOREACH(list_entry, list_head, next_entry)
     {
         de = &list_entry->dnode_data;
+
+        /* update the bucket pointers */
+        prev_bckt = curr_bckt;
+        curr_bckt = list_entry->bucket_entry;
+        if (prev_bckt != curr_bckt) {
+            curr_bckt->buffer = buffer;
+        }
 
         /* lets write the static data */
         len = de->rec_len - de->link_len;
@@ -659,6 +763,7 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
     dnode_list_entry_t * list_entry;
     dnode_data_t * de;
     dnode_dir_payload_t * payload = (dnode_dir_payload_t *)buffer;
+    dirnode_bucket_entry_t * bucket_entry;
 
     for (size_t i = 0; i < dn->header.dirbox_count; i++) {
         /* instantiate the list entry */
@@ -830,6 +935,6 @@ dirnode_get_root(uc_dirnode_t * dirnode)
 bool
 dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2)
 {
-    return memcmp(&dn1->header, &dn2->header, sizeof(dnode_header_t)) == 0;
+    return memcmp(&dn1->header, &dn2->header, sizeof(dirnode_header_t)) == 0;
 }
 

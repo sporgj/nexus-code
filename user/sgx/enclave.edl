@@ -4,12 +4,6 @@ enclave {
     trusted {
         public int ecall_init_enclave();
 
-        public int ecall_crypto_dirnode([in, out]dnode_header_t * header,
-                [user_check] uint8_t * data, uc_crypto_op_t op);
-
-        public int ecall_crypto_filebox([in, out]fbox_header_t * header,
-                [user_check] uint8_t * data, uc_crypto_op_t op);
-
         /* store operations */
         public int ecall_fetchstore_init([in, out] xfer_context_t * xfer_ctx);
 
@@ -38,10 +32,11 @@ enclave {
 
         public int ecall_supernode_mount([user_check] supernode_t * supernode);
 
+        /*
         public int ecall_check_rights([in] dnode_header_t * dnode_head,
                                       [user_check] acl_list_head_t * acl_list,
                                       acl_rights_t rights);
-
+        */
     };
 
 };

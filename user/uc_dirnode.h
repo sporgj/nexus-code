@@ -18,11 +18,14 @@ struct uc_dentry;
 struct metadata_entry;
 
 typedef struct dirnode {
-    dnode_header_t header;
+    dirnode_header_t header;
     dnode_list_head_t dirbox;
     acl_list_head_t lockbox;
+    bucket_list_head_t buckets;
 
+    bool bucket_update;
     sds dnode_path;
+    dirnode_bucket_entry_t * bucket0;
     struct uc_dentry * dentry;
     struct metadata_entry * mcache;
 } uc_dirnode_t;
