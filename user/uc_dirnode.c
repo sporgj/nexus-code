@@ -1,6 +1,7 @@
 #include "uc_encode.h"
 #include "uc_sgx.h"
 #include "uc_uspace.h"
+#include "uc_utils.h"
 #include "uc_vfs.h"
 
 #include "third/log.h"
@@ -49,6 +50,8 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
         return NULL;
     }
 
+    dn->bucket0->freeable = true;
+
     TAILQ_INSERT_TAIL(&dn->buckets, dn->bucket0, next_entry);
 
     if (parent) {
@@ -87,7 +90,7 @@ dirnode_new()
 }
 
 static inline void
-free_list_entry(dnode_list_entry_t * list_entry)
+free_dnode_entry(dnode_list_entry_t * list_entry)
 {
     if (list_entry->dnode_data.target) {
         free(list_entry->dnode_data.target);
@@ -103,20 +106,19 @@ dirnode_free(uc_dirnode_t * dirnode)
     acl_list_head_t * acl_head = &dirnode->lockbox;
     bucket_list_head_t * bucket_head = &dirnode->buckets;
 
-    dnode_list_entry_t * dnode_data;
+    dnode_list_entry_t * dnode_entry;
     acl_list_entry_t * acl_entry;
     dirnode_bucket_entry_t * bucket_entry;
 
     /* clear the entries in the entries */
-    while ((dnode_data = TAILQ_FIRST(dir_head))) {
-        // since, we're cloberring the dirnode, no need to update these
-        // TAILQ_REMOVE(dir_head, dnode_data, next_entry);
-        free_list_entry(dnode_data);
+    while ((dnode_entry = TAILQ_FIRST(dir_head))) {
+        TAILQ_REMOVE(dir_head, dnode_entry, next_entry);
+        free_dnode_entry(dnode_entry);
     }
 
     /* clear lockbox entries */
     while ((acl_entry = SIMPLEQ_FIRST(acl_head))) {
-        // SIMPLEQ_REMOVE_HEAD(acl_head, next_entry);
+        SIMPLEQ_REMOVE_HEAD(acl_head, next_entry);
         free(acl_entry);
     }
 
@@ -144,8 +146,10 @@ dirnode_from_file(const sds filepath)
     dnode_list_head_t * dirbox;
     acl_list_head_t * lockbox;
     bucket_list_head_t * buckets;
+    dirnode_bucket_entry_t * bucket0;
     uint8_t *buffer = NULL, *offset_ptr = NULL;
-    FILE * fd;
+    FILE *fd, *fd2 = NULL;
+    sds path2 = NULL;
     size_t nbytes, body_len;
     int error = -1;
 
@@ -187,18 +191,20 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 
-    (dn->bucket0 = &bucket_list[0])->freeable = true;
+    /* assign bucket 0 */
+    (dn->bucket0 = bucket0 = &bucket_list[0])->freeable = true;
 
     for (size_t x = 0; x < header->bucket_count; x++) {
-        // copy the iv, tag and count data
+        // copy the iv, tag, length and count data
         if (!fread(&bucket_list[x].bckt, sizeof(dirnode_bucket_t), 1, fd)) {
             log_error("reading bucket failed (%s)", filepath);
             goto out;
         }
 
+        // please note that the other buckets -> freeable = false
+
         TAILQ_INSERT_TAIL(buckets, &bucket_list[x], next_entry);
     }
-
 
     /* lets try to read the body of the dirnode */
     // TODO maybe check when body_len is ridiculous?
@@ -212,10 +218,47 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 
-    if ((nbytes = fread(buffer, 1, body_len, fd)) != body_len) {
-        log_error("reading metadata: expected=%zu, actual=%zu", body_len,
-                  nbytes);
-        goto out;
+    /* lets read bucket0 */
+    nbytes = fread(buffer, 1, bucket0->bckt.length, fd);
+    bucket0->buffer = buffer;
+    fclose(fd);
+    fd = NULL;
+
+    /* move the pointer where the next file will be read */
+    offset_ptr = buffer;
+
+    /* read the remaining files */
+    int x = -1;
+    dirnode_bucket_entry_t * bucket_entry;
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
+    {
+        x++;
+        offset_ptr += bucket_entry->bckt.length;
+        if (bucket_entry == bucket0) {
+            continue;
+        }
+
+        path2 = string_and_number(filepath, x);
+
+        fd2 = fopen(path2, "rb");
+        if (fd2 == NULL) {
+            log_error("opening '%s' FAILED", path2);
+            goto out;
+        }
+
+        // copy the iv, tag and count data
+        if (!fread(offset_ptr, bucket_entry->bckt.length, 1, fd2)) {
+            log_error("reading bucket failed (%s)", path2);
+            goto out;
+        }
+
+        bucket_entry->buffer = offset_ptr;
+
+        sdsfree(path2);
+        fclose(fd2);
+
+        path2 = NULL;
+        fd2 = NULL;
     }
 
 #if 0
@@ -256,7 +299,14 @@ out:
         free(buffer);
     }
 
-    fclose(fd);
+    if (fd2) {
+        fclose(fd2);
+    }
+
+    if (fd) {
+        fclose(fd);
+    }
+
     return dn;
 }
 
@@ -266,8 +316,10 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     bool ret = false;
     int error;
     uint8_t *buffer = NULL, *offset_ptr = NULL;
-    FILE * fd;
-    size_t proto_len, total_len;
+    sds path2 = NULL;
+    FILE *fd, *fd2 = NULL;
+    size_t proto_len, total_len, nbytes;
+    dirnode_bucket_entry_t * bucket0 = dn->bucket0;
 
     total_len = dn->header.dirbox_len + dn->header.lockbox_len;
 
@@ -309,22 +361,71 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 
     /* now write the chunk information */
     dirnode_bucket_entry_t * bucket_entry;
-    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry) {
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
+    {
         // copy the iv, tag and count data
         if (!fwrite(&bucket_entry->bckt, sizeof(dirnode_bucket_t), 1, fd)) {
             log_error("reading bucket failed (%s)", fpath);
             goto out;
         }
+    }
+
+    /* write the contents of bucket0 */
+    if (bucket0->is_dirty) {
+        nbytes = fwrite(bucket0->buffer, 1, bucket0->bckt.length, fd);
+        bucket0->is_dirty = false;
+        bucket0->buffer = NULL;
+    }
+
+    fclose(fd);
+    fd = NULL;
+
+    /* now write the buffers in the different files */
+    int x = -1;
+
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
+    {
+        x++;
+        if (!bucket_entry->is_dirty) {
+            continue;
+        }
+
+        /* form the path to the string here */
+        path2 = string_and_number(fpath, x);
+        /* open the file and save */
+        fd2 = fopen(path2, "wb");
+        if (fd2 == NULL) {
+            log_error("opening '%s' FAILED", path2);
+            goto out;
+        }
+
+        /* writes the contents of the the bucket */
+        nbytes
+            = fwrite(bucket_entry->buffer, 1, bucket_entry->bckt.length, fd2);
+
+        fclose(fd2);
+        sdsfree(path2);
+
+        fd2 = NULL;
+        path2 = NULL;
 
         bucket_entry->is_dirty = false;
         bucket_entry->buffer = NULL;
     }
 
-    fwrite(buffer, total_len, 1, fd);
-
     ret = true;
 out:
-    fclose(fd);
+    if (fd) {
+        fclose(fd);
+    }
+
+    if (fd2) {
+        fclose(fd2);
+    }
+
+    if (path2) {
+        sdsfree(path2);
+    }
 
     if (buffer) {
         free(buffer);
@@ -476,7 +577,7 @@ dirnode_add_alias(uc_dirnode_t * dn,
     memcpy(shdw_name, &de->shadow_name, sizeof(shadow_t));
 
     /* insert in the corresponding bucket */
-    dirnode_bucket_entry_t * bucket_var, * bucket_entry = NULL;
+    dirnode_bucket_entry_t *bucket_var, *bucket_entry = NULL;
     TAILQ_FOREACH_REVERSE(bucket_var, &dn->buckets, bucket_list, next_entry)
     {
         if (bucket_var->bckt.count < CONFIG_DIRNODE_BUCKET_CAPACITY) {
@@ -498,6 +599,8 @@ dirnode_add_alias(uc_dirnode_t * dn,
     }
 
     bucket_entry->freeable = true;
+    TAILQ_INSERT_TAIL(&dn->buckets, bucket_entry, next_entry);
+    dn->header.bucket_count++;
 
     dn->bucket_update = true;
 
@@ -519,7 +622,7 @@ out:
         }
 
         if (list_entry) {
-            free_list_entry(list_entry);
+            free_dnode_entry(list_entry);
         }
     }
 
@@ -599,7 +702,8 @@ dirnode_rm(uc_dirnode_t * dn,
     dnode_data_t * de;
     int len1;
 
-    list_entry = iterate_by_realname(dn, realname, p_type, p_journal, pp_link_info);
+    list_entry
+        = iterate_by_realname(dn, realname, p_type, p_journal, pp_link_info);
     if (list_entry == NULL) {
         return NULL;
     }
@@ -626,7 +730,7 @@ dirnode_rm(uc_dirnode_t * dn,
     // XXX compact here?
 
     TAILQ_REMOVE(&dn->dirbox, list_entry, next_entry);
-    free_list_entry(list_entry);
+    free_dnode_entry(list_entry);
 
     return result;
 out:
@@ -669,7 +773,8 @@ dirnode_traverse(uc_dirnode_t * dn,
                  int * p_journal,
                  const link_info_t ** pp_link_info)
 {
-    return __dirnode_raw2enc(dn, realname, type, p_type, p_journal, pp_link_info);
+    return __dirnode_raw2enc(dn, realname, type, p_type, p_journal,
+                             pp_link_info);
 }
 
 const char *
@@ -714,14 +819,16 @@ dirnode_rename(uc_dirnode_t * dn,
 
     *ptr_shadow2_bin = NULL;
 
-    *ptr_shadow1_bin = dirnode_rm(dn, oldname, type, &atype, &jrnl, pp_link_info1);
+    *ptr_shadow1_bin
+        = dirnode_rm(dn, oldname, type, &atype, &jrnl, pp_link_info1);
     if (*ptr_shadow1_bin) {
         // it is necessary to return the codename of the existing entry
         // otherwise, we get a lingering file in the AFS server
         //
         // Pass the UNKOWN flag to ensure any copy of the existing file is
         // erased
-        shadow2_bin = dirnode_rm(dn, newname, UC_ANY, &atype1, &jrnl, pp_link_info2);
+        shadow2_bin
+            = dirnode_rm(dn, newname, UC_ANY, &atype1, &jrnl, pp_link_info2);
         if (shadow2_bin == NULL) {
             shadow2_bin = dirnode_add(dn, newname, atype, jrnl);
         } else {
@@ -745,7 +852,7 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
     dnode_data_t * de;
-    dirnode_bucket_entry_t * prev_bckt, * curr_bckt = NULL;
+    dirnode_bucket_entry_t *prev_bckt, *curr_bckt = NULL;
 
     TAILQ_FOREACH(list_entry, list_head, next_entry)
     {
@@ -776,14 +883,15 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 static int
 parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 {
-    int len, ret = -1;
+    int len, ret = -1, entries_left;
     size_t sz;
     dnode_list_head_t * list_head = &dn->dirbox;
     dnode_list_entry_t * list_entry;
     dnode_data_t * de;
     dnode_dir_payload_t * payload = (dnode_dir_payload_t *)buffer;
-    dirnode_bucket_entry_t * bucket_entry;
+    dirnode_bucket_entry_t * bucket_entry = TAILQ_FIRST(&dn->buckets);
 
+    entries_left = bucket_entry->bckt.count;
     for (size_t i = 0; i < dn->header.dirbox_count; i++) {
         /* instantiate the list entry */
         sz = sizeof(dnode_list_entry_t)
@@ -815,6 +923,13 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
         // move to the next entry
         payload = (dnode_dir_payload_t *)buffer;
+
+        list_entry->bucket_entry = bucket_entry;
+        // if we have read all the entries
+        if (!(--entries_left)) {
+            bucket_entry = TAILQ_NEXT(bucket_entry, next_entry);
+            entries_left = bucket_entry ? bucket_entry->bckt.count : 0;
+        }
     }
 
     ret = 0;
@@ -956,4 +1071,3 @@ dirnode_equals(uc_dirnode_t * dn1, uc_dirnode_t * dn2)
 {
     return memcmp(&dn1->header, &dn2->header, sizeof(dirnode_header_t)) == 0;
 }
-

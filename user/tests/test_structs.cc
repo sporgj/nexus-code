@@ -1,7 +1,39 @@
 #include "ucafs_tests.h"
 
 sgx_enclave_id_t global_eid;
+const char * dnode_file = "./repo/dnode-test";
 
+#define N 6
+TEST(DIRNODE, test1)
+{
+    ucafs_entry_type atype;
+    uc_dirnode_t * dirnode = dirnode_new();
+    shadow_t * shadows[N];
+    sds fname, dnode_fname = sdsnew(dnode_file);
+    const char * name;
+
+    for (size_t x = 0; x < N; x++) {
+        fname = string_and_number("test", x);
+
+        shadows[x] = dirnode_add(dirnode, fname, UC_FILE, 0);
+
+        sdsfree(fname);
+    }
+
+    ASSERT_TRUE(dirnode_write(dirnode, dnode_file));
+    dirnode_free(dirnode);
+
+    dirnode = dirnode_from_file(dnode_fname);
+    for (size_t x = 0; x < N; x++) {
+        name = dirnode_enc2raw(dirnode, shadows[x], UC_FILE, &atype);
+        ASSERT_TRUE(name != NULL);
+    }
+
+    dirnode_free(dirnode);
+    sdsfree(dnode_fname);
+}
+
+#if 0
 TEST(DIRNODE, test1)
 {
     uc_dirnode_t * dirnode = dirnode_new();
@@ -101,3 +133,4 @@ TEST(DIRNODE, test3)
 
     dirnode_free(dirnode1);
 }
+#endif

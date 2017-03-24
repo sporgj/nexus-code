@@ -24,6 +24,9 @@ sds do_get_dir(const char * fpath);
 sds
 do_make_path(const char * dirpath, const char * fname);
 
+sds
+string_and_number(const char * str, int number);
+
 static inline void do_free(void ** p_ptr) {
     free(*p_ptr);
     *p_ptr = NULL;

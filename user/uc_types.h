@@ -21,7 +21,7 @@
 // based on AFS
 #define CONFIG_MAX_NAME 100
 
-#define CONFIG_DIRNODE_BUCKET_CAPACITY 128
+#define CONFIG_DIRNODE_BUCKET_CAPACITY 3
 
 struct uc_dentry;
 struct metadata_entry;
@@ -229,8 +229,8 @@ typedef struct dnode_data {
 
 typedef struct dnode_list_entry {
    TAILQ_ENTRY(dnode_list_entry) next_entry;
-   dnode_data_t dnode_data;
    dirnode_bucket_entry_t * bucket_entry;
+   dnode_data_t dnode_data;
 } __attribute__((packed)) dnode_list_entry_t;
 
 typedef TAILQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;

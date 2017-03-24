@@ -5,6 +5,19 @@
 
 #include "uc_utils.h"
 
+/* takes 'str' + num => 'str-num' */
+sds
+string_and_number(const char * str, int number)
+{
+    sds rv;
+    char buf[50];
+
+    snprintf(buf, sizeof(buf), "-%d", number);
+    rv = sdsnew(str);
+    rv = sdscat(rv, buf);
+    return rv;
+}
+
 // https://gist.github.com/ccbrown/9722406
 void
 hexdump(uint8_t * data, uint32_t size)
