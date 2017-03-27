@@ -21,7 +21,7 @@
 // based on AFS
 #define CONFIG_MAX_NAME 100
 
-#define CONFIG_DIRNODE_BUCKET_CAPACITY 3
+#define CONFIG_DIRNODE_BUCKET_CAPACITY 128
 
 struct uc_dentry;
 struct metadata_entry;
