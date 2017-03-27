@@ -611,6 +611,21 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
             log_error("deleting dirnode (%s) FAILED", metadata_path);
             goto out;
         }
+
+        /* lazily remove the file entries */
+        int x = 1;
+        while(true) {
+            sds path2 = string_and_number(metadata_path, x);
+
+            if (unlink(path2)) {
+                log_warn("deleting split (%s) FAILED", metadata_path);
+                sdsfree(path2);
+                break;
+            }
+
+            sdsfree(path2);
+            x++;
+        }
     }
 
     error = 0;

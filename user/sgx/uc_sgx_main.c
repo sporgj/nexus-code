@@ -277,7 +277,7 @@ crypto_dirnode_buffer(dirnode_header_t * header,
     gcm_iv_t iv;
     gcm_tag_t tag;
     mbedtls_gcm_context _, *gcm_ctx = &_;
-    uint8_t p_input[CONFIG_CRYPTO_BUFLEN], *p_data;
+    uint8_t p_input[CONFIG_CRYPTO_BUFLEN], p_out[CONFIG_CRYPTO_BUFLEN], *p_data;
 
     if (op == UC_ENCRYPT) {
         sgx_read_rand((uint8_t *)&bucket_entry->bckt.iv, sizeof(gcm_iv_t));
@@ -290,9 +290,9 @@ crypto_dirnode_buffer(dirnode_header_t * header,
     mbedtls_gcm_setkey(gcm_ctx, MBEDTLS_CIPHER_ID_AES, (uint8_t *)ekey,
                        CONFIG_GCM_KEYBITS);
 
-    mbedtls_gcm_starts(gcm_ctx, md, (uint8_t *)&iv, sizeof(gcm_iv_t), (uint8_t *)header,
-                       offsetof(dirnode_header_t, ekey));
-
+    mbedtls_gcm_starts(gcm_ctx, md, (uint8_t *)&iv, sizeof(gcm_iv_t), NULL, 0);
+    /*(uint8_t *)header,
+                       offsetof(dirnode_header_t, ekey) */
     /* now encrypt the buffer */
     p_data = bucket_entry->buffer;
     bytes_left = bucket_entry->bckt.length;
@@ -321,7 +321,7 @@ crypto_dirnode_buffer(dirnode_header_t * header,
 }
 
 inline int
-usgx_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
+usgx_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 {
     int ret = -1, dirty_count = 0;
     crypto_ekey_t * sealing_key;
@@ -329,15 +329,6 @@ usgx_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
     gcm_ekey_t _ekey, *ekey = &_ekey;
     dirnode_bucket_entry_t * bucket_entry;
     uint8_t *p_input, *p_data;
-
-    TAILQ_FOREACH(bucket_entry, &dirnode->buckets, next_entry)
-    {
-        if (!bucket_entry->is_dirty) {
-            continue;
-        }
-
-        dirty_count++;
-    }
 
     /* super_ekey + root_shdw + fnode_uuid */
     sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);
@@ -347,9 +338,19 @@ usgx_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 
     /* now unseal the crypto key */
     if (op == UC_ENCRYPT) {
+        TAILQ_FOREACH(bucket_entry, &dirnode->buckets, next_entry)
+        {
+            if (!bucket_entry->is_dirty) {
+                continue;
+            }
+
+            dirty_count++;
+        }
+
         if (dirty_count == dirnode->header.bucket_count) {
             sgx_read_rand((uint8_t *)ekey, sizeof(gcm_ekey_t));
         } else {
+            memcpy(ekey, &dirnode->header.ekey, sizeof(gcm_ekey_t));
             enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_DECRYPT);
         }
     } else {
@@ -369,10 +370,11 @@ usgx_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
         }
     }
 
-    enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_ENCRYPT);
-
     /* copy the encryption key into the dirnode */
-    memcpy(&dirnode->header.ekey, ekey, sizeof(gcm_ekey_t));
+    if (op == UC_ENCRYPT) {
+        enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_ENCRYPT);
+        memcpy(&dirnode->header.ekey, ekey, sizeof(gcm_ekey_t));
+    }
 
     ret = 0;
 out:
@@ -382,5 +384,5 @@ out:
 int
 ecall_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 {
-    return usgx_crypto_dirnode(dirnode, op);
+    return usgx_dirnode_crypto(dirnode, op);
 }

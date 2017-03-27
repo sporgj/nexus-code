@@ -232,8 +232,8 @@ dirnode_from_file(const sds filepath)
     TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
     {
         x++;
-        offset_ptr += bucket_entry->bckt.length;
         if (bucket_entry == bucket0) {
+            offset_ptr += bucket_entry->bckt.length;
             continue;
         }
 
@@ -252,6 +252,7 @@ dirnode_from_file(const sds filepath)
         }
 
         bucket_entry->buffer = offset_ptr;
+        offset_ptr += bucket_entry->bckt.length;
 
         sdsfree(path2);
         fclose(fd2);
@@ -282,6 +283,9 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 
+    /* adjust the size of bucket0 */
+    bucket0->bckt.length -= header->lockbox_len;
+
 done:
     dn->dnode_path = sdsdup(filepath);
     error = 0;
@@ -310,22 +314,42 @@ out:
 bool
 dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
-    bool ret = false;
+    bool ret = false, preexist = true;
     int error;
     uint8_t *buffer = NULL, *offset_ptr = NULL;
     sds path2 = NULL;
     FILE *fd, *fd2 = NULL;
-    size_t proto_len, total_len, nbytes;
-    dirnode_bucket_entry_t * bucket0 = dn->bucket0;
+    size_t proto_len, total_len = 0, nbytes;
+    dirnode_bucket_entry_t * bucket0 = dn->bucket0, *bucket_entry;
 
-    total_len = dn->header.dirbox_len + dn->header.lockbox_len;
-
-    fd = fopen(fpath, "wb");
+    /* if the file exists, do not overwrite */
+    fd = fopen(fpath, bucket0->is_dirty ? "wb" : "rb+");
     if (fd == NULL) {
-        log_error("file not found: %s", fpath);
-        return false;
+        preexist = false;
+
+        if ((fd = fopen(fpath, "wb")) == NULL) {
+            log_error("file not found: %s", fpath);
+            return false;
+        }
     }
 
+    if (!preexist || dn->bucket_update) {
+        bucket0->is_dirty = true;
+    }
+
+    /* if it's dirty, then we have to add ACL information */
+    if (bucket0->is_dirty) {
+        total_len += dn->header.lockbox_len;
+    }
+
+    /* iterate through every bucket entry and only include their sizes */
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry) {
+        if (bucket_entry->is_dirty) {
+            total_len += bucket_entry->bckt.length;
+        }
+    }
+
+    /* allocate the buffer that will hold everything */
     if ((buffer = (uint8_t *)malloc(total_len)) == NULL) {
         log_fatal("allocation error (%s)", __func__);
         goto out;
@@ -333,12 +357,16 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 
     /* now serialize the the access control information */
     offset_ptr = buffer;
-    if (serialize_lockbox(dn, offset_ptr)) {
-        log_error("serializing dirnode ACL failed (%s)", fpath);
-        goto out;
+    if (bucket0->is_dirty) {
+        if (serialize_lockbox(dn, offset_ptr)) {
+            log_error("serializing dirnode ACL failed (%s)", fpath);
+            goto out;
+        }
+
+        // move the pointer ahead
+        offset_ptr += dn->header.lockbox_len;
     }
 
-    offset_ptr += dn->header.lockbox_len;
     if (serialize_dirbox(dn, offset_ptr)) {
         log_error("serialization failed");
         goto out;
@@ -360,7 +388,6 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     fwrite(&dn->header, sizeof(dirnode_header_t), 1, fd);
 
     /* now write the chunk information */
-    dirnode_bucket_entry_t * bucket_entry;
     TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
     {
         // copy the iv, tag and count data
@@ -860,14 +887,20 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
 
     TAILQ_FOREACH(list_entry, list_head, next_entry)
     {
-        de = &list_entry->dnode_data;
-
         /* update the bucket pointers */
         prev_bckt = curr_bckt;
         curr_bckt = list_entry->bucket_entry;
+
+        /* if we don't have to serialize the entry, lets skip it */
+        if (!curr_bckt->is_dirty) {
+            continue;
+        }
+
         if (prev_bckt != curr_bckt) {
             curr_bckt->buffer = buffer;
         }
+
+        de = &list_entry->dnode_data;
 
         /* lets write the static data */
         len = de->rec_len - de->link_len;

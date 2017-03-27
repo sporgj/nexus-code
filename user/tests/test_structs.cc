@@ -21,14 +21,15 @@ TEST(DIRNODE, test1)
         fname = string_and_number("test", x);
 
         shadows[x] = dirnode_add(dirnode, fname, UC_FILE, 0);
+        ASSERT_TRUE(dirnode_write(dirnode, dnode_file));
 
         sdsfree(fname);
     }
 
-    ASSERT_TRUE(dirnode_write(dirnode, dnode_file));
     dirnode_free(dirnode);
 
-    dirnode = dirnode_from_file(dnode_fname);
+    ASSERT_FALSE((dirnode = dirnode_from_file(dnode_fname)) == NULL) << "oops";
+
     for (size_t x = 0; x < N; x++) {
         name = dirnode_enc2raw(dirnode, shadows[x], UC_FILE, &atype);
         ASSERT_TRUE(name != NULL);
