@@ -52,7 +52,7 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 
     dn->bucket0->freeable = true;
 
-    TAILQ_INSERT_TAIL(&dn->buckets, dn->bucket0, next_entry);
+    TAILQ_INSERT_HEAD(&dn->buckets, dn->bucket0, next_entry);
 
     if (parent) {
         memcpy(&dn->header.parent, &parent->header.uuid, sizeof(shadow_t));
@@ -123,9 +123,8 @@ dirnode_free(uc_dirnode_t * dirnode)
     }
 
     /* clear the buckets */
-    TAILQ_FOREACH_REVERSE(bucket_entry, bucket_head, bucket_list, next_entry)
-    {
-        // REMOVE THE ENTRY
+    while ((bucket_entry = TAILQ_LAST(bucket_head, bucket_list))) {
+        TAILQ_REMOVE(bucket_head, bucket_entry, next_entry);
         if (bucket_entry->freeable) {
             free(bucket_entry);
         }
@@ -261,15 +260,13 @@ dirnode_from_file(const sds filepath)
         fd2 = NULL;
     }
 
-#if 0
 #ifdef UCAFS_SGX
     /* decrypt the content with enclave */
-    ecall_crypto_dirnode(global_eid, &error, header, buffer, UC_DECRYPT);
+    ecall_dirnode_crypto(global_eid, &error, dn, UC_DECRYPT);
     if (error) {
         log_error("enclave dirnode decryption failed");
         goto out;
     }
-#endif
 #endif
 
     /* parse the body */
@@ -347,14 +344,17 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         goto out;
     }
 
-#if 0
+    /* before we go to the enclave, lets include the acl information
+     * as part of bucket0 */
+    bucket0->buffer = buffer;
+    bucket0->bckt.length += dn->header.lockbox_len;
+
 #ifdef UCAFS_SGX
-    ecall_crypto_dirnode(global_eid, &error, &dn->header, buffer, UC_ENCRYPT);
+    ecall_dirnode_crypto(global_eid, &error, dn, UC_ENCRYPT);
     if (error) {
         log_error("enclave encryption failed (%s)", __func__);
         goto out;
     }
-#endif
 #endif
 
     fwrite(&dn->header, sizeof(dirnode_header_t), 1, fd);
@@ -466,6 +466,8 @@ dirnode_lockbox_clear(uc_dirnode_t * dn)
     SIMPLEQ_INIT(acl_list);
     dn->header.lockbox_len = 0;
     dn->header.lockbox_count = 0;
+
+    dn->bucket0->is_dirty = true;
 }
 
 int
@@ -487,6 +489,8 @@ dirnode_lockbox_add(uc_dirnode_t * dn, const char * name, acl_rights_t rights)
     SIMPLEQ_INSERT_TAIL(&dn->lockbox, acl_entry, next_entry);
     dn->header.lockbox_len += sizeof(acl_data_t) + len + 1;
     dn->header.lockbox_count++;
+
+    dn->bucket0->is_dirty = true;
 
     return 0;
 }

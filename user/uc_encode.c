@@ -174,7 +174,7 @@ compute_encoded_str_size()
 {
     shadow_t code;
     ecryptfs_encode_for_filename(NULL, &encoded_str_size, (uint8_t *)&code,
-                                     sizeof(shadow_t));
+                                 sizeof(shadow_t));
 }
 
 static char *
@@ -236,6 +236,13 @@ encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
                                   (uint8_t *)_encoded_fname, src_sz);
 
     return code;
+}
+
+char *
+metadir_bin2str(const shadow_t * bin)
+{
+    return encode_bin2str(bin, UC_METADIR_PREFIX,
+                          UC_PREFIX_LEN(UC_METADIR_PREFIX));
 }
 
 char *

@@ -175,10 +175,10 @@ typedef SIMPLEQ_HEAD(acl_head, acl_list_entry) acl_list_head_t;
 
 /** DIRNODE PARTIALS */
 typedef struct {
-   gcm_iv_t iv;
-   gcm_tag_t tag;
    uint16_t count; /* the number of entries in this bucket */
    uint32_t length; /* size of the buffer */
+   gcm_iv_t iv;
+   gcm_tag_t tag;
 } __attribute__((packed)) dirnode_bucket_t;
 
 typedef struct dirnode_bucket_entry {
@@ -194,9 +194,9 @@ typedef TAILQ_HEAD(bucket_list, dirnode_bucket_entry) bucket_list_head_t;
 typedef struct {
     shadow_t uuid, parent, root;
     uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
+    uint8_t bucket_count;
     gcm_ekey_t ekey;
     gcm_tag_t tag;
-    uint8_t bucket_count;
 } __attribute__((packed)) dirnode_header_t;
 
 typedef enum {

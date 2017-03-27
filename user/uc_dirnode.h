@@ -4,8 +4,6 @@
 extern "C" {
 #endif
 
-#include <uv.h>
-
 #include "third/sds.h"
 
 #include "uc_types.h"

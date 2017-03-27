@@ -4,8 +4,6 @@
 #include <stdint.h>
 #endif
 
-#include "ucafs_env.h"
-
 #if defined(UCPRIV_ENCLAVE) || defined(KERNEL)
 typedef struct {
     uint8_t bin[16];
@@ -41,16 +39,6 @@ typedef struct {
 #define UCAFS_PATH_MAX 4096
 #define UCAFS_FNAME_MAX 256
 
-#ifdef UCAFS_DEV
-#define UCAFS_PATH_KERN "/xyz.vm/user/djoko"
-#define UCAFS_PATH "/afs" UCAFS_PATH_KERN
-#else
-#define UCAFS_PATH_KERN "/maatta.sgx/user/bruyne"
-#define UCAFS_PATH "/afs" UCAFS_PATH_KERN
-#endif
-
-#define UC_AFS_WATCH "sgx"
-
 #define UCAFS_SUPER_FNAME "ucafs"
 #define UCAFS_REPO_DIR ".afsx"
 #define UCAFS_WATCH_DIR "sgx"
@@ -60,6 +48,9 @@ typedef struct {
 #define CONFIG_PUBKEY   "profile/public_key"
 #define CONFIG_PRIVKEY  "profile/private_key"
 #define CONFIG_ENCLAVE_PUBKEY   "profile/enclave_pubkey"
+
+#define CONFIG_GCM_KEYBITS 128
+#define CONFIG_CRYPTO_BUFLEN   256
 
 typedef enum {
     UC_STATUS_GOOD = 0,
@@ -86,6 +77,7 @@ typedef enum {
 
 /* prefixes for the different file types */
 #define UC_METADATA_PREFIX "md"
+#define UC_METADIR_PREFIX "_"
 #define UC_FILEDATA_PREFIX ""
 #define UC_PREFIX_LEN(x) sizeof(x) - 1
 

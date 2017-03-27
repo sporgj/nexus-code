@@ -12,6 +12,7 @@
 #include <sgx_utils.h>
 
 #include <mbedtls/aes.h>
+#include <mbedtls/gcm.h>
 #include <mbedtls/md.h>
 #include <mbedtls/sha256.h>
 

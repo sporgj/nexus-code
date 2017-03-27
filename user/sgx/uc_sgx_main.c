@@ -1,5 +1,5 @@
-#include "ucafs_sgx.h"
 #include "seqptrmap.h"
+#include "ucafs_sgx.h"
 
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 crypto_ekey_t * __enclave_key__ = (crypto_ekey_t *)&__enclave_encryption_key__;
@@ -262,17 +262,117 @@ usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
 int
 ecall_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
-    return 0; //usgx_crypto_filebox(header, data, op);
+    return 0; // usgx_crypto_filebox(header, data, op);
+}
+
+static int
+crypto_dirnode_buffer(dirnode_header_t * header,
+                      gcm_ekey_t * ekey,
+                      dirnode_bucket_entry_t * bucket_entry,
+                      uc_crypto_op_t op)
+{
+    int ret = 0,
+        md = (op == UC_ENCRYPT) ? MBEDTLS_GCM_ENCRYPT : MBEDTLS_GCM_DECRYPT,
+        bytes_left, len;
+    gcm_iv_t iv;
+    gcm_tag_t tag;
+    mbedtls_gcm_context _, *gcm_ctx = &_;
+    uint8_t p_input[CONFIG_CRYPTO_BUFLEN], *p_data;
+
+    if (op == UC_ENCRYPT) {
+        sgx_read_rand((uint8_t *)&bucket_entry->bckt.iv, sizeof(gcm_iv_t));
+    }
+
+    memcpy(&iv, &bucket_entry->bckt.iv, sizeof(gcm_iv_t));
+
+    /* start the encryption */
+    mbedtls_gcm_init(gcm_ctx);
+    mbedtls_gcm_setkey(gcm_ctx, MBEDTLS_CIPHER_ID_AES, (uint8_t *)ekey,
+                       CONFIG_GCM_KEYBITS);
+
+    mbedtls_gcm_starts(gcm_ctx, md, (uint8_t *)&iv, sizeof(gcm_iv_t), (uint8_t *)header,
+                       offsetof(dirnode_header_t, ekey));
+
+    /* now encrypt the buffer */
+    p_data = bucket_entry->buffer;
+    bytes_left = bucket_entry->bckt.length;
+    while (bytes_left > 0) {
+        len = MIN(bytes_left, CONFIG_CRYPTO_BUFLEN);
+
+        memcpy(p_input, p_data, len);
+
+        mbedtls_gcm_update(gcm_ctx, len, p_input, p_data);
+
+        p_data += len;
+        bytes_left -= len;
+    }
+
+    mbedtls_gcm_finish(gcm_ctx, (uint8_t *)&tag, sizeof(gcm_tag_t));
+    mbedtls_gcm_free(gcm_ctx);
+
+    /* just */
+    if (op == UC_ENCRYPT) {
+        memcpy(&bucket_entry->bckt.tag, &tag, sizeof(gcm_tag_t));
+    } else {
+        ret = memcmp(&tag, &bucket_entry->bckt.tag, sizeof(gcm_tag_t));
+    }
+
+    return ret;
 }
 
 inline int
 usgx_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 {
-    int ret = -1;
-    gcm_ekey_t * sealing_key;
+    int ret = -1, dirty_count = 0;
+    crypto_ekey_t * sealing_key;
+    dirnode_header_t * header = &dirnode->header;
+    gcm_ekey_t _ekey, *ekey = &_ekey;
+    dirnode_bucket_entry_t * bucket_entry;
+    uint8_t *p_input, *p_data;
 
-    /* iterate the buffer entries */
-    //TAILQ_
+    TAILQ_FOREACH(bucket_entry, &dirnode->buckets, next_entry)
+    {
+        if (!bucket_entry->is_dirty) {
+            continue;
+        }
+
+        dirty_count++;
+    }
+
+    /* super_ekey + root_shdw + fnode_uuid */
+    sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);
+    if (sealing_key == NULL) {
+        return -1;
+    }
+
+    /* now unseal the crypto key */
+    if (op == UC_ENCRYPT) {
+        if (dirty_count == dirnode->header.bucket_count) {
+            sgx_read_rand((uint8_t *)ekey, sizeof(gcm_ekey_t));
+        } else {
+            enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_DECRYPT);
+        }
+    } else {
+        memcpy(ekey, &dirnode->header.ekey, sizeof(gcm_ekey_t));
+        enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_DECRYPT);
+    }
+
+    /* iterate the buffer entries and encrypt them */
+    TAILQ_FOREACH(bucket_entry, &dirnode->buckets, next_entry)
+    {
+        if (op == UC_ENCRYPT && !bucket_entry->is_dirty) {
+            continue;
+        }
+
+        if (crypto_dirnode_buffer(header, ekey, bucket_entry, op)) {
+            goto out;
+        }
+    }
+
+    enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_ENCRYPT);
+
+    /* copy the encryption key into the dirnode */
+    memcpy(&dirnode->header.ekey, ekey, sizeof(gcm_ekey_t));
 
     ret = 0;
 out:
@@ -280,7 +380,7 @@ out:
 }
 
 int
-ecall_crypto_dirnode(uc_dirnode_t * dirnode, uc_crypto_op_t op)
+ecall_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 {
-    return ugx_crypto_dirnode(dirnode, op);
+    return usgx_crypto_dirnode(dirnode, op);
 }

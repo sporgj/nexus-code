@@ -512,7 +512,7 @@ ecall_supernode_mount(supernode_t * super)
  * @return 0 if one has access to the file
  */
 static int
-usgx_check_rights(dnode_header_t * dnode_head,
+usgx_check_rights(dirnode_header_t * dnode_head,
                   acl_list_head_t * acl_list,
                   acl_rights_t rights)
 {
@@ -571,7 +571,7 @@ out:
 }
 
 int
-ecall_check_rights(dnode_header_t * dnode_head,
+ecall_check_rights(dirnode_header_t * dnode_head,
                    acl_list_head_t * acl_list,
                    acl_rights_t rights)
 {

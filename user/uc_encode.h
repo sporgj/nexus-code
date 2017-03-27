@@ -6,6 +6,9 @@ extern "C" {
 #endif
 
 char *
+metadir_bin2str(const shadow_t * bin);
+
+char *
 metaname_bin2str(const shadow_t * bin);
 
 shadow_t *

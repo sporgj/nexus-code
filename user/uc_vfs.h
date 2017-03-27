@@ -6,6 +6,8 @@ extern "C" {
 
 #include <stdatomic.h>
 
+#include <uv.h>
+
 #include "uc_dirnode.h"
 #include "uc_filebox.h"
 

@@ -12,6 +12,11 @@ TEST(DIRNODE, test1)
     sds fname, dnode_fname = sdsnew(dnode_file);
     const char * name;
 
+    /* initialize the enclave */
+    if (ucafs_init_enclave()) {
+        return;
+    }
+
     for (size_t x = 0; x < N; x++) {
         fname = string_and_number("test", x);
 

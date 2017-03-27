@@ -1,5 +1,6 @@
 enclave {
     include "uc_types.h"
+    include "uc_dirnode.h"
 
     trusted {
         public int ecall_init_enclave();
@@ -31,6 +32,10 @@ enclave {
                 seal_op_t op);
 
         public int ecall_supernode_mount([user_check] supernode_t * supernode);
+
+        /* signing dirnode data */
+        public int ecall_dirnode_crypto([user_check] uc_dirnode_t * dirnode,
+                                        uc_crypto_op_t op);
 
         /*
         public int ecall_check_rights([in] dnode_header_t * dnode_head,
