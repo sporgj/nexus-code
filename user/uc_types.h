@@ -205,9 +205,9 @@ typedef enum {
 } jrnl_op_t;
 
 typedef struct {
-   uint8_t type: 1;
+   uint16_t type: 4;
    uint8_t jrnl: 1;
-} entry_info_t;
+} __attribute__((packed)) entry_info_t;
 
 // mainly for debug purposes in gdb
 #define DNODE_PAYLOAD                                                          \

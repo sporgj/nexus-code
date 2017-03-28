@@ -132,7 +132,7 @@ _metadata_on_demand(struct uc_dentry * parent_dentry,
 
     // XXX might be wiser to check if the file already exists on disk
     if (!dirnode_write(dn, fpath)) {
-        log_error("Creating: '%s' dirnode FAILED", fpath);
+        log_error("writing '%s' dirnode FAILED", fpath);
         goto out;
     }
 

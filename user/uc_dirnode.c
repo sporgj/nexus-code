@@ -674,7 +674,7 @@ dirnode_add_link(uc_dirnode_t * dn,
                  const char * link_name,
                  const link_info_t * link_info)
 {
-    return dirnode_add_alias(dn, link_name, UC_LINK, 0, NULL, link_info);
+    return dirnode_add_alias(dn, link_name, UC_LINK, JRNL_NOOP, NULL, link_info);
 }
 
 static inline dnode_list_entry_t *
@@ -712,7 +712,7 @@ iterate_by_realname(uc_dirnode_t * dn,
             }
 
             *p_type = de->info.type;
-            *p_journal = de->info.type;
+            *p_journal = de->info.jrnl;
             return list_entry;
         }
     }
@@ -833,6 +833,7 @@ dirnode_enc2raw(uc_dirnode_t * dn,
 }
 
 // TODO fix locking
+// TODO make sure you add entry to the same bucket
 int
 dirnode_rename(uc_dirnode_t * dn,
                const char * oldname,
@@ -1042,7 +1043,7 @@ dirnode_rm_from_journal(uc_dirnode_t * dirnode, const shadow_t * shdw)
         de = &list_entry->dnode_data;
 
         if (memcmp(&de->shadow_name, shdw, sizeof(shadow_t)) == 0) {
-            de->info.type = JRNL_NOOP;
+            de->info.jrnl = JRNL_NOOP;
             break;
         }
     }
