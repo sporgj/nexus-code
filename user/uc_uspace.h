@@ -21,6 +21,9 @@ extern size_t global_supernode_count;
 
 extern supernode_t * global_supernode_object;
 
+extern uint8_t * global_xfer_addr;
+extern size_t global_xfer_buflen;
+
 struct dirnode;
 
 /**

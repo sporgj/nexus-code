@@ -35,6 +35,9 @@
 #define UCMOD_BUFFER_ALLOC() (char *)get_zeroed_page(GFP_KERNEL)
 #define UCMOD_BUFFER_FREE(x) free_page(x)
 
+#define UCMOD_XFER_ORDER 5
+#define UCAFS_XFER_SIZE (PAGE_SIZE << UCMOD_XFER_ORDER)
+
 typedef struct {
     struct list_head list;
     int path_len;
@@ -48,9 +51,9 @@ void clear_watchlist(void);
 
 struct ucafs_mod {
     wait_queue_head_t outq, msgq;
-    size_t buffersize;
-    char * outb, * inb;
-    size_t outb_len, inb_len, outb_sent;
+    char * outb, * inb, *xfer_buffer;
+    int xfer_order;
+    size_t buffersize, outb_len, inb_len, outb_sent, xfer_len;
     struct task_struct * daemon;
     struct cdev cdev;
     struct mutex send_mut;

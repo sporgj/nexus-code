@@ -209,34 +209,6 @@ crypto_metadata(crypto_context_t * p_ctx,
 }
 
 inline int
-usgx_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
-{
-    int ret;
-    supernode_t * super;
-    crypto_ekey_t * sealing_key;
-    shadow_t * shdw_name;
-    size_t total = header->dirbox_len + header->lockbox_len;
-
-    /* super_ekey + root_shdw + fnode_uuid */
-    sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);
-    if (sealing_key == NULL) {
-        return -1;
-    }
-
-    ret = crypto_metadata(&header->crypto_ctx, sealing_key, header,
-                           sizeof(dnode_header_t) - sizeof(crypto_context_t),
-                           data, total, op);
-    free(sealing_key);
-    return ret;
-}
-
-int
-ecall_crypto_dirnode(dnode_header_t * header, uint8_t * data, uc_crypto_op_t op)
-{
-    return usgx_crypto_dirnode(header, data, op);
-}
-
-inline int
 usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
 {
     int ret;
@@ -250,8 +222,8 @@ usgx_crypto_filebox(fbox_header_t * header, uint8_t * data, uc_crypto_op_t op)
     }
 
     ret = crypto_metadata(&header->crypto_ctx, sealing_key, header,
-                           sizeof(fbox_header_t) - sizeof(crypto_context_t),
-                           data, header->fbox_len, op);
+                          sizeof(fbox_header_t) - sizeof(crypto_context_t),
+                          data, header->fbox_len, op);
 
     free(sealing_key);
     return ret;

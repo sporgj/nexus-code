@@ -6,16 +6,16 @@
 
 #include "enclave_u.h"
 
+#include "third/log.h"
 #include "third/sds.h"
 #include "third/seqptrmap.h"
-#include "third/log.h"
 
-#include "uc_vfs.h"
 #include "uc_dirnode.h"
 #include "uc_fetchstore.h"
 #include "uc_filebox.h"
 #include "uc_sgx.h"
 #include "uc_utils.h"
+#include "uc_vfs.h"
 
 static struct seqptrmap * xfer_context_array = NULL;
 
@@ -32,10 +32,6 @@ free_xfer_context(xfer_context_t * xfer_ctx)
 
     if (xfer_ctx->path) {
         free(xfer_ctx->path);
-    }
-
-    if (xfer_ctx->buffer) {
-        free(xfer_ctx->buffer);
     }
 
     free(xfer_ctx);
@@ -69,17 +65,11 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
         goto out;
     }
 
-    // XXX sometimes, we don't need a whole page just for data
-    if (posix_memalign((void **)&xfer_ctx->buffer, PAGE_SIZE, 2 * PAGE_SIZE)) {
-        log_fatal("fetchstore - memory allocatio failed");
-        goto out;
-    }
-
     /* initialize our xfer context data */
     xfer_ctx->xfer_id = -1;
     xfer_ctx->xfer_op = rq->op;
     xfer_ctx->completed = 0;
-    xfer_ctx->buflen = PAGE_SIZE;
+    xfer_ctx->buflen = global_xfer_buflen;
     xfer_ctx->offset = rq->offset;
     xfer_ctx->total_len = rq->file_size;
     xfer_ctx->path = strdup(fpath);
@@ -109,9 +99,7 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
 #endif
 
     /* set the response */
-    *rp = (xfer_rsp_t){.xfer_id = xfer_ctx->xfer_id,
-                       .buflen = PAGE_SIZE,
-                       .uaddr = xfer_ctx->buffer };
+    *rp = (xfer_rsp_t){.xfer_id = xfer_ctx->xfer_id };
 
     ret = 0;
 out:

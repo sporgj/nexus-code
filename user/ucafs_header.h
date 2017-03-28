@@ -19,6 +19,7 @@ typedef struct {
 #define UCAFS_IOC_MAGIC 'W'
 
 #define IOCTL_ADD_PATH _IOW(UCAFS_IOC_MAGIC, 1, char *)
+#define IOCTL_MMAP_SIZE _IOR(UCAFS_IOC_MAGIC, 2, char *)
 
 #define UCAFS_IOC_MAXNR 1
 
@@ -59,10 +60,10 @@ typedef enum {
 } uc_err_t;
 
 typedef enum {
+    UC_ANY = 0x0,
     UC_FILE = 0x1,
     UC_DIR = 0x2,
-    UC_LINK = 0x4,
-    UC_ANY = UC_FILE | UC_DIR | UC_LINK,
+    UC_LINK = 0x3
 } __attribute__((packed)) ucafs_entry_type;
 
 typedef enum {
@@ -103,8 +104,6 @@ typedef struct {
 
 typedef struct {
     int xfer_id;
-    size_t buflen;
-    char * uaddr;
 } __attribute__((packed)) xfer_rsp_t;
 
 static inline int

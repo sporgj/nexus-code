@@ -21,8 +21,10 @@
 #include "third/json.h"
 #include "third/log.h"
 
+uint8_t * global_xfer_addr = NULL;
 char * global_supernode_paths[MAX_SUPERNODE_PATHS] = { NULL };
 size_t global_supernode_count = 0;
+size_t global_xfer_buflen = 0;
 
 supernode_t * global_supernode_object = NULL;
 

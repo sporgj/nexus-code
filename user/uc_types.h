@@ -205,8 +205,8 @@ typedef enum {
 } jrnl_op_t;
 
 typedef struct {
-   uint16_t type: 4;
-   uint8_t jrnl: 1;
+   uint8_t type;
+   uint8_t jrnl;
 } __attribute__((packed)) entry_info_t;
 
 // mainly for debug purposes in gdb

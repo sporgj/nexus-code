@@ -92,10 +92,8 @@ ucafs_store_init(store_context_t * context,
     }
 
     context->id = xfer_rsp.xfer_id;
-    context->uaddr = xfer_rsp.uaddr;
     context->xfer_size = bytes;
     context->offset = start_pos;
-    context->buflen = xfer_rsp.buflen;
 
     ret = 0;
 out:
@@ -217,8 +215,7 @@ ucafs_kern_store(struct vcache * avc,
                  void * rock)
 {
     int ret = -1, i, nbytes, bytes_stored = 0;
-    struct page * page = NULL;
-    fetch_context_t _context, *context = &_context;
+    store_context_t _context, *context = &_context;
 
     memset(context, 0, sizeof(store_context_t));
     context->id = -1;
@@ -232,18 +229,9 @@ ucafs_kern_store(struct vcache * avc,
         goto out;
     }
 
-    /* 2 - pin the user pages and start the transfer */
-    down_read(&dev->daemon->mm->mmap_sem);
-    ret = get_user_pages(dev->daemon, dev->daemon->mm,
-                         (unsigned long)context->uaddr, 1, 1, 1, &page, NULL);
-    if (ret != 1) {
-        up_read(&dev->daemon->mm->mmap_sem);
-        ERROR("get_user_pages failed. ret=%d, uaddr=%p\n", ret, context->uaddr);
-        goto out;
-    }
-
-    context->buffer = kmap(page);
-    up_read(&dev->daemon->mm->mmap_sem);
+    /* 2 - set the context buffer */
+    context->buflen = dev->xfer_len;
+    context->buffer = dev->xfer_buffer;
 
     /* 3 - lets start uploading stuff */
     for (i = 0; i < nchunks; i++) {
@@ -252,7 +240,7 @@ ucafs_kern_store(struct vcache * avc,
         // TODO add code for afs_wakeup for cases file is locked at the server
         if (ucafs_store_xfer(context, dclist[i], &nbytes)) {
             ERROR("ucafs_store_xfer error :(");
-            goto out1;
+            goto out;
         }
 
         // TODO add code for "small" tdc entries: send a buffer of zeros
@@ -270,15 +258,6 @@ ucafs_kern_store(struct vcache * avc,
 
     if (*doProcessFS) {
         hadd32(*anewDV, 1);
-    }
-
-out1:
-    /* unpin the page and release everything */
-    kunmap(page);
-    if (!PageReserved(page)) {
-        // DO we really need to say it's "dirty"?
-        SetPageDirty(page);
-        page_cache_release(page);
     }
 
 out:

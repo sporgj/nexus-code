@@ -128,14 +128,12 @@ filebox_from_file2(const sds filepath, size_t size_hint)
         goto out;
     }
 
-#if 0
 #ifdef UCAFS_SGX
     ecall_crypto_filebox(global_eid, &ret, &header, buffer, UC_DECRYPT);
     if (ret) {
         log_error("ecall_crypto_filebox %d", ret);
         goto out;
     }
-#endif
 #endif
 
     obj = (uc_filebox_t *)malloc(sizeof(uc_filebox_t));
@@ -192,7 +190,6 @@ filebox_write(uc_filebox_t * filebox, const char * fpath)
 
     memcpy(fbox1, filebox->fbox, len);
 
-#if 0
 #ifdef UCAFS_SGX
     ecall_crypto_filebox(global_eid, &error, (fbox_header_t *)fbox1,
                          (void *)&fbox1->chunks, UC_ENCRYPT);
@@ -200,7 +197,6 @@ filebox_write(uc_filebox_t * filebox, const char * fpath)
         log_error("ecall_crypto_filebox %d", ret);
         goto out;
     }
-#endif
 #endif
 
     if (fwrite(fbox1, 1, len, fd) != len) {

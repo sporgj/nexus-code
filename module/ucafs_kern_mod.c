@@ -1,4 +1,5 @@
 #include "ucafs_module.h"
+#include <linux/mm.h>
 
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_mod: " fmt, ##args)
@@ -57,7 +58,8 @@ ucafs_p_show(struct seq_file * sf, void * v)
     seq_printf(sf, "outb=%zu, inb=%zu\n", dev->outb_len, dev->inb_len);
 
     seq_printf(sf, "paths:\n");
-    list_for_each_entry(curr, watchlist_ptr, list) {
+    list_for_each_entry(curr, watchlist_ptr, list)
+    {
         seq_printf(sf, "%s\n", curr->afs_path);
     }
 
@@ -155,6 +157,14 @@ ucafs_m_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
         kfree(path);
         break;
 
+    case IOCTL_MMAP_SIZE:
+        if (copy_to_user((char *)arg, &dev->xfer_order, sizeof(dev->xfer_order))) {
+            ERROR("sending mmap order FAILED\n");
+            err = -1;
+        }
+
+        break;
+
     default:
         err = -1;
     }
@@ -162,10 +172,39 @@ ucafs_m_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
     return err;
 }
 
+static int
+ucafs_mmap_fault(struct vm_area_struct * vma, struct vm_fault * vmf)
+{
+    struct page * page;
+    pgoff_t index = vmf->pgoff;
+    if (index > dev->xfer_order) {
+        ERROR("mmap_fault pgoff=%d, order=%d\n", (int)index, dev->xfer_order);
+        return VM_FAULT_NOPAGE;
+    }
+
+    /* convert the address to a page */
+    page = virt_to_page(dev->xfer_buffer + (PAGE_SIZE << index));
+    get_page(page);
+    vmf->page = page;
+
+    return 0;
+}
+
+static struct vm_operations_struct mmap_ops = {.fault = ucafs_mmap_fault};
+
+static int
+ucafs_m_mmap(struct file * filp, struct vm_area_struct * vma)
+{
+    vma->vm_ops = &mmap_ops;
+    vma->vm_private_data = filp->private_data;
+    return 0;
+}
+
 const struct file_operations ucafs_mod_fops = {.owner = THIS_MODULE,
                                                .unlocked_ioctl = ucafs_m_ioctl,
                                                .open = ucafs_m_open,
                                                .release = ucafs_m_release,
+                                               .mmap = ucafs_m_mmap,
                                                .write = ucafs_m_write,
                                                .read = ucafs_m_read};
 
@@ -254,7 +293,7 @@ out:
 int
 ucafs_mod_init(void)
 {
-    int ret;
+    int ret, order = UCMOD_XFER_ORDER;
 
     if (ucafs_module_is_mounted) {
         printk(KERN_NOTICE "ucafs_mod is already mounted\n");
@@ -275,11 +314,27 @@ ucafs_mod_init(void)
 
     mutex_init(&dev->send_mut);
 
+    // FIXME dev-outb != NULL?
     if (((dev->outb = UCMOD_BUFFER_ALLOC()) == NULL) ||
         ((dev->inb = UCMOD_BUFFER_ALLOC()) == NULL)) {
         ERROR("allocating buffers failed\n");
         return -1;
     }
+
+    /* allocate the transfer buffer */
+    while (1) {
+        if ((dev->xfer_buffer = (char *)__get_free_pages(GFP_KERNEL, order))) {
+            break;
+        }
+
+        if (--order < 0) {
+            printk(KERN_NOTICE "could not allocate xfer_buffer\n");
+            return -1;
+        }
+    }
+
+    dev->xfer_order = order;
+    dev->xfer_len = (PAGE_SIZE << order);
 
     dev->buffersize = UCMOD_BUFFER_SIZE;
     dev->inb_len = dev->outb_len = 0;
@@ -295,8 +350,9 @@ ucafs_mod_init(void)
     }
 
     ucafs_module_is_mounted = 1;
-    printk(KERN_INFO "ucafs_mod: mounted major=%d, minor=%d :)\n", uc_mod_major,
-           uc_mod_minor);
+    printk(KERN_INFO
+           "ucafs_mod: mounted major=%d, minor=%d, xfer_size: %zu :)\n",
+           uc_mod_major, uc_mod_minor, dev->xfer_len);
 
     proc_create_data("ucafs_mod", 0, NULL, &ucafs_proc_fops, NULL);
 

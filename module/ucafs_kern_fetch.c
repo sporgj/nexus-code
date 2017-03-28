@@ -50,10 +50,8 @@ ucafs_fetch_init(fetch_context_t * context,
     }
 
     context->id = xfer_rsp.xfer_id;
-    context->uaddr = xfer_rsp.uaddr;
     context->xfer_size = size;
     context->offset = offset;
-    context->buflen = xfer_rsp.buflen;
 
     ret = 0;
 out:
@@ -217,7 +215,6 @@ ucafs_kern_fetch(struct afs_conn * tc,
                  char * path)
 {
     int ret = -1, nbytes;
-    struct page * page = NULL;
     fetch_context_t _context, *context = &_context;
 
     memset(context, 0, sizeof(fetch_context_t));
@@ -235,33 +232,16 @@ ucafs_kern_fetch(struct afs_conn * tc,
         adc->validPos = base;
     }
 
-    /* 2 - Pin the user pages and start tranferring */
-    down_read(&dev->daemon->mm->mmap_sem);
-    ret = get_user_pages(dev->daemon, dev->daemon->mm,
-                         (unsigned long)context->uaddr, 1, 1, 1, &page, NULL);
-    if (ret != 1) {
-        up_read(&dev->daemon->mm->mmap_sem);
-        ERROR("get_user_pages failed. ret=%d, uaddr=%p\n", ret, context->uaddr);
-        goto out;
-    }
-
-    context->buffer = kmap(page);
-    up_read(&dev->daemon->mm->mmap_sem);
+    /* 2 - set the context buffer */
+    context->buflen = dev->xfer_len;
+    context->buffer = dev->xfer_buffer;
 
     /* 3 - lets start the transfer */
     if (ucafs_fetch_xfer(context, adc, fp, base, size, &nbytes)) {
-        goto out1;
+        goto out;
     }
 
     ret = 0;
-out1:
-    /* unpin the page and release everything */
-    kunmap(page);
-    if (!PageReserved(page)) {
-        SetPageDirty(page);
-        page_cache_release(page);
-    }
-
 out:
     ucafs_fetch_exit(context, ret);
     // TODO if the userspace returns an error, erase the tdc contents

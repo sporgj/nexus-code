@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 
 #include <uv.h>
 
@@ -82,13 +83,28 @@ setup_mod()
         path = sdscat(path, UCAFS_WATCH_DIR);
         
         if ((ret = ioctl(fno, IOCTL_ADD_PATH, path))) {
-            sdsfree(path);
             uerror("ioctl ADD_PATH (%s) failed\n", path);
+            sdsfree(path);
             return -1;
         }
 
         log_info("Added: %s", path);
         sdsfree(path);
+    }
+
+    /* set the memory map */
+    int mmap_page_count;
+    if ((ret = ioctl(fno, IOCTL_MMAP_SIZE, &mmap_page_count))) {
+        uerror("ioctl MMAP_SIZE failed");
+        return -1;
+    }
+
+    global_xfer_buflen = (PAGE_SIZE << mmap_page_count);
+    global_xfer_addr = mmap(NULL, global_xfer_buflen, PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE, fno, 0);
+    if (global_xfer_addr == (void *)-1) {
+        log_fatal("mmap failed (size=%zu) :(", global_xfer_buflen);
+        return -1;
     }
 
     while (1) {
