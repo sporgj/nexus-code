@@ -19,9 +19,9 @@ typedef struct {
 #define UCAFS_IOC_MAGIC 'W'
 
 #define IOCTL_ADD_PATH _IOW(UCAFS_IOC_MAGIC, 1, char *)
-#define IOCTL_MMAP_SIZE _IOR(UCAFS_IOC_MAGIC, 2, char *)
+#define IOCTL_MMAP_SIZE _IOR(UCAFS_IOC_MAGIC, 2, int *)
 
-#define UCAFS_IOC_MAXNR 1
+#define UCAFS_IOC_MAXNR 2
 
 typedef struct {
     int len;

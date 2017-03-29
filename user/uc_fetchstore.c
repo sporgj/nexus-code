@@ -76,6 +76,7 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(rq->offset);
     xfer_ctx->fbox = filebox_fbox(filebox);
     xfer_ctx->filebox = filebox;
+    xfer_ctx->buffer = global_xfer_addr;
 
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {

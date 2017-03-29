@@ -162,7 +162,6 @@ ucafs_m_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
             ERROR("sending mmap order FAILED\n");
             err = -1;
         }
-
         break;
 
     default:

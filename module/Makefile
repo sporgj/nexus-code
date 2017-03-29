@@ -9,12 +9,11 @@ FILES := \
 	ucafs_kern_store.c\
 	ucafs_module.h\
 	ucafs_kern.h\
-	ucafs_env.h\
 	ucafs_header.h
 
 all: install
 
-install: ucafs_header.h ucafs_env.h
+install: ucafs_header.h
 	@cp -u $(FILES) $(OPENAFS_DIR)
 	@echo "install: $(FILES)"
 
