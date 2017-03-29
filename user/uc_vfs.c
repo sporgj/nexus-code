@@ -51,6 +51,26 @@ vfs_lookup(const char * path, bool dirpath)
     return NULL;
 }
 
+static inline sds
+_append_root_dirnode_path(sds root_path, const char * metadata_fname)
+{
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, UCAFS_REPO_DIR);
+    root_path = sdscat(root_path, "/");
+    root_path = sdscat(root_path, metadata_fname);
+    return root_path;
+}
+
+static inline sds
+vfs_append(sds root_path, const shadow_t * shdw_name)
+{
+    char * metaname = metaname_bin2str(shdw_name);
+    root_path = _append_root_dirnode_path(root_path, metaname);
+    free(metaname);
+
+    return root_path;
+}
+
 /**
  * Adds the path to the list of all supernodes
  * @param path
@@ -130,26 +150,6 @@ vfs_get_root_path(const char * path)
     return _vfs_get_root_path(path, NULL);
 }
 
-static inline sds
-_append_root_dirnode_path(sds root_path, const char * metadata_fname)
-{
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, UCAFS_REPO_DIR);
-    root_path = sdscat(root_path, "/");
-    root_path = sdscat(root_path, metadata_fname);
-    return root_path;
-}
-
-sds
-vfs_append(sds root_path, const shadow_t * shdw_name)
-{
-    char * metaname = metaname_bin2str(shdw_name);
-    root_path = _append_root_dirnode_path(root_path, metaname);
-    free(metaname);
-
-    return root_path;
-}
-
 const shadow_t * vfs_root_dirnode(const char * path)
 {
     sds root_path;
@@ -182,38 +182,10 @@ vfs_root_dirnode_path(const char * path)
     return NULL;
 }
 
-inline sds
-vfs_dirnode_path(const char * path, const shadow_t * shdw)
-{
-    const shadow_t * root_shdw;
-    sds root_path = _vfs_get_root_path(path, &root_shdw);
-    if (root_path == NULL) {
-        return NULL;
-    }
-
-    /* if it's a root dirnode, let's return it as if */
-    if (memcmp(root_shdw, shdw, sizeof(shadow_t)) == 0) {
-        return _append_root_dirnode_path(root_path, UCAFS_ROOT_DIRNODE);
-    }
-
-    // derive the metadata name
-    char * metadata_path = metaname_bin2str(shdw);
-    root_path = _append_root_dirnode_path(root_path, metadata_path);
-    free(metadata_path);
-
-    return root_path;
-}
-
 sds
-vfs_metadata_path(const char * path, const shadow_t * shdw_name)
+vfs_afsx_path(const char * path, const shadow_t * shdw)
 {
-    return vfs_dirnode_path(path, shdw_name);
-}
-
-sds
-vfs_filebox_path(const char * path, const shadow_t * shdw)
-{
-    return vfs_dirnode_path(path, shdw);
+    return vfs_append(sdsnew(path), shdw);
 }
 
 sds

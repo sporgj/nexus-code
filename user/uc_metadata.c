@@ -159,7 +159,7 @@ out:
 
 /**
  * Loads the dirnode associated with a particular shadow
- * @param path is the path to the file being loaded
+ * @param parent_path is the path to the parent directory
  * @param dentry is the element's parent dentry
  * @param shdw is the shadow name to load
  */
@@ -206,7 +206,7 @@ metadata_get_dirnode(const char * path,
     goto out;
 
 load_from_disk:
-    if (fpath == NULL && (fpath = vfs_dirnode_path(path, shdw)) == NULL) {
+    if (fpath == NULL && (fpath = vfs_afsx_path(path, shdw)) == NULL) {
         log_error("vfs_dirnode_path returned NULL (%s)", fpath);
         goto out;
     }

@@ -100,23 +100,14 @@ const shadow_t * vfs_root_dirnode(const char * path);
 sds
 vfs_root_dirnode_path(const char * path);
 
-sds
-vfs_append(sds root_path, const shadow_t * shdw_name);
-
 int
 vfs_mount(const char * path);
-
-uc_filebox_t *
-vfs_get_filebox(const char * path, size_t hint);
 
 uc_dirnode_t *
 vfs_lookup(const char * path, bool dirpath);
 
 sds
-vfs_dirnode_path(const char * path, const shadow_t * shdw);
-
-sds
-vfs_filebox_path(const char * path, const shadow_t * shdw);
+vfs_afsx_path(const char * path, const shadow_t * shdw);
 
 /**
  * Returns the dirnode from the metadata
