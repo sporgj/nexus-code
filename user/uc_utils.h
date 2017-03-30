@@ -15,6 +15,7 @@ extern "C" {
 
 #include <stdio.h>
 
+#include "uc_encode.h"
 #include "uc_types.h"
 
 #include "third/sds.h"
@@ -30,7 +31,9 @@ sds
 string_and_number(const char * str, int number);
 
 sds
-path_and_shadow(sds path, const shadow_t * shdw);
+metadata_fname_and_folder(const sds parent_metadata_fpath,
+                          const shadow_t * shdw,
+                          sds * dest_metadata_dir);
 
 static inline void do_free(void ** p_ptr) {
     free(*p_ptr);

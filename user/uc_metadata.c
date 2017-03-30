@@ -3,6 +3,7 @@
  *
  * @author Judicael Briand
  */
+#include "uc_encode.h"
 #include "uc_utils.h"
 #include "uc_vfs.h"
 
@@ -99,6 +100,38 @@ metadata_rm_dirnode(const shadow_t * shdw)
     free(entry);
 }
 
+sds
+dirpath_and_shadow(sds dirpath, const shadow_t * shdw)
+{
+    char * metaname = metaname_bin2str(shdw);
+    sds path = sdsdup(dirpath);
+    path = sdscat(path, "/");
+    path = sdscat(path, metaname);
+    free(metaname);
+
+    return path;
+}
+
+sds
+dirpath_to_string(const struct uc_dentry * dentry,
+                  const path_builder_t * path_build)
+{
+    // XXX use sdsnewlen to preallocate afsx_path based on path_build
+    sds path = sdsnew(dentry->dentry_tree->root_path);
+    char * metaname;
+    struct path_element * path_elmt;
+
+    TAILQ_FOREACH(path_elmt, path_build, next_entry) {
+        metaname = metaname_bin2str(path_elmt->shdw);
+        path = sdscat(path, "/");
+        path = sdscat(path, "_");
+        path = sdscat(path, metaname);
+        free(metaname);
+    }
+
+    return path;
+}
+
 /**
  * Checks for journal section of the parent dirnode to create on-disk file
  * @param parent_dentry
@@ -106,15 +139,14 @@ metadata_rm_dirnode(const shadow_t * shdw)
  * @param p_dirnode would be the destination pointer for the new dirnode
  * @return 0 on success
  */
-static int
-_metadata_on_demand(struct uc_dentry * parent_dentry,
-                    const shadow_t * shdw,
-                    const char * fpath,
-                    uc_dirnode_t ** p_dirnode)
+static uc_dirnode_t *
+metadata_create_dirnode(struct uc_dentry * parent_dentry,
+                        sds dirpath,
+                        const shadow_t * shdw)
 {
-    int err = -1, ret = -1;
+    int ret = -1, err;
+    sds fpath = NULL;
     uc_dirnode_t *dn = NULL, *parent_dirnode = parent_dentry->metadata->dn;
-    *p_dirnode = NULL;
 
     if (parent_dirnode == NULL) {
         // then we have to load it from the metadata
@@ -130,9 +162,20 @@ _metadata_on_demand(struct uc_dentry * parent_dentry,
         goto out;
     }
 
+    /* create the directory */
+
+
     // XXX might be wiser to check if the file already exists on disk
+    /*
+     Hmmm the file will be written by the dirops call
+
     if (!dirnode_write(dn, fpath)) {
         log_error("writing '%s' dirnode FAILED", fpath);
+        goto out;
+    }
+    */
+    if ((err = mkdir(dirpath, S_IRWXG)) && err != EEXIST) {
+        log_error("mkdir '%s' FAILED", fpath);
         goto out;
     }
 
@@ -145,16 +188,18 @@ _metadata_on_demand(struct uc_dentry * parent_dentry,
     }
 
     /* lets not forget to set the path */
-    dirnode_set_path(dn, fpath);
-    *p_dirnode = dn;
+    /* we grant the ownership of fpath to the dirnode */
+    fpath = dirpath_and_shadow(dirpath, shdw);
+    dn->dnode_path = fpath;
 
     ret = 0;
 out:
     if (ret && dn) {
         dirnode_free(dn);
+        dn = NULL;
     }
 
-    return ret;
+    return dn;
 }
 
 /**
@@ -164,7 +209,7 @@ out:
  * @param shdw is the shadow name to load
  */
 uc_dirnode_t *
-metadata_get_dirnode(const char * path,
+metadata_get_dirnode(const path_builder_t * path_build,
                      struct uc_dentry * dentry)
 {
     int err;
@@ -173,7 +218,7 @@ metadata_get_dirnode(const char * path,
     metadata_entry_t * entry;
     struct stat st;
     int * hashval;
-    sds fpath = NULL;
+    sds fpath = NULL, dirpath = NULL;
     struct uc_dentry * parent_dentry = (struct uc_dentry *)dentry->key.parent;
     const shadow_t * shdw = &dentry->shdw_name;
 
@@ -206,22 +251,34 @@ metadata_get_dirnode(const char * path,
     goto out;
 
 load_from_disk:
-    if (fpath == NULL && (fpath = vfs_afsx_path(path, shdw)) == NULL) {
-        log_error("vfs_dirnode_path returned NULL (%s)", fpath);
+    /* if we are loading the root dirnode */
+    if (fpath == NULL
+        && ((dirpath = dirpath_to_string(dentry, path_build)) == NULL)) {
+        log_error("path_to_string returned NULL (%s)", fpath);
         goto out;
     }
 
     /* this is the code for on-demand loading of the dirnode */
-    if (parent_dentry && _metadata_on_demand(parent_dentry, shdw, fpath, &dn)) {
-        log_error("creating metadata failed (%s)", path);
-        goto out;
+    if (parent_dentry && dentry->negative) {
+        dn = metadata_create_dirnode(parent_dentry, dirpath, shdw);
+        if (dn == NULL) {
+            log_error("metadata_create_dirnode FAILED");
+            goto out;
+        }
+
+        goto update_entry;
     }
 
     /* load it from disk */
+    if (fpath == NULL) {
+        fpath = dirpath_and_shadow(dirpath, shdw);
+    }
+
     if ((dn = dirnode_from_file(fpath)) == NULL) {
         goto out;
     }
 
+update_entry:
     // add it to the metadata cache
     if (entry == NULL) { 
         /* associate it to the dentry */
@@ -247,7 +304,72 @@ out:
         sdsfree(fpath);
     }
 
+    if (dirpath) {
+        sdsfree(dirpath);
+    }
+
     return dn;
+}
+
+uc_filebox_t *
+metadata_get_filebox(struct uc_dentry * parent_dentry,
+                     uc_dirnode_t * dirnode,
+                     const path_builder_t * path_build,
+                     const shadow_t * shdw,
+                     size_t size_hint,
+                     int jrnl)
+{
+    int ret = -1;
+    uc_filebox_t * fb;
+    sds fbox_path = NULL, dirpath = NULL;
+
+    /* check if the file is on disk */
+    if (jrnl == JRNL_NOOP) {
+        goto load_from_disk;
+    }
+
+    /* then we have to create the filebox */
+    if ((fb = filebox_new3(shdw, dirnode, size_hint)) == NULL) {
+        log_error("filebox_new2 failed");
+        return NULL;
+    }
+
+    /* set the path to allow flushing the filebox */
+    dirpath = dirpath_to_string(parent_dentry, path_build);
+    fbox_path = dirpath_and_shadow(dirpath, shdw);
+    filebox_set_path(fb, fbox_path);
+
+    /* delete the entry from the dirnode
+     * XXX should we flush it now or later ? */
+    dirnode_rm_from_journal(dirnode, shdw);
+    if (!dirnode_flush(dirnode)) {
+        log_error("dirnode_flush FAILED");
+        goto out;
+    }
+
+    goto done;
+
+load_from_disk:
+    fb = filebox_from_file2(fbox_path, size_hint);
+
+done:
+    ret = 0;
+out:
+    if (ret && fb) {
+        filebox_free(fb);
+        fb = NULL;
+    }
+
+    if (dirpath) {
+        sdsfree(dirpath);
+    }
+
+    if (fbox_path) {
+        sdsfree(fbox_path);
+    }
+
+
+    return fb;
 }
 
 static int

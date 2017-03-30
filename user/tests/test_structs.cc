@@ -1,6 +1,5 @@
 #include "ucafs_tests.h"
 
-sgx_enclave_id_t global_eid;
 const char * dnode_file = "./repo/dnode-test";
 
 #define N 6

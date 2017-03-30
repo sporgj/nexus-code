@@ -21,12 +21,12 @@ typedef atomic_int ref_t;
 struct dentry_tree;
 struct metadata_entry;
 
-struct path_comp {
+struct path_element {
     shadow_t * shdw;
-    TAILQ_ENTRY(path_comp) next_item;
+    TAILQ_ENTRY(path_element) next_entry;
 };
 
-typedef TAILQ_HEAD(path_comp_list, path_comp) path_comp_list_t;
+typedef TAILQ_HEAD(path_builder, path_element) path_builder_t;
 
 typedef struct dentry_list_entry {
     struct uc_dentry * dentry;
@@ -113,6 +113,9 @@ vfs_mount(const char * path);
 uc_dirnode_t *
 vfs_lookup(const char * path, bool dirpath);
 
+uc_filebox_t *
+vfs_get_filebox(const char * path, size_t size_hint);
+
 sds
 vfs_afsx_path(const char * path, const shadow_t * shdw);
 
@@ -121,7 +124,15 @@ vfs_afsx_path(const char * path, const shadow_t * shdw);
  * @param is shadow name
  */
 uc_dirnode_t *
-metadata_get_dirnode(const path_comp_list_t *, struct uc_dentry *);
+metadata_get_dirnode(const path_builder_t *, struct uc_dentry *);
+
+uc_filebox_t *
+metadata_get_filebox(struct uc_dentry * parent_dentry,
+                     uc_dirnode_t * dirnode,
+                     const path_builder_t * path_build,
+                     const shadow_t * shdw,
+                     size_t size_hint,
+                     int jrnl);
 
 void
 metadata_update_entry(struct metadata_entry * entry);

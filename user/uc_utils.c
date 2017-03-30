@@ -6,18 +6,6 @@
 #include "uc_encode.h"
 #include "uc_utils.h"
 
-sds
-path_and_shadow(sds path, const shadow_t * shdw)
-{
-    char * metaname = metaname_bin2str(shdw);
-    path = sdscat(path, "/");
-    path = sdscat(path, "_");
-    path = sdscat(path, metaname);
-    free(metaname);
-
-    return path;
-}
-
 /* takes 'str' + num => 'str-num' */
 sds
 string_and_number(const char * str, int number)
@@ -180,6 +168,30 @@ do_get_dir(const char * fpath)
     }
 
     return sdsnewlen(fpath, (uintptr_t)(result - fpath));
+}
+
+/**
+ * returns the filename and optionally sets the directory
+ */
+sds
+metadata_fname_and_folder(const sds parent_metadata_fpath,
+                          const shadow_t * shdw,
+                          sds * dest_metadata_dir)
+{
+    sds parent_path = do_get_dir(parent_metadata_fpath);
+    char * metaname = metaname_bin2str(shdw);
+
+    if (dest_metadata_dir) {
+        sds dirpath = sdsdup(parent_path);
+        dirpath = sdscat(dirpath, "/_");
+        dirpath = sdscat(dirpath, metaname);
+        *dest_metadata_dir = dirpath;
+    }
+
+    sds fpath = sdscat(parent_path, "/");
+    fpath = sdscat(fpath, metaname);
+
+    return fpath;
 }
 
 static unsigned long crc32_tab[]

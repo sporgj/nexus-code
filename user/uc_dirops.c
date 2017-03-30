@@ -204,7 +204,7 @@ dirops_move(const char * from_dir,
     }
 
     /* now delete the structures on disk */
-
+#if 0
     path1 = vfs_metadata_path(from_dir, shadow1_bin);
     path2 = vfs_metadata_path(to_dir, shadow2_bin);
 
@@ -218,6 +218,7 @@ dirops_move(const char * from_dir,
     } else {
         log_info("renaming link (%s) %s -> %s", from_dir, oldname, newname);
     }
+#endif
 
     /* last step is to update the moved entry's parent directory. */
     if (atype == UC_DIR) {
@@ -577,7 +578,7 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
 {
     int error = -1;
     uc_filebox_t * filebox = NULL;
-    sds metadata_path = NULL;
+    sds metadata_path = NULL, metadata_dirpath = NULL;
 
     /* check if the entry is in the journal */
     if (jrnl != JRNL_NOOP) {
@@ -585,7 +586,10 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
         return 0;
     }
 
-    metadata_path = vfs_metadata_path(parent_dir, shadowname_bin);
+    metadata_path
+        = metadata_fname_and_folder(parent_dirnode->dnode_path, shadowname_bin,
+                                    (is_filebox ? NULL : &metadata_dirpath));
+
     if (is_filebox) {
         /* instatiate, update ref count and delete */
         if ((filebox = filebox_from_file(metadata_path)) == NULL) {
@@ -611,7 +615,12 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
         /* directories are a lot simpler. Since no hardlinks can't point to
          * directories, they only have one ref count. */
         if (unlink(metadata_path)) {
-            log_error("deleting dirnode (%s) FAILED", metadata_path);
+            log_warn("deleting dirnode (%s) FAILED", metadata_path);
+            goto out;
+        }
+
+        if (unlink(metadata_dirpath)) {
+            log_warn("deleting (%s) FAILED", metadata_dirpath);
             goto out;
         }
 
@@ -639,6 +648,10 @@ out:
 
     if (metadata_path) {
         sdsfree(metadata_path);
+    }
+
+    if (metadata_dirpath) {
+        sdsfree(metadata_dirpath);
     }
 
     return error;
