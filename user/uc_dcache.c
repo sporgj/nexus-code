@@ -7,14 +7,14 @@
 #include "third/hashmap.h"
 #include "third/log.h"
 #include "third/queue.h"
-#include "third/log.h"
+#include "third/selist.h"
 
-#include "uc_vfs.h"
 #include "uc_dirnode.h"
 #include "uc_encode.h"
 #include "uc_filebox.h"
 #include "uc_uspace.h"
 #include "uc_utils.h"
+#include "uc_vfs.h"
 
 unsigned long
 crc32(const unsigned char * s, unsigned int len);
@@ -223,6 +223,11 @@ hash_lookup(const struct uc_dentry * parent, const char * name)
     return NULL;
 }
 
+sds selist_to_str(sds root_path, struct selist * list)
+{
+    sds path = sdsnew(root_path);
+}
+
 /**
  * The main traversal procedure
  * @param parent_dentry is where we start traversing from
@@ -237,7 +242,8 @@ dcache_traverse(struct uc_dentry * root_dentry,
                 sds root_path,
                 const char * canonical_path,
                 char * path_cstr,
-                sds * final_path)
+                path_list_t * path_list_head,
+                int * p_afsx_path_count)
 {
     struct uc_dentry * dentry = parent_dentry;
     ucafs_entry_type atype;
@@ -245,10 +251,8 @@ dcache_traverse(struct uc_dentry * root_dentry,
     const link_info_t * link_info;
     const shadow_t * shadow_name;
     uc_dirnode_t *dn = NULL, *dn2;
-    int jrnl;
-
-    /* the string builder */
-    sds curr_path = sdsdup(root_path);
+    int jrnl, afsx_path_count = *p_afsx_path_count;
+    struct path_comp * component;
 
     /* start tokenizing */
     nch = strtok_r(path_cstr, "/", &pch);
@@ -259,7 +263,7 @@ dcache_traverse(struct uc_dentry * root_dentry,
         if (nch[0] == '.') {
             if (nch[1] == '\0') {
                 // then let's skip to the next one
-                goto next1;
+                goto next;
             }
 
             if (nch[1] == '.' && nch[2] == '\0') {
@@ -269,18 +273,25 @@ dcache_traverse(struct uc_dentry * root_dentry,
                     break;
                 }
 
+                // TODO check return
+                component = TAILQ_LAST(path_list_head, path_comp_list);
+                TAILQ_REMOVE(path_list_head, component, next_entry);
+                free(component);
+                afsx_path_count--;
+
                 goto next1;
             }
         }
 
         /* 1 - hash_lookup: checks if the entry was already created */
         if ((dentry = hash_lookup(parent_dentry, nch))) {
+            // TODO ask the metadata to check for up-to-date information
             /* let's jump to the next one */
             goto next1;
         }
 
         /* 2 - Fetch the parent dirnode from disk */
-        if ((dn = metadata_get_dirnode(curr_path, parent_dentry)) == NULL) {
+        if ((dn = metadata_get_dirnode(path_list_head, parent_dentry)) == NULL) {
             break;
         }
 
@@ -294,15 +305,11 @@ dcache_traverse(struct uc_dentry * root_dentry,
         /* special care for our symlinks :( */
         if (atype == UC_LINK) {
             /* get the link and recursively traverse */
-            sds temp_path = NULL;
             char * link_cstr = strdup(link_info->target_link);
             dentry = dcache_traverse(root_dentry, parent_dentry, curr_path,
-                                     canonical_path, link_cstr, &temp_path);
-            sdsfree(curr_path);
+                                     canonical_path, link_cstr, path_list_head,
+                                     &afsx_path_count);
             free(link_cstr);
-
-            /* make the curr path point to the new temp_path */
-            curr_path = temp_path;
 
             if (dentry) {
                 goto next1;
@@ -326,22 +333,29 @@ dcache_traverse(struct uc_dentry * root_dentry,
     next1:
         /* move the path to the next component */
         // FIXME potential issues with .. and .
-        curr_path = sdscat(curr_path, "/");
-        curr_path = sdscat(curr_path, nch);
+        component = (struct path_comp *)malloc(sizeof(struct path_comp));
+        if (component == NULL) {
+            log_fatal("allocation error");
+            goto out;
+        }
 
+        component->shdw = (shadow_t *)&dentry->shdw_name;
+        TAILQ_INSERT_TAIL(path_list_head, component, next_entry);
+
+        afsx_path_count++;
         parent_dentry = dentry;
+
+    next:
         nch = strtok_r(NULL, "/", &pch);
     }
+
+    *p_afsx_path_count = afsx_path_count;
 
     /* now return the entry */
     /* if it's not null, it means we haven't parsed to the end of the string */
     if (nch) {
-        *final_path = NULL;
-        sdsfree(curr_path);
         return NULL;
     }
-
-    *final_path = curr_path;
 
     return dentry;
 }
@@ -354,17 +368,21 @@ real_lookup(struct uc_dentry * root_dentry,
             uc_dirnode_t ** pp_dirnode)
 {
     struct uc_dentry * dentry;
-    sds curr_path = NULL;
+    sds curr_path = NULL, afsx_path = vfs_root_path();
     char * path_cstr = strdup(rel_path);
+    int afsx_path_count = 0;
+    path_comp_list_t path_list;
 
-    dentry = dcache_traverse(root_dentry, root_dentry, root_path,
-                             canonical_path, path_cstr, &curr_path);
+    TAILQ_INIT(&path_list);
+
+    dentry
+        = dcache_traverse(root_dentry, root_dentry, root_path, canonical_path,
+                          path_cstr, &path_list, &afsx_path_count);
 
     /* dentry points to the entry we're interested in. Now, we have to load its
      * associated dirnode */
     if (dentry) {
-        *pp_dirnode = metadata_get_dirnode(curr_path, dentry);
-        sdsfree(curr_path);
+        *pp_dirnode = metadata_get_dirnode(afsx_path, dentry);
     }
 
     free(path_cstr);
@@ -429,7 +447,8 @@ dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint)
     }
 
     /* get the entry in the file */
-    codename = dirnode_traverse(dirnode, fname, UC_ANY, &atype, &jrnl, &link_info);
+    codename
+        = dirnode_traverse(dirnode, fname, UC_ANY, &atype, &jrnl, &link_info);
     if (codename == NULL) {
         goto out;
     }

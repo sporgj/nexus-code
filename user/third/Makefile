@@ -1,7 +1,7 @@
 include ../build.mk
 
 OBJS := hashmap.o slog.o sds.o seqptrmap.o elasticqueue.o elasticarray.o xdr.o xdr_mem.o\
-	linenoise.o json.o
+	linenoise.o json.o selist.o
 CC := gcc
 
 ifeq ($(UCAFS_DEV), 1)

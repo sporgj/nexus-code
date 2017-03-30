@@ -3,7 +3,20 @@
 #include <string.h>
 #include <stdbool.h>
 
+#include "uc_encode.h"
 #include "uc_utils.h"
+
+sds
+path_and_shadow(sds path, const shadow_t * shdw)
+{
+    char * metaname = metaname_bin2str(shdw);
+    path = sdscat(path, "/");
+    path = sdscat(path, "_");
+    path = sdscat(path, metaname);
+    free(metaname);
+
+    return path;
+}
 
 /* takes 'str' + num => 'str-num' */
 sds

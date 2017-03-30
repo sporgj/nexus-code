@@ -15,6 +15,8 @@ extern "C" {
 
 #include <stdio.h>
 
+#include "uc_types.h"
+
 #include "third/sds.h"
 
 sds do_get_fname(const char * fpath);
@@ -26,6 +28,9 @@ do_make_path(const char * dirpath, const char * fname);
 
 sds
 string_and_number(const char * str, int number);
+
+sds
+path_and_shadow(sds path, const shadow_t * shdw);
 
 static inline void do_free(void ** p_ptr) {
     free(*p_ptr);
