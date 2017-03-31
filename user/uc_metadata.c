@@ -8,9 +8,9 @@
 #include "uc_vfs.h"
 
 #include "third/hashmap.h"
+#include "third/log.h"
 #include "third/queue.h"
 #include "third/sds.h"
-#include "third/log.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -101,6 +101,18 @@ metadata_rm_dirnode(const shadow_t * shdw)
 }
 
 sds
+path_and_shadow_dir(sds dirpath, const shadow_t * shdw)
+{
+    char * metaname = metaname_bin2str(shdw);
+    sds path = sdsdup(dirpath);
+    path = sdscat(path, "/_");
+    path = sdscat(path, metaname);
+    free(metaname);
+
+    return path;
+}
+
+sds
 dirpath_and_shadow(sds dirpath, const shadow_t * shdw)
 {
     char * metaname = metaname_bin2str(shdw);
@@ -117,14 +129,18 @@ dirpath_to_string(const struct uc_dentry * dentry,
                   const path_builder_t * path_build)
 {
     // XXX use sdsnewlen to preallocate afsx_path based on path_build
-    sds path = sdsnew(dentry->dentry_tree->root_path);
+    sds path = sdsnew(dentry->dentry_tree->afsx_path);
     char * metaname;
-    struct path_element * path_elmt;
+    struct path_element * path_elmt, * last_elmt = TAILQ_LAST(path_build, path_builder);
 
-    TAILQ_FOREACH(path_elmt, path_build, next_entry) {
+    TAILQ_FOREACH(path_elmt, path_build, next_entry)
+    {
+        if (path_elmt == last_elmt) {
+            break;
+        }
+
         metaname = metaname_bin2str(path_elmt->shdw);
-        path = sdscat(path, "/");
-        path = sdscat(path, "_");
+        path = sdscat(path, "/_");
         path = sdscat(path, metaname);
         free(metaname);
     }
@@ -145,7 +161,7 @@ metadata_create_dirnode(struct uc_dentry * parent_dentry,
                         const shadow_t * shdw)
 {
     int ret = -1, err;
-    sds fpath = NULL;
+    sds fpath = NULL, dpath = NULL;
     uc_dirnode_t *dn = NULL, *parent_dirnode = parent_dentry->metadata->dn;
 
     if (parent_dirnode == NULL) {
@@ -164,18 +180,16 @@ metadata_create_dirnode(struct uc_dentry * parent_dentry,
 
     /* create the directory */
 
-
     // XXX might be wiser to check if the file already exists on disk
-    /*
-     Hmmm the file will be written by the dirops call
-
+    fpath = dirpath_and_shadow(dirpath, shdw);
     if (!dirnode_write(dn, fpath)) {
         log_error("writing '%s' dirnode FAILED", fpath);
         goto out;
     }
-    */
-    if ((err = mkdir(dirpath, S_IRWXG)) && err != EEXIST) {
-        log_error("mkdir '%s' FAILED", fpath);
+
+    dpath = path_and_shadow_dir(dirpath, shdw);
+    if ((err = mkdir(dpath, S_IRWXG)) && err != EEXIST) {
+        log_error("mkdir '%s' FAILED", dpath);
         goto out;
     }
 
@@ -189,7 +203,6 @@ metadata_create_dirnode(struct uc_dentry * parent_dentry,
 
     /* lets not forget to set the path */
     /* we grant the ownership of fpath to the dirnode */
-    fpath = dirpath_and_shadow(dirpath, shdw);
     dn->dnode_path = fpath;
 
     ret = 0;
@@ -197,6 +210,10 @@ out:
     if (ret && dn) {
         dirnode_free(dn);
         dn = NULL;
+    }
+
+    if (dpath) {
+        sdsfree(dpath);
     }
 
     return dn;
@@ -271,6 +288,7 @@ load_from_disk:
 
     /* load it from disk */
     if (fpath == NULL) {
+        // if it's the parent dentry
         fpath = dirpath_and_shadow(dirpath, shdw);
     }
 
@@ -280,9 +298,9 @@ load_from_disk:
 
 update_entry:
     // add it to the metadata cache
-    if (entry == NULL) { 
+    if (entry == NULL) {
         /* associate it to the dentry */
-         entry = _create_entry(dn, shdw);
+        entry = _create_entry(dn, shdw);
     } else {
         /* if entry already exists, just update it */
         _update_entry(entry, dn);
@@ -367,7 +385,6 @@ out:
     if (fbox_path) {
         sdsfree(fbox_path);
     }
-
 
     return fb;
 }

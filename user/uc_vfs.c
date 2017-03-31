@@ -167,6 +167,7 @@ const shadow_t * vfs_root_dirnode(const char * path)
 sds
 vfs_root_dirnode_path(const char * path)
 {
+    char * metaname;
     sds root_path;
     supernode_entry_t * curr;
     SLIST_FOREACH(curr, snode_list, next_entry)
@@ -175,7 +176,11 @@ vfs_root_dirnode_path(const char * path)
             root_path = sdsdup(curr->path);
 
             /* to return the root, return the path and root */
-            return _append_root_dirnode_path(root_path, UCAFS_ROOT_DIRNODE);
+            metaname = metaname_bin2str(&curr->super->root_dnode);
+            root_path = _append_root_dirnode_path(root_path, metaname);
+            free(metaname);
+
+            return root_path;
         }
     }
 

@@ -178,7 +178,7 @@ metadata_fname_and_folder(const sds parent_metadata_fpath,
                           const shadow_t * shdw,
                           sds * dest_metadata_dir)
 {
-    sds parent_path = do_get_dir(parent_metadata_fpath);
+    sds parent_path = sdsnew(parent_metadata_fpath);
     char * metaname = metaname_bin2str(shdw);
 
     if (dest_metadata_dir) {

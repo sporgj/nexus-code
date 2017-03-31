@@ -71,7 +71,7 @@ struct dentry_tree {
     Hashmap * hashmap;
     struct uc_dentry * root_dentry;
     uv_mutex_t dcache_lock;
-    sds root_path;
+    sds root_path, afsx_path;
 };
 
 uc_dirnode_t *

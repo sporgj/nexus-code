@@ -20,7 +20,7 @@ dirops_new1(const char * parent_dir,
             char ** shadow_name_dest)
 {
     int error = -1; // TODO change this
-    uc_dirnode_t *dirnode = NULL;
+    uc_dirnode_t * dirnode = NULL;
     uc_filebox_t * filebox = NULL;
     shadow_t * fname_code = NULL;
     sds path1 = NULL;
@@ -161,8 +161,8 @@ dirops_move(const char * from_dir,
         if (dirnode_rename(dirnode1, oldname, newname, type, &atype,
                            &shadow1_bin, &shadow2_bin, &link_info1,
                            &link_info2)) {
-            log_error("rename (%s) %s -> %s FAILED", from_dir,
-                 oldname, newname);
+            log_error("rename (%s) %s -> %s FAILED", from_dir, oldname,
+                      newname);
             goto out;
         }
 
@@ -203,7 +203,7 @@ dirops_move(const char * from_dir,
         }
     }
 
-    /* now delete the structures on disk */
+/* now delete the structures on disk */
 #if 0
     path1 = vfs_metadata_path(from_dir, shadow1_bin);
     path2 = vfs_metadata_path(to_dir, shadow2_bin);
@@ -235,9 +235,9 @@ dirops_move(const char * from_dir,
         }
     }
 
-    // XXX what about the linking info.
-    // For softlinks, since no on-disk structures are touched, we are fine
-    // For hardlinks, we should be good as well as they still point to the file
+// XXX what about the linking info.
+// For softlinks, since no on-disk structures are touched, we are fine
+// For hardlinks, we should be good as well as they still point to the file
 
 success:
     shadow1_str = filename_bin2str(shadow1_bin);
@@ -570,8 +570,7 @@ out:
 }
 
 static int
-__delete_metadata_file(uc_dirnode_t * parent_dirnode,
-                       const char * parent_dir,
+__delete_metadata_file(sds parent_afsx_dir,
                        const shadow_t * shadowname_bin,
                        int jrnl,
                        int is_filebox)
@@ -587,7 +586,7 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
     }
 
     metadata_path
-        = metadata_fname_and_folder(parent_dirnode->dnode_path, shadowname_bin,
+        = metadata_fname_and_folder(parent_afsx_dir, shadowname_bin,
                                     (is_filebox ? NULL : &metadata_dirpath));
 
     if (is_filebox) {
@@ -599,34 +598,32 @@ __delete_metadata_file(uc_dirnode_t * parent_dirnode,
 
         if (filebox_decr_link_count(filebox) == 0) {
             if (unlink(metadata_path)) {
-                log_error("deleting filebox (%s) FAILED",
-                     metadata_path);
+                log_error("deleting filebox (%s) FAILED", metadata_path);
                 goto out;
             }
         } else {
             // write it to disk
             if (!filebox_flush(filebox)) {
-                log_error("writing filebox (%s) FAILED",
-                     metadata_path);
+                log_error("writing filebox (%s) FAILED", metadata_path);
                 goto out;
             }
         }
     } else {
         /* directories are a lot simpler. Since no hardlinks can't point to
          * directories, they only have one ref count. */
-        if (unlink(metadata_path)) {
-            log_warn("deleting dirnode (%s) FAILED", metadata_path);
+        if (rmdir(metadata_dirpath)) {
+            log_warn("deleting dirnode (%s) FAILED", metadata_dirpath);
             goto out;
         }
 
-        if (unlink(metadata_dirpath)) {
-            log_warn("deleting (%s) FAILED", metadata_dirpath);
+        if (unlink(metadata_path)) {
+            log_warn("deleting (%s) FAILED", metadata_path);
             goto out;
         }
 
         /* lazily remove the file entries */
         int x = 1;
-        while(true) {
+        while (true) {
             sds path2 = string_and_number(metadata_path, x);
 
             if (unlink(path2)) {
@@ -694,6 +691,7 @@ dirops_remove1(const char * parent_dir,
     shadow_t * shadow_name = NULL;
     uc_dirnode_t * dirnode = NULL;
     ucafs_entry_type atype;
+    sds parent_afsx_dir = NULL;
 
     if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
         log_error("dirnode (%s) not found", parent_dir);
@@ -723,7 +721,14 @@ dirops_remove1(const char * parent_dir,
 
     /* ignore if it's a link */
     if (atype != UC_LINK) {
-        __delete_metadata_file(dirnode, parent_dir, shadow_name, jrnl,
+        dirnode_header_t * header = &dirnode->header;
+        parent_afsx_dir = do_get_dir(dirnode->dnode_path);
+        /** if it's not a parent dir */
+        if (memcmp(&header->root, &header->uuid, sizeof(shadow_t))) {
+            parent_afsx_dir = do_make_afsx_dir(parent_afsx_dir, &header->uuid);
+        }
+
+        __delete_metadata_file(parent_afsx_dir, shadow_name, jrnl,
                                atype == UC_FILE);
     }
 
@@ -740,6 +745,10 @@ out:
         free(link_info);
     }
 
+    if (parent_afsx_dir) {
+        sdsfree(parent_afsx_dir);
+    }
+
     return error;
 }
 
@@ -752,7 +761,8 @@ struct acl {
 
 const char rights_str[] = "rwildka";
 
-static char * print_rights(acl_rights_t rights)
+static char *
+print_rights(acl_rights_t rights)
 {
     char * arr = calloc(1, sizeof(rights_str));
     size_t k = 1, l = 0;
@@ -864,4 +874,3 @@ out:
 
     return err;
 }
-

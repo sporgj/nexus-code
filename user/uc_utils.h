@@ -51,6 +51,18 @@ hash_string(const char * keystring);
 uint32_t
 murmurhash(const char * key, uint32_t len, uint32_t seed);
 
+static inline sds
+do_make_afsx_dir(sds parent_fpath, const shadow_t * shdw)
+{
+    char * metaname = metaname_bin2str(shdw);
+    sds dirpath = parent_fpath;
+    dirpath = sdscat(dirpath, "/_");
+    dirpath = sdscat(dirpath, metaname);
+    free(metaname);
+
+    return dirpath;
+}
+
 #define uerror(...)                   \
     {                                 \
         fprintf(stderr, " ! ");       \

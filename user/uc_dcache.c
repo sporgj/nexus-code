@@ -92,6 +92,11 @@ dcache_new_root(shadow_t * root_shdw, const char * path)
     root_path = sdscat(root_path, UCAFS_WATCH_DIR);
     tree->root_path = root_path;
 
+    sds afsx_path = sdsnew(path);
+    afsx_path = sdscat(afsx_path, "/");
+    afsx_path = sdscat(afsx_path, UCAFS_REPO_DIR);
+    tree->afsx_path = afsx_path;
+
     uv_mutex_init(&tree->dcache_lock);
 
     dcache_add(tree->root_dentry, NULL);
@@ -318,16 +323,19 @@ dcache_traverse(struct uc_dentry * parent_dentry,
         dcache_add(dentry, parent_dentry);
 
     next1:
-        /* move the path to the next component */
-        path_elmt = (struct path_element *)malloc(sizeof(struct path_element));
-        if (path_elmt == NULL) {
-            log_fatal("allocation error");
-            return NULL;
+        /* only add to the path if it's not the root path */
+        if (parent_dentry) {
+            path_elmt = (struct path_element *)malloc(sizeof(struct path_element));
+            if (path_elmt == NULL) {
+                log_fatal("allocation error");
+                return NULL;
+            }
+
+            path_elmt->shdw = (shadow_t *)&dentry->shdw_name;
+            TAILQ_INSERT_TAIL(path_build, path_elmt, next_entry);
         }
 
-        path_elmt->shdw = (shadow_t *)&dentry->shdw_name;
-        TAILQ_INSERT_TAIL(path_build, path_elmt, next_entry);
-
+        /* move the path to the next component */
         parent_dentry = dentry;
 
     next:
