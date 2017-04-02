@@ -93,6 +93,9 @@ dcache_new_root(shadow_t * root_shdw, const char * root_path);
 sds
 vfs_metadata_path(const char * path, const shadow_t * shdw_name);
 
+sds
+vfs_metadata_fpath(const uc_dirnode_t * dirnode, const shadow_t * shdw);
+
 void
 metadata_rm_dirnode(const shadow_t * shdw);
 

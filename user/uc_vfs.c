@@ -1,3 +1,4 @@
+#include "uc_dirnode.h"
 #include "uc_encode.h"
 #include "uc_supernode.h"
 #include "uc_types.h"
@@ -69,6 +70,17 @@ vfs_append(sds root_path, const shadow_t * shdw_name)
     free(metaname);
 
     return root_path;
+}
+
+sds
+vfs_metadata_fpath(const uc_dirnode_t * dirnode, const shadow_t * shdw)
+{
+    sds path = dirnode_get_dirpath(dirnode, true);
+    char * metaname = metaname_bin2str(shdw);
+    path = sdscat(path, metaname);
+    free(metaname);
+
+    return path;
 }
 
 /**

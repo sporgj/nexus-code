@@ -405,36 +405,26 @@ dirops_hardlink(const char * target_path,
                 const char * link_path,
                 char ** shadow_name_dest)
 {
-    int error = UC_STATUS_NOOP, len, link_info_len;
-    char * fname = NULL;
-    uc_filebox_t * target_fbox = NULL;
-    uc_dirnode_t *target_dnode = NULL, *link_dnode = NULL;
-    sds target_fname = NULL, link_fname = NULL;
+    int error = UC_STATUS_NOOP;
+    uc_dirnode_t *target_dnode, *link_dnode = NULL;
+    sds target_fname = NULL, link_fname = NULL, target_afsx_path = NULL,
+        link_afsx_path = NULL;
     const shadow_t * shadow_name1 = NULL;
     shadow_t * shadow_name2 = NULL;
     ucafs_entry_type atype;
-    link_info_t * link_info = NULL;
 
     /* 1 - Get the dirnodes for both link and target */
-    if ((target_fbox = vfs_get_filebox(target_path, 0)) == NULL) {
-        log_error("filebox (%s) not found", target_path);
-        return error;
-    }
-
     if ((target_dnode = vfs_lookup(target_path, false)) == NULL) {
         log_error("dirnode (%s) not found", target_path);
-        filebox_free(target_fbox);
         return error;
     }
 
     if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
         log_error("dirnode (%s) not found", link_path);
-        filebox_free(target_fbox);
-        dcache_put(target_dnode);
         return error;
     }
 
-    /* 2 - get the filenames */
+    /* Hardlink the files on the hardisk */
     if ((target_fname = do_get_fname(target_path)) == NULL) {
         log_error("getting fname (%s) FAILED", target_path);
         goto out;
@@ -445,39 +435,26 @@ dirops_hardlink(const char * target_path,
         goto out;
     }
 
-    /* 3 - get shadow name of the target */
-    shadow_name1 = dirnode_raw2enc(target_dnode, target_fname, UC_ANY, &atype);
-    if (shadow_name1 == NULL) {
-        log_error("finding entry in (%s) FAILED", target_fname);
+    /* get the shadow name of the target file */
+    shadow_name1 = dirnode_raw2enc(target_dnode, target_fname, UC_FILE, &atype);
+    if (shadow_name2 == NULL) {
+        log_error("dirnode_enc2raw (%s)", target_path);
         goto out;
     }
 
-    /* 4 - create the link in the dnode */
-    len = sizeof(shadow_t);
-    link_info_len = len + sizeof(link_info_t) + 1;
-    if ((link_info = (link_info_t *)calloc(1, link_info_len)) == NULL) {
-        log_error("allocation failed for link_info");
-        goto out;
-    }
-
-    link_info->total_len = link_info_len;
-    link_info->type = UC_HARDLINK;
-    memcpy(&link_info->meta_file, shadow_name1, sizeof(shadow_t));
-
-    /* 5 - add it to the dirnode */
-    /* to hardlink, there must be an existing on-disk filebox */
-    shadow_name2 = dirnode_add_alias(link_dnode, link_fname, UC_FILE, JRNL_NOOP,
-                                     NULL, link_info);
+    shadow_name2 = dirnode_add(link_dnode, link_fname, UC_FILE, JRNL_NOOP);
     if (shadow_name2 == NULL) {
         log_error("adding link (%s) FAILED", link_path);
         goto out;
     }
 
-    filebox_incr_link_count(target_fbox);
+    /* get the metadata file */
+    target_afsx_path = vfs_metadata_fpath(target_dnode, shadow_name1);
+    link_afsx_path = vfs_metadata_fpath(link_dnode, shadow_name2);
 
-    /* 6 - save the dirnodes */
-    if (!filebox_flush(target_fbox)) {
-        log_error("saving filebox (%s) FAILED", target_path);
+    if (link(target_afsx_path, link_afsx_path)) {
+        log_error("hardlink '%s' -> '%s' FAILED", target_afsx_path,
+                  link_afsx_path);
         goto out;
     }
 
@@ -490,9 +467,13 @@ dirops_hardlink(const char * target_path,
     *shadow_name_dest = filename_bin2str(shadow_name2);
     error = 0;
 out:
-    filebox_free(target_fbox);
-    dcache_put(target_dnode);
-    dcache_put(link_dnode);
+    if (link_dnode) {
+        dcache_put(link_dnode);
+    }
+
+    if (target_dnode) {
+        dcache_put(target_dnode);
+    }
 
     if (target_fname) {
         sdsfree(target_fname);
@@ -502,8 +483,12 @@ out:
         sdsfree(link_fname);
     }
 
-    if (link_info) {
-        free(link_info);
+    if (target_afsx_path) {
+        sdsfree(target_afsx_path);
+    }
+
+    if (link_afsx_path) {
+        sdsfree(link_afsx_path);
     }
 
     if (shadow_name2) {
@@ -721,13 +706,7 @@ dirops_remove1(const char * parent_dir,
 
     /* ignore if it's a link */
     if (atype != UC_LINK) {
-        dirnode_header_t * header = &dirnode->header;
-        parent_afsx_dir = do_get_dir(dirnode->dnode_path);
-        /** if it's not a parent dir */
-        if (memcmp(&header->root, &header->uuid, sizeof(shadow_t))) {
-            parent_afsx_dir = do_make_afsx_dir(parent_afsx_dir, &header->uuid);
-        }
-
+        parent_afsx_dir = dirnode_get_dirpath(dirnode, false);
         __delete_metadata_file(parent_afsx_dir, shadow_name, jrnl,
                                atype == UC_FILE);
     }

@@ -21,12 +21,11 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 {
-    uc_dirnode_t * dn = (uc_dirnode_t *)malloc(sizeof(uc_dirnode_t));
+    uc_dirnode_t * dn = (uc_dirnode_t *)calloc(1, sizeof(uc_dirnode_t));
     if (dn == NULL) {
         return NULL;
     }
 
-    memset(&dn->header, 0, sizeof(dirnode_header_t));
     if (id) {
         memcpy(&dn->header.uuid, id, sizeof(shadow_t));
     } else {
@@ -36,10 +35,7 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
     TAILQ_INIT(&dn->dirbox);
     SIMPLEQ_INIT(&dn->lockbox);
     TAILQ_INIT(&dn->buckets);
-    dn->bucket_update = false;
 
-    dn->dnode_path = NULL;
-    dn->dentry = NULL;
     dn->header.bucket_count = 1;
 
     /* create the default bucket */
@@ -73,6 +69,8 @@ dirnode_new_root(const shadow_t * id)
     /* make sure we put stuff that makes it lok like root */
     memcpy(&dn->header.parent, id, sizeof(shadow_t));
     memcpy(&dn->header.root, id, sizeof(shadow_t));
+
+    dn->is_root = true;
 
     return dn;
 }
@@ -134,6 +132,10 @@ dirnode_free(uc_dirnode_t * dirnode)
         sdsfree(dirnode->dnode_path);
     }
 
+    if (dirnode->cond_dirpath_is_root) {
+        sdsfree(dirnode->cond_dirpath_is_root);
+    }
+
     free(dirnode);
 }
 
@@ -180,6 +182,17 @@ dirnode_from_file(const sds filepath)
         log_error("reading header: %s (nbytes=%zu, exp=%lu)", filepath, nbytes,
                   sizeof(dirnode_header_t));
         goto out;
+    }
+
+    if (memcmp(&header->uuid, &header->parent, sizeof(shadow_t)) == 0) {
+        dn->is_root = true;
+        dn->cond_dirpath_is_root = sdsdup(filepath);
+        for (char * s = dn->cond_dirpath_is_root - 1; s != dn->cond_dirpath_is_root; s--) {
+            if (*s == '/') {
+                *s = '\0';
+                break;
+            }
+        }
     }
 
     /* initialize the buckets */

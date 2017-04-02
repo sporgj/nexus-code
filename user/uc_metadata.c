@@ -105,8 +105,9 @@ path_and_shadow_dir(sds dirpath, const shadow_t * shdw)
 {
     char * metaname = metaname_bin2str(shdw);
     sds path = sdsdup(dirpath);
-    path = sdscat(path, "/_");
+    path = sdscat(path, "/");
     path = sdscat(path, metaname);
+    path = sdscat(path, "_");
     free(metaname);
 
     return path;
@@ -140,7 +141,7 @@ dirpath_to_string(const struct uc_dentry * dentry,
         }
 
         metaname = metaname_bin2str(path_elmt->shdw);
-        path = sdscat(path, "/_");
+        path = sdscat(path, "_/");
         path = sdscat(path, metaname);
         free(metaname);
     }

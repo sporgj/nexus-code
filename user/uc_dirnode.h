@@ -21,8 +21,8 @@ typedef struct dirnode {
     acl_list_head_t lockbox;
     bucket_list_head_t buckets;
 
-    bool bucket_update;
-    sds dnode_path;
+    bool is_root, bucket_update;
+    sds dnode_path, cond_dirpath_is_root;
     dirnode_bucket_entry_t * bucket0;
     struct uc_dentry * dentry;
     struct metadata_entry * mcache;
@@ -34,8 +34,18 @@ dirnode_new();
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent);
 
+static inline sds
+dirnode_get_dirpath(const uc_dirnode_t * dn, bool include_slash)
+{
+    if (dn->is_root) {
+        return sdsdup(dn->cond_dirpath_is_root);
+    }
+
+    return sdscat(sdsdup(dn->dnode_path), (include_slash ? "_/" : "_"));
+}
+
 static inline void
-dirnode_set_path(uc_dirnode_t * dirnode, const char * path)
+dirnode_set_filepath(uc_dirnode_t * dirnode, const char * path)
 {
     if (dirnode->dnode_path) {
         sdsfree(dirnode->dnode_path);
@@ -45,7 +55,7 @@ dirnode_set_path(uc_dirnode_t * dirnode, const char * path)
 }
 
 static inline sds
-dirnode_get_path(uc_dirnode_t * dirnode)
+dirnode_get_path(const uc_dirnode_t * dirnode)
 {
     return dirnode->dnode_path ? sdsdup(dirnode->dnode_path) : NULL;
 }
@@ -73,7 +83,7 @@ uc_dirnode_t *
 dirnode_new_alias(const shadow_t * id);
 
 uc_dirnode_t *
-dirnode_new_root(const shadow_t * id); 
+dirnode_new_root(const shadow_t * id);
 
 void
 dirnode_set_root(uc_dirnode_t * dirnode, shadow_t * root_dnode);
@@ -93,8 +103,10 @@ dirnode_get_dentry(uc_dirnode_t * dirnode);
 void
 dirnode_clear_dentry(uc_dirnode_t * dirnode);
 
-struct metadata_entry * dirnode_get_metadata(uc_dirnode_t * dn);
-void dirnode_set_metadata(uc_dirnode_t *, struct metadata_entry *);
+struct metadata_entry *
+dirnode_get_metadata(uc_dirnode_t * dn);
+void
+dirnode_set_metadata(uc_dirnode_t *, struct metadata_entry *);
 
 /**
  * Creates a new dirnode object from the path.
@@ -149,13 +161,13 @@ dirnode_add_link(uc_dirnode_t * dn,
 /**
  * Adding an entry to the dirnode
  * @param dn is the dirnode object
- * @param fname is the file name 
+ * @param fname is the file name
  * @param type is the entry type
  * @param jrnl if the entry we are adding has no on-disk entry
  * @param p_encoded_name if the encoded name has been precomputed
  * @param link_info
  * @return the encoded name. Keep in mind if a p_encoded_name is passed, the
- * variable returned would be of a different address and hence requires a 
+ * variable returned would be of a different address and hence requires a
  * separate deallocation.
  */
 shadow_t *
@@ -199,7 +211,7 @@ dirnode_rename(uc_dirnode_t * dn,
                const char * oldname,
                const char * newname,
                ucafs_entry_type type,
-               ucafs_entry_type *p_type,
+               ucafs_entry_type * p_type,
                shadow_t ** pp_shadow1_bin,
                shadow_t ** pp_shadow2_bin,
                link_info_t ** pp_link_info1,
@@ -215,11 +227,16 @@ int
 dirnode_lockbox_add(uc_dirnode_t * dn, const char * name, acl_rights_t rights);
 
 // internal functions to manage the dirnode in-memory object
-void dirnode_mark_dirty(uc_dirnode_t * dn);
-void dirnode_mark_clean(uc_dirnode_t * dn);
-bool dirnode_is_dirty(uc_dirnode_t * dn);
-int dirnode_trylock(uc_dirnode_t * dn);
-void dirnode_unlock(uc_dirnode_t * dn);
+void
+dirnode_mark_dirty(uc_dirnode_t * dn);
+void
+dirnode_mark_clean(uc_dirnode_t * dn);
+bool
+dirnode_is_dirty(uc_dirnode_t * dn);
+int
+dirnode_trylock(uc_dirnode_t * dn);
+void
+dirnode_unlock(uc_dirnode_t * dn);
 
 /** returns the root's shadow name */
 const shadow_t *
