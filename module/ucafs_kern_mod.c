@@ -158,7 +158,7 @@ ucafs_m_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
         break;
 
     case IOCTL_MMAP_SIZE:
-        if (copy_to_user((char *)arg, &dev->xfer_order, sizeof(dev->xfer_order))) {
+        if (copy_to_user((char *)arg, &dev->xfer_len, sizeof(dev->xfer_len))) {
             ERROR("sending mmap order FAILED\n");
             err = -1;
         }
@@ -177,17 +177,17 @@ ucafs_mmap_fault(struct vm_area_struct * vma, struct vm_fault * vmf)
     char * addr;
     struct page * page;
     pgoff_t index = vmf->pgoff;
-    if (index > dev->xfer_pages) {
-        ERROR("mmap_fault pgoff=%d, order=%d\n", (int)index, dev->xfer_order);
+    if (index >= dev->xfer_pages) {
+        ERROR("mmap_fault pgoff=%d, pages=%d\n", (int)index, dev->xfer_pages);
         return VM_FAULT_NOPAGE;
     }
 
     /* convert the address to a page */
     addr = dev->xfer_buffer + (index << PAGE_SHIFT);
     page = virt_to_page(addr);
-    ERROR("ucafs_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
+    /* ERROR("ucafs_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
           (int)index, addr, (int)current->pid, current->comm,
-          vmf->virtual_address, page);
+          vmf->virtual_address, page); */
 
     if (!page) {
         return VM_FAULT_SIGBUS;
@@ -343,7 +343,7 @@ ucafs_mod_init(void)
     }
 
     dev->xfer_order = order;
-    dev->xfer_pages = 1 << order;
+    dev->xfer_pages = (1 << (order - 1));
     dev->xfer_len = (dev->xfer_pages << PAGE_SHIFT);
 
     dev->buffersize = UCMOD_BUFFER_SIZE;
