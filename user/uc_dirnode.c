@@ -333,7 +333,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     sds path2 = NULL;
     FILE *fd, *fd2 = NULL;
     size_t proto_len, total_len = 0, nbytes;
-    dirnode_bucket_entry_t * bucket0 = dn->bucket0, *bucket_entry;
+    dirnode_bucket_entry_t *bucket0 = dn->bucket0, *bucket_entry;
 
     /* if the file exists, do not overwrite */
     fd = fopen(fpath, bucket0->is_dirty ? "wb" : "rb+");
@@ -356,7 +356,8 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     }
 
     /* iterate through every bucket entry and only include their sizes */
-    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry) {
+    TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
+    {
         if (bucket_entry->is_dirty) {
             total_len += bucket_entry->bckt.length;
         }
@@ -687,7 +688,8 @@ dirnode_add_link(uc_dirnode_t * dn,
                  const char * link_name,
                  const link_info_t * link_info)
 {
-    return dirnode_add_alias(dn, link_name, UC_LINK, JRNL_NOOP, NULL, link_info);
+    return dirnode_add_alias(dn, link_name, UC_LINK, JRNL_NOOP, NULL,
+                             link_info);
 }
 
 static inline dnode_list_entry_t *
@@ -856,16 +858,17 @@ dirnode_rename(uc_dirnode_t * dn,
                shadow_t ** ptr_shadow1_bin,
                shadow_t ** ptr_shadow2_bin,
                link_info_t ** pp_link_info1,
-               link_info_t ** pp_link_info2)
+               link_info_t ** pp_link_info2,
+               int * p_jrnl1,
+               int * p_jrnl2)
 {
     shadow_t * shadow2_bin;
     ucafs_entry_type atype, atype1;
-    int jrnl;
 
     *ptr_shadow2_bin = NULL;
 
     *ptr_shadow1_bin
-        = dirnode_rm(dn, oldname, type, &atype, &jrnl, pp_link_info1);
+        = dirnode_rm(dn, oldname, type, &atype, p_jrnl1, pp_link_info1);
     if (*ptr_shadow1_bin) {
         // it is necessary to return the codename of the existing entry
         // otherwise, we get a lingering file in the AFS server
@@ -873,12 +876,12 @@ dirnode_rename(uc_dirnode_t * dn,
         // Pass the UNKOWN flag to ensure any copy of the existing file is
         // erased
         shadow2_bin
-            = dirnode_rm(dn, newname, UC_ANY, &atype1, &jrnl, pp_link_info2);
+            = dirnode_rm(dn, newname, UC_ANY, &atype1, p_jrnl2, pp_link_info2);
         if (shadow2_bin == NULL) {
-            shadow2_bin = dirnode_add(dn, newname, atype, jrnl);
+            shadow2_bin = dirnode_add(dn, newname, atype, *p_jrnl1);
         } else {
             // in case the source was a link, its information gets carried over
-            shadow2_bin = dirnode_add_alias(dn, newname, atype, jrnl,
+            shadow2_bin = dirnode_add_alias(dn, newname, atype, *p_jrnl1,
                                             shadow2_bin, *pp_link_info1);
         }
 

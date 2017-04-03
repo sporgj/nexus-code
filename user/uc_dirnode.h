@@ -215,7 +215,9 @@ dirnode_rename(uc_dirnode_t * dn,
                shadow_t ** pp_shadow1_bin,
                shadow_t ** pp_shadow2_bin,
                link_info_t ** pp_link_info1,
-               link_info_t ** pp_link_info2);
+               link_info_t ** pp_link_info2,
+               int * jrnl1,
+               int * jrnl2);
 
 int
 dirnode_checkacl(uc_dirnode_t * dn, acl_rights_t rights);

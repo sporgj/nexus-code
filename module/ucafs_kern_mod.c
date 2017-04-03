@@ -1,4 +1,5 @@
 #include "ucafs_module.h"
+#include <asm/pgtable.h>
 #include <linux/mm.h>
 
 #undef ERROR
@@ -185,9 +186,9 @@ ucafs_mmap_fault(struct vm_area_struct * vma, struct vm_fault * vmf)
     /* convert the address to a page */
     addr = dev->xfer_buffer + (index << PAGE_SHIFT);
     page = virt_to_page(addr);
-    /* ERROR("ucafs_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
+    ERROR("ucafs_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
           (int)index, addr, (int)current->pid, current->comm,
-          vmf->virtual_address, page); */
+          vmf->virtual_address, page);
 
     if (!page) {
         return VM_FAULT_SIGBUS;
@@ -195,6 +196,20 @@ ucafs_mmap_fault(struct vm_area_struct * vma, struct vm_fault * vmf)
 
     get_page(page);
     vmf->page = page;
+
+#if 0
+    struct page * page;
+    int ret = 0;
+    size_t index =
+        ((unsigned long)vmf->virtual_address - vma->vm_start) >> PAGE_SHIFT;
+    if (index >= dev->xfer_pages) {
+        ERROR("mmap_error out of range index=%d", index);
+        return VM_FAULT_SIGBUS;
+    }
+
+    page = virt_to_page(dev->xfer_buffer + (index << PAGE_SHIFT));
+    ret = vm_insert_page(vma, (unsigned long)vmf->virtual_address, page);
+#endif
 
     return 0;
 }
@@ -205,7 +220,25 @@ static int
 ucafs_m_mmap(struct file * filp, struct vm_area_struct * vma)
 {
     vma->vm_ops = &mmap_ops;
+    vma->vm_flags |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO);
     vma->vm_private_data = filp->private_data;
+
+#if 0
+    int i, err;
+    struct page * page;
+    unsigned long uaddr = vma->vm_start;
+
+    for (i = 0; i < dev->xfer_pages; i++) {
+        page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
+        get_page(page);
+        err = vm_insert_page(vma, uaddr, page);
+        if (err) {
+            ERROR("mmap error (%d)\n", err);
+            return err;
+        }
+    }
+#endif
+
     return 0;
 }
 
@@ -343,7 +376,7 @@ ucafs_mod_init(void)
     }
 
     dev->xfer_order = order;
-    dev->xfer_pages = (1 << (order - 1));
+    dev->xfer_pages = (1 << (order));
     dev->xfer_len = (dev->xfer_pages << PAGE_SHIFT);
 
     dev->buffersize = UCMOD_BUFFER_SIZE;

@@ -132,13 +132,13 @@ dirops_move(const char * from_dir,
             char ** ptr_oldname,
             char ** ptr_newname)
 {
-    int error = UC_STATUS_NOOP, jrnl;
+    int error = UC_STATUS_NOOP, jrnl1, jrnl2;
     ucafs_entry_type atype;
     uc_dirnode_t *dirnode1 = NULL, *dirnode2 = NULL, *dirnode3 = NULL;
     link_info_t *link_info1 = NULL, *link_info2 = NULL;
     shadow_t *shadow1_bin = NULL, *shadow2_bin = NULL;
     char *shadow1_str = NULL, *shadow2_str = NULL;
-    sds path1 = NULL, path2 = NULL, fpath1 = NULL, fpath2 = NULL;
+    sds fpath1 = NULL, fpath2 = NULL, dpath1 = NULL, dpath2 = NULL;
 
     /* get the dirnode objects */
     dirnode1 = vfs_lookup(from_dir, true);
@@ -160,7 +160,7 @@ dirops_move(const char * from_dir,
     if (dirnode_equals(dirnode1, dirnode2)) {
         if (dirnode_rename(dirnode1, oldname, newname, type, &atype,
                            &shadow1_bin, &shadow2_bin, &link_info1,
-                           &link_info2)) {
+                           &link_info2, &jrnl1, &jrnl2)) {
             log_error("rename (%s) %s -> %s FAILED", from_dir, oldname,
                       newname);
             goto out;
@@ -171,20 +171,18 @@ dirops_move(const char * from_dir,
             log_error("flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
-
-        goto success;
     } else {
         /* get the shadow names */
         shadow1_bin
-            = dirnode_rm(dirnode1, oldname, type, &atype, &jrnl, &link_info1);
+            = dirnode_rm(dirnode1, oldname, type, &atype, &jrnl1, &link_info1);
         if (shadow1_bin == NULL) {
             log_error("finding '%s' failed", oldname);
             goto out;
         }
 
         // the new file might still exist in the dirnode
-        dirnode_rm(dirnode2, newname, UC_ANY, &atype, &jrnl, &link_info2);
-        shadow2_bin = dirnode_add_alias(dirnode2, newname, atype, jrnl,
+        dirnode_rm(dirnode2, newname, UC_ANY, &atype, &jrnl2, &link_info2);
+        shadow2_bin = dirnode_add_alias(dirnode2, newname, atype, jrnl2,
                                         shadow1_bin, link_info1);
         if (shadow2_bin == NULL) {
             log_error("adding '%s' to dirnode FAILED", newname);
@@ -203,43 +201,43 @@ dirops_move(const char * from_dir,
         }
     }
 
-/* now delete the structures on disk */
-#if 0
-    path1 = vfs_metadata_path(from_dir, shadow1_bin);
-    path2 = vfs_metadata_path(to_dir, shadow2_bin);
+    if (atype == UC_LINK) {
+        goto success;
+    }
 
-    // TODO just update the entry in the dirnode
+    /* now delete the structures on disk */
+    fpath1 = metadata_afsx_path(dirnode1, shadow1_bin,
+                                (atype == UC_DIR ? &dpath1 : NULL));
+    fpath2 = metadata_afsx_path(dirnode2, shadow2_bin,
+                                (atype == UC_DIR ? &dpath2 : NULL));
+
     /* move the metadata file */
-    if (atype != UC_LINK) {
-        if (rename(path1, path2)) {
+    if (jrnl1 == JRNL_NOOP) {
+        if (rename(fpath1, fpath2)) {
             log_error("renaming metadata file failed");
             goto out;
         }
-    } else {
-        log_info("renaming link (%s) %s -> %s", from_dir, oldname, newname);
-    }
-#endif
 
-    /* last step is to update the moved entry's parent directory. */
-    if (atype == UC_DIR) {
-        if ((dirnode3 = dirnode_from_file(path2)) == NULL) {
-            log_info("loading dirnode file failed(%s)", path2);
-            goto out;
-        }
+        /* last step is to update the moved entry's parent directory. */
+        if (atype == UC_DIR) {
+            if ((dirnode3 = dirnode_from_file(fpath2)) == NULL) {
+                log_info("loading dirnode file failed(%s)", fpath2);
+                goto out;
+            }
 
-        dirnode_set_parent(dirnode3, dirnode2);
+            dirnode_set_parent(dirnode3, dirnode2);
 
-        if (!dirnode_flush(dirnode3)) {
-            log_error("flushing dirnode (%s) failed", path2);
-            goto out;
+            if (!dirnode_flush(dirnode3)) {
+                log_error("flushing dirnode (%s) failed", fpath2);
+                goto out;
+            }
         }
     }
-
-// XXX what about the linking info.
-// For softlinks, since no on-disk structures are touched, we are fine
-// For hardlinks, we should be good as well as they still point to the file
 
 success:
+    // XXX what about the linking info.
+    // For softlinks, since no on-disk structures are touched, we are fine
+    // For hardlinks, we should be good as well as they still point to the file
     shadow1_str = filename_bin2str(shadow1_bin);
     shadow2_str = filename_bin2str(shadow2_bin);
     if (shadow1_str == NULL || shadow2_str == NULL) {
@@ -271,12 +269,20 @@ out:
         free(shadow2_str);
     }
 
-    if (path1) {
-        sdsfree(path1);
+    if (fpath1) {
+        sdsfree(fpath1);
     }
 
-    if (path2) {
-        sdsfree(path2);
+    if (fpath2) {
+        sdsfree(fpath2);
+    }
+
+    if (dpath1) {
+        sdsfree(dpath1);
+    }
+
+    if (dpath2) {
+        sdsfree(dpath2);
     }
 
     return error;
@@ -437,7 +443,7 @@ dirops_hardlink(const char * target_path,
 
     /* get the shadow name of the target file */
     shadow_name1 = dirnode_raw2enc(target_dnode, target_fname, UC_FILE, &atype);
-    if (shadow_name2 == NULL) {
+    if (shadow_name1 == NULL) {
         log_error("dirnode_enc2raw (%s)", target_path);
         goto out;
     }
