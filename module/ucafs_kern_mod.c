@@ -174,15 +174,25 @@ ucafs_m_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
 static int
 ucafs_mmap_fault(struct vm_area_struct * vma, struct vm_fault * vmf)
 {
+    char * addr;
     struct page * page;
     pgoff_t index = vmf->pgoff;
-    if (index > dev->xfer_order) {
+    if (index > dev->xfer_pages) {
         ERROR("mmap_fault pgoff=%d, order=%d\n", (int)index, dev->xfer_order);
         return VM_FAULT_NOPAGE;
     }
 
     /* convert the address to a page */
-    page = virt_to_page(dev->xfer_buffer + (PAGE_SIZE << index));
+    addr = dev->xfer_buffer + (index << PAGE_SHIFT);
+    page = virt_to_page(addr);
+    ERROR("ucafs_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
+          (int)index, addr, (int)current->pid, current->comm,
+          vmf->virtual_address, page);
+
+    if (!page) {
+        return VM_FAULT_SIGBUS;
+    }
+
     get_page(page);
     vmf->page = page;
 
@@ -333,7 +343,8 @@ ucafs_mod_init(void)
     }
 
     dev->xfer_order = order;
-    dev->xfer_len = (PAGE_SIZE << order);
+    dev->xfer_pages = 1 << order;
+    dev->xfer_len = (dev->xfer_pages << PAGE_SHIFT);
 
     dev->buffersize = UCMOD_BUFFER_SIZE;
     dev->inb_len = dev->outb_len = 0;
@@ -350,8 +361,9 @@ ucafs_mod_init(void)
 
     ucafs_module_is_mounted = 1;
     printk(KERN_INFO
-           "ucafs_mod: mounted major=%d, minor=%d, xfer_size: %zu :)\n",
-           uc_mod_major, uc_mod_minor, dev->xfer_len);
+           "ucafs_mod: mounted (%d,%d), xfer: %zuB [%p - %p] %d pages\n",
+           uc_mod_major, uc_mod_minor, dev->xfer_len, dev->xfer_buffer,
+           dev->xfer_buffer + dev->xfer_len, dev->xfer_pages);
 
     proc_create_data("ucafs_mod", 0, NULL, &ucafs_proc_fops, NULL);
 

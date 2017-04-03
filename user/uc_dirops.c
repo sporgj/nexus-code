@@ -555,43 +555,36 @@ out:
 }
 
 static int
-__delete_metadata_file(sds parent_afsx_dir,
-                       const shadow_t * shadowname_bin,
-                       int jrnl,
+__delete_metadata_file(sds metadata_filepath,
+                       sds metadata_dirpath,
                        int is_filebox)
 {
     int error = -1;
     uc_filebox_t * filebox = NULL;
-    sds metadata_path = NULL, metadata_dirpath = NULL;
-
-    /* check if the entry is in the journal */
-    if (jrnl != JRNL_NOOP) {
-        /* then we know there's no on-disk metadata file */
-        return 0;
-    }
-
-    metadata_path
-        = metadata_fname_and_folder(parent_afsx_dir, shadowname_bin,
-                                    (is_filebox ? NULL : &metadata_dirpath));
 
     if (is_filebox) {
+#if 0
+        /* XXX: since we depend on the underlying filesystem to manage hardlinks,
+         * this step seems to be unnecessary */
+
         /* instatiate, update ref count and delete */
-        if ((filebox = filebox_from_file(metadata_path)) == NULL) {
-            log_error("loading filebox (%s) FAILED", metadata_path);
+        if ((filebox = filebox_from_file(metadata_filepath)) == NULL) {
+            log_error("loading filebox (%s) FAILED", metadata_filepath);
             goto out;
         }
 
-        if (filebox_decr_link_count(filebox) == 0) {
-            if (unlink(metadata_path)) {
-                log_error("deleting filebox (%s) FAILED", metadata_path);
-                goto out;
-            }
-        } else {
-            // write it to disk
+        if (filebox_decr_link_count(filebox)) {
             if (!filebox_flush(filebox)) {
-                log_error("writing filebox (%s) FAILED", metadata_path);
-                goto out;
+                log_error("writing filebox (%s) FAILED", metadata_filepath);
+                // goto out;
             }
+        }
+#endif
+
+        /* delete the haardlink */
+        if (unlink(metadata_filepath)) {
+            log_error("deleting filebox (%s) FAILED", metadata_filepath);
+            goto out;
         }
     } else {
         /* directories are a lot simpler. Since no hardlinks can't point to
@@ -601,15 +594,15 @@ __delete_metadata_file(sds parent_afsx_dir,
             goto out;
         }
 
-        if (unlink(metadata_path)) {
-            log_warn("deleting (%s) FAILED", metadata_path);
+        if (unlink(metadata_filepath)) {
+            log_warn("deleting (%s) FAILED", metadata_filepath);
             goto out;
         }
 
         /* lazily remove the file entries */
         int x = 1;
         while (true) {
-            sds path2 = string_and_number(metadata_path, x);
+            sds path2 = string_and_number(metadata_filepath, x);
 
             if (unlink(path2)) {
                 // log_warn("deleting split (%s) FAILED", path2);
@@ -626,14 +619,6 @@ __delete_metadata_file(sds parent_afsx_dir,
 out:
     if (filebox) {
         filebox_free(filebox);
-    }
-
-    if (metadata_path) {
-        sdsfree(metadata_path);
-    }
-
-    if (metadata_dirpath) {
-        sdsfree(metadata_dirpath);
     }
 
     return error;
@@ -676,7 +661,7 @@ dirops_remove1(const char * parent_dir,
     shadow_t * shadow_name = NULL;
     uc_dirnode_t * dirnode = NULL;
     ucafs_entry_type atype;
-    sds parent_afsx_dir = NULL;
+    sds afsx_fpath = NULL, afsx_dpath = NULL;
 
     if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
         log_error("dirnode (%s) not found", parent_dir);
@@ -704,11 +689,11 @@ dirops_remove1(const char * parent_dir,
         metadata_rm_dirnode(shadow_name);
     }
 
-    /* ignore if it's a link */
-    if (atype != UC_LINK) {
-        parent_afsx_dir = dirnode_get_dirpath(dirnode, false);
-        __delete_metadata_file(parent_afsx_dir, shadow_name, jrnl,
-                               atype == UC_FILE);
+    /* ignore if it's a link or a "journal" file */
+    if (atype != UC_LINK && jrnl == JRNL_NOOP) {
+        afsx_fpath = metadata_afsx_path(dirnode, shadow_name,
+                                        (atype == UC_DIR ? &afsx_dpath : NULL));
+        __delete_metadata_file(afsx_fpath, afsx_dpath, atype == UC_FILE);
     }
 
     *encoded_fname_dest = filename_bin2str(shadow_name);
@@ -724,8 +709,12 @@ out:
         free(link_info);
     }
 
-    if (parent_afsx_dir) {
-        sdsfree(parent_afsx_dir);
+    if (afsx_fpath) {
+        sdsfree(afsx_fpath);
+    }
+
+    if (afsx_dpath) {
+        sdsfree(afsx_dpath);
     }
 
     return error;

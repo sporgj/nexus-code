@@ -152,7 +152,7 @@ dirnode_from_file(const sds filepath)
     FILE *fd, *fd2 = NULL;
     sds path2 = NULL;
     size_t nbytes, body_len;
-    int error = -1;
+    int error = -1, len;
 
     fd = fopen(filepath, "rb");
     if (fd == NULL) {
@@ -186,10 +186,10 @@ dirnode_from_file(const sds filepath)
 
     if (memcmp(&header->uuid, &header->parent, sizeof(shadow_t)) == 0) {
         dn->is_root = true;
-        dn->cond_dirpath_is_root = sdsdup(filepath);
-        for (char * s = dn->cond_dirpath_is_root - 1; s != dn->cond_dirpath_is_root; s--) {
+        char * s = filepath + (len = strlen(filepath)) - 1;
+        for (; len; s--, len--) {
             if (*s == '/') {
-                *s = '\0';
+                dn->cond_dirpath_is_root = sdsnewlen(filepath, len);
                 break;
             }
         }

@@ -52,7 +52,7 @@ void clear_watchlist(void);
 struct ucafs_mod {
     wait_queue_head_t outq, msgq;
     char * outb, * inb, *xfer_buffer;
-    int xfer_order;
+    int xfer_order, xfer_pages;
     size_t buffersize, outb_len, inb_len, outb_sent, xfer_len;
     struct task_struct * daemon;
     struct cdev cdev;

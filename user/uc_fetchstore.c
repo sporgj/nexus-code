@@ -124,12 +124,14 @@ fetchstore_run(int id, size_t valid_buflen)
 
     xfer_ctx->valid_buflen = valid_buflen;
 
+#if 0
 #ifdef UCAFS_SGX
     ecall_fetchstore_crypto(global_eid, &ret, xfer_ctx);
     if (ret) {
         log_fatal("enclave error");
         goto out;
     }
+#endif
 #endif
 
     ret = 0;

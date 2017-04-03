@@ -125,25 +125,40 @@ dirpath_and_shadow(sds dirpath, const shadow_t * shdw)
     return path;
 }
 
-sds
-dirpath_to_string(const struct uc_dentry * dentry,
-                  const path_builder_t * path_build)
+static inline sds
+metadata_filepath(const struct uc_dentry * dentry,
+                  const struct uc_dentry * parent,
+                  sds * dpath)
 {
-    // XXX use sdsnewlen to preallocate afsx_path based on path_build
-    sds path = sdsnew(dentry->dentry_tree->afsx_path);
-    char * metaname;
-    struct path_element * path_elmt, * last_elmt = TAILQ_LAST(path_build, path_builder);
+    sds path = parent ? dirnode_get_dirpath(parent->metadata->dn, true)
+                      : sdscat(sdsdup(dentry->dentry_tree->afsx_path), "/");
+    char * metaname = metaname_bin2str(&dentry->shdw_name);
+    path = sdscat(path, metaname);
 
-    TAILQ_FOREACH(path_elmt, path_build, next_entry)
-    {
-        if (path_elmt == last_elmt) {
-            break;
-        }
+    if (dpath) {
+        sds dirpath = sdsdup(path);
+        dirpath = sdscat(dirpath, "_");
+        *dpath = dirpath;
+    }
 
-        metaname = metaname_bin2str(path_elmt->shdw);
-        path = sdscat(path, "_/");
-        path = sdscat(path, metaname);
-        free(metaname);
+    return path;
+}
+
+// TODO refactor
+sds
+metadata_afsx_path(const uc_dirnode_t * parent_dirnode,
+                   const shadow_t * shdw,
+                   sds * dpath)
+{
+    sds path = dirnode_get_dirpath(parent_dirnode, true);
+
+    char * metaname = metaname_bin2str(shdw);
+    path = sdscat(path, metaname);
+
+    if (dpath) {
+        sds dirpath = sdsdup(path);
+        dirpath = sdscat(dirpath, "_");
+        *dpath = dirpath;
     }
 
     return path;
@@ -158,11 +173,11 @@ dirpath_to_string(const struct uc_dentry * dentry,
  */
 static uc_dirnode_t *
 metadata_create_dirnode(struct uc_dentry * parent_dentry,
-                        sds dirpath,
-                        const shadow_t * shdw)
+                        const shadow_t * shdw,
+                        sds fpath,
+                        sds dpath)
 {
     int ret = -1, err;
-    sds fpath = NULL, dpath = NULL;
     uc_dirnode_t *dn = NULL, *parent_dirnode = parent_dentry->metadata->dn;
 
     if (parent_dirnode == NULL) {
@@ -182,13 +197,11 @@ metadata_create_dirnode(struct uc_dentry * parent_dentry,
     /* create the directory */
 
     // XXX might be wiser to check if the file already exists on disk
-    fpath = dirpath_and_shadow(dirpath, shdw);
     if (!dirnode_write(dn, fpath)) {
         log_error("writing '%s' dirnode FAILED", fpath);
         goto out;
     }
 
-    dpath = path_and_shadow_dir(dirpath, shdw);
     if ((err = mkdir(dpath, S_IRWXG)) && err != EEXIST) {
         log_error("mkdir '%s' FAILED", dpath);
         goto out;
@@ -204,17 +217,13 @@ metadata_create_dirnode(struct uc_dentry * parent_dentry,
 
     /* lets not forget to set the path */
     /* we grant the ownership of fpath to the dirnode */
-    dn->dnode_path = fpath;
+    dirnode_set_filepath(dn, fpath);
 
     ret = 0;
 out:
     if (ret && dn) {
         dirnode_free(dn);
         dn = NULL;
-    }
-
-    if (dpath) {
-        sdsfree(dpath);
     }
 
     return dn;
@@ -236,7 +245,7 @@ metadata_get_dirnode(const path_builder_t * path_build,
     metadata_entry_t * entry;
     struct stat st;
     int * hashval;
-    sds fpath = NULL, dirpath = NULL;
+    sds fpath = NULL, dpath = NULL;
     struct uc_dentry * parent_dentry = (struct uc_dentry *)dentry->key.parent;
     const shadow_t * shdw = &dentry->shdw_name;
 
@@ -269,28 +278,23 @@ metadata_get_dirnode(const path_builder_t * path_build,
     goto out;
 
 load_from_disk:
+    in_journal = parent_dentry && dentry->negative;
     /* if we are loading the root dirnode */
-    if (fpath == NULL
-        && ((dirpath = dirpath_to_string(dentry, path_build)) == NULL)) {
+    if (!(fpath = metadata_filepath(dentry, parent_dentry,
+                                    (in_journal ? &dpath : NULL)))) {
         log_error("path_to_string returned NULL (%s)", fpath);
         goto out;
     }
 
     /* this is the code for on-demand loading of the dirnode */
-    if (parent_dentry && dentry->negative) {
-        dn = metadata_create_dirnode(parent_dentry, dirpath, shdw);
+    if (in_journal) {
+        dn = metadata_create_dirnode(parent_dentry, shdw, fpath, dpath);
         if (dn == NULL) {
             log_error("metadata_create_dirnode FAILED");
             goto out;
         }
 
         goto update_entry;
-    }
-
-    /* load it from disk */
-    if (fpath == NULL) {
-        // if it's the parent dentry
-        fpath = dirpath_and_shadow(dirpath, shdw);
     }
 
     if ((dn = dirnode_from_file(fpath)) == NULL) {
@@ -323,8 +327,8 @@ out:
         sdsfree(fpath);
     }
 
-    if (dirpath) {
-        sdsfree(dirpath);
+    if (dpath) {
+        sdsfree(dpath);
     }
 
     return dn;
@@ -340,7 +344,7 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
 {
     int ret = -1;
     uc_filebox_t * fb;
-    sds fbox_path = NULL, dirpath = NULL;
+    sds fbox_path = vfs_metadata_fpath(dirnode, shdw);
 
     /* check if the file is on disk */
     if (jrnl == JRNL_NOOP) {
@@ -354,8 +358,6 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
     }
 
     /* set the path to allow flushing the filebox */
-    dirpath = dirpath_to_string(parent_dentry, path_build);
-    fbox_path = dirpath_and_shadow(dirpath, shdw);
     filebox_set_path(fb, fbox_path);
 
     /* delete the entry from the dirnode
@@ -377,10 +379,6 @@ out:
     if (ret && fb) {
         filebox_free(fb);
         fb = NULL;
-    }
-
-    if (dirpath) {
-        sdsfree(dirpath);
     }
 
     if (fbox_path) {

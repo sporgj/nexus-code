@@ -137,6 +137,11 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
                      size_t size_hint,
                      int jrnl);
 
+sds
+metadata_afsx_path(const uc_dirnode_t * parent_dirnode,
+                   const shadow_t * shdw,
+                   sds * dpath);
+
 void
 metadata_update_entry(struct metadata_entry * entry);
 
