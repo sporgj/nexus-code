@@ -194,7 +194,7 @@ ucafs_mmap_fault(struct vm_area_struct * vma, struct vm_fault * vmf)
         return VM_FAULT_SIGBUS;
     }
 
-    get_page(page);
+    //get_page(page);
     vmf->page = page;
 
 #if 0
@@ -219,14 +219,13 @@ static struct vm_operations_struct mmap_ops = {.fault = ucafs_mmap_fault};
 static int
 ucafs_m_mmap(struct file * filp, struct vm_area_struct * vma)
 {
-    vma->vm_ops = &mmap_ops;
-    vma->vm_flags |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO);
-    vma->vm_private_data = filp->private_data;
-
-#if 0
     int i, err;
     struct page * page;
     unsigned long uaddr = vma->vm_start;
+
+    vma->vm_ops = &mmap_ops;
+    vma->vm_flags |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
+    vma->vm_private_data = filp->private_data;
 
     for (i = 0; i < dev->xfer_pages; i++) {
         page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
@@ -236,8 +235,9 @@ ucafs_m_mmap(struct file * filp, struct vm_area_struct * vma)
             ERROR("mmap error (%d)\n", err);
             return err;
         }
+
+        uaddr += PAGE_SIZE;
     }
-#endif
 
     return 0;
 }
