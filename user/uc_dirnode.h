@@ -24,7 +24,6 @@ typedef struct dirnode {
     bool is_root, bucket_update;
     sds dnode_path, cond_dirpath_is_root;
     dirnode_bucket_entry_t * bucket0;
-    struct uc_dentry * dentry;
     struct metadata_entry * mcache;
 } uc_dirnode_t;
 
@@ -94,17 +93,9 @@ dirnode_set_parent(uc_dirnode_t * dn, const uc_dirnode_t * parent);
 const shadow_t *
 dirnode_get_parent(uc_dirnode_t * dn);
 
-void
-dirnode_set_dentry(uc_dirnode_t * dirnode, struct uc_dentry * dentry);
-
-struct uc_dentry *
-dirnode_get_dentry(uc_dirnode_t * dirnode);
-
-void
-dirnode_clear_dentry(uc_dirnode_t * dirnode);
-
 struct metadata_entry *
 dirnode_get_metadata(uc_dirnode_t * dn);
+
 void
 dirnode_set_metadata(uc_dirnode_t *, struct metadata_entry *);
 

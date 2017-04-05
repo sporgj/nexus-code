@@ -111,18 +111,6 @@ remove_path_name(const char * parent_path, const char * fname);
 void
 remove_shdw_name(const char * shadow_name);
 
-// returns true if the fname is prefixed with .md
-static inline int is_md_file(const char * fname, int count)
-{
-    int min_len = UC_PREFIX_LEN(UC_METADATA_PREFIX);
-    // let's check if the path equals
-    if (count >= min_len && memcmp(fname, UC_METADATA_PREFIX, min_len) == 0) {
-        return 1;
-    }
-
-    return 0;
-}
-
 static inline ucafs_entry_type
 dentry_type(const struct dentry * dentry)
 {

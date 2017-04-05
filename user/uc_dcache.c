@@ -80,7 +80,6 @@ dcache_new_root(shadow_t * root_shdw, const char * path)
         return NULL;
     }
 
-    tree->hashmap = hashmapCreate(MAP_INIT_SIZE, hash_dentry, hash_is_equals);
     tree->root_dentry = dcache_new("", root_shdw, NULL, tree);
     if (tree->root_dentry == NULL) {
         log_fatal("allocation failed");
@@ -97,8 +96,6 @@ dcache_new_root(shadow_t * root_shdw, const char * path)
     afsx_path = sdscat(afsx_path, UCAFS_REPO_DIR);
     tree->afsx_path = afsx_path;
 
-    uv_mutex_init(&tree->dcache_lock);
-
     dcache_add(tree->root_dentry, NULL);
 
     err = 0;
@@ -106,10 +103,6 @@ out:
     if (err) {
         if (tree->root_dentry) {
             free(tree->root_dentry);
-        }
-
-        if (tree->hashmap) {
-            hashmapFree(tree->hashmap);
         }
 
         free(tree);
@@ -157,7 +150,6 @@ void
 dcache_free(struct uc_dentry * dentry)
 {
     dcache_item_t * ptr_entry;
-    Hashmap * hashmap = dentry->dentry_tree->hashmap;
 
     /* deallocate the children */
     uv_mutex_lock(&dentry->c_lock);
@@ -172,10 +164,7 @@ dcache_free(struct uc_dentry * dentry)
     }
     uv_mutex_unlock(&dentry->c_lock);
 
-    hashmapLock(hashmap);
-    hashmapRemove(hashmap, &dentry->key);
     stats_total_cache_entries--;
-    hashmapUnlock(hashmap);
 
     sdsfree(dentry->key.name);
     memset(dentry, 0, sizeof(struct uc_dentry));
@@ -185,7 +174,6 @@ dcache_free(struct uc_dentry * dentry)
 void
 dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
 {
-    Hashmap * hashmap = dentry->dentry_tree->hashmap;
     dcache_item_t * entry = (dcache_item_t *)malloc(sizeof(dcache_item_t));
     if (entry == NULL) {
         log_warn("allocation on new dlist_item");
@@ -201,11 +189,6 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
         uv_mutex_unlock(&parent->c_lock);
     }
 
-    /* add it to the hashmap */
-    /* TODO hashmapPut returns the exisiting hash value if we have a
-     * matching entry */
-    hashmapPut(hashmap, &dentry->key, dentry, &dentry->key.p_hashval);
-
     // TODO add lock
     stats_total_cache_entries++;
 }
@@ -213,10 +196,8 @@ dcache_add(struct uc_dentry * dentry, struct uc_dentry * parent)
 struct uc_dentry *
 hash_lookup(const struct uc_dentry * parent, const char * name)
 {
-    Hashmap * hashmap = parent->dentry_tree->hashmap;
     dcache_key_t v = {.parent = parent, .name = (const sds)name };
-
-    struct uc_dentry * dentry = (struct uc_dentry *)hashmapGet(hashmap, &v);
+    struct uc_dentry * dentry = NULL;
 
     stats_cache_lookups++;
     if (dentry && dentry->valid) {
@@ -393,7 +374,6 @@ _dcache_lookup(struct dentry_tree * tree,
 
     if (dentry && (dirnode = metadata_get_dirnode(path_build, dentry))) {
         atomic_fetch_add(&dentry->count, 1);
-        dirnode_set_dentry(dirnode, dentry);
     }
 
     *pp_dentry = dentry;
@@ -493,8 +473,8 @@ out:
 void
 dcache_put(uc_dirnode_t * dn)
 {
-    // container of
-    struct uc_dentry * dentry = (struct uc_dentry *)dirnode_get_dentry(dn);
+    // container of NULL
+    struct uc_dentry * dentry = NULL;
     atomic_fetch_sub(&dentry->count, 1);
 
     if (dentry->count < 0) {
@@ -512,12 +492,10 @@ dcache_put(uc_dirnode_t * dn)
 void
 dcache_rm(uc_dirnode_t * dn, const char * entry_name)
 {
-    struct uc_dentry *parent = (struct uc_dentry *)dirnode_get_dentry(dn),
-                     *child;
+    metadata_entry_t * mcache = dn->mcache;
+    struct uc_dentry *parent = SLIST_FIRST(&mcache->aliases)->dentry, *child;
     dcache_item_t *prev = NULL, *curr, *next;
     dcache_key_t temp_key = {.parent = parent, .name = (const sds)entry_name };
-    Hashmap * hashmap = parent->dentry_tree->hashmap;
-    int hash_val = hashmapHashKey(hashmap, &temp_key);
 
     if (parent == NULL) {
         return;
@@ -528,8 +506,7 @@ dcache_rm(uc_dirnode_t * dn, const char * entry_name)
     {
         child = curr->dentry;
         /* perform a hash comparison for a fast check */
-        if (hash_val == *child->key.p_hashval
-            && strcmp(entry_name, child->key.name) == 0) {
+        if (strcmp(entry_name, child->key.name) == 0) {
             /* free the memory */
             if (prev == NULL) {
                 SLIST_REMOVE_HEAD(&parent->children, next_dptr);

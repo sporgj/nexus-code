@@ -18,6 +18,17 @@ extern "C" {
 
 typedef atomic_int ref_t;
 
+typedef enum {
+    DIROPS_CREATE = 0x01,
+    DIROPS_LOOKUP = 0x02,
+    DIROPS_CHECKACL = 0x04,
+    DIROPS_SETACL = 0x08,
+    DIROPS_HARDLINK = 0x10,
+    DIROPS_SYMLINK = 0x20,
+    DIROPS_MOVE = 0x40,
+    DIROPS_FILEOP = 0x80
+} lookup_flags_t;
+
 struct dentry_tree;
 struct metadata_entry;
 
@@ -30,18 +41,18 @@ typedef TAILQ_HEAD(path_builder, path_element) path_builder_t;
 
 typedef struct dentry_list_entry {
     struct uc_dentry * dentry;
-    SLIST_ENTRY(dentry_list_entry) next_item;
+    TAILQ_ENTRY(dentry_list_entry) next_entry;
 } dentry_list_entry_t;
 
-typedef SLIST_HEAD(dentry_head, dentry_list_entry) dentry_list_head_t;
+typedef TAILQ_HEAD(dentry_head, dentry_list_entry) dentry_list_head_t;
 
 typedef struct metadata_entry {
     uc_dirnode_t * dn;
     time_t epoch;
     shadow_t shdw_name;
     uv_mutex_t lock; /* locking the whole structure */
-    dentry_list_head_t d_entries;
-} metadata_entry_t;
+    dentry_list_head_t aliases;
+} metadata_entry_t, metadata_t;
 
 typedef struct {
     const struct uc_dentry * parent;
@@ -49,45 +60,52 @@ typedef struct {
     sds name;
 } dcache_key_t;
 
-typedef struct dcache_item {
+typedef struct dentry_item {
     struct uc_dentry * dentry;
-    SLIST_ENTRY(dcache_item) next_dptr;
-} dcache_item_t;
+    TAILQ_ENTRY(dentry_item) next_entry;
+} dentry_item_t;
 
-struct uc_dentry {
-    bool valid, negative; /* if the entry is valid */
+typedef struct uc_dentry {
+    bool valid, negative, is_root; /* if the entry is valid */
     ref_t count; /* number of references to the dentry */
     shadow_t shdw_name; /* the dirnode file name */
     dcache_key_t key;
-    SLIST_HEAD(dcache_list_t, dcache_item) children;
-    struct dentry_tree * dentry_tree;
-    struct metadata_entry * metadata;
+    struct dentry_tree * tree;
+    metadata_t * metadata;
 
-    uv_mutex_t v_lock; /* required to change valid */
-    uv_mutex_t c_lock; /* to change the children */
-};
+    TAILQ_HEAD(dentry_list, dentry_item) subdirs;
+} dentry_t;
 
 struct dentry_tree {
-    Hashmap * hashmap;
+    shadow_t root_shadow;
     struct uc_dentry * root_dentry;
-    uv_mutex_t dcache_lock;
-    sds root_path, afsx_path;
+    sds root_path, afsx_path, watch_path;
 };
 
-uc_dirnode_t *
-dcache_lookup(struct dentry_tree * tree, const char * path, bool dirpath);
+/* dentry stuff */
+dentry_t *
+d_instantiate(dentry_t * dentry, metadata_t * mcache);
 
 void
-dcache_put(uc_dirnode_t * dn);
+d_get(dentry_t * dentry);
 
 void
-dcache_rm(uc_dirnode_t * dn, const char * entry);
+d_put(dentry_t * dentry);
+
+void
+d_remove(dentry_t * dentry, const char * name);
+
+dentry_t *
+dentry_lookup(const char * path, lookup_flags_t flags);
 
 uc_filebox_t *
-dcache_get_filebox(struct dentry_tree * tree, const char * path, size_t hint);
+dcache_filebox(const char * path, size_t size_hint);
 
-struct dentry_tree *
-dcache_new_root(shadow_t * root_shdw, const char * root_path);
+static inline uc_dirnode_t *
+d_dirnode(dentry_t * dentry)
+{
+    return dentry->metadata ? dentry->metadata->dn : NULL;
+}
 
 /* vfs */
 sds
@@ -110,14 +128,11 @@ const shadow_t * vfs_root_dirnode(const char * path);
 sds
 vfs_root_dirnode_path(const char * path);
 
+struct dentry_tree *
+vfs_tree(const char * path);
+
 int
 vfs_mount(const char * path);
-
-uc_dirnode_t *
-vfs_lookup(const char * path, bool dirpath);
-
-uc_filebox_t *
-vfs_get_filebox(const char * path, size_t size_hint);
 
 sds
 vfs_afsx_path(const char * path, const shadow_t * shdw);
@@ -144,6 +159,9 @@ metadata_afsx_path(const uc_dirnode_t * parent_dirnode,
 
 void
 metadata_update_entry(struct metadata_entry * entry);
+
+void
+metadata_prune(metadata_t * entry);
 
 #ifdef __cplusplus
 };

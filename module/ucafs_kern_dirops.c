@@ -15,7 +15,7 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
 
     *shadow_name = NULL;
 
-    if (ucafs_vnode_path(avc, &path) || is_md_file(name, strlen(name))) {
+    if (ucafs_vnode_path(avc, &path)) {
         return -1;
     }
 
@@ -265,15 +265,11 @@ ucafs_kern_rename(struct vcache * from_vnode,
                   char ** old_shadowname,
                   char ** new_shadowname)
 {
-    int ret = -1, code, len1 = strlen(oldname), len2 = strlen(newname);
+    int ret = -1, code;
     char *from_path = NULL, *to_path = NULL;
     caddr_t payload;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
-
-    if (is_md_file(oldname, len1) || is_md_file(newname, len2)) {
-        return -1;
-    }
 
     if (ucafs_vnode_path(from_vnode, &from_path) ||
         ucafs_vnode_path(to_vnode, &to_path)) {

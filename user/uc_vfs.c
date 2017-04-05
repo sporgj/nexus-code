@@ -9,6 +9,9 @@
 #include "third/queue.h"
 #include "third/sds.h"
 
+struct dentry_tree *
+d_alloc_root(shadow_t * root_shdw, sds data_path, sds afsx_path);
+
 struct supernode_entry {
     SLIST_ENTRY(supernode_entry) next_entry;
     supernode_t * super;
@@ -24,28 +27,14 @@ static SLIST_HEAD(_list, supernode_entry) _s = SLIST_HEAD_INITIALIZER(NULL),
 static inline sds
 _append_root_dirnode_path(sds root_path, const char * metadata_fname);
 
-uc_filebox_t *
-vfs_get_filebox(const char * path, size_t hint)
+struct dentry_tree *
+vfs_tree(const char * path)
 {
     supernode_entry_t * curr;
     SLIST_FOREACH(curr, snode_list, next_entry)
     {
         if (strstr(path, curr->path)) {
-            return dcache_get_filebox(curr->dentry_tree, path, hint);
-        }
-    }
-
-    return NULL;
-}
-
-uc_dirnode_t *
-vfs_lookup(const char * path, bool dirpath)
-{
-    supernode_entry_t * curr;
-    SLIST_FOREACH(curr, snode_list, next_entry)
-    {
-        if (strstr(path, curr->path)) {
-            return dcache_lookup(curr->dentry_tree, path, dirpath);
+            return curr->dentry_tree;
         }
     }
 
@@ -94,7 +83,7 @@ vfs_mount(const char * path)
     int ret = -1;
     supernode_entry_t * snode_entry;
     struct uc_dentry * root_dentry;
-    sds snode_path = ucafs_supernode_path(path), root_dnode_path = NULL;
+    sds snode_path = ucafs_supernode_path(path);
 
     /* open the supernode object */
     supernode_t * super = supernode_from_file(snode_path);
@@ -119,9 +108,17 @@ vfs_mount(const char * path)
 
     SLIST_INSERT_HEAD(snode_list, snode_entry, next_entry);
 
+    sds watch_path = sdsnew(path);
+    watch_path = sdscat(watch_path, "/");
+    watch_path = sdscat(watch_path, UCAFS_WATCH_DIR);
+
+    sds afsx_path = sdsnew(path);
+    afsx_path = sdscat(afsx_path, "/");
+    afsx_path = sdscat(afsx_path, UCAFS_REPO_DIR);
+
     // initialize the root dentry
-    root_dnode_path = vfs_append(sdsnew(path), &super->root_dnode);
-    snode_entry->dentry_tree = dcache_new_root(&super->root_dnode, path);
+    snode_entry->dentry_tree
+        = d_alloc_root(&super->root_dnode, watch_path, afsx_path);
 
     ret = 0;
 out:
@@ -129,10 +126,6 @@ out:
         sdsfree(snode_path);
 
         supernode_free(super);
-    }
-
-    if (root_dnode_path) {
-        sdsfree(root_dnode_path);
     }
 
     return ret;
@@ -144,7 +137,8 @@ _vfs_get_root_path(const char * path, const shadow_t ** root_shdw)
     supernode_entry_t * curr;
     SLIST_FOREACH(curr, snode_list, next_entry)
     {
-        if (strstr(path, curr->path)) {
+        int len = strlen(curr->path) - 1;
+        if (memcmp(path, curr->path, len) == 0) {
             if (root_shdw) {
                 *root_shdw = &curr->super->root_dnode;
             }

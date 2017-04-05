@@ -267,10 +267,6 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
                 count++;
             }
 
-            if (temp != path && is_md_file(temp + 1, count - 1)) {
-                return 1;
-            }
-
         skip_fname_check:
             if (dest) {
                 total_len = afs_prefix_len + len;

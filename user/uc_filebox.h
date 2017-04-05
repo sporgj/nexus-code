@@ -37,6 +37,12 @@ filebox_set_path(uc_filebox_t * filebox, const char * path)
     filebox->fbox_path = sdsnew(path);
 }
 
+static inline sds
+filebox_get_path(uc_filebox_t * filebox)
+{
+    return filebox->fbox_path ? sdsnew(filebox->fbox_path) : NULL;
+}
+
 /**
  * Initialize a new filebox from the specified path
  * @param file_path is the absolute path to the filebox file

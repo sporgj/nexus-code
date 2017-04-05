@@ -20,15 +20,21 @@ dirops_new1(const char * parent_dir,
             char ** shadow_name_dest)
 {
     int error = -1; // TODO change this
+    dentry_t * dentry = NULL;
     uc_dirnode_t * dirnode = NULL;
     uc_filebox_t * filebox = NULL;
     shadow_t * fname_code = NULL;
     sds path1 = NULL;
 
-    /* lets get the directory entry */
-    if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
+    /* lets get the dentry */
+    if ((dentry = dentry_lookup(parent_dir, DIROPS_CREATE)) == NULL) {
         log_error("Error loading dirnode: %s", parent_dir);
         return error;
+    }
+
+    if ((dirnode = d_dirnode(dentry)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
+        goto out;
     }
 
     /* Get filename and add it to DirNode */
@@ -51,12 +57,12 @@ out:
      * failed dirnode/filebox writes to disk. */
     if (filebox)
         filebox_free(filebox);
-    if (dirnode)
-        dcache_put(dirnode);
     if (path1)
         sdsfree(path1);
     if (fname_code)
-        free((void *)fname_code);
+        free(fname_code);
+
+    d_put(dentry);
 
     return error;
 }
@@ -86,7 +92,7 @@ out:
 }
 
 int
-dirops_code2plain(const char * dir_path,
+dirops_code2plain(const char * parent_dir,
                   const char * encoded_name,
                   ucafs_entry_type type,
                   char ** raw_name_dest)
@@ -95,6 +101,14 @@ dirops_code2plain(const char * dir_path,
     shadow_t * fname_code = NULL;
     ucafs_entry_type atype;
     const char * result;
+    dentry_t * dentry;
+    uc_dirnode_t * dn;
+
+    /* lets get the dentry */
+    if ((dentry = dentry_lookup(parent_dir, DIROPS_LOOKUP)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
+        return error;
+    }
 
     /* 1 - Get the binary version */
     if ((fname_code = filename_str2bin(encoded_name)) == NULL) {
@@ -102,8 +116,8 @@ dirops_code2plain(const char * dir_path,
     }
 
     // 2 - Get the corresponding dirnode
-    uc_dirnode_t * dn = vfs_lookup(dir_path, true);
-    if (dn == NULL) {
+    if ((dn = d_dirnode(dentry)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
         goto out;
     }
 
@@ -117,8 +131,8 @@ dirops_code2plain(const char * dir_path,
 out:
     if (fname_code)
         free(fname_code);
-    if (dn)
-        dcache_put(dn);
+
+    d_put(dentry);
     return error;
 }
 
@@ -139,25 +153,36 @@ dirops_move(const char * from_dir,
     shadow_t *shadow1_bin = NULL, *shadow2_bin = NULL;
     char *shadow1_str = NULL, *shadow2_str = NULL;
     sds fpath1 = NULL, fpath2 = NULL, dpath1 = NULL, dpath2 = NULL;
+    dentry_t * dentry1, * dentry2;
 
-    /* get the dirnode objects */
-    dirnode1 = vfs_lookup(from_dir, true);
-    if (dirnode1 == NULL) {
-        return -1;
+    /* get the dentries */
+    if ((dentry1 = dentry_lookup(from_dir, DIROPS_MOVE)) == NULL) {
+        log_error("dentry_lookup: %s", from_dir);
+        return error;
     }
 
-    dirnode2 = vfs_lookup(to_dir, true);
-    if (dirnode2 == NULL) {
-        dcache_put(dirnode1);
-        return -1;
+    if ((dentry2 = dentry_lookup(to_dir, DIROPS_MOVE)) == NULL) {
+        log_error("dentry_lookup: %s", to_dir);
+        d_put(dentry1);
+        return error;
     }
 
-    // XXX future versions should check if the entries are
-    // directories before removing them
-    dcache_rm(dirnode1, oldname);
-    dcache_rm(dirnode2, newname);
+    /* XXX this is extremely innefficient. If they share the same dirnode,
+     * just a rename should work */
+    d_remove(dentry1, oldname);
+    d_remove(dentry2, newname);
 
-    if (dirnode_equals(dirnode1, dirnode2)) {
+    if ((dirnode1 = d_dirnode(dentry1)) == NULL) {
+        log_error("d_dirnode NULL: %s", from_dir);
+        goto out;
+    }
+
+    if ((dirnode2 = d_dirnode(dentry2)) == NULL) {
+        log_error("d_dirnode NULL: %s", to_dir);
+        goto out;
+    }
+
+    if (dirnode1 == dirnode2 || dirnode_equals(dirnode1, dirnode2)) {
         if (dirnode_rename(dirnode1, oldname, newname, type, &atype,
                            &shadow1_bin, &shadow2_bin, &link_info1,
                            &link_info2, &jrnl1, &jrnl2)) {
@@ -171,6 +196,9 @@ dirops_move(const char * from_dir,
             log_error("flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
+
+        /* since we are just "renaming", no need to move the metadata */
+        goto skip_moving_metadata;
     } else {
         /* get the shadow names */
         shadow1_bin
@@ -202,7 +230,7 @@ dirops_move(const char * from_dir,
     }
 
     if (atype == UC_LINK) {
-        goto success;
+        goto skip_moving_metadata;
     }
 
     /* now delete the structures on disk */
@@ -234,7 +262,7 @@ dirops_move(const char * from_dir,
         }
     }
 
-success:
+skip_moving_metadata:
     // XXX what about the linking info.
     // For softlinks, since no on-disk structures are touched, we are fine
     // For hardlinks, we should be good as well as they still point to the file
@@ -250,8 +278,8 @@ success:
 
     error = 0;
 out:
-    dcache_put(dirnode1);
-    dcache_put(dirnode2);
+    d_put(dentry1);
+    d_put(dentry2);
 
     if (shadow1_bin) {
         free(shadow1_bin);
@@ -340,11 +368,17 @@ dirops_symlink(const char * link_path,
     shadow_t * shadow_name2 = NULL;
     ucafs_entry_type atype;
     sds target_fname = NULL, link_fname = NULL;
+    dentry_t * dentry;
 
     /* 1 - get the respective dirnode */
-    if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
-        log_error("dirnode (%s) not found", link_path);
+    if ((dentry = dentry_lookup(link_path, DIROPS_SYMLINK)) == NULL) {
+        log_error("dentry_lookup: %s", link_path);
         return error;
+    }
+
+    if ((link_dnode = d_dirnode(dentry)) == NULL) {
+        log_error("dirnode (%s) not found", link_path);
+        goto out;
     }
 
     /* 2 - Find the link to the file */
@@ -384,8 +418,6 @@ dirops_symlink(const char * link_path,
     *shadow_name_dest = filename_bin2str(shadow_name2);
     error = 0;
 out:
-    dcache_put(link_dnode);
-
     if (target_fname) {
         sdsfree(target_fname);
     }
@@ -412,20 +444,28 @@ dirops_hardlink(const char * target_path,
                 char ** shadow_name_dest)
 {
     int error = UC_STATUS_NOOP;
-    uc_dirnode_t *target_dnode, *link_dnode = NULL;
+    uc_dirnode_t *link_dnode = NULL;
     sds target_fname = NULL, link_fname = NULL, target_afsx_path = NULL,
         link_afsx_path = NULL;
-    const shadow_t * shadow_name1 = NULL;
     shadow_t * shadow_name2 = NULL;
     ucafs_entry_type atype;
+    dentry_t * dentry1, *dentry2;
+    uc_filebox_t * filebox = NULL;
 
-    /* 1 - Get the dirnodes for both link and target */
-    if ((target_dnode = vfs_lookup(target_path, false)) == NULL) {
-        log_error("dirnode (%s) not found", target_path);
+    filebox = dcache_filebox(target_path, 0);
+    if (filebox == NULL) {
+        log_error("finding filebox failed: '%s'", target_path);
+        return -1;
+    }
+
+    if ((dentry2 = dentry_lookup(link_path, DIROPS_HARDLINK)) == NULL) {
+        log_error("dentry_lookup %s", link_path);
+        d_put(dentry1);
         return error;
     }
 
-    if ((link_dnode = vfs_lookup(link_path, false)) == NULL) {
+    /* 1 - Get the dirnodes for both link and target */
+    if ((link_dnode = d_dirnode(dentry2)) == NULL) {
         log_error("dirnode (%s) not found", link_path);
         return error;
     }
@@ -442,12 +482,6 @@ dirops_hardlink(const char * target_path,
     }
 
     /* get the shadow name of the target file */
-    shadow_name1 = dirnode_raw2enc(target_dnode, target_fname, UC_FILE, &atype);
-    if (shadow_name1 == NULL) {
-        log_error("dirnode_enc2raw (%s)", target_path);
-        goto out;
-    }
-
     shadow_name2 = dirnode_add(link_dnode, link_fname, UC_FILE, JRNL_NOOP);
     if (shadow_name2 == NULL) {
         log_error("adding link (%s) FAILED", link_path);
@@ -455,7 +489,7 @@ dirops_hardlink(const char * target_path,
     }
 
     /* get the metadata file */
-    target_afsx_path = vfs_metadata_fpath(target_dnode, shadow_name1);
+    target_afsx_path = filebox_get_path(filebox);
     link_afsx_path = vfs_metadata_fpath(link_dnode, shadow_name2);
 
     if (link(target_afsx_path, link_afsx_path)) {
@@ -473,13 +507,8 @@ dirops_hardlink(const char * target_path,
     *shadow_name_dest = filename_bin2str(shadow_name2);
     error = 0;
 out:
-    if (link_dnode) {
-        dcache_put(link_dnode);
-    }
-
-    if (target_dnode) {
-        dcache_put(target_dnode);
-    }
+    d_put(dentry1);
+    d_put(dentry2);
 
     if (target_fname) {
         sdsfree(target_fname);
@@ -499,6 +528,10 @@ out:
 
     if (shadow_name2) {
         free(shadow_name2);
+    }
+
+    if (filebox) {
+        filebox_free(filebox);
     }
 
     return error;
@@ -531,7 +564,7 @@ dirops_plain2code(const char * fpath_raw,
 }
 
 int
-dirops_plain2code1(const char * parent_path,
+dirops_plain2code1(const char * parent_dir,
                    const char * fname,
                    ucafs_entry_type type,
                    char ** encoded_fname_dest)
@@ -539,24 +572,31 @@ dirops_plain2code1(const char * parent_path,
     int error = -1; // TODO
     const shadow_t * fname_code = NULL;
     ucafs_entry_type atype;
+    dentry_t * dentry;
+    uc_dirnode_t * dirnode;
 
-    /* 1 - Get the corresponding dirnode */
-    uc_dirnode_t * dirnode = vfs_lookup(parent_path, true);
-    if (dirnode == NULL) {
+    /* lets get the dentry */
+    if ((dentry = dentry_lookup(parent_dir, DIROPS_LOOKUP)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
         return error;
+    }
+
+    if ((dirnode = d_dirnode(dentry)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
+        goto out;
     }
 
     /* Perform the operation */
     fname_code = dirnode_raw2enc(dirnode, fname, type, &atype);
     if (fname_code == NULL) {
-        log_warn("%s not found (%s)", fname, parent_path);
+        log_warn("%s not found (%s)", fname, parent_dir);
         goto out;
     }
 
     *encoded_fname_dest = filename_bin2str(fname_code);
     error = 0;
 out:
-    dcache_put(dirnode);
+    d_put(dentry);
     return error;
 }
 
@@ -665,17 +705,23 @@ dirops_remove1(const char * parent_dir,
     int error = UC_STATUS_ERROR, jrnl;
     link_info_t * link_info = NULL;
     shadow_t * shadow_name = NULL;
+    dentry_t * dentry;
     uc_dirnode_t * dirnode = NULL;
     ucafs_entry_type atype;
     sds afsx_fpath = NULL, afsx_dpath = NULL;
 
-    if ((dirnode = vfs_lookup(parent_dir, true)) == NULL) {
-        log_error("dirnode (%s) not found", parent_dir);
+    if ((dentry = dentry_lookup(parent_dir, DIROPS_CHECKACL)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
         return error;
     }
 
-    /* update the dcache */
-    dcache_rm(dirnode, fname);
+    /* remove it from the dentry cache */
+    d_remove(dentry, fname);
+
+    if ((dirnode = d_dirnode(dentry)) == NULL) {
+        log_error("Error loading dirnode: %s", parent_dir);
+        goto out;
+    }
 
     /* delete and get the info */
     shadow_name = dirnode_rm(dirnode, fname, type, &atype, &jrnl, &link_info);
@@ -690,11 +736,6 @@ dirops_remove1(const char * parent_dir,
         goto out;
     }
 
-    /* if it's a directory, remove it from the metadata cache */
-    if (atype == UC_DIR) {
-        metadata_rm_dirnode(shadow_name);
-    }
-
     /* ignore if it's a link or a "journal" file */
     if (atype != UC_LINK && jrnl == JRNL_NOOP) {
         afsx_fpath = metadata_afsx_path(dirnode, shadow_name,
@@ -705,7 +746,7 @@ dirops_remove1(const char * parent_dir,
     *encoded_fname_dest = filename_bin2str(shadow_name);
     error = 0;
 out:
-    dcache_put(dirnode);
+    d_put(dentry);
 
     if (shadow_name) {
         free(shadow_name);
@@ -774,10 +815,17 @@ dirops_setacl(const char * path, const char * afs_acl_str)
     char *astr = (char *)afs_acl_str, tname[CONFIG_MAX_NAME],
          *acl_print_str = NULL;
     acl_rights_t rights;
+    dentry_t * dentry;
 
-    if ((dirnode = vfs_lookup(path, true)) == NULL) {
-        log_error("dirnode (%s) not found", path);
+    /* lets get the dentry */
+    if ((dentry = dentry_lookup(path, DIROPS_CREATE)) == NULL) {
+        log_error("Error loading dirnode: %s", path);
         return error;
+    }
+
+    if ((dirnode = d_dirnode(dentry)) == NULL) {
+        log_error("Error loading dirnode: %s", path);
+        goto out;
     }
 
     ta->dfs = 0;
@@ -812,7 +860,7 @@ dirops_setacl(const char * path, const char * afs_acl_str)
 
     error = 0;
 out:
-    dcache_put(dirnode);
+    d_put(dentry);
 
     if (acl_print_str) {
         free(acl_print_str);
@@ -827,12 +875,20 @@ dirops_checkacl(const char * path, acl_rights_t rights, int is_dir)
     int err = -1;
     uc_dirnode_t * dirnode = NULL;
     char * str = NULL;
+    dentry_t * dentry;
 
-    /* if it's a directory, get the dirnode it points to. Otherwise, for a file
-     * get the parent dirnode */
-    if ((dirnode = vfs_lookup(path, (is_dir ? true : false))) == NULL) {
-        log_error("dirnode (%s) not found", path);
+    // path could point to file or directory
+    sds dirpath = is_dir ? (sds)path : do_get_dir(path);
+
+    /* lets get the dentry */
+    if ((dentry = dentry_lookup(dirpath, DIROPS_CHECKACL)) == NULL) {
+        log_error("Error loading dirnode: %s", dirpath);
         return err;
+    }
+
+    if ((dirnode = d_dirnode(dentry)) == NULL) {
+        log_error("Error loading dirnode: %s", dirpath);
+        goto out;
     }
 
     if (dirnode_checkacl(dirnode, rights)) {
@@ -842,7 +898,11 @@ dirops_checkacl(const char * path, acl_rights_t rights, int is_dir)
 
     err = 0;
 out:
-    dcache_put(dirnode);
+    d_put(dentry);
+
+    if (!is_dir) {
+        sdsfree(dirpath);
+    }
 
     free(str);
 

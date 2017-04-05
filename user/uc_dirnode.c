@@ -1090,24 +1090,6 @@ dirnode_set_metadata(uc_dirnode_t * dn, struct metadata_entry * entry)
     dn->mcache = entry;
 }
 
-void
-dirnode_set_dentry(uc_dirnode_t * dirnode, struct uc_dentry * dentry)
-{
-    dirnode->dentry = dentry;
-}
-
-struct uc_dentry *
-dirnode_get_dentry(uc_dirnode_t * dirnode)
-{
-    return dirnode->dentry;
-}
-
-void
-dirnode_clear_dentry(uc_dirnode_t * dirnode)
-{
-    dirnode->dentry = NULL;
-}
-
 const sds
 dirnode_get_fpath(uc_dirnode_t * dirnode)
 {

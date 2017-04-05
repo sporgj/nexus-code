@@ -86,18 +86,17 @@ _free_entry(metadata_entry_t * entry)
 }
 
 void
-metadata_rm_dirnode(const shadow_t * shdw)
+metadata_prune(metadata_t * entry)
 {
-    metadata_entry_t * entry;
-
-    /* check if the item is in the cache */
-    entry = (metadata_entry_t *)hashmapRemove(metadata_hashmap, (void *)shdw);
-    if (entry == NULL) {
-        return;
+    uc_dirnode_t * dn = entry->dn;
+    if (dn) {
+        hashmapRemove(metadata_hashmap, (void *)&dn->header.uuid);
+        dirnode_free(dn);
     }
 
-    dirnode_free(entry->dn);
-    free(entry);
+    entry->dn = NULL;
+
+    // TODO add to free list
 }
 
 sds
@@ -131,7 +130,7 @@ metadata_filepath(const struct uc_dentry * dentry,
                   sds * dpath)
 {
     sds path = parent ? dirnode_get_dirpath(parent->metadata->dn, true)
-                      : sdscat(sdsdup(dentry->dentry_tree->afsx_path), "/");
+                      : sdscat(sdsdup(dentry->tree->afsx_path), "/");
     char * metaname = metaname_bin2str(&dentry->shdw_name);
     path = sdscat(path, metaname);
 
@@ -319,9 +318,7 @@ update_entry:
     }
 
     /* lets not forget to add it to the dentry */
-    // TODO add to dentry to metadata's list
-    dentry->metadata = entry;
-    dentry->negative = false;
+    d_instantiate(dentry, entry);
 out:
     if (fpath) {
         sdsfree(fpath);
@@ -359,6 +356,12 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
 
     /* set the path to allow flushing the filebox */
     filebox_set_path(fb, fbox_path);
+
+    /* probably hardlink trying to access the file */
+    if (size_hint == 0 && !filebox_flush(fb)) {
+        log_error("could not save filebox");
+        return NULL;
+    }
 
     /* delete the entry from the dirnode
      * XXX should we flush it now or later ? */
