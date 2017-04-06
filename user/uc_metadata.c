@@ -358,7 +358,7 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
     filebox_set_path(fb, fbox_path);
 
     /* probably hardlink trying to access the file */
-    if (size_hint == 0 && !filebox_flush(fb)) {
+    if (!filebox_flush(fb)) {
         log_error("could not save filebox");
         return NULL;
     }

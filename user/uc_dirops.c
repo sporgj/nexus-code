@@ -196,9 +196,6 @@ dirops_move(const char * from_dir,
             log_error("flushing dirnode (%s) FAILED", from_dir);
             goto out;
         }
-
-        /* since we are just "renaming", no need to move the metadata */
-        goto skip_moving_metadata;
     } else {
         /* get the shadow names */
         shadow1_bin
@@ -248,6 +245,11 @@ dirops_move(const char * from_dir,
 
         /* last step is to update the moved entry's parent directory. */
         if (atype == UC_DIR) {
+            if (rename(dpath1, dpath2)) {
+                log_error("renaming metadata file failed");
+                goto out;
+            }
+
             if ((dirnode3 = dirnode_from_file(fpath2)) == NULL) {
                 log_info("loading dirnode file failed(%s)", fpath2);
                 goto out;
@@ -589,7 +591,7 @@ dirops_plain2code1(const char * parent_dir,
     /* Perform the operation */
     fname_code = dirnode_raw2enc(dirnode, fname, type, &atype);
     if (fname_code == NULL) {
-        log_warn("%s not found (%s)", fname, parent_dir);
+        //log_warn("%s not found (%s)", fname, parent_dir);
         goto out;
     }
 

@@ -56,7 +56,7 @@ typedef struct metadata_entry {
 
 typedef struct {
     const struct uc_dentry * parent;
-    int * p_hashval;
+    uint8_t len;
     sds name;
 } dcache_key_t;
 

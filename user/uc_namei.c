@@ -28,6 +28,7 @@ d_alloc(dentry_t * parent, const shadow_t * shdw, const char * name)
     dentry->negative = true;
     dentry->key.parent = parent;
     dentry->key.name = sdsnew(name);
+    dentry->key.len = strlen(name);
     dentry->tree = parent ? parent->tree : NULL;
     memcpy(&dentry->shdw_name, shdw, sizeof(shadow_t));
 
@@ -101,17 +102,13 @@ __d_lookup(dentry_t * parent, const char * name, dentry_item_t ** d_item)
     TAILQ_FOREACH(item, &parent->subdirs, next_entry)
     {
         dentry = item->dentry;
-        if (memcmp(dentry->key.name, name, len)) {
-            continue;
-        }
+        if (len == dentry->key.len && !memcmp(dentry->key.name, name, len)) {
+            if (d_item) {
+                *d_item = item;
+            }
 
-        /* we have found it, increment use and return */
-        if (d_item) {
-            *d_item = item;
+            return dentry;
         }
-
-        d_get(dentry);
-        return dentry;
     }
 
     return NULL;
