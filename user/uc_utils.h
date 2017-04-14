@@ -63,6 +63,9 @@ do_make_afsx_dir(sds parent_fpath, const shadow_t * shdw)
     return dirpath;
 }
 
+unsigned long
+crc32(const unsigned char * s, unsigned int len);
+
 #define uerror(...)                   \
     {                                 \
         fprintf(stderr, " ! ");       \

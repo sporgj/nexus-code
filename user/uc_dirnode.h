@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 
+#include "third/hashmap.h"
 #include "third/sds.h"
 
 #include "uc_types.h"
@@ -22,9 +23,11 @@ typedef struct dirnode {
     bucket_list_head_t buckets;
 
     bool is_root, bucket_update;
+    int buckets_deleted;
     sds dnode_path, cond_dirpath_is_root;
     dirnode_bucket_entry_t * bucket0;
     struct metadata_entry * mcache;
+    Hashmap * name2shdw_map, * shdw2name_map;
 } uc_dirnode_t;
 
 uc_dirnode_t *

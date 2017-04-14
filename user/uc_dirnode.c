@@ -18,6 +18,32 @@ serialize_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 static int
 parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer);
 
+static inline int
+shdw_hash_func(void * shdw)
+{
+    return crc32((uint8_t *)shdw, sizeof(shadow_t));
+}
+
+static inline bool
+shdw_equals_func(void * kA, void * kB)
+{
+    return memcmp(kA, kB, sizeof(shadow_t));
+}
+
+static inline int
+name_hash_func(void * name)
+{
+    return hash_string((char *)name);
+}
+
+static inline bool
+name_equals_func(void * kA, void * kB)
+{
+    char *str_kA = (char *)kA, *str_kB = (char *)kB;
+
+    return strcmp(str_kA, str_kB) == 0;
+}
+
 uc_dirnode_t *
 dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
 {
@@ -35,6 +61,10 @@ dirnode_new2(const shadow_t * id, const uc_dirnode_t * parent)
     TAILQ_INIT(&dn->dirbox);
     SIMPLEQ_INIT(&dn->lockbox);
     TAILQ_INIT(&dn->buckets);
+
+    /* create the hasmap */
+    dn->name2shdw_map = hashmapCreate(16, name_hash_func, name_equals_func);
+    dn->shdw2name_map = hashmapCreate(16, shdw_hash_func, shdw_equals_func);
 
     dn->header.bucket_count = 1;
 
@@ -136,6 +166,14 @@ dirnode_free(uc_dirnode_t * dirnode)
         sdsfree(dirnode->cond_dirpath_is_root);
     }
 
+    if (dirnode->name2shdw_map) {
+        hashmapFree(dirnode->name2shdw_map);
+    }
+
+    if (dirnode->shdw2name_map) {
+        hashmapFree(dirnode->shdw2name_map);
+    }
+
     free(dirnode);
 }
 
@@ -175,6 +213,10 @@ dirnode_from_file(const sds filepath)
     TAILQ_INIT(dirbox);
     SIMPLEQ_INIT(lockbox);
     TAILQ_INIT(buckets);
+
+    /* create the hasmap */
+    dn->name2shdw_map = hashmapCreate(16, name_hash_func, name_equals_func);
+    dn->shdw2name_map = hashmapCreate(16, shdw_hash_func, shdw_equals_func);
 
     /* read the header from the file */
     nbytes = fread(header, sizeof(dirnode_header_t), 1, fd);
@@ -649,6 +691,10 @@ dirnode_add_alias(uc_dirnode_t * dn,
 
     dn->bucket_update = true;
 
+    /* add it to the hashmap */
+    int * hash;
+    hashmapPut(dn->name2shdw_map, de->real_name, list_entry, &hash);
+    hashmapPut(dn->shdw2name_map, &de->shadow_name, list_entry, &hash);
 update_refs:
     /* update the references */
     bucket_entry->bckt.count++;
@@ -703,6 +749,12 @@ iterate_by_realname(uc_dirnode_t * dn,
     dnode_data_t * de;
     link_info_t * link_info;
 
+    list_entry = (dnode_list_entry_t *)hashmapGet(dn->name2shdw_map, (void *)realname);
+    if (list_entry) {
+        de = &list_entry->dnode_data;
+        goto success;
+    }
+
     int len = strlen(realname) + 1, len1;
 
     TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry)
@@ -710,29 +762,32 @@ iterate_by_realname(uc_dirnode_t * dn,
         de = &list_entry->dnode_data;
 
         if (len == de->name_len && memcmp(realname, de->real_name, len) == 0) {
-            /* XXX this needs to be deprecated. */
-            if (pp_link_info && de->link_len) {
-                len1 = de->link_len + sizeof(link_info_t);
-
-                if ((link_info = (link_info_t *)malloc(len1)) == NULL) {
-                    log_fatal("allocation error");
-                    return NULL;
-                }
-
-                link_info->total_len = len1;
-                link_info->type
-                    = (de->info.type == UC_LINK) ? UC_SOFTLINK : UC_HARDLINK;
-                memcpy(link_info->target_link, de->target, de->link_len);
-                *pp_link_info = link_info;
-            }
-
-            *p_type = de->info.type;
-            *p_journal = de->info.jrnl;
-            return list_entry;
+            goto success;
         }
     }
 
     return NULL;
+
+success:
+    /* XXX this needs to be deprecated. */
+    if (pp_link_info && de->link_len) {
+        len1 = de->link_len + sizeof(link_info_t);
+
+        if ((link_info = (link_info_t *)malloc(len1)) == NULL) {
+            log_fatal("allocation error");
+            return NULL;
+        }
+
+        link_info->total_len = len1;
+        link_info->type
+            = (de->info.type == UC_LINK) ? UC_SOFTLINK : UC_HARDLINK;
+        memcpy(link_info->target_link, de->target, de->link_len);
+        *pp_link_info = link_info;
+    }
+
+    *p_type = de->info.type;
+    *p_journal = de->info.jrnl;
+    return list_entry;
 }
 
 shadow_t *
@@ -773,7 +828,9 @@ dirnode_rm(uc_dirnode_t * dn,
     bucket_entry->bckt.length -= de->rec_len;
     bucket_entry->is_dirty = true;
 
-    // XXX compact here?
+    /* remove the entry in the hashmap */
+    hashmapRemove(dn->name2shdw_map, de->real_name);
+    hashmapRemove(dn->shdw2name_map, &de->shadow_name);
 
     TAILQ_REMOVE(&dn->dirbox, list_entry, next_entry);
     free_dnode_entry(list_entry);
@@ -833,6 +890,12 @@ dirnode_enc2raw(uc_dirnode_t * dn,
     dnode_list_entry_t * list_entry;
     dnode_data_t * de;
 
+    list_entry = (dnode_list_entry_t *)hashmapGet(dn->shdw2name_map, (void *)encoded_name);
+    if (list_entry) {
+        return list_entry->dnode_data.real_name;
+    }
+
+iterate_dirbox:
     TAILQ_FOREACH(list_entry, &dn->dirbox, next_entry)
     {
         de = &list_entry->dnode_data;
@@ -984,6 +1047,10 @@ parse_dirbox(uc_dirnode_t * dn, uint8_t * buffer)
             bucket_entry = TAILQ_NEXT(bucket_entry, next_entry);
             entries_left = bucket_entry ? bucket_entry->bckt.count : 0;
         }
+
+        int * hash;
+        hashmapPut(dn->name2shdw_map, de->real_name, list_entry, &hash);
+        hashmapPut(dn->shdw2name_map, &de->shadow_name, list_entry, &hash);
     }
 
     ret = 0;
@@ -1060,6 +1127,7 @@ dirnode_rm_from_journal(uc_dirnode_t * dirnode, const shadow_t * shdw)
 
         if (memcmp(&de->shadow_name, shdw, sizeof(shadow_t)) == 0) {
             de->info.jrnl = JRNL_NOOP;
+            list_entry->bucket_entry->is_dirty = true;
             break;
         }
     }
