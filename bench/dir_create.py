@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import pdb
 import argparse, sys, timeit, time, os, subprocess;
 
 total_dirs = 0;
@@ -16,6 +17,7 @@ def create(l):
     
     total_levels += 1;
 
+
     for i in range(number):
         wd = os.getcwd();
         s = "lvl" + str(l) + "num" + str(i);
@@ -27,8 +29,25 @@ def create(l):
         create(l + 1);
         os.chdir(wd);
 
-def run():
-    create(0);
+def delete(l, n):
+    global total_levels;
+    global total_dirs;
+
+    if (l == levels):
+        return;
+
+    wd = os.getcwd();
+
+    for i in range(number):
+        s = "lvl" + str(l) + "num" + str(i);
+        os.chdir(s)
+        delete(l + 1, i)
+        os.chdir(wd)
+
+    # delete all the empty folders
+    for i in range(number):
+        s = "lvl" + str(l) + "num" + str(i);
+        os.rmdir(s);
 
 parser = argparse.ArgumentParser(description = 'Create directory structure');
 parser.add_argument('depth', type=int, help='Number of levels');
@@ -50,11 +69,20 @@ print("Testdir = {}, Depth = {}, Per level = {}".format(testdir, levels, number)
 os.mkdir(testdir);
 os.chdir(rootdir + '/' + testdir);
 
-t1 = timeit.timeit(run, number=1);
+# create
+t1 = time.monotonic()
+create(0)
+t1 = time.monotonic() - t1
 
-def clean():
-    cmd = ['rm', '-rf', rootdir + '/' + testdir];
-    subprocess.call(cmd);
+print('--------------------------')
 
-t2 = timeit.timeit(clean, number=1);
+# delete
+t2 = time.monotonic()
+#pdb.set_trace()
+delete(0, 0)
+t2 = time.monotonic() - t2
+
+os.chdir(rootdir);
+os.rmdir(testdir);
+
 print("dirs={} \t create = {}s \t delete = {}s".format(total_dirs, t1, t2));
