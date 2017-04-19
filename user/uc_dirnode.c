@@ -189,8 +189,9 @@ dirnode_from_file(const sds filepath)
     uint8_t *buffer = NULL, *offset_ptr = NULL;
     FILE *fd, *fd2 = NULL;
     sds path2 = NULL;
-    size_t nbytes, body_len;
+    size_t nbytes, body_len, bucket_size, bucket0_dirbox_len;
     int error = -1, len;
+    bool no_bucket0_file;
 
     fd = fopen(filepath, "rb");
     if (fd == NULL) {
@@ -272,8 +273,12 @@ dirnode_from_file(const sds filepath)
         goto out;
     }
 
-    /* lets read bucket0 */
-    nbytes = fread(buffer, 1, bucket0->bckt.length, fd);
+    no_bucket0_file = header->bucket_count == 1;
+    bucket0_dirbox_len = bucket0->bckt.length - header->lockbox_len;
+
+    /* if we are split, we only have the lockbox in bucket0 */
+    bucket_size = no_bucket0_file ? bucket0->bckt.length : header->lockbox_len;
+    nbytes = fread(buffer, 1, bucket_size, fd);
     bucket0->buffer = buffer;
     fclose(fd);
     fd = NULL;
@@ -287,10 +292,15 @@ dirnode_from_file(const sds filepath)
     TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
     {
         x++;
-        if (bucket_entry == bucket0) {
-            offset_ptr += bucket_entry->bckt.length;
-            continue;
-        }
+        bucket_size = bucket_entry->bckt.length;
+        if (bucket_entry == bucket0)
+            if (no_bucket0_file) {
+                /* then we already have bucket0 dirbox, move on */
+                offset_ptr += bucket_entry->bckt.length;
+                continue;
+            }
+
+        bucket_size = bucket0_dirbox_len;
 
         path2 = string_and_number(filepath, x);
 
@@ -301,7 +311,7 @@ dirnode_from_file(const sds filepath)
         }
 
         // copy the iv, tag and count data
-        if (!fread(offset_ptr, bucket_entry->bckt.length, 1, fd2)) {
+        if (!fread(offset_ptr, bucket_size, 1, fd2)) {
             log_error("reading bucket failed (%s)", path2);
             goto out;
         }
@@ -371,13 +381,13 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
     bool ret = false, preexist = true;
     int error;
-    uint8_t *buffer = NULL, *offset_ptr = NULL;
+    uint8_t *buffer = NULL, *offset_ptr = NULL, *lockbox_ptr;
     sds path2 = NULL;
     FILE *fd, *fd2 = NULL;
     size_t proto_len, total_len = 0, nbytes;
     dirnode_bucket_entry_t *bucket0 = dn->bucket0, *bucket_entry;
 
-    /* if the file exists, do not overwrite */
+    /* if the file exists, do overwrite */
     fd = fopen(fpath, bucket0->is_dirty ? "wb" : "rb+");
     if (fd == NULL) {
         preexist = false;
@@ -412,7 +422,7 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     }
 
     /* now serialize the the access control information */
-    offset_ptr = buffer;
+    offset_ptr = lockbox_ptr = buffer;
     if (bucket0->is_dirty) {
         if (serialize_lockbox(dn, offset_ptr)) {
             log_error("serializing dirnode ACL failed (%s)", fpath);
@@ -441,9 +451,10 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     }
 #endif
 
+    /* write the header information */
     fwrite(&dn->header, sizeof(dirnode_header_t), 1, fd);
 
-    /* now write the chunk information */
+    /* now write the bucket information */
     TAILQ_FOREACH(bucket_entry, &dn->buckets, next_entry)
     {
         // copy the iv, tag and count data
@@ -453,12 +464,22 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
         }
     }
 
-    /* write the contents of bucket0 */
-    if (bucket0->is_dirty) {
+    /* write the lockbox and bucket0 information */
+    if (dn->header.bucket_count == 1) {
+        /* then write both lockbox and bucket0 data */
         nbytes = fwrite(bucket0->buffer, 1, bucket0->bckt.length, fd);
         bucket0->is_dirty = false;
         bucket0->buffer = NULL;
+    } else {
+        /* bucket_count > 1: write the lockbox and dirbox separately */
+        fwrite(lockbox_ptr, 1, dn->header.lockbox_len, fd);
+
+        /* adjust the pointer of bucket0 */
+        bucket0->buffer += dn->header.lockbox_len;
     }
+
+    /* re-adjust the length of bucket0 */
+    bucket0->bckt.length -= dn->header.lockbox_len;
 
     fclose(fd);
     fd = NULL;
@@ -749,7 +770,8 @@ iterate_by_realname(uc_dirnode_t * dn,
     dnode_data_t * de;
     link_info_t * link_info;
 
-    list_entry = (dnode_list_entry_t *)hashmapGet(dn->name2shdw_map, (void *)realname);
+    list_entry
+        = (dnode_list_entry_t *)hashmapGet(dn->name2shdw_map, (void *)realname);
     if (list_entry) {
         de = &list_entry->dnode_data;
         goto success;
@@ -890,7 +912,8 @@ dirnode_enc2raw(uc_dirnode_t * dn,
     dnode_list_entry_t * list_entry;
     dnode_data_t * de;
 
-    list_entry = (dnode_list_entry_t *)hashmapGet(dn->shdw2name_map, (void *)encoded_name);
+    list_entry = (dnode_list_entry_t *)hashmapGet(dn->shdw2name_map,
+                                                  (void *)encoded_name);
     if (list_entry) {
         return list_entry->dnode_data.real_name;
     }

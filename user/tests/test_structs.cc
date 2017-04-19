@@ -20,11 +20,11 @@ TEST(DIRNODE, test1)
         fname = string_and_number("test", x);
 
         shadows[x] = dirnode_add(dirnode, fname, UC_FILE, 0);
-        ASSERT_TRUE(dirnode_write(dirnode, dnode_file));
 
         sdsfree(fname);
     }
 
+    ASSERT_TRUE(dirnode_write(dirnode, dnode_file));
     dirnode_free(dirnode);
 
     ASSERT_FALSE((dirnode = dirnode_from_file(dnode_fname)) == NULL) << "oops";
