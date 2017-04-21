@@ -99,7 +99,7 @@ dentry_t *
 dentry_lookup(const char * path, lookup_flags_t flags);
 
 uc_filebox_t *
-dcache_filebox(const char * path, size_t size_hint);
+dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op);
 
 static inline uc_dirnode_t *
 d_dirnode(dentry_t * dentry)

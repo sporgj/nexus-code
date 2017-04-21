@@ -13,6 +13,9 @@
 #include "uc_utils.h"
 #include "uc_vfs.h"
 
+static char *
+print_rights(acl_rights_t rights);
+
 int
 dirops_new1(const char * parent_dir,
             const char * fname,
@@ -34,6 +37,14 @@ dirops_new1(const char * parent_dir,
 
     if ((dirnode = d_dirnode(dentry)) == NULL) {
         log_error("Error loading dirnode: %s", parent_dir);
+        goto out;
+    }
+
+    /* check if they have the rights */
+    if (dirnode_checkacl(dirnode, ACCESS_INSERT)) {
+        char * acl_str = print_rights(ACCESS_INSERT);
+        log_error("[check_acl] %s ~> %s", parent_dir, acl_str);
+        free(acl_str);
         goto out;
     }
 
@@ -103,6 +114,7 @@ dirops_code2plain(const char * parent_dir,
     const char * result;
     dentry_t * dentry;
     uc_dirnode_t * dn;
+    char * acl_str = NULL;
 
     /* lets get the dentry */
     if ((dentry = dentry_lookup(parent_dir, DIROPS_LOOKUP)) == NULL) {
@@ -121,6 +133,14 @@ dirops_code2plain(const char * parent_dir,
         goto out;
     }
 
+    /* check if they have the rights */
+    if (dirnode_checkacl(dn, ACCESS_LOOKUP)) {
+        char * acl_str = print_rights(ACCESS_LOOKUP);
+        log_error("[check_acl] %s ~> %s", parent_dir, acl_str);
+        free(acl_str);
+        goto out;
+    }
+
     // 3 - Get the plain filename
     if ((result = dirnode_enc2raw(dn, fname_code, UC_ANY, &atype)) == NULL) {
         goto out;
@@ -129,8 +149,9 @@ dirops_code2plain(const char * parent_dir,
     *raw_name_dest = strdup(result);
     error = 0;
 out:
-    if (fname_code)
+    if (fname_code) {
         free(fname_code);
+    }
 
     d_put(dentry);
     return error;
@@ -179,6 +200,21 @@ dirops_move(const char * from_dir,
 
     if ((dirnode2 = d_dirnode(dentry2)) == NULL) {
         log_error("d_dirnode NULL: %s", to_dir);
+        goto out;
+    }
+
+    /* check access control */
+    if (dirnode_checkacl(dirnode1, ACCESS_DELETE)) {
+        char * acl_str = print_rights(ACCESS_DELETE);
+        log_error("[check_acl] %s ~> %s", from_dir, acl_str);
+        free(acl_str);
+        goto out;
+    }
+
+    if (dirnode_checkacl(dirnode2, ACCESS_INSERT)) {
+        char * acl_str = print_rights(ACCESS_INSERT);
+        log_error("[check_acl] %s ~> %s", to_dir, acl_str);
+        free(acl_str);
         goto out;
     }
 
@@ -383,6 +419,14 @@ dirops_symlink(const char * link_path,
         goto out;
     }
 
+    /* check if we can insert into the DIRNODE */
+    if (dirnode_checkacl(link_dnode, ACCESS_INSERT)) {
+        char * acl_str = print_rights(ACCESS_INSERT);
+        log_error("[check_acl] %s ~> %s", link_path, acl_str);
+        free(acl_str);
+        goto out;
+    }
+
     /* 2 - Find the link to the file */
     if ((link_fname = do_get_fname(link_path)) == NULL) {
         log_error("getting fname (%s) FAILED", target_path);
@@ -454,7 +498,7 @@ dirops_hardlink(const char * target_path,
     dentry_t * dentry1, *dentry2;
     uc_filebox_t * filebox = NULL;
 
-    filebox = dcache_filebox(target_path, 0);
+    filebox = dcache_filebox(target_path, 0, UCAFS_STORE);
     if (filebox == NULL) {
         log_error("finding filebox failed: '%s'", target_path);
         return -1;
@@ -480,6 +524,14 @@ dirops_hardlink(const char * target_path,
 
     if ((link_fname = do_get_fname(link_path)) == NULL) {
         log_error("getting fname (%s) FAILED", link_path);
+        goto out;
+    }
+
+    /* check if we can insert into the DIRNODE */
+    if (dirnode_checkacl(link_dnode, ACCESS_INSERT)) {
+        char * acl_str = print_rights(ACCESS_INSERT);
+        log_error("[check_acl] %s ~> %s", link_path, acl_str);
+        free(acl_str);
         goto out;
     }
 
@@ -576,6 +628,7 @@ dirops_plain2code1(const char * parent_dir,
     ucafs_entry_type atype;
     dentry_t * dentry;
     uc_dirnode_t * dirnode;
+    char * acl_str = NULL;
 
     /* lets get the dentry */
     if ((dentry = dentry_lookup(parent_dir, DIROPS_LOOKUP)) == NULL) {
@@ -585,6 +638,14 @@ dirops_plain2code1(const char * parent_dir,
 
     if ((dirnode = d_dirnode(dentry)) == NULL) {
         log_error("Error loading dirnode: %s", parent_dir);
+        goto out;
+    }
+
+    /* check if they have the rights */
+    if (dirnode_checkacl(dirnode, ACCESS_LOOKUP)) {
+        char * acl_str = print_rights(ACCESS_LOOKUP);
+        log_error("[check_acl] %s ~> %s", parent_dir, acl_str);
+        free(acl_str);
         goto out;
     }
 
@@ -711,6 +772,7 @@ dirops_remove1(const char * parent_dir,
     uc_dirnode_t * dirnode = NULL;
     ucafs_entry_type atype;
     sds afsx_fpath = NULL, afsx_dpath = NULL;
+    char * acl_str = NULL;
 
     if ((dentry = dentry_lookup(parent_dir, DIROPS_CHECKACL)) == NULL) {
         log_error("Error loading dirnode: %s", parent_dir);
@@ -722,6 +784,13 @@ dirops_remove1(const char * parent_dir,
 
     if ((dirnode = d_dirnode(dentry)) == NULL) {
         log_error("Error loading dirnode: %s", parent_dir);
+        goto out;
+    }
+
+    if (dirnode_checkacl(dirnode, ACCESS_DELETE)) {
+        char * acl_str = print_rights(ACCESS_DELETE);
+        log_error("[check_acl] %s ~> %s", parent_dir, acl_str);
+        free(acl_str);
         goto out;
     }
 
@@ -830,6 +899,13 @@ dirops_setacl(const char * path, const char * afs_acl_str)
         goto out;
     }
 
+    if (dirnode_checkacl(dirnode, ACCESS_ADMIN)) {
+        char * acl_str = print_rights(ACCESS_ADMIN);
+        log_error("[check_acl] %s ~> %s", path, acl_str);
+        free(acl_str);
+        goto out;
+    }
+
     ta->dfs = 0;
     sscanf(astr, "%d dfs:%d %1024s", &ta->nplus, &ta->dfs, ta->cell);
     astr = skip_line(astr);
@@ -906,7 +982,9 @@ out:
         sdsfree(dirpath);
     }
 
-    free(str);
+    if (str) {
+        free(str);
+    }
 
     return err;
 }

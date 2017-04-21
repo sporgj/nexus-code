@@ -1,7 +1,7 @@
 #include "uc_dirnode.h"
 #include "uc_filebox.h"
-#include "uc_vfs.h"
 #include "uc_utils.h"
+#include "uc_vfs.h"
 
 #include "third/log.h"
 #include "third/queue.h"
@@ -158,8 +158,9 @@ d_prune(dentry_item_t * dentry_item)
     if (dentry->metadata) {
         dentry_list_head_t * aliases = &dentry->metadata->aliases;
         struct dentry_list_entry * var;
-        
-        TAILQ_FOREACH(var, aliases, next_entry) {
+
+        TAILQ_FOREACH(var, aliases, next_entry)
+        {
             if (var->dentry == dentry) {
                 break;
             }
@@ -307,14 +308,14 @@ _dcache_lookup(struct dentry_tree * tree,
     sds relpath;
     bool is_parent;
 
-    switch(flags) {
-        case DIROPS_SYMLINK:
-        case DIROPS_HARDLINK:
-        case DIROPS_FILEOP:
-            is_parent = false;
-            break;
-        default:
-            is_parent = true;
+    switch (flags) {
+    case DIROPS_SYMLINK:
+    case DIROPS_HARDLINK:
+    case DIROPS_FILEOP:
+        is_parent = false;
+        break;
+    default:
+        is_parent = true;
     }
 
     if ((relpath = vfs_relpath(path, is_parent)) == NULL) {
@@ -360,7 +361,7 @@ dentry_lookup(const char * path, lookup_flags_t flags)
 }
 
 uc_filebox_t *
-dcache_filebox(const char * path, size_t size_hint)
+dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op)
 {
     int err, jrnl;
     const shadow_t * shdw;
@@ -401,7 +402,7 @@ dcache_filebox(const char * path, size_t size_hint)
         if (link_info->target_link[0] == '/') {
             // we have an absolute path
             // send request here
-            fb = dcache_filebox(link_info->target_link, size_hint);
+            fb = dcache_filebox(link_info->target_link, size_hint, xfer_op);
             goto out;
         } else {
             // have an relative path
@@ -409,10 +410,18 @@ dcache_filebox(const char * path, size_t size_hint)
             path_link = sdscat(path_link, "/");
             path_link = sdscat(path_link, link_info->target_link);
 
-            fb = dcache_filebox(path_link, size_hint);
+            fb = dcache_filebox(path_link, size_hint, xfer_op);
             sdsfree(path_link);
             goto out;
         }
+    }
+
+    /* check if the user has rights */
+    acl_rights_t right = (xfer_op == UCAFS_STORE) ? ACCESS_WRITE : ACCESS_READ;
+    if (dirnode_checkacl(dirnode, right)) {
+        log_error("[check_acl] %s ~> %s", path,
+                  (right == ACCESS_WRITE ? "write" : "read"));
+        goto out;
     }
 
     fb = metadata_get_filebox(dentry, dirnode, &path_list, shdw, size_hint,

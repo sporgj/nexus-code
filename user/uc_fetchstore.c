@@ -53,7 +53,7 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
     }
 
     /* lets find the dirnode object first */
-    filebox = dcache_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size));
+    filebox = dcache_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size), rq->op);
     if (filebox == NULL) {
         log_error("finding filebox failed: '%s'", fpath);
         return ret;

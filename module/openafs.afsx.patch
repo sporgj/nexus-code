@@ -21,7 +21,7 @@ index 0b34f1a..7775a94 100644
  }
  
 diff --git a/src/afs/LINUX/osi_vnodeops.c b/src/afs/LINUX/osi_vnodeops.c
-index 1b99c94..f2dd846 100644
+index 1b99c94..ee64498 100644
 --- a/src/afs/LINUX/osi_vnodeops.c
 +++ b/src/afs/LINUX/osi_vnodeops.c
 @@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
@@ -56,7 +56,7 @@ index 1b99c94..f2dd846 100644
  	/* filldir returns -EINVAL when the buffer is full. */
  	{
  	    unsigned int type = DT_UNKNOWN;
-@@ -431,25 +442,64 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
+@@ -431,25 +442,63 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
  		/* clean up from afs_FindVCache */
  		afs_PutVCache(tvc);
  	    }
@@ -71,8 +71,7 @@ index 1b99c94..f2dd846 100644
 +		}
 +
 +		if ((uc_name[0] == '.' && uc_name[1] == '\0') ||
-+		    (uc_name[0] == '.' && uc_name[1] == '.' && uc_name[2] == '\0') ||
-+		    (md_file = is_md_file(uc_name, len))) {
++		    (uc_name[0] == '.' && uc_name[1] == '.' && uc_name[2] == '\0')) {
 +		    goto skip;
 +		}
 +
@@ -123,7 +122,7 @@ index 1b99c94..f2dd846 100644
      }
      /* If filldir didn't fill in the last one this is still pointing to that
       * last attempt.
-@@ -475,6 +525,11 @@ out:
+@@ -475,6 +524,11 @@ out:
      afs_DestroyReq(treq);
  out1:
      AFS_GUNLOCK();
@@ -135,7 +134,7 @@ index 1b99c94..f2dd846 100644
      return code;
  }
  
-@@ -1613,6 +1668,9 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1613,6 +1667,9 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      cred_t *credp = crref();
      const char *name = newdp->d_name.name;
      struct inode *oldip = olddp->d_inode;
@@ -145,7 +144,7 @@ index 1b99c94..f2dd846 100644
  
      /* If afs_link returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1620,7 +1678,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
+@@ -1620,7 +1677,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
      d_drop(newdp);
  
      AFS_GLOCK();
@@ -167,7 +166,7 @@ index 1b99c94..f2dd846 100644
  
      AFS_GUNLOCK();
      crfree(credp);
-@@ -1722,6 +1793,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1722,6 +1792,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
      cred_t *credp = crref();
      struct vattr *vattr = NULL;
      const char *name = dp->d_name.name;
@@ -177,7 +176,7 @@ index 1b99c94..f2dd846 100644
  
      /* If afs_symlink returned the vnode, we could instantiate the
       * dentry. Since it's not, we drop this one and do a new lookup.
-@@ -1734,11 +1808,24 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
+@@ -1734,11 +1807,24 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
  	goto out;
      }
  
@@ -203,49 +202,6 @@ index 1b99c94..f2dd846 100644
      AFS_GUNLOCK();
      crfree(credp);
      return afs_convert_code(code);
-diff --git a/src/afs/VNOPS/afs_vnop_access.c b/src/afs/VNOPS/afs_vnop_access.c
-index 0087073..6116b94 100644
---- a/src/afs/VNOPS/afs_vnop_access.c
-+++ b/src/afs/VNOPS/afs_vnop_access.c
-@@ -115,6 +115,8 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
-     afs_int32 mask;
-     afs_int32 dirBits;
-     afs_int32 fileBits;
-+    /* ucafs code */
-+    int ret;
- 
-     AFS_STATCNT(afs_AccessOK);
- 
-@@ -130,7 +132,7 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
- 	    dirBits = PRSFS_LOOKUP | PRSFS_READ;
- 	    return (arights == (dirBits & arights));
- 	}
--	return (arights == afs_GetAccessBits(avc, arights, areq));
-+	ret = (arights == afs_GetAccessBits(avc, arights, areq));
-     } else {
- 	/* some rights come from dir and some from file.  Specifically, you 
- 	 * have "a" rights to a file if you are its owner, which comes
-@@ -183,8 +185,19 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
- 		    fileBits |= PRSFS_READ;
- 	    }
- 	}
--	return ((fileBits & arights) == arights);	/* true if all rights bits are on */
-+	ret = ((fileBits & arights) == arights);	/* true if all rights bits are on */
-     }
-+
-+    /* ucafs code
-+     * if the permission check passes, send it for ucafs
-+     * to check */
-+    if (ret && !UCAFS_DISCONNECTED()) {
-+	if (ucafs_kern_access(avc, arights)) {
-+	    ret = 0;
-+	}
-+    }
-+
-+    return ret;
- }
- 
- 
 diff --git a/src/afs/VNOPS/afs_vnop_create.c b/src/afs/VNOPS/afs_vnop_create.c
 index f33da96..d9cb9dd 100644
 --- a/src/afs/VNOPS/afs_vnop_create.c
