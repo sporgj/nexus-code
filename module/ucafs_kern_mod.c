@@ -382,6 +382,8 @@ ucafs_mod_init(void)
     dev->buffersize = UCMOD_BUFFER_SIZE;
     dev->inb_len = dev->outb_len = 0;
 
+    mutex_init(&xfer_buffer_mutex);
+
     /* lets setup the character device */
     uc_mod_major = MAJOR(uc_mod_devno);
     uc_mod_minor = MINOR(uc_mod_devno);
@@ -399,6 +401,8 @@ ucafs_mod_init(void)
            dev->xfer_buffer + dev->xfer_len, dev->xfer_pages);
 
     proc_create_data("ucafs_mod", 0, NULL, &ucafs_proc_fops, NULL);
+
+    ucafs_kern_init();
 
     return 0;
 }

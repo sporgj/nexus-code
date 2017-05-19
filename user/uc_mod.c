@@ -99,7 +99,7 @@ setup_mod()
     }
 
     global_xfer_addr = mmap(NULL, global_xfer_buflen, PROT_READ | PROT_WRITE,
-                            MAP_PRIVATE, fno, 0);
+                            MAP_SHARED, fno, 0);
     if (global_xfer_addr == (void *)-1) {
         log_fatal("mmap failed (size=%zu) :(", global_xfer_buflen);
         return -1;

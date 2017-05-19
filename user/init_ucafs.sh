@@ -4,7 +4,7 @@ if [ "$#" -lt 1 ]; then
   exit 1
 fi
 
-repo_dir="/afs/xyz.vm/user/$1"
+repo_dir="/afs/maatta.sgx/user/$1"
 
 set -e
 echo "Creating $repo_dir/{.afsx, sgx}"

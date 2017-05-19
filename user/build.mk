@@ -1,15 +1,15 @@
 # File defines configuration for release/debug/hw/sim
 
-SGX_MODE := SIM
+SGX_MODE := HW
 SGX_ARCH := x64
 SGX_DEBUG := 1
 SGX_PRELEASE := 0
 
 # enable SGX ecalls
-UCAFS_SGX := 0
+UCAFS_SGX := 1
 
 # are we running a development build
-UCAFS_DEV := 1
+UCAFS_DEV := 0
 
 # if to add the profiler
 UCAFS_PROFILER := 1

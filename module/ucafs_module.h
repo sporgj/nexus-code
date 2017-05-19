@@ -61,11 +61,16 @@ struct ucafs_mod {
 
 extern struct ucafs_mod * dev;
 
+int ucafs_kern_init(void);
+
 #define UCAFS_IS_OFFLINE                                                       \
     (dev->daemon == NULL || task_is_stopped_or_traced(dev->daemon))
 
 #undef ERROR
-#define ERROR(fmt, args...) printk(KERN_ERR "ucafs: " fmt, ##args)
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs: " fmt " (%s, %s:%d)", \
+    ##args, __func__, __FILE__, __LINE__)
+
+static DEFINE_MUTEX(xfer_buffer_mutex);
 
 static DEFINE_MUTEX(mut_msg_counter);
 static inline mid_t

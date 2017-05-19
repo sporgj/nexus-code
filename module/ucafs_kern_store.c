@@ -153,6 +153,7 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
         size = MIN(bytes_left, context->buflen);
 
         /* 1 - read the file into the buffer */
+        mutex_lock_interruptible(&xfer_buffer_mutex);
         afs_osi_Read(fp, -1, context->buffer, size);
 
         if ((rpc_ptr = READPTR_LOCK()) == 0) {
@@ -176,6 +177,8 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
             goto out;
         }
 
+        mutex_unlock(&xfer_buffer_mutex);
+
         kfree(reply);
         reply = NULL;
 
@@ -191,6 +194,10 @@ out:
 
     if (reply) {
         kfree(reply);
+    }
+
+    if (mutex_is_locked(&xfer_buffer_mutex)) {
+        mutex_unlock(&xfer_buffer_mutex);
     }
 
     return ret;

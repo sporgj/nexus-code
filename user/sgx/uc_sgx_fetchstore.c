@@ -272,7 +272,7 @@ close_chunk_crypto(enclave_context_t * context, xfer_context_t * xfer_ctx)
         memcpy(dest_crypto_ctx, crypto_ctx, sizeof(crypto_context_t));
     } else {
         error = memcmp(mac, &dest_crypto_ctx->mac, sizeof(crypto_mac_t));
-        error = error ? E_ERROR_ERROR : E_SUCCESS;
+        error = error ? E_ERROR_CRYPTO : E_SUCCESS;
     }
 
     return error;

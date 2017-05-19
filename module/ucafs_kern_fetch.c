@@ -154,6 +154,7 @@ ucafs_fetch_xfer(fetch_context_t * context,
         size = MIN(bytes_left, context->buflen);
 
         // read from the server
+        mutex_lock_interruptible(&xfer_buffer_mutex);
         if (ucafs_fetch_read(context, context->buffer, size, &nbytes)) {
             goto out;
         }
@@ -186,6 +187,8 @@ ucafs_fetch_xfer(fetch_context_t * context,
             goto out;
         }
 
+        mutex_unlock(&xfer_buffer_mutex);
+
         pos += size;
         bytes_left -= size;
         *xferred += size;
@@ -198,6 +201,10 @@ ucafs_fetch_xfer(fetch_context_t * context,
 out:
     if (reply) {
         kfree(reply);
+    }
+
+    if (mutex_is_locked(&xfer_buffer_mutex)) {
+        mutex_unlock(&xfer_buffer_mutex);
     }
 
     return ret;

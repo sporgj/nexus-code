@@ -15,7 +15,7 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
 
     *shadow_name = NULL;
 
-    if (ucafs_vnode_path(avc, &path)) {
+    if (name[0] == '\\' || ucafs_vnode_path(avc, &path)) {
         return -1;
     }
 
@@ -28,7 +28,8 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
     if (!xdr_string(&xdrs, &path, UCAFS_PATH_MAX) ||
         !xdr_string(&xdrs, &name, UCAFS_FNAME_MAX) ||
         !xdr_int(&xdrs, (int *)&type)) {
-        ERROR("xdr create failed\n");
+        ERROR("xdr create failed (path=%s, type=%d, name=%s)\n", path,
+              (int)msg_type, name);
         READPTR_UNLOCK();
         goto out;
     }
@@ -208,7 +209,7 @@ ucafs_kern_filldir(char * parent_dir,
                    char ** real_name)
 {
     int err = -1, code;
-    char * fname = NULL;
+    char * fname;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
     caddr_t payload;
@@ -265,11 +266,12 @@ ucafs_kern_rename(struct vcache * from_vnode,
                   char ** old_shadowname,
                   char ** new_shadowname)
 {
-    int ret = -1, code;
+    int ret = -1, code, unlocked = 0;
     char *from_path = NULL, *to_path = NULL;
     caddr_t payload;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
+    struct mutex * rename_mutex;
 
     if (ucafs_vnode_path(from_vnode, &from_path) ||
         ucafs_vnode_path(to_vnode, &to_path)) {
@@ -290,6 +292,13 @@ ucafs_kern_rename(struct vcache * from_vnode,
         goto out;
     }
 
+    /* check if cross directory renaming is present */
+    rename_mutex = &AFSTOV(from_vnode)->i_sb->s_vfs_rename_mutex;
+    if (mutex_is_locked(rename_mutex)) {
+        mutex_unlock(rename_mutex);
+        unlocked = 1;
+    }
+
     if (ucafs_mod_send(UCAFS_MSG_RENAME, &xdrs, &reply, &code) || code) {
         goto out;
     }
@@ -306,6 +315,10 @@ ucafs_kern_rename(struct vcache * from_vnode,
 
     ret = 0;
 out:
+    if (unlocked) {
+        mutex_lock(rename_mutex);
+    }
+
     if (from_path) {
         kfree(from_path);
     }

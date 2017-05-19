@@ -127,7 +127,7 @@ fetchstore_run(int id, size_t valid_buflen)
 #ifdef UCAFS_SGX
     ecall_fetchstore_crypto(global_eid, &ret, xfer_ctx);
     if (ret) {
-        log_fatal("enclave error");
+        log_fatal("enclave error (%s)", xfer_ctx->filebox->fbox_path);
         goto out;
     }
 #endif
@@ -151,7 +151,8 @@ fetchstore_finish(int id)
 #ifdef UCAFS_SGX
     ecall_fetchstore_finish(global_eid, &ret, xfer_ctx);
     if (ret) {
-        log_error("enclave reports error");
+        log_error("enclave reports error (%d): %s", ret,
+                xfer_ctx->filebox->fbox_path);
         // TODO have proper handling here
         goto out;
     }

@@ -223,28 +223,45 @@ UCAFS_DISCONNECTED()
     return UCAFS_IS_OFFLINE;
 }
 
+static char path_buf[4096];
+static size_t path_buf_len = sizeof(path_buf);
+static DEFINE_MUTEX(path_buf_mutex);
+
+int
+ucafs_kern_init(void)
+{
+    mutex_init(&path_buf_mutex);
+
+    return 0;
+}
+
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 {
     int len, total_len, count;
-    char *path, *result, *temp;
-    char buf[512];
+    char *path, *result, *temp, *buf;
     watch_path_t * curr_entry;
 
-    if (dentry == NULL) {
+    if (dentry == NULL || d_is_special(dentry)) {
         return 1;
     }
+
+    buf = path_buf;
 
     /* TODO cache the inode number
     printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d
     dentry_name=%s",
            dentry->d_parent, dentry, dentry->d_iname, dentry->d_name.len,
            dentry->d_name.name); */
-    path = dentry_path_raw((struct dentry *)dentry, buf, sizeof(buf));
+
+    mutex_lock(&path_buf_mutex);
+    path = dentry_path_raw((struct dentry *)dentry, buf, path_buf_len);
 
     if (IS_ERR_OR_NULL(path)) {
         print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf,
                        sizeof(buf), 1);
+
+        mutex_unlock(&path_buf_mutex);
         return 1;
     }
 
@@ -277,10 +294,12 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
                 *dest = result;
             }
 
+            mutex_unlock(&path_buf_mutex);
             return 0;
         }
     }
 
+    mutex_unlock(&path_buf_mutex);
     return 1;
 }
 

@@ -3,31 +3,36 @@
 set -e
 
 btime='/usr/bin/time -f %e'
-nodejs_url='https://nodejs.org/dist/v7.10.0/node-v7.10.0-linux-x64.tar.xz' 
-sintel_url='http://ftp.nluug.nl/pub/graphics/blender/demo/movies/Sintel.2010.720p.mkv'
-nodejs_fname='node-v7.10.0-linux-x64'
+nodejs_url='https://github.com/v8/v8/archive/6.0.261.tar.gz' 
+sintel_url='/home/briand/Sintel.2010.720p.mkv'
+nodejs_fname='v8-6.0.261'
 test_fldr='fake_dir'
 
-# remove everything
-$(rm -rf ./*)
 echo 'wget1, tar, du1, grep1, wget2, ffmpeg'
 
-# wget
-wget1=$(${btime} wget -q ${nodejs_url} -O nodejs.tar.gz)
+for i in `seq 1 7`
+do
+  # remove everything
+  $(rm -rf ./*)
 
-# extract archive
-tar=$(${btime} tar -xf nodejs.tar.gz)
+  # wget
+  wget1=$(${btime} wget -q ${nodejs_url} -O nodejs.tar.gz)
 
-# calculate disk usage
-du1=$(${btime} du -h ${nodejs_fname})
+  # extract archive
+  tar=$(${btime} tar -xf nodejs.tar.gz)
 
-# find 'javascript'
-grep1=$(${btime} find . -type f -exec grep -q -i 'javascript' '{}' \;)
+  # calculate disk usage
+  du1=$(${btime} du -ch ${nodejs_fname} > /dev/null)
 
-# download the movie
-wget2=$(${btime} wget -q ${sintel_url} -O sintel.mkv)
+  # find 'javascript'
+  grep1=$(${btime} find . -type f -exec grep -q -i 'javascript' '{}' \;)
 
-# generate jpegs
-ffmpeg=$(${btime} ffmpeg -i sintel.mkv -vf fps 1/5 img%03d.jpg)
+  # download the movie
+  wget2=$(${btime} cp ${sintel_url} sintel.mkv)
 
-echo ${wget1}, ${tar}, ${du1}, ${grep1}, ${wget2}, ${ffmpeg}, lol
+  # generate jpegs
+  ffmpeg=$(${btime} ffmpeg -i sintel.mkv -v -8 -vf fps=1/5 img%03d.jpg)
+  echo ${wget1}, ${tar}, ${du1}, ${grep1}, ${wget2}, ${ffmpeg}
+done
+
+rm -rf ./*
