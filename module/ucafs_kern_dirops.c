@@ -48,7 +48,7 @@ __ucafs_parent_aname_req(uc_msg_type_t msg_type,
     /* XXX create: should create remove the match? */
     if (msg_type == UCAFS_MSG_REMOVE) {
         // remove it from the cache
-        remove_shdw_name(*shadow_name);
+        //remove_shdw_name(*shadow_name);
     }
 
     ret = 0;
@@ -209,16 +209,18 @@ ucafs_kern_filldir(char * parent_dir,
                    char ** real_name)
 {
     int err = -1, code;
-    char * fname;
+    //char * fname;
     XDR xdrs, *xdr_reply;
     reply_data_t * reply = NULL;
     caddr_t payload;
 
     // check if it's in the cache
+    /*
     if ((fname = lookup_shdw_name(shadow_name))) {
         *real_name = fname;
         return 0;
     }
+    */
 
     if ((payload = READPTR_LOCK()) == 0) {
         return -1;
@@ -247,7 +249,7 @@ ucafs_kern_filldir(char * parent_dir,
     }
 
     /* add it to the cache */
-    add_path_to_cache(shadow_name, parent_dir, *real_name);
+    //add_path_to_cache(shadow_name, parent_dir, *real_name);
 
     err = 0;
 out:
@@ -310,8 +312,8 @@ ucafs_kern_rename(struct vcache * from_vnode,
         goto out;
     }
 
-    remove_path_name(from_path, oldname);
-    remove_path_name(to_path, newname);
+    //remove_path_name(from_path, oldname);
+    //remove_path_name(to_path, newname);
 
     ret = 0;
 out:

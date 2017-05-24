@@ -238,8 +238,8 @@ ucafs_kern_init(void)
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 {
-    int len, total_len, count;
-    char *path, *result, *temp, *buf;
+    int len, total_len;
+    char *path, *result, *buf;
     watch_path_t * curr_entry;
 
     if (dentry == NULL || d_is_special(dentry)) {
@@ -272,27 +272,15 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 
     list_for_each_entry(curr_entry, watchlist_ptr, list)
     {
-        if (startsWith(curr_entry->afs_path, path)) {
+        if (startsWith(curr_entry->afs_path, path) && dest) {
             len = strlen(path);
-            if (!d_is_file(dentry)) {
-                goto skip_fname_check;
-            }
 
-            /* if it's a file, lets make sure it doesn't start with .md */
-            temp = path + len;
-            for (count = 0; *temp != '/' && temp != path; temp--) {
-                count++;
-            }
-
-        skip_fname_check:
-            if (dest) {
-                total_len = afs_prefix_len + len;
-                result = kmalloc(total_len + 1, GFP_KERNEL);
-                memcpy(result, afs_prefix, afs_prefix_len);
-                memcpy(result + afs_prefix_len, path, len);
-                result[total_len] = '\0';
-                *dest = result;
-            }
+            total_len = afs_prefix_len + len;
+            result = kmalloc(total_len + 1, GFP_KERNEL);
+            memcpy(result, afs_prefix, afs_prefix_len);
+            memcpy(result + afs_prefix_len, path, len);
+            result[total_len] = '\0';
+            *dest = result;
 
             mutex_unlock(&path_buf_mutex);
             return 0;
@@ -306,11 +294,23 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 int
 ucafs_vnode_path(const struct vcache * avc, char ** dest)
 {
+    int ret = -1;
+    unsigned int hash;
+    char buf1[64], buf2[64], *str1, *str2;
+    struct inode * inode;
+    struct dentry * dentry, * alias;
+
     if (avc == NULL || vnode_type(avc) == UC_ANY) {
         return -1;
     }
 
-    return ucafs_dentry_path(d_find_alias(AFSTOV((struct vcache *)avc)), dest);
+    /* this calls a dget(dentry) */
+    dentry = d_find_alias((inode = AFSTOV((struct vcache *)avc)));
+    /* maybe check that the dentry is not disconnected? */
+    ret = ucafs_dentry_path(dentry, dest);
+    dput(dentry);
+
+    return ret;
 }
 
 void
