@@ -495,7 +495,7 @@ dirops_hardlink(const char * target_path,
         link_afsx_path = NULL;
     shadow_t * shadow_name2 = NULL;
     ucafs_entry_type atype;
-    dentry_t * dentry1, *dentry2;
+    dentry_t *dentry2;
     uc_filebox_t * filebox = NULL;
 
     filebox = dcache_filebox(target_path, 0, UCAFS_STORE);
@@ -506,7 +506,6 @@ dirops_hardlink(const char * target_path,
 
     if ((dentry2 = dentry_lookup(link_path, DIROPS_HARDLINK)) == NULL) {
         log_error("dentry_lookup %s", link_path);
-        d_put(dentry1);
         return error;
     }
 
@@ -561,7 +560,6 @@ dirops_hardlink(const char * target_path,
     *shadow_name_dest = filename_bin2str(shadow_name2);
     error = 0;
 out:
-    d_put(dentry1);
     d_put(dentry2);
 
     if (target_fname) {

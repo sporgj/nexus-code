@@ -379,7 +379,7 @@ out:
 bool
 dirnode_write(uc_dirnode_t * dn, const char * fpath)
 {
-    bool ret = false, preexist = true;
+    bool ret = false;
     int error;
     uint8_t *buffer = NULL, *offset_ptr = NULL, *lockbox_ptr;
     sds path2 = NULL;
@@ -388,17 +388,12 @@ dirnode_write(uc_dirnode_t * dn, const char * fpath)
     dirnode_bucket_entry_t *bucket0 = dn->bucket0, *bucket_entry;
 
     /* if the file exists, do overwrite */
-    fd = fopen(fpath, bucket0->is_dirty ? "wb" : "rb+");
-    if (fd == NULL) {
-        preexist = false;
-
-        if ((fd = fopen(fpath, "wb")) == NULL) {
-            log_error("file not found: %s", fpath);
-            return false;
-        }
+    if ((fd = fopen(fpath, "wb")) == NULL) {
+        log_error("file not found: %s", fpath);
+        return false;
     }
 
-    if (!preexist || dn->bucket_update) {
+    if (dn->bucket_update) {
         bucket0->is_dirty = true;
     }
 
