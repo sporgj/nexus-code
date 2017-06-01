@@ -38,6 +38,24 @@ TEST(DIRNODE, test1)
     sdsfree(dnode_fname);
 }
 
+const char * fbox_file = "./repo/filebox-test";
+TEST(FILEBOX, test1)
+{
+    uc_filebox_t * filebox1 = filebox_new();
+    sds fpath = sdsnew(fbox_file);
+
+    /* write the filebox to disk */
+    filebox_set_size(filebox1, UCAFS_CHUNK_SIZE);
+    ASSERT_TRUE(filebox_write(filebox1, fbox_file));
+
+    /* read filebox in a separate variable */
+    uc_filebox_t * filebox2 = filebox_from_file(fpath);
+    ASSERT_NE(filebox2, nullptr);
+
+    ASSERT_EQ(0, memcmp(&filebox1->header, &filebox2->header,
+                        sizeof(filebox_header_t)));
+}
+
 #if 0
 TEST(DIRNODE, test1)
 {

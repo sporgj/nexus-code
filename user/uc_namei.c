@@ -361,7 +361,7 @@ dentry_lookup(const char * path, lookup_flags_t flags)
 }
 
 uc_filebox_t *
-dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op)
+dcache_filebox(const char * path, uc_xfer_op_t xfer_op)
 {
     int err, jrnl;
     const shadow_t * shdw;
@@ -402,7 +402,7 @@ dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op)
         if (link_info->target_link[0] == '/') {
             // we have an absolute path
             // send request here
-            fb = dcache_filebox(link_info->target_link, size_hint, xfer_op);
+            fb = dcache_filebox(link_info->target_link, xfer_op);
             goto out;
         } else {
             // have an relative path
@@ -410,7 +410,7 @@ dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op)
             path_link = sdscat(path_link, "/");
             path_link = sdscat(path_link, link_info->target_link);
 
-            fb = dcache_filebox(path_link, size_hint, xfer_op);
+            fb = dcache_filebox(path_link, xfer_op);
             sdsfree(path_link);
             goto out;
         }
@@ -424,8 +424,7 @@ dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op)
         goto out;
     }
 
-    fb = metadata_get_filebox(dentry, dirnode, &path_list, shdw, size_hint,
-                              jrnl);
+    fb = metadata_get_filebox(dentry, dirnode, &path_list, shdw, jrnl);
 out:
     sdsfree(fbox_path);
 

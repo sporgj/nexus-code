@@ -1,18 +1,15 @@
 enclave {
     include "uc_types.h"
     include "uc_dirnode.h"
+    include "uc_fetchstore.h"
 
     trusted {
         public int ecall_init_enclave();
 
         /* store operations */
-        public int ecall_fetchstore_init([in, out] xfer_context_t * xfer_ctx);
-
-        public int ecall_fetchstore_start([in, out] xfer_context_t * xfer_ctx);
-
-        public int ecall_fetchstore_crypto([in, out] xfer_context_t * xfer_ctx);
-
-        public int ecall_fetchstore_finish([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_xfer_init([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_xfer_crypto([in, out] xfer_context_t * xfer_ctx);
+        public int ecall_xfer_finish([in, out] xfer_context_t * xfer_ctx);
 
         /* authentication */
         public int ecall_initialize([user_check] supernode_t * supernode,
@@ -38,8 +35,7 @@ enclave {
                                         uc_crypto_op_t op);
 
         public int
-        ecall_crypto_filebox([user_check] fbox_header_t * header,
-                             [user_check] uint8_t * data,
+        ecall_filebox_crypto([user_check] uc_filebox_t * filebox,
                              uc_crypto_op_t op);
 
         /*

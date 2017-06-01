@@ -6,7 +6,7 @@
 #include <string.h>
 
 #ifndef LOGLEVEL
-#define LOGLEVEL 2
+#define LOGLEVEL 5
 #endif
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)

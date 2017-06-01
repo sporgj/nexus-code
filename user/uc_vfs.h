@@ -99,7 +99,7 @@ dentry_t *
 dentry_lookup(const char * path, lookup_flags_t flags);
 
 uc_filebox_t *
-dcache_filebox(const char * path, size_t size_hint, uc_xfer_op_t xfer_op);
+dcache_filebox(const char * path, uc_xfer_op_t xfer_op);
 
 static inline uc_dirnode_t *
 d_dirnode(dentry_t * dentry)
@@ -149,7 +149,6 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
                      uc_dirnode_t * dirnode,
                      const path_builder_t * path_build,
                      const shadow_t * shdw,
-                     size_t size_hint,
                      int jrnl);
 
 sds

@@ -159,6 +159,7 @@ ucafs_fetch_xfer(fetch_context_t * context,
             goto out;
         }
 
+#if 0
         if ((buf_ptr = READPTR_LOCK()) == 0) {
             goto out;
         }
@@ -176,9 +177,11 @@ ucafs_fetch_xfer(fetch_context_t * context,
             ERROR("ucafs_xfer code=%d, ret=%d\n", ret, code);
             goto out;
         }
+        
 
         kfree(reply);
         reply = NULL;
+#endif
 
         /* move our pointers and copy the data into the tdc file */
         nbytes = afs_osi_Write(fp, -1, (void *)context->buffer, size);

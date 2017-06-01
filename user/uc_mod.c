@@ -98,12 +98,14 @@ setup_mod()
         return -1;
     }
 
+#if 0
     global_xfer_addr = mmap(NULL, global_xfer_buflen, PROT_READ | PROT_WRITE,
                             MAP_SHARED, fno, 0);
     if (global_xfer_addr == (void *)-1) {
         log_fatal("mmap failed (size=%zu) :(", global_xfer_buflen);
         return -1;
     }
+#endif
 
     uinfo("mmap %p for %zu bytes", global_xfer_addr, global_xfer_buflen);
 

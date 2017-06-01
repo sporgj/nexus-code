@@ -4,7 +4,7 @@ CC=gcc
 
 APP_PATH = ..
 OBJS = uc_sgx_main.o\
-	   uc_sgx_fetchstore.o\
+	   uc_sgx_xfer.o\
 	   uc_sgx_auth.o\
 	   elasticarray.o\
 	   elasticqueue.o\

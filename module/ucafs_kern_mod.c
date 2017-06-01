@@ -229,7 +229,6 @@ ucafs_m_mmap(struct file * filp, struct vm_area_struct * vma)
 
     for (i = 0; i < dev->xfer_pages; i++) {
         page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
-        get_page(page);
         err = vm_insert_page(vma, uaddr, page);
         if (err) {
             ERROR("mmap error (%d)\n", err);
@@ -335,7 +334,8 @@ out:
 int
 ucafs_mod_init(void)
 {
-    int ret, order = UCMOD_XFER_ORDER;
+    int ret, order = UCMOD_XFER_ORDER, i;
+    struct page * page;
 
     if (ucafs_module_is_mounted) {
         printk(KERN_NOTICE "ucafs_mod is already mounted\n");
@@ -381,6 +381,11 @@ ucafs_mod_init(void)
 
     dev->buffersize = UCMOD_BUFFER_SIZE;
     dev->inb_len = dev->outb_len = 0;
+
+    for (i = 0; i < dev->xfer_pages; i++) {
+        page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
+        get_page(page);
+    }
 
     mutex_init(&xfer_buffer_mutex);
 

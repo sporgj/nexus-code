@@ -220,8 +220,8 @@ dirnode_from_file(const sds filepath)
     dn->shdw2name_map = hashmapCreate(16, shdw_hash_func, shdw_equals_func);
 
     /* read the header from the file */
-    nbytes = fread(header, sizeof(dirnode_header_t), 1, fd);
-    if (!nbytes) {
+    nbytes = fread(header, 1, sizeof(dirnode_header_t), fd);
+    if (nbytes != sizeof(dirnode_header_t)) {
         log_error("reading header: %s (nbytes=%zu, exp=%lu)", filepath, nbytes,
                   sizeof(dirnode_header_t));
         goto out;

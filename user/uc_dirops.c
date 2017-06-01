@@ -498,7 +498,7 @@ dirops_hardlink(const char * target_path,
     dentry_t *dentry2;
     uc_filebox_t * filebox = NULL;
 
-    filebox = dcache_filebox(target_path, 0, UCAFS_STORE);
+    filebox = dcache_filebox(target_path, UCAFS_STORE);
     if (filebox == NULL) {
         log_error("finding filebox failed: '%s'", target_path);
         return -1;

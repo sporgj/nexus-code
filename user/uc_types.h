@@ -25,8 +25,6 @@
 
 struct uc_dentry;
 struct metadata_entry;
-struct filebox;
-typedef struct filebox uc_filebox_t;
 
 /* 128 bits */
 typedef struct {
@@ -98,56 +96,7 @@ typedef struct {
    gcm_iv_t iv;
    gcm_ekey_t ekey;
    gcm_tag_t tag;
-} __attribute__((packed)) gcm_context_t;
-
-/* File box information */
-#define UCAFS_FBOX_HEADER                                                      \
-    uint8_t link_count;                                                        \
-    uint16_t chunk_count;                                                      \
-    uint32_t chunk_size;                                                       \
-    uint32_t file_size;                                                        \
-    uint16_t fbox_len;                                                         \
-    shadow_t uuid, root;                                                       \
-    crypto_context_t crypto_ctx;
-
-typedef struct {
-    UCAFS_FBOX_HEADER;
-} __attribute__((packed)) fbox_header_t;
-
-typedef struct uc_fbox {
-    UCAFS_FBOX_HEADER;
-    crypto_context_t chunks[1];
-} __attribute__((packed)) uc_fbox_t;
-
-#define FBOX_HEADER_LEN sizeof(uc_fbox_header_t)
-#define UCAFS_GET_REAL_FILE_SIZE(len) len - sizeof(uc_fbox_t)
-#define FBOX_DEFAULT_LEN sizeof(uc_fbox_t)
-
-static inline int
-UCAFS_FBOX_SIZE(int file_size)
-{
-    return UCAFS_CHUNK_COUNT(file_size) * sizeof(crypto_context_t);
-}
-
-/* data transfer for fbox */
-typedef struct {
-    int xfer_id;
-    int enclave_crypto_id;
-    int chunk_num; // chunk number for the current store
-    uc_xfer_op_t xfer_op; // UCAFS_FETCH/UCAFS_STORE
-    char * buffer;
-    uint32_t buflen;
-    uint32_t valid_buflen; // how much "good" data can be read from the buffer
-    uint32_t completed;
-    uint32_t offset;
-    uint32_t total_len;
-    char * path;
-    int fbox_xfer;
-    int fbox_rd;
-    int fbox_wr;
-    uc_fbox_t * fbox;
-    uc_filebox_t * filebox;
-} xfer_context_t;
+} __attribute__((packed)) gcm_context_t, gcm_crypto_t;
 
 /* access control stuff */
 typedef enum {

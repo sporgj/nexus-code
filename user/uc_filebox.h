@@ -1,5 +1,6 @@
 #pragma once
 #include <stdbool.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,12 +8,40 @@ extern "C" {
 
 #include "third/sds.h"
 
+#include "uc_dirnode.h"
 #include "uc_types.h"
 
-struct filebox {
-    uc_fbox_t * fbox;
-    sds fbox_path;
-};
+typedef struct {
+   shadow_t uuid, root;
+   uint8_t chunk_size_log2; // power of 2
+   uint16_t chunk_count;
+   uint32_t file_size, fbox_payload_len; // the size of the chunks
+   gcm_context_t gcm_crypto;
+} __attribute__((packed)) filebox_header_t;
+
+/* used for maintaining header integrity */
+#define FILEBOX_HEADER_SIZE_NOCRYPTO\
+   sizeof(filebox_header_t) - sizeof(gcm_context_t)
+
+/* a chunk is just a gcm context :) */
+typedef gcm_crypto_t filebox_chunk_t;
+
+typedef struct filebox_chunk_entry {
+   TAILQ_ENTRY(filebox_chunk_entry) next_entry;
+   filebox_chunk_t chunk;
+} filebox_chunk_entry_t;
+
+// define the head of the list
+typedef TAILQ_HEAD(chunk_list, filebox_chunk_entry) filebox_chunk_head_t;
+
+typedef struct {
+   filebox_header_t header;
+   filebox_chunk_head_t chunk_list;
+   filebox_chunk_entry_t * chunk0;
+   sds fbox_path;
+   int allocated;
+   uint8_t * payload;
+} uc_filebox_t;
 
 /**
  * Creates a new filebox with a default segments
@@ -24,8 +53,8 @@ filebox_new();
 uc_filebox_t *
 filebox_new2(const shadow_t * id, uc_dirnode_t * dirnode);
 
-uc_filebox_t *
-filebox_new3(const shadow_t * id, uc_dirnode_t * dirnode, size_t hint);
+void
+filebox_set_size(uc_filebox_t * filebox, size_t size);
 
 static inline void
 filebox_set_path(uc_filebox_t * filebox, const char * path)
@@ -52,38 +81,6 @@ uc_filebox_t *
 filebox_from_file(const sds file_path);
 
 /**
- * Just like the above function, but specify a hint for the fbox
- * buffer size. Useful when you call from the xfer_context.
- * if the size_hint < uc_fbox_header_t.fbox_len, it will be ignored
- */
-uc_filebox_t *
-filebox_from_file2(const sds file_path, size_t size_hint);
-
-uc_fbox_t *
-filebox_fbox(uc_filebox_t * filebox);
-
-/**
- * Resolves the shadow name into a path and opens the filebox file
- */
-uc_filebox_t *
-filebox_from_shadow_name(const shadow_t * shdw_name);
-
-uc_filebox_t *
-filebox_from_shadow_name2(const shadow_t * shdw_name, size_t hint);
-
-
-/**
- * Creates a filebox from an existing one
- * @param fbox is the filebox to copy from
- * @return a new filebox
- */
-uc_filebox_t *
-filebox_copy(const uc_filebox_t * fb);
-
-int
-filebox_equals(const uc_filebox_t * fb1, uc_filebox_t * fb2);
-
-/**
  * Deallocates the filebox from the heap
  * @param fb
  */
@@ -106,28 +103,35 @@ filebox_write(uc_filebox_t * fb, const char * path);
 bool
 filebox_flush(uc_filebox_t * fb);
 
-int filebox_decr_link_count(uc_filebox_t * fb);
+static filebox_chunk_t *
+filebox_get_chunk(uc_filebox_t * filebox, size_t chunk_id)
+{
+    size_t i = 0;
+    filebox_chunk_entry_t * chunk_entry = TAILQ_FIRST(&filebox->chunk_list);
 
-int filebox_incr_link_count(uc_filebox_t * fb);
+    for (; i < chunk_id; i++) {
+        chunk_entry = TAILQ_NEXT(chunk_entry, next_entry);
+    }
 
-/**
- * Returns the crypto context at the specific chunk id
- * @param chunk_id
- * @return NULL if the id is invalid
- */
-crypto_context_t *
-filebox_get_crypto(uc_filebox_t * fb, size_t chunk_id);
+    return chunk_entry ? &chunk_entry->chunk : NULL;
+}
 
-/**
- * Updates the crypto context at the specified chunk id
- * @param fb
- * @param chunk_id
- * @param crypto_ctx
- */
-void
-filebox_set_crypto(uc_filebox_t * fb,
-                   size_t chunk_id,
-                   crypto_context_t * crypto_ctx);
+static void
+filebox_set_chunk(uc_filebox_t * filebox,
+                  const filebox_chunk_t * chunk,
+                  size_t chunk_id)
+{
+    size_t i = 0;
+    filebox_chunk_entry_t * chunk_entry = TAILQ_FIRST(&filebox->chunk_list);
+
+    for (; i < chunk_id; i++) {
+        chunk_entry = TAILQ_NEXT(chunk_entry, next_entry);
+    }
+
+    if (chunk_entry) {
+        memcpy(&chunk_entry->chunk, chunk, sizeof(filebox_chunk_t));
+    }
+}
 
 #ifdef __cplusplus
 }

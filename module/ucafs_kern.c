@@ -295,17 +295,14 @@ int
 ucafs_vnode_path(const struct vcache * avc, char ** dest)
 {
     int ret = -1;
-    unsigned int hash;
-    char buf1[64], buf2[64], *str1, *str2;
-    struct inode * inode;
-    struct dentry * dentry, * alias;
+    struct dentry * dentry;
 
     if (avc == NULL || vnode_type(avc) == UC_ANY) {
         return -1;
     }
 
     /* this calls a dget(dentry) */
-    dentry = d_find_alias((inode = AFSTOV((struct vcache *)avc)));
+    dentry = d_find_alias(AFSTOV((struct vcache *)avc));
     /* maybe check that the dentry is not disconnected? */
     ret = ucafs_dentry_path(dentry, dest);
     dput(dentry);

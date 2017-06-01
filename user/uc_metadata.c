@@ -336,7 +336,6 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
                      uc_dirnode_t * dirnode,
                      const path_builder_t * path_build,
                      const shadow_t * shdw,
-                     size_t size_hint,
                      int jrnl)
 {
     int ret = -1;
@@ -349,7 +348,7 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
     }
 
     /* then we have to create the filebox */
-    if ((fb = filebox_new3(shdw, dirnode, size_hint)) == NULL) {
+    if ((fb = filebox_new2(shdw, dirnode)) == NULL) {
         log_error("filebox_new2 failed");
         return NULL;
     }
@@ -374,7 +373,7 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
     goto done;
 
 load_from_disk:
-    fb = filebox_from_file2(fbox_path, size_hint);
+    fb = filebox_from_file(fbox_path);
 
 done:
     ret = 0;

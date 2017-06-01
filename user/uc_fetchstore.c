@@ -38,22 +38,18 @@ free_xfer_context(xfer_context_t * xfer_ctx)
 }
 
 int
-fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
+fetchstore_init(xfer_req_t * req, char * fpath, xfer_rsp_t * rsp)
 {
     int ret = -1;
-    xfer_context_t * xfer_ctx = NULL;
-    const shadow_t * shdw_name;
+    xfer_context_t * xfer_ctx;
     uc_filebox_t * filebox;
-    ucafs_entry_type atype;
-    int chunk_count;
 
-    /* TODO move this to an init function */
     if (xfer_context_array == NULL) {
         xfer_context_array = seqptrmap_init();
     }
 
     /* lets find the dirnode object first */
-    filebox = dcache_filebox(fpath, UCAFS_FBOX_SIZE(rq->file_size), rq->op);
+    filebox = dcache_filebox(fpath, req->op);
     if (filebox == NULL) {
         log_error("finding filebox failed: '%s'", fpath);
         return ret;
@@ -65,19 +61,21 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
         goto out;
     }
 
-    /* initialize our xfer context data */
-    xfer_ctx->xfer_id = -1;
-    xfer_ctx->xfer_op = rq->op;
-    xfer_ctx->completed = 0;
-    xfer_ctx->buflen = global_xfer_buflen;
-    xfer_ctx->offset = rq->offset;
-    xfer_ctx->total_len = rq->file_size;
-    xfer_ctx->path = strdup(fpath);
-    xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(rq->offset);
-    xfer_ctx->fbox = filebox_fbox(filebox);
-    xfer_ctx->filebox = filebox;
-    xfer_ctx->buffer = global_xfer_addr;
+    /* initialize the xfer content */
+    xfer_ctx->enclave_crypto_id = -1;
+    xfer_ctx->xfer_op = req->op;
+    xfer_ctx->offset = req->offset;
+    xfer_ctx->total_len = req->file_size;
+    xfer_ctx->xfer_size = req->xfer_size;
 
+    /* set the buffer and its maximum size */
+    xfer_ctx->buffer = (uint8_t *)global_xfer_addr;
+    xfer_ctx->buflen = global_xfer_buflen;
+
+    xfer_ctx->path = strdup(fpath);
+    xfer_ctx->filebox = filebox;
+
+    /* add it to the context array */
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {
         // TODO delete context from enclave space
@@ -85,22 +83,10 @@ fetchstore_init(xfer_req_t * rq, char * fpath, xfer_rsp_t * rp)
         goto out;
     }
 
-#ifdef UCAFS_SGX
-    ecall_fetchstore_init(global_eid, &ret, xfer_ctx);
-    if (ret) {
-        log_error("Enclave error");
-        goto out;
-    }
-
-    ecall_fetchstore_start(global_eid, &ret, xfer_ctx);
-    if (ret) {
-        log_fatal("enclave error");
-        goto out;
-    }
-#endif
+    filebox_set_size(filebox, req->file_size);
 
     /* set the response */
-    *rp = (xfer_rsp_t){.xfer_id = xfer_ctx->xfer_id };
+    *rsp = (xfer_rsp_t){.xfer_id = xfer_ctx->xfer_id };
 
     ret = 0;
 out:
@@ -114,22 +100,62 @@ out:
 int
 fetchstore_run(int id, size_t valid_buflen)
 {
-    int ret = -1;
+    int ret = 0;
     xfer_context_t * xfer_ctx
         = (xfer_context_t *)seqptrmap_get(xfer_context_array, id);
     if (xfer_ctx == NULL) {
-        log_warn("xfer_ctx id=%d not found", id);
+        log_error("xfer_ctx id=%d not found", id);
         return -1;
     }
 
     xfer_ctx->valid_buflen = valid_buflen;
 
+#if 0
 #ifdef UCAFS_SGX
-    ecall_fetchstore_crypto(global_eid, &ret, xfer_ctx);
+    if (xfer_ctx->enclave_crypto_id == -1) {
+        /* calculate chunk left */
+        xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(xfer_ctx->offset);
+        xfer_ctx->chunk_left = MIN(xfer_ctx->xfer_size, UCAFS_CHUNK_SIZE);
+        /* get the chunk information */
+        xfer_ctx->chunk
+            = filebox_get_chunk(xfer_ctx->filebox, xfer_ctx->chunk_num);
+
+        if (xfer_ctx->chunk == NULL) {
+            log_error("problem getting chunknum=%d", xfer_ctx->chunk_num);
+            return 0;
+        }
+
+        ecall_xfer_init(global_eid, &ret, xfer_ctx);
+        if (ret) {
+            log_error("enclave error: initializing transfer failed (%s)",
+                    xfer_ctx->path);
+            goto out;
+        }
+    }
+
+    /* call the enclave for encryption */
+    ecall_xfer_crypto(global_eid, &ret, xfer_ctx);
     if (ret) {
-        log_fatal("enclave error (%s)", xfer_ctx->filebox->fbox_path);
+        log_error("enclave encryption error (%d) (%s)", ret,
+                xfer_ctx->path);
         goto out;
     }
+
+    /* update the amount of data left to be encrypted */
+    xfer_ctx->chunk_left -= valid_buflen;
+    xfer_ctx->offset += valid_buflen;
+    xfer_ctx->xfer_size -= valid_buflen;
+
+    /* how much of the chunk do we have left */
+    if (xfer_ctx->chunk_left == 0) {
+        ecall_xfer_finish(global_eid, &ret, xfer_ctx);
+        if (ret) {
+            log_error("enclave error: finishing transfer (%d) (%s)", ret,
+                    xfer_ctx->path);
+            goto out;
+        }
+    }
+#endif
 #endif
 
     ret = 0;
@@ -148,17 +174,7 @@ fetchstore_finish(int id)
         return -1;
     }
 
-#ifdef UCAFS_SGX
-    ecall_fetchstore_finish(global_eid, &ret, xfer_ctx);
-    if (ret) {
-        log_error("enclave reports error (%d): %s", ret,
-                xfer_ctx->filebox->fbox_path);
-        // TODO have proper handling here
-        goto out;
-    }
-#endif
-
-    if (!filebox_flush(xfer_ctx->filebox)) {
+    if (xfer_ctx->xfer_op == UCAFS_STORE && !filebox_flush(xfer_ctx->filebox)) {
         log_error("committing the filebox to disk failed");
         goto out;
     }
