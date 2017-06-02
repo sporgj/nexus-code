@@ -67,10 +67,7 @@ typedef struct snode_entry snode_entry_t;
 supernode_t * find_supernode(shadow_t * root_dnode);
 
 crypto_ekey_t *
-derive_skey2(crypto_ekey_t * rkey, shadow_t * shdw1, shadow_t * shdw2);
-
-crypto_ekey_t *
-derive_skey1(shadow_t * root, shadow_t * part1, shadow_t * par2);
+derive_skey(shadow_t * shdw1, shadow_t * shdw2);
 
 #ifdef __cplusplus
 }

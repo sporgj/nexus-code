@@ -49,7 +49,7 @@ out:
 }
 
 crypto_ekey_t *
-derive_skey2(crypto_ekey_t * rkey, shadow_t * shdw1, shadow_t * shdw2)
+derive_skey(shadow_t * shdw1, shadow_t * shdw2)
 {
     crypto_ekey_t * skey;
     mbedtls_sha256_context _, *sha256_ctx = &_;
@@ -61,26 +61,13 @@ derive_skey2(crypto_ekey_t * rkey, shadow_t * shdw1, shadow_t * shdw2)
     }
 
     mbedtls_sha256_init(sha256_ctx);
-    mbedtls_sha256_update(sha256_ctx, (uint8_t *)rkey, sizeof(crypto_ekey_t));
+    mbedtls_sha256_update(sha256_ctx, (uint8_t *)&__enclave_encryption_key__, sizeof(crypto_ekey_t));
     mbedtls_sha256_update(sha256_ctx, (uint8_t *)shdw1, sizeof(shadow_t));
     mbedtls_sha256_update(sha256_ctx, (uint8_t *)shdw2, sizeof(shadow_t));
     mbedtls_sha256_finish(sha256_ctx, (uint8_t *)skey);
     mbedtls_sha256_free(sha256_ctx);
 
     return skey;
-}
-
-crypto_ekey_t *
-derive_skey1(shadow_t * root, shadow_t * shdw1, shadow_t * shdw2)
-{
-    supernode_t * super;
-
-    /* find the supernode */
-    if ((super = find_supernode(root)) == NULL) {
-        return NULL;
-    }
-
-    return derive_skey2(&super->crypto_ctx.ekey, shdw1, shdw2);
 }
 
 int
@@ -119,7 +106,7 @@ crypto_dirnode_buffer(dirnode_header_t * header,
     gcm_iv_t iv;
     gcm_tag_t tag;
     mbedtls_gcm_context _, *gcm_ctx = &_;
-    uint8_t p_input[CONFIG_CRYPTO_BUFLEN], p_out[CONFIG_CRYPTO_BUFLEN], *p_data;
+    uint8_t p_input[CONFIG_CRYPTO_BUFLEN], *p_data;
 
     if (op == UC_ENCRYPT) {
         sgx_read_rand((uint8_t *)&bucket_entry->bckt.iv, sizeof(gcm_iv_t));
@@ -162,7 +149,7 @@ crypto_dirnode_buffer(dirnode_header_t * header,
     return ret;
 }
 
-inline int
+static inline int
 usgx_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 {
     int ret = -1, dirty_count = 0;
@@ -173,7 +160,7 @@ usgx_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
     uint8_t *p_input, *p_data;
 
     /* super_ekey + root_shdw + fnode_uuid */
-    sealing_key = derive_skey1(&header->root, &header->parent, &header->uuid);
+    sealing_key = derive_skey(&header->root, &header->uuid);
     if (sealing_key == NULL) {
         return -1;
     }
@@ -245,7 +232,7 @@ usgx_filebox_crypto(uc_filebox_t * filebox, uc_crypto_op_t op)
     mbedtls_gcm_context _gcm, *gcm_ctx = &_gcm;
 
     /* 1 - derive its sealing key */
-    sealing_key = derive_skey1(&header->root, &header->root, &header->uuid);
+    sealing_key = derive_skey(&header->root, &header->uuid);
     if (sealing_key == NULL) {
         return -1;
     }

@@ -209,7 +209,7 @@ ecall_initialize(supernode_t * super, char * pubkey_str, size_t keylen)
         return E_ERROR_CRYPTO;
     }
 
-    skey = derive_skey2(__enclave_key__, &_super.root_dnode, &_super.uuid);
+    skey = derive_skey(&_super.root_dnode, &_super.uuid);
     if (skey == NULL) {
         return -1;
     }
@@ -333,7 +333,7 @@ usgx_ucafs_response(supernode_t * super,
     /* 2 - Verify the supernode has not been tampered and was created with the
      * specified public key */
 
-    skey = derive_skey2(__enclave_key__, &super->root_dnode, &super->uuid);
+    skey = derive_skey(&super->root_dnode, &super->uuid);
     if (skey == NULL) {
         return -1;
     }
@@ -396,7 +396,7 @@ ecall_supernode_crypto(supernode_t * super, seal_op_t op)
     crypto_ctx = &_super.crypto_ctx;
 
     crypto_ekey_t * skey
-        = derive_skey2(__enclave_key__, &_super.root_dnode, &_super.uuid);
+        = derive_skey(&_super.root_dnode, &_super.uuid);
     if (skey == NULL) {
         return -1;
     }
@@ -434,7 +434,7 @@ usgx_supernode_mount(supernode_t * super)
 
     /* derive the sealing key */
     crypto_ekey_t * skey
-        = derive_skey2(__enclave_key__, &super->root_dnode, &super->uuid);
+        = derive_skey(&super->root_dnode, &super->uuid);
     if (skey == NULL) {
         return -1;
     }

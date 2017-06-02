@@ -110,7 +110,6 @@ fetchstore_run(int id, size_t valid_buflen)
 
     xfer_ctx->valid_buflen = valid_buflen;
 
-#if 0
 #ifdef UCAFS_SGX
     if (xfer_ctx->enclave_crypto_id == -1) {
         /* calculate chunk left */
@@ -155,7 +154,6 @@ fetchstore_run(int id, size_t valid_buflen)
             goto out;
         }
     }
-#endif
 #endif
 
     ret = 0;

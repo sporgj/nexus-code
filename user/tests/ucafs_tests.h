@@ -10,6 +10,9 @@ extern "C" {
 #include <uc_utils.h>
 
 #include <third/log.h>
+#include <third/sds.h>
+
+#include <mbedtls/sha256.h>
 
 int
 start_testbed();
