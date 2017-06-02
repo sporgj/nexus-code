@@ -1,41 +1,36 @@
 #!/usr/bin/python3.5
-import subprocess, time
-#workloads = ['media', 'src', 'www']
-workloads = ['www']
+import subprocess, time, os
+#workloads = ['large_file_small_dir', 'medium_file_medium_dir', 'small_file_large_dir']
+workloads = ['medium_file_medium_dir', 'small_file_large_dir']
+#workloads = ['small_file_large_dir']
 
 tar_files = [wrk + '-workload.tar' for wrk in workloads]
 gz_files = [wrk + '-workload.tar.gz' for wrk in workloads]
 
-cp_cmd = 'cp {:} .'
-gunzip_cmd = 'gunzip {:}'
-grep1_cmd = 'grep -q -a \'javascript\' {:}'
 tarx_cmd = 'tar -xf {:}'
 du_cmd = 'du -cs {:}'
 grep2_cmd = 'grep -q -R \'javascript\' {:}'
-tarc_cmd = 'tar -czf {:} {:}'
-rm_cmd = 'rm -rf {:} {:} {:}'
+tarc_cmd = 'tar -cf {:} {:}'
+cp_cmd = 'cp -r {0}/{1} {0}/{1}-txt'
+mv_cmd = 'mv {0}/{1} {0}/{1}-txt'
+rm_cmd = 'rm -rf {:} {:}'
 
 flush_cmd = 'sudo fs flushall && echo 3 | sudo tee /proc/sys/vm/drop_caches'
 
-GREP = [2, 5]
+GREP = [2]
+
+# create the file to run the test
+timestr = time.strftime("%Y%m%d-%H%M%S")
+fd = open('/home/briand/results/microbm-'+timestr+'.txt', 'w')
 
 def gen(workload):
     folder = workload
-    gz_file = workload+'-workload.tar.gz'
-    tar_file = workload+'-workload.tar'
-    cv_file = workload+'-compress.tar.xz'
-    
-    # create cp
-    cp = cp_cmd.format('/home/briand/ucafs/bench/ucafs-workloads/'+gz_file)
-
-    # gunzip
-    gunzip = gunzip_cmd.format(gz_file)
-
-    # grepping the larger tar file
-    grep1 = grep1_cmd.format(tar_file)
+    gz_file = workload+'.tar.gz'
+    cv_file = workload+'-compress.tar.gz'
+    gz_path = '/home/briand/ucafs/bench/ucafs-workloads/'+gz_file 
 
     # extract tar
-    tar1 = tarx_cmd.format(tar_file)
+    tar1 = tarx_cmd.format(gz_path)
 
     # du_cmd
     du = du_cmd.format(folder)
@@ -46,10 +41,15 @@ def gen(workload):
     # creating the tar file
     tar2 = tarc_cmd.format(cv_file, folder)
 
-    # the removal
-    rm = rm_cmd.format(cv_file, tar_file, folder)
+    # copy one item
+    cp = cp_cmd.format(folder, '0000001')
 
-    return (cp, gunzip, grep1, tar1, du, grep2, tar2, rm,)
+    mv = mv_cmd.format(folder, '0000002')
+
+    # the removal
+    rm = rm_cmd.format(cv_file, folder)
+
+    return (tar1, du, grep2, tar2, cp, mv, rm,)
 
 def run_test(workload):
     commands = gen(workload)
@@ -72,12 +72,24 @@ def run_test(workload):
         i += 1
 
         vals.append(t1)
+    
+    data = fmt.format(*vals)
+    fd.writelines([data, '\n'])
+    fd.flush()
 
-    print(fmt.format(*vals))
+    print(data)
 
-v = 'cp, gunzip, grep1, tar1, du, grep2, tar2, rm_cmd'
+v = 'tar_x, du, grep, tar_c, cp, mv, rm'
 print(v)
+fd.writelines([os.getcwd(), '\n', v, '\n'])
+fd.flush()
+
 for load in workloads:
     print('#', load)
-    for i in range(5):
+    fd.writelines(['#', load, '\n'])
+    fd.flush()
+
+    for i in range(25):
         run_test(load)
+
+fd.close()
