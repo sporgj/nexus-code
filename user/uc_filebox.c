@@ -77,7 +77,7 @@ filebox_free(uc_filebox_t * filebox)
 }
 
 uc_filebox_t *
-filebox_from_file(const sds filepath)
+filebox_from_file(const char * filepath)
 {
     uc_filebox_t * filebox;
     filebox_header_t * header;
@@ -154,7 +154,7 @@ filebox_from_file(const sds filepath)
 
     // setup chunk0 and the path of the metadata file
     filebox->chunk0 = TAILQ_FIRST(chunk_list);
-    filebox->fbox_path = sdsdup(filepath);
+    filebox->fbox_path = sdsnew(filepath);
 
     ret = 0;
 out:
@@ -246,7 +246,7 @@ void
 filebox_set_size(uc_filebox_t * filebox, size_t size)
 {
     filebox_chunk_entry_t * chunk_entry;
-    int nchunks = UCAFS_CHUNK_COUNT(size), todo;
+    size_t nchunks = UCAFS_CHUNK_COUNT(size), todo;
 
     /* make sure the number of allocated chunks suffice */
     if (nchunks > filebox->header.chunk_count) {

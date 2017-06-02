@@ -78,7 +78,7 @@ filebox_get_path(uc_filebox_t * filebox)
  * @return NULL if the filebox could not be initialized
  */
 uc_filebox_t *
-filebox_from_file(const sds file_path);
+filebox_from_file(const char * file_path);
 
 /**
  * Deallocates the filebox from the heap

@@ -1,5 +1,6 @@
 #include "ucafs_module.h"
 
+#include <linux/dcache.h>
 #include <linux/list.h>
 #include <linux/string.h>
 

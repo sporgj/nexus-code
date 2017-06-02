@@ -106,8 +106,8 @@ typedef struct {
     int xfer_id;
 } __attribute__((packed)) xfer_rsp_t;
 
-static inline int
-UCAFS_CHUNK_BASE(int offset)
+static inline size_t
+UCAFS_CHUNK_BASE(size_t offset)
 {
     return ((offset < UCAFS_CHUNK_SIZE)
                 ? 0
@@ -115,25 +115,18 @@ UCAFS_CHUNK_BASE(int offset)
                    + UCAFS_CHUNK_SIZE));
 }
 
-static inline int
-UCAFS_CHUNK_NUM(int offset)
+static inline size_t
+UCAFS_CHUNK_NUM(size_t offset)
 {
     return ((offset < UCAFS_CHUNK_SIZE)
                 ? 0
-                : 1 + ((offset - UCAFS_CHUNK_SIZE) >> UCAFS_CHUNK_LOG));
-}
-
-static inline int
-UCAFS_CHUNK_COUNT(int file_size)
-{
-    return UCAFS_CHUNK_NUM(file_size) + 1;
+                : 1 + ((offset - (size_t)UCAFS_CHUNK_SIZE) >> UCAFS_CHUNK_LOG));
 }
 
 static inline size_t
-CHUNK_RATIO(int numerator_log, int denomintor_log)
+UCAFS_CHUNK_COUNT(size_t file_size)
 {
-    int ratio = numerator_log - denomintor_log;
-    return ratio < 0 ? 0 : (1 << ratio) + 1;
+    return UCAFS_CHUNK_NUM(file_size) + 1;
 }
 
 /* module-userspace data structures */

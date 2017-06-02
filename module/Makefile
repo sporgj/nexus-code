@@ -14,7 +14,7 @@ FILES := \
 
 all: install
 
-install: ucafs_header.h install-vanilla
+install: ucafs_header.h #install-vanilla
 	@cp -u $(FILES) $(OPENAFS_DIR)
 	@echo "install: $(FILES)"
 
