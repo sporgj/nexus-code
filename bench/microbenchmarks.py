@@ -1,8 +1,8 @@
 #!/usr/bin/python3.5
 import subprocess, time, os
 #workloads = ['large_file_small_dir', 'medium_file_medium_dir', 'small_file_large_dir']
-workloads = ['medium_file_medium_dir', 'small_file_large_dir']
-#workloads = ['small_file_large_dir']
+#workloads = ['medium_file_medium_dir', 'small_file_large_dir']
+workloads = ['large_file_small_dir']
 
 tar_files = [wrk + '-workload.tar' for wrk in workloads]
 gz_files = [wrk + '-workload.tar.gz' for wrk in workloads]
