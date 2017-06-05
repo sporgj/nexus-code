@@ -2,6 +2,7 @@
 
 const char * dnode_file = "./repo/dnode-test";
 
+#if 0
 #define N 6
 TEST(DIRNODE, test1)
 {
@@ -80,6 +81,9 @@ TEST(FILEBOX, test2)
     }
 }
 
+#endif
+
+#define KB_FILE (size_t)(1 << 10)
 #define MB_FILE (size_t)(1 << 20)
 #define GB_FILE (size_t)(1 << 30)
 #define PAGE_SIZE 4096
@@ -89,13 +93,14 @@ typedef struct {
     char bytes[32];
 } sha256_buf_t;
 const uint32_t file_sizes[]
-    = { MB_FILE, 0, 100 * MB_FILE, 512 * MB_FILE, 3 * GB_FILE, 0 };
+    = { 10 * KB_FILE,  20,       5 * MB_FILE, 10 * MB_FILE,
+        100 * MB_FILE, 512 * MB_FILE, 3 * GB_FILE, 0 };
 char buf[4096];
 
 TEST(FILEBOX, test3)
 {
     uint32_t fsize = 1;
-    int bytes_left, chunk_left, chunk_num = 0, nbytes;
+    int bytes_left, chunk_left, chunk_num = 0, nbytes, cmp;
     mbedtls_sha256_context _, *sha_ctx = &_;
     char * temp;
     const char * fname = "foo";
@@ -109,7 +114,6 @@ TEST(FILEBOX, test3)
     sds filepath = do_make_path(root_path, fname);
     ASSERT_EQ(0, dirops_new(filepath, UC_DIR, &temp));
 
-    fd = fopen(filepath, "wb");
 
     /* allocate the global memory table */
     global_xfer_buflen = BUFFER_LEN;
@@ -121,6 +125,8 @@ TEST(FILEBOX, test3)
         fsize = file_sizes[i];
         // calculate the number of chunks
         size_t nchunks = UCAFS_CHUNK_COUNT(fsize);
+
+        uinfo("Running filesize: %zu, nchunks=%zu", (size_t)fsize, nchunks);
 
         /* allocate the sha256 array */
         write_sha = (sha256_buf_t *)calloc(sizeof(sha256_buf_t), nchunks);
@@ -137,6 +143,7 @@ TEST(FILEBOX, test3)
             << "fetchstore init failed";
 
         mbedtls_sha256_init(sha_ctx);
+        fd = fopen(filepath, "wb");
 
         /* prefill the buffer and start encrypting */
         bytes_left = fsize, chunk_left = MIN(bytes_left, UCAFS_CHUNK_SIZE),
@@ -145,7 +152,7 @@ TEST(FILEBOX, test3)
             nbytes = MIN(bytes_left, global_xfer_buflen);
 
             // copy data into the buffer
-            memset(global_xfer_addr, 1, nbytes);
+            memset(global_xfer_addr, (char)i, nbytes);
             mbedtls_sha256_update(sha_ctx, global_xfer_addr, nbytes);
 
             /* run it */
@@ -214,6 +221,7 @@ TEST(FILEBOX, test3)
         read_file(fd, 0, fsize, write_sha);*/
 
         free(write_sha);
+        fclose(fd);
     }
 
     sdsfree(filepath);
