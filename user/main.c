@@ -40,6 +40,12 @@ int main(int argc, char ** argv)
         return -1;
     }
 
+#ifdef UCAFS_FLUSH
+    uinfo("Flush ENABLED");
+#else
+    uinfo("Flush DISABLED");
+#endif
+
     if (setup_mod()) {
         uerror(" ! Could not access module");
         return -1;

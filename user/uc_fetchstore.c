@@ -26,10 +26,6 @@ free_xfer_context(xfer_context_t * xfer_ctx)
         seqptrmap_delete(xfer_context_array, xfer_ctx->xfer_id);
     }
 
-    if (xfer_ctx->filebox) {
-        filebox_free(xfer_ctx->filebox);
-    }
-
     if (xfer_ctx->path) {
         free(xfer_ctx->path);
     }

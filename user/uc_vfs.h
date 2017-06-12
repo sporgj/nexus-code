@@ -54,6 +54,12 @@ typedef struct metadata_entry {
     dentry_list_head_t aliases;
 } metadata_entry_t, metadata_t;
 
+typedef struct filebox_entry {
+    shadow_t shdw_name;
+    time_t epoch;
+    uc_filebox_t * fb;
+} filebox_entry_t;
+
 typedef struct {
     const struct uc_dentry * parent;
     uint8_t len;
@@ -115,7 +121,7 @@ sds
 vfs_metadata_fpath(const uc_dirnode_t * dirnode, const shadow_t * shdw);
 
 void
-metadata_rm_dirnode(const shadow_t * shdw);
+metadata_rm_filebox(const shadow_t * shdw);
 
 sds
 vfs_relpath(const char * path, bool dirpath);

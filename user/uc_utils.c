@@ -11,11 +11,13 @@ sds
 string_and_number(const char * str, int number)
 {
     sds rv;
-    char buf[50];
+    char buf[10];
 
-    snprintf(buf, sizeof(buf), "-%d", number);
-    rv = sdsnew(str);
-    rv = sdscat(rv, buf);
+    int len1 = snprintf(buf, sizeof(buf), "%d", number), len2 = strlen(str);
+    rv = sdsnewlen(str, len1 + len2 + 2);
+    /* danger, danger */
+    memcpy(&rv[len2], buf, len1);
+    rv[len1 + len2] = '\0';
     return rv;
 }
 

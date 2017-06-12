@@ -536,18 +536,27 @@ out:
 bool
 dirnode_flush(uc_dirnode_t * dn)
 {
+#ifdef UCAFS_FLUSH
     bool ret = dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
     if (ret && dn->mcache) {
         metadata_update_entry(dn->mcache);
     }
 
     return ret;
+#else
+    return true;
+#endif
 }
 
 bool
 dirnode_fsync(uc_dirnode_t * dn)
 {
-    return dirnode_flush(dn);
+    bool ret = dn->dnode_path ? dirnode_write(dn, dn->dnode_path) : false;
+    if (ret && dn->mcache) {
+        metadata_update_entry(dn->mcache);
+    }
+
+    return ret;
 }
 
 void

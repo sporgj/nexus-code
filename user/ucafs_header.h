@@ -5,12 +5,17 @@
 #endif
 
 #if defined(UCPRIV_ENCLAVE) || defined(KERNEL)
+#include <linux/types.h>
 typedef struct {
     uint8_t bin[16];
 } uuid_t;
 #else
 #include <uuid/uuid.h>
 #include <stdlib.h>
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 #endif
 
 #ifndef UCPRIV_ENCLAVE
@@ -27,11 +32,6 @@ typedef struct {
     int len;
     char path[0];
 } watchlist_path_t;
-#endif
-
-
-#ifndef PAGE_SIZE
-#define PAGE_SIZE 4096
 #endif
 
 #define UCAFS_DATA_BUFPAGES 1
@@ -77,9 +77,9 @@ typedef enum {
 } acl_type_t;
 
 /* prefixes for the different file types */
-#define UC_METADATA_PREFIX "md"
+#define UC_METADATA_PREFIX "m"
 #define UC_METADIR_PREFIX "_"
-#define UC_FILEDATA_PREFIX ""
+#define UC_FILEDATA_PREFIX "f"
 #define UC_PREFIX_LEN(x) sizeof(x) - 1
 
 #define UC_ENCRYPT 0x00000001

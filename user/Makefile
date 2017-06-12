@@ -27,7 +27,7 @@ enclave_u.o: enclave_u.c
 	@echo "CC <= $^"
 
 ucafs: main.c libucafs.a
-	@$(CC) $(CFLAGS) $^ $(LIBS) $(App_Link_Flags) -o $@
+	$(CC) $(CFLAGS) $^ $(LIBS) $(App_Link_Flags) -o $@
 	@echo "CXX <= $@"
 
 third/libthird.a:

@@ -14,6 +14,10 @@ else
        FLAGS += -UUCAFS_DEV -DLOGLEVEL=1 -O2
 endif
 
+ifeq ($(UCAFS_FLUSH), 1)
+       FLAGS += -DUCAFS_FLUSH
+endif
+
 PROGRAM = ucafs
 CXX = g++
 CC = gcc

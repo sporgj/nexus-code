@@ -187,7 +187,7 @@ encode_bin2str(const shadow_t * code, char * prefix, size_t prefix_len)
         compute_encoded_str_size();
     }
 
-    result = (char *)malloc(prefix_len + encoded_str_size + 1);
+    result = (char *)calloc(1, prefix_len + encoded_str_size + 1);
     if (result == NULL) {
         return NULL;
     }

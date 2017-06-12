@@ -239,7 +239,23 @@ out:
 bool
 filebox_flush(uc_filebox_t * fb)
 {
-    return fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
+    bool ret;
+#ifdef UCAFS_FLUSH
+    ret = fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
+    if (ret) {
+        fb->is_ondisk = true;
+    }
+
+    return ret;
+#else
+    /* only flush if required */
+    if (!fb->is_ondisk) {
+        fb->is_ondisk = true;
+        return filebox_fsync(fb);
+    }
+
+    return true;
+#endif
 }
 
 void

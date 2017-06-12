@@ -25,7 +25,6 @@ dirops_new1(const char * parent_dir,
     int error = -1; // TODO change this
     dentry_t * dentry = NULL;
     uc_dirnode_t * dirnode = NULL;
-    uc_filebox_t * filebox = NULL;
     shadow_t * fname_code = NULL;
     sds path1 = NULL;
 
@@ -66,8 +65,6 @@ dirops_new1(const char * parent_dir,
 out:
     /* TODO probably need to perform an additional check here concerning
      * failed dirnode/filebox writes to disk. */
-    if (filebox)
-        filebox_free(filebox);
     if (path1)
         sdsfree(path1);
     if (fname_code)
@@ -545,6 +542,12 @@ dirops_hardlink(const char * target_path,
     target_afsx_path = filebox_get_path(filebox);
     link_afsx_path = vfs_metadata_fpath(link_dnode, shadow_name2);
 
+    /* flush the filebox to disk */
+    if (!filebox->is_ondisk && !filebox_write(filebox, target_afsx_path)) {
+        log_error("flushing the filebox (%s) FAILED", target_afsx_path);
+        goto out;
+    }
+
     if (link(target_afsx_path, link_afsx_path)) {
         log_error("hardlink '%s' -> '%s' FAILED", target_afsx_path,
                   link_afsx_path);
@@ -580,10 +583,6 @@ out:
 
     if (shadow_name2) {
         free(shadow_name2);
-    }
-
-    if (filebox) {
-        filebox_free(filebox);
     }
 
     return error;
@@ -667,7 +666,6 @@ __delete_metadata_file(sds metadata_filepath,
                        int is_filebox)
 {
     int error = -1;
-    uc_filebox_t * filebox = NULL;
 
     if (is_filebox) {
 #if 0
@@ -707,7 +705,7 @@ __delete_metadata_file(sds metadata_filepath,
         }
 
         /* lazily remove the file entries */
-        int x = 1;
+        int x = 0;
         while (true) {
             sds path2 = string_and_number(metadata_filepath, x);
 
@@ -724,10 +722,6 @@ __delete_metadata_file(sds metadata_filepath,
 
     error = 0;
 out:
-    if (filebox) {
-        filebox_free(filebox);
-    }
-
     return error;
 }
 
@@ -803,6 +797,10 @@ dirops_remove1(const char * parent_dir,
     if (!dirnode_flush(dirnode)) {
         log_error("flushing dirnode (%s) failed", parent_dir);
         goto out;
+    }
+
+    if (atype == UC_FILE) {
+        metadata_rm_filebox(shadow_name);
     }
 
     /* ignore if it's a link or a "journal" file */

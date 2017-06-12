@@ -22,6 +22,7 @@
 struct dirty_item;
 
 static Hashmap * metadata_hashmap;
+static Hashmap * filebox_hashmap;
 
 static metadata_entry_t *
 _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
@@ -95,6 +96,7 @@ metadata_prune(metadata_t * entry)
     }
 
     entry->dn = NULL;
+    free(entry);
 
     // TODO add to free list
 }
@@ -331,6 +333,57 @@ out:
     return dn;
 }
 
+static filebox_entry_t *
+_create_filebox_entry(uc_filebox_t * fb, const shadow_t * shdw)
+{
+    int ret = -1, *hash;
+    void * ptr;
+    filebox_entry_t * entry
+        = (filebox_entry_t *)calloc(1, sizeof(filebox_entry_t));
+    if (entry == NULL) {
+        log_fatal("allocation failed for filebox_entry_t");
+        return NULL;
+    }
+
+    entry->fb = fb;
+    entry->epoch = time(NULL);
+    memcpy(&entry->shdw_name, shdw, sizeof(shadow_t));
+
+    // add it to the hashmap
+    ptr = hashmapPut(filebox_hashmap, (void *)shdw, entry, &hash);
+
+    ret = 0;
+out:
+    if (ret) {
+        free(entry);
+        entry = NULL;
+    }
+
+    return entry;
+}
+
+static inline void
+_update_filebox_entry(struct filebox_entry * entry, uc_filebox_t * fb)
+{
+    if (entry->fb) {
+        filebox_free(entry->fb);
+    }
+
+    entry->fb = fb;
+}
+
+static inline void
+_free_filebox_entry(filebox_entry_t * entry)
+{
+    if (entry->fb) {
+        filebox_free(entry->fb);
+    }
+
+    entry->fb = NULL;
+
+    free(entry);
+}
+
 uc_filebox_t *
 metadata_get_filebox(struct uc_dentry * parent_dentry,
                      uc_dirnode_t * dirnode,
@@ -339,9 +392,41 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
                      int jrnl)
 {
     int ret = -1;
-    uc_filebox_t * fb;
+    uc_filebox_t * fb = NULL;
+    filebox_entry_t * entry = NULL;
+    struct stat st;
     sds fbox_path = vfs_metadata_fpath(dirnode, shdw);
 
+    /* check if the item is in our cache */
+    entry = (filebox_entry_t *)hashmapGet(filebox_hashmap, (void *)shdw);
+    if (entry == NULL) {
+        goto skip_cache;
+    }
+
+    /* there is a chance that the filebox was never written */
+    if (entry->fb->is_ondisk == false) {
+        fb = entry->fb;
+        ret = 0;
+        goto out;
+    }
+
+    if (stat(fbox_path, &st)) {
+        log_error("file '%s' does not exist", fbox_path);
+        goto out;
+    }
+
+    /* frees the filebox object and loads it from disk */
+    if (difftime(st.st_mtime, entry->epoch) > 0) {
+        filebox_free(entry->fb);
+        entry->fb = NULL;
+        goto load_from_disk;
+    }
+
+    fb = entry->fb;
+    ret = 0;
+    goto out;
+
+skip_cache:
     /* check if the file is on disk */
     if (jrnl == JRNL_NOOP) {
         goto load_from_disk;
@@ -355,6 +440,7 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
 
     /* set the path to allow flushing the filebox */
     filebox_set_path(fb, fbox_path);
+    fb->is_ondisk = false;
 
     /* probably hardlink trying to access the file */
     if (!filebox_flush(fb)) {
@@ -374,8 +460,18 @@ metadata_get_filebox(struct uc_dentry * parent_dentry,
 
 load_from_disk:
     fb = filebox_from_file(fbox_path);
+    fb->is_ondisk = true;
 
 done:
+    /* lets try to add the element to the cache */
+    if (entry == NULL) {
+        /* associate it to the dentry */
+        entry = _create_filebox_entry(fb, shdw);
+    } else {
+        /* if entry already exists, just update it */
+        _update_filebox_entry(entry, fb);
+    }
+
     ret = 0;
 out:
     if (ret && fb) {
@@ -388,6 +484,18 @@ out:
     }
 
     return fb;
+}
+
+void
+metadata_rm_filebox(const shadow_t * shdw)
+{
+    /* lookup the entry */
+    filebox_entry_t * entry
+        = (filebox_entry_t *)hashmapRemove(filebox_hashmap, (void *)shdw);
+
+    if (entry) {
+        _free_filebox_entry(entry);
+    }
 }
 
 static int
@@ -407,7 +515,14 @@ metadata_init()
 {
     metadata_hashmap = hashmapCreate(64, _hash_func, _hash_eq);
     if (metadata_hashmap == NULL) {
-        log_fatal("hashmapCreate returns NULL");
+        log_fatal("hashmapCreate (dirnode) returns NULL");
+        return -1;
+    }
+
+    /* initialize the filebox map */
+    filebox_hashmap = hashmapCreate(64, _hash_func, _hash_eq);
+    if (filebox_hashmap == NULL) {
+        log_fatal("hashmapCreate (filebox) returns NULL");
         return -1;
     }
 
