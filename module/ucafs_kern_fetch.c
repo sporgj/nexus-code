@@ -49,6 +49,11 @@ ucafs_fetch_init(fetch_context_t * context,
         goto out;
     }
 
+    if (xfer_rsp.xfer_id == -1) {
+        ERROR("fetch_init '%s' FAILED\n", context->path);
+        goto out;
+    }
+
     context->id = xfer_rsp.xfer_id;
     context->xfer_size = size;
     context->offset = offset;
@@ -104,6 +109,34 @@ next_op:
 }
 
 static int
+ucafs_fetch_write(struct osi_file * fp,
+                  caddr_t buf,
+                  int bytes_left,
+                  int * byteswritten)
+{
+    int ret = 0;
+    afs_int32 nbytes, size;
+    *byteswritten = 0;
+
+    while (bytes_left > 0) {
+        size = MIN(MAX_FSERV_SIZE, bytes_left);
+
+        nbytes = afs_osi_Write(fp, -1, buf, size);
+        if (nbytes != size) {
+            ERROR("nbytes=%d, size=%d\n", nbytes, size);
+            goto out;
+        }
+
+        buf += size;
+        bytes_left -= size;
+        *byteswritten += size;
+    }
+
+out:
+    return ret;
+}
+
+static int
 ucafs_fetch_read(fetch_context_t * context,
                  caddr_t buf,
                  int bytes_left,
@@ -154,7 +187,7 @@ ucafs_fetch_xfer(fetch_context_t * context,
         size = MIN(bytes_left, context->buflen);
 
         // read from the server
-        mutex_lock_interruptible(&xfer_buffer_mutex);
+        // mutex_lock_interruptible(&xfer_buffer_mutex);
         if (ucafs_fetch_read(context, context->buffer, size, &nbytes)) {
             goto out;
         }
@@ -182,13 +215,11 @@ ucafs_fetch_xfer(fetch_context_t * context,
         reply = NULL;
 
         /* move our pointers and copy the data into the tdc file */
-        nbytes = afs_osi_Write(fp, -1, (void *)context->buffer, size);
-        if (nbytes != size) {
-            ERROR("nbytes=%d, size=%d\n", nbytes, size);
+        if (ucafs_fetch_write(fp, context->buffer, size, &nbytes)) {
             goto out;
         }
 
-        mutex_unlock(&xfer_buffer_mutex);
+        // mutex_unlock(&xfer_buffer_mutex);
 
         pos += size;
         bytes_left -= size;
@@ -204,9 +235,11 @@ out:
         kfree(reply);
     }
 
+    /*
     if (mutex_is_locked(&xfer_buffer_mutex)) {
         mutex_unlock(&xfer_buffer_mutex);
     }
+    */
 
     return ret;
 }

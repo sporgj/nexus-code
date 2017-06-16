@@ -67,8 +67,8 @@ int ucafs_kern_init(void);
     (dev->daemon == NULL || task_is_stopped(dev->daemon))
 
 #undef ERROR
-#define ERROR(fmt, args...) printk(KERN_ERR "ucafs: " fmt " (%s, %s:%d)", \
-    ##args, __func__, __FILE__, __LINE__)
+#define ERROR(fmt, args...) printk(KERN_ERR "ucafs: " fmt " [%s():%d]", \
+    ##args, __func__, __LINE__)
 
 static DEFINE_MUTEX(xfer_buffer_mutex);
 

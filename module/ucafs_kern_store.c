@@ -91,6 +91,11 @@ ucafs_store_init(store_context_t * context,
         goto out;
     }
 
+    if (xfer_rsp.xfer_id == -1) {
+        ERROR("store_init '%s' FAILED\n", context->path);
+        goto out;
+    }
+
     context->id = xfer_rsp.xfer_id;
     context->xfer_size = bytes;
     context->offset = start_pos;
@@ -138,6 +143,34 @@ out:
 }
 
 static int
+ucafs_store_read(struct osi_file * fp,
+                 caddr_t buf,
+                 int bytes_left,
+                 int * byteswritten)
+{
+    int ret = 0;
+    afs_int32 nbytes, size;
+    *byteswritten = 0;
+
+    while (bytes_left > 0) {
+        size = MIN(MAX_FSERV_SIZE, bytes_left);
+
+        nbytes = afs_osi_Read(fp, -1, buf, size);
+        if (nbytes != size) {
+            ERROR("nbytes=%d, size=%d\n", nbytes, size);
+            goto out;
+        }
+
+        buf += size;
+        bytes_left -= size;
+        *byteswritten += size;
+    }
+
+out:
+    return ret;
+}
+
+static int
 ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
 {
     int ret = -1, code, nbytes, size, bytes_left = tdc->f.chunkBytes;
@@ -153,8 +186,10 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
         size = MIN(bytes_left, context->buflen);
 
         /* 1 - read the file into the buffer */
-        mutex_lock_interruptible(&xfer_buffer_mutex);
-        afs_osi_Read(fp, -1, context->buffer, size);
+        // mutex_lock_interruptible(&xfer_buffer_mutex);
+        if (ucafs_store_read(fp, context->buffer, size, &nbytes)) {
+            goto out;
+        }
 
         if ((rpc_ptr = READPTR_LOCK()) == 0) {
             goto out;
@@ -180,7 +215,7 @@ ucafs_store_xfer(store_context_t * context, struct dcache * tdc, int * xferred)
             goto out;
         }
 
-        mutex_unlock(&xfer_buffer_mutex);
+        // mutex_unlock(&xfer_buffer_mutex);
 
         bytes_left -= size;
         *xferred += size;
@@ -196,9 +231,11 @@ out:
         kfree(reply);
     }
 
+    /*
     if (mutex_is_locked(&xfer_buffer_mutex)) {
         mutex_unlock(&xfer_buffer_mutex);
     }
+    */
 
     return ret;
 }

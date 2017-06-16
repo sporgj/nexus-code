@@ -9,6 +9,9 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_kern: " fmt, ##args)
 
+#define SGX_PATH "sgx"
+#define SGX_PATHLEN 3
+
 static const char * afs_prefix = "/afs";
 static const uint32_t afs_prefix_len = 4;
 
@@ -236,6 +239,27 @@ ucafs_kern_init(void)
     return 0;
 }
 
+static int
+d_is_subdir(const struct dentry * dentry)
+{
+    struct dentry *d = (struct dentry *)dentry, *parent;
+
+    while (!IS_ROOT(d)) {
+        parent = d->d_parent;
+        prefetch(parent);
+
+        /* check if the names match */
+        if (d->d_name.len == SGX_PATHLEN &&
+            memcmp(d->d_name.name, SGX_PATH, SGX_PATHLEN) == 0) {
+            return 1;
+        }
+
+        d = parent;
+    }
+
+    return 0;
+}
+
 int
 ucafs_dentry_path(const struct dentry * dentry, char ** dest)
 {
@@ -243,7 +267,7 @@ ucafs_dentry_path(const struct dentry * dentry, char ** dest)
     char *path, *result, *buf;
     watch_path_t * curr_entry;
 
-    if (dentry == NULL || d_is_special(dentry)) {
+    if (dentry == NULL || d_is_special(dentry) || !d_is_subdir(dentry)) {
         return 1;
     }
 

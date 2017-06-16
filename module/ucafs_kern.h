@@ -1,6 +1,4 @@
 #pragma once
-#include <linux/dcache.h>
-
 #include "afs/ucafs_header.h"
 
 #include <afsconfig.h>
