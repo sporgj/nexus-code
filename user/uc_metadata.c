@@ -45,7 +45,7 @@ _create_entry(uc_dirnode_t * dn, const shadow_t * shdw)
 
     // add it to the hashmap
     hashmapLock(metadata_hashmap);
-    ptr = hashmapPut(metadata_hashmap, (void *)shdw, entry, &hash);
+    ptr = hashmapPut(metadata_hashmap, (void *)&entry->shdw_name, entry, &hash);
     hashmapUnlock(metadata_hashmap);
 
     ret = 0;
@@ -350,7 +350,7 @@ _create_filebox_entry(uc_filebox_t * fb, const shadow_t * shdw)
     memcpy(&entry->shdw_name, shdw, sizeof(shadow_t));
 
     // add it to the hashmap
-    ptr = hashmapPut(filebox_hashmap, (void *)shdw, entry, &hash);
+    ptr = hashmapPut(filebox_hashmap, (void *)&entry->shdw_name, entry, &hash);
 
     ret = 0;
 out:
@@ -439,14 +439,11 @@ skip_cache:
     }
 
     /* set the path to allow flushing the filebox */
+    /* the calling function will take responsibility. If it is
+     * hardlink, he will make sure to write the filebox to disk
+     * before making the system call */
     filebox_set_path(fb, fbox_path);
     fb->is_ondisk = false;
-
-    /* probably hardlink trying to access the file */
-    if (!filebox_flush(fb)) {
-        log_error("could not save filebox");
-        return NULL;
-    }
 
     /* delete the entry from the dirnode
      * XXX should we flush it now or later ? */

@@ -543,9 +543,13 @@ dirops_hardlink(const char * target_path,
     link_afsx_path = vfs_metadata_fpath(link_dnode, shadow_name2);
 
     /* flush the filebox to disk */
-    if (!filebox->is_ondisk && !filebox_write(filebox, target_afsx_path)) {
-        log_error("flushing the filebox (%s) FAILED", target_afsx_path);
-        goto out;
+    if (!filebox->is_ondisk) {
+        if (!filebox_write(filebox, target_afsx_path)) {
+            log_error("flushing the filebox (%s) FAILED", target_afsx_path);
+            goto out;
+        }
+        // this ensures that the object in memory is aware of its presence in memory
+        filebox->is_ondisk = true;
     }
 
     if (link(target_afsx_path, link_afsx_path)) {

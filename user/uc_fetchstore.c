@@ -47,7 +47,8 @@ fetchstore_init(xfer_req_t * req, char * fpath, xfer_rsp_t * rsp)
     /* lets find the dirnode object first */
     filebox = dcache_filebox(fpath, req->op);
     if (filebox == NULL) {
-        log_error("finding filebox failed: '%s'", fpath);
+        log_error("[ucafs_%s] finding filebox failed: '%s'",
+                  (req->op == UCAFS_STORE ? "store" : "fetch"), fpath);
         return ret;
     }
 
@@ -75,7 +76,8 @@ fetchstore_init(xfer_req_t * req, char * fpath, xfer_rsp_t * rsp)
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {
         // TODO delete context from enclave space
-        log_error("fileops - Adding to list failed");
+        log_error("[ucafs_%s] fileops - Adding to list failed",
+                  (req->op == UCAFS_STORE ? "store" : "fetch"));
         goto out;
     }
 
