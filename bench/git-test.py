@@ -4,7 +4,7 @@ import subprocess
 import time
 
 parser = argparse.ArgumentParser(description="Clone (redis, julia, node) from bonino")
-parser.add_argument('rounds', nargs='?', default=5)
+parser.add_argument('rounds', nargs='?', default=10)
 args = parser.parse_args()
 
 # parse the arguments

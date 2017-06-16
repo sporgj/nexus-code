@@ -8,9 +8,9 @@ sintel_url='/home/briand/Sintel.2010.720p.mkv'
 nodejs_fname='v8-6.0.261'
 test_fldr='fake_dir'
 
-echo 'wget1, tar, du1, grep1, wget2, ffmpeg'
+echo 'wget1, tar, du1, grep1'
 
-for i in `seq 1 7`
+for i in `seq 1 15`
 do
   # remove everything
   $(rm -rf ./*)
@@ -27,12 +27,7 @@ do
   # find 'javascript'
   grep1=$(${btime} find . -type f -exec grep -q -i 'javascript' '{}' \;)
 
-  # download the movie
-  wget2=$(${btime} cp ${sintel_url} sintel.mkv)
-
-  # generate jpegs
-  ffmpeg=$(${btime} ffmpeg -i sintel.mkv -v -8 -vf fps=1/5 img%03d.jpg)
-  echo ${wget1}, ${tar}, ${du1}, ${grep1}, ${wget2}, ${ffmpeg}
+  echo ${wget1}, ${tar}, ${du1}, ${grep1}
 done
 
 rm -rf ./*
