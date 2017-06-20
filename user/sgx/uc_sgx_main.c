@@ -1,6 +1,8 @@
 #include "seqptrmap.h"
 #include "ucafs_sgx.h"
 
+#include "siv/GCM_SIV.h"
+
 sgx_key_128bit_t __TOPSECRET__ __enclave_encryption_key__;
 crypto_ekey_t * __enclave_key__ = (crypto_ekey_t *)&__enclave_encryption_key__;
 
@@ -48,6 +50,39 @@ out:
     return 0;
 }
 
+/*
+ * make sure key material is within the enclave
+ */
+int
+enclave_siv_crypto(gcm_ekey_t * ekey,
+                   gcm_tag_t * ekey_auth,
+                   const shadow_t * uuid, /* the nonce */
+                   const shadow_t * root_uuid, /* additional authenticated data */
+                   uc_crypto_op_t op)
+{
+    int ret = 0;
+    AES_GCM_SIV_CONTEXT siv_ctx;
+
+    /* initialize the gcm SIV context */
+    AES_GCM_SIV_Init(&siv_ctx, &__enclave_encryption_key__);
+
+    if (op == UC_ENCRYPT) {
+        AES_GCM_SIV_Encrypt(&siv_ctx, (uint8_t *)ekey, (uint8_t *)ekey_auth,
+                            (uint8_t *)root_uuid, (const uint8_t *)ekey,
+                            sizeof(shadow_t), sizeof(gcm_ekey_t),
+                            (const uint8_t *)uuid,
+                            (const uint8_t *)&__enclave_encryption_key__);
+    } else {
+        ret = AES_GCM_SIV_Decrypt(&siv_ctx, (uint8_t *)ekey,
+                                  (uint8_t *)ekey_auth, (uint8_t *)root_uuid,
+                                  (const uint8_t *)ekey, sizeof(shadow_t),
+                                  sizeof(gcm_ekey_t), (const uint8_t *)uuid,
+                                  (const uint8_t *)&__enclave_encryption_key__);
+    }
+
+    return ret;
+}
+
 crypto_ekey_t *
 derive_skey(shadow_t * shdw1, shadow_t * shdw2)
 {
@@ -61,11 +96,13 @@ derive_skey(shadow_t * shdw1, shadow_t * shdw2)
     }
 
     mbedtls_sha256_init(sha256_ctx);
-    mbedtls_sha256_update(sha256_ctx, (uint8_t *)&__enclave_encryption_key__, sizeof(crypto_ekey_t));
+    mbedtls_sha256_update(sha256_ctx, (uint8_t *)&__enclave_encryption_key__,
+            sizeof(crypto_ekey_t));
     mbedtls_sha256_update(sha256_ctx, (uint8_t *)shdw1, sizeof(shadow_t));
     mbedtls_sha256_update(sha256_ctx, (uint8_t *)shdw2, sizeof(shadow_t));
     mbedtls_sha256_finish(sha256_ctx, (uint8_t *)skey);
     mbedtls_sha256_free(sha256_ctx);
+
 
     return skey;
 }
@@ -153,17 +190,11 @@ static inline int
 usgx_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
 {
     int ret = -1, dirty_count = 0;
-    crypto_ekey_t * sealing_key;
     dirnode_header_t * header = &dirnode->header;
-    gcm_ekey_t _ekey, *ekey = &_ekey;
     dirnode_bucket_entry_t * bucket_entry;
     uint8_t *p_input, *p_data;
-
-    /* super_ekey + root_shdw + fnode_uuid */
-    sealing_key = derive_skey(&header->root, &header->uuid);
-    if (sealing_key == NULL) {
-        return -1;
-    }
+    gcm_crypto_t _gcm, * gcm_crypto = &_gcm;
+    gcm_ekey_t * ekey = &gcm_crypto->ekey;
 
     /* now unseal the crypto key */
     if (op == UC_ENCRYPT) {
@@ -177,14 +208,18 @@ usgx_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
         }
 
         if (dirty_count == dirnode->header.bucket_count) {
-            sgx_read_rand((uint8_t *)ekey, sizeof(gcm_ekey_t));
+            sgx_read_rand((uint8_t *)gcm_crypto, sizeof(gcm_crypto_t));
         } else {
-            memcpy(ekey, &dirnode->header.ekey, sizeof(gcm_ekey_t));
-            enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_DECRYPT);
+            memcpy(gcm_crypto, &header->gcm_crypto, sizeof(gcm_crypto_t));
+            /* decrypt the siv key */
+            enclave_siv_crypto(ekey, &gcm_crypto->ekey_auth, &header->uuid,
+                               &header->root, UC_DECRYPT);
         }
     } else {
-        memcpy(ekey, &dirnode->header.ekey, sizeof(gcm_ekey_t));
-        enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_DECRYPT);
+        memcpy(gcm_crypto, &header->gcm_crypto, sizeof(gcm_crypto_t));
+        /* unveril the encryption key */
+        enclave_siv_crypto(ekey, &gcm_crypto->ekey_auth, &header->uuid,
+                           &header->root, UC_DECRYPT);
     }
 
     /* iterate the buffer entries and encrypt them */
@@ -199,15 +234,34 @@ usgx_dirnode_crypto(uc_dirnode_t * dirnode, uc_crypto_op_t op)
         }
     }
 
+    /* encrypt the metadata */
+#if 0
+    memcpy(&iv, &gcm_crypto->iv, sizeof(gcm_iv_t));
+
+    mbedtls_gcm_context gcm_context;
+    mbedtls_gcm_init(&gcm_context);
+    mbedtls_gcm_setkey(gcm_ctx, MBEDTLS_CIPHER_ID_AES, (uint8_t *)ekey,
+                       CONFIG_GCM_KEYBITS);
+    mbedtls_gcm_starts(
+        gcm_ctx, (op == UC_ENCRYPT ? MBEDTLS_GCM_ENCRYPT : MBEDTLS_GCM_DECRYPT),
+        (uint8_t *)&iv, sizeof(gcm_iv_t), NULL, 0);
+
+    /* use the bucket and header information as additional data */
+
+
+    mbedtls_gcm_finish(gcm_ctx, (uint8_t *)&tag, sizeof(gcm_tag_t));
+    mbedtls_gcm_free(gcm_ctx);
+#endif
+
     /* copy the encryption key into the dirnode */
     if (op == UC_ENCRYPT) {
-        enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_ENCRYPT);
-        memcpy(&dirnode->header.ekey, ekey, sizeof(gcm_ekey_t));
+        enclave_siv_crypto(ekey, &gcm_crypto->ekey_auth, &header->uuid,
+                           &header->root, UC_ENCRYPT);
+        memcpy(&header->gcm_crypto, gcm_crypto, sizeof(gcm_crypto_t));
     }
 
     ret = 0;
 out:
-    free(sealing_key);
     return ret;
 }
 
@@ -231,19 +285,14 @@ usgx_filebox_crypto(uc_filebox_t * filebox, uc_crypto_op_t op)
     uint8_t p_input[CONFIG_CRYPTO_BUFLEN], *p_data;
     mbedtls_gcm_context _gcm, *gcm_ctx = &_gcm;
 
-    /* 1 - derive its sealing key */
-    sealing_key = derive_skey(&header->root, &header->uuid);
-    if (sealing_key == NULL) {
-        return -1;
-    }
-
     /* 2 - generate or extract the encryption key */
     if (op == UC_ENCRYPT) {
         sgx_read_rand((uint8_t *)&gcm_crypto, sizeof(gcm_crypto_t));
     } else {
         memcpy(&gcm_crypto, &header->gcm_crypto, sizeof(gcm_crypto_t));
         // unseal the crypto key
-        enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_DECRYPT);
+        enclave_siv_crypto(ekey, &gcm_crypto.ekey_auth, &header->uuid,
+                           &header->root, UC_DECRYPT);
     }
     // copy the IV
     memcpy(&iv, &gcm_crypto.iv, sizeof(gcm_iv_t));
@@ -276,7 +325,8 @@ usgx_filebox_crypto(uc_filebox_t * filebox, uc_crypto_op_t op)
     if (op == UC_ENCRYPT) {
         memcpy(&gcm_crypto.tag, &tag, sizeof(gcm_tag_t));
         // seal the crypto key and send the result to E+
-        enclave_crypto_ekey((crypto_ekey_t *)ekey, sealing_key, UC_ENCRYPT);
+        enclave_siv_crypto(ekey, &gcm_crypto.ekey_auth, &header->uuid,
+                           &header->root, UC_DECRYPT);
         memcpy(&header->gcm_crypto, &gcm_crypto, sizeof(gcm_crypto_t));
     } else {
         /* lets perform the decryption */
@@ -287,7 +337,6 @@ usgx_filebox_crypto(uc_filebox_t * filebox, uc_crypto_op_t op)
     }
 
 out:
-    free(sealing_key);
     return ret;
 }
 

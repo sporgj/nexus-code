@@ -5,7 +5,10 @@
 #endif
 
 #if defined(UCPRIV_ENCLAVE) || defined(KERNEL)
+#if defined(KERNEL)
 #include <linux/types.h>
+#endif
+
 typedef struct {
     uint8_t bin[16];
 } uuid_t;

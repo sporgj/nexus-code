@@ -95,7 +95,7 @@ typedef uint8_t gcm_tag_t[16];
 typedef struct {
    gcm_iv_t iv;
    gcm_ekey_t ekey;
-   gcm_tag_t tag;
+   gcm_tag_t tag, ekey_auth;
 } __attribute__((packed)) gcm_context_t, gcm_crypto_t;
 
 /* access control stuff */
@@ -144,8 +144,7 @@ typedef struct {
     shadow_t uuid, parent, root;
     uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
     uint8_t bucket_count;
-    gcm_ekey_t ekey;
-    gcm_tag_t tag;
+    gcm_crypto_t gcm_crypto;
 } __attribute__((packed)) dirnode_header_t;
 
 typedef enum {

@@ -104,17 +104,6 @@ filebox_write(uc_filebox_t * fb, const char * path);
 bool
 filebox_flush(uc_filebox_t * fb);
 
-static bool
-filebox_fsync(uc_filebox_t * fb)
-{
-    bool ret = fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
-    if (ret) {
-        fb->is_ondisk = true;
-    }
-
-    return ret;
-}
-
 static filebox_chunk_t *
 filebox_get_chunk(uc_filebox_t * filebox, size_t chunk_id)
 {

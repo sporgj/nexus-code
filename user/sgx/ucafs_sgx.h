@@ -69,6 +69,12 @@ supernode_t * find_supernode(shadow_t * root_dnode);
 crypto_ekey_t *
 derive_skey(shadow_t * shdw1, shadow_t * shdw2);
 
+int
+enclave_siv_crypto(gcm_ekey_t * ekey,
+                   gcm_tag_t * ekey_auth,
+                   const shadow_t * uuid,
+                   const shadow_t * root_uuid,
+                   uc_crypto_op_t op);
 #ifdef __cplusplus
 }
 #endif

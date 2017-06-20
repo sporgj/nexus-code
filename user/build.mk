@@ -15,4 +15,4 @@ UCAFS_DEV := 0
 UCAFS_PROFILER := 1
 
 # if to flush the entries or nah
-UCAFS_FLUSH := 1
+UCAFS_FLUSH := 0

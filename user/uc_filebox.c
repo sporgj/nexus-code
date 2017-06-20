@@ -235,18 +235,24 @@ out:
     return ret;
 }
 
+bool
+filebox_fsync(uc_filebox_t * fb)
+{
+    bool ret = fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
+    if (ret) {
+        fb->is_ondisk = true;
+    }
+
+    return ret;
+}
+
 // XXX inline this
 bool
 filebox_flush(uc_filebox_t * fb)
 {
     bool ret;
 #ifdef UCAFS_FLUSH
-    ret = fb->fbox_path ? filebox_write(fb, fb->fbox_path) : false;
-    if (ret) {
-        fb->is_ondisk = true;
-    }
-
-    return ret;
+    return filebox_fsync(fb);
 #else
     /* only flush if required */
     if (!fb->is_ondisk) {
