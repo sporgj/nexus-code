@@ -1,285 +1,400 @@
-#include "afsx.h"
-#include "cdefs.h"
+#include "uc_rpc.h"
 #include "uc_dirops.h"
-#include "uc_fileops.h"
+#include "uc_fetchstore.h"
+#include "uc_types.h"
 #include "uc_utils.h"
 
-#define N_SECURITY_OBJECTS 1
-bool_t
-xdr_ucafs_entry_type(XDR * xdrs, ucafs_entry_type * lp)
+#include "third/log.h"
+
+int
+uc_rpc_ping(XDR * xdrs, XDR * rsp)
 {
-    // TODO no need to make the additional call_
-    return xdr_afs_uint32(xdrs, (afs_uint32 *)lp);
+    int l;
+
+    if (!xdr_int(xdrs, &l)) {
+        uerror("Could not decode message");
+        return -1;
+    }
+
+    log_info("[ping] magic = %d", l);
+
+    return 0;
+}
+
+typedef int (*dirops_func_t)(const char *,
+                             const char *,
+                             ucafs_entry_type,
+                             char **);
+
+typedef struct {
+    uc_msg_type_t msg_type;
+    char * name;
+    dirops_func_t func;
+} dirops_str_and_func_t;
+
+dirops_str_and_func_t dirops_map[]
+    = { { UCAFS_MSG_LOOKUP, "lookup", &dirops_plain2code1 },
+        { UCAFS_MSG_FILLDIR, "filldir", &dirops_code2plain },
+        { UCAFS_MSG_REMOVE, "remove", &dirops_remove1 },
+        { UCAFS_MSG_CREATE, "create", &dirops_new1 } };
+
+static inline dirops_str_and_func_t *
+msg_func_and_string(uc_msg_type_t mtype)
+{
+    size_t i = 0;
+    for (; i < sizeof(dirops_map) / sizeof(dirops_str_and_func_t); i++) {
+        if (dirops_map[i].msg_type == mtype) {
+            return &dirops_map[i];
+        }
+    }
+
+    return NULL;
 }
 
 int
-setup_rx(int port)
+uc_rpc_dirops(uc_msg_type_t msg_type, XDR * xdrs, XDR * xdr_out)
 {
-    struct rx_securityClass *(security_objs[N_SECURITY_OBJECTS]);
-    struct rx_service * service;
-    int ret = 1;
+    int ret = -1;
+    afs_int32 type;
+    char *parent_dir = NULL, *name = NULL, *shdw_name = NULL;
+    dirops_str_and_func_t * tor = msg_func_and_string(msg_type);
+    if (tor == NULL) {
+        uerror("invalid message type");
+        return -1;
+    }
 
-    port = (port == 0) ? AFSX_SERVER_PORT : port;
-
-    if (rx_Init(port) < 0) {
-        uerror("rx_init");
+    if (!xdr_string(xdrs, &parent_dir, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &name, UCAFS_FNAME_MAX)
+        || !xdr_int(xdrs, (int *)&type)) {
+        uerror("%s error decoding message", TYPE_TO_STR(msg_type));
         goto out;
     }
 
-    // create the null security object, UNAUTHENTICATED access
-    security_objs[AFSX_NULL] = rxnull_NewServerSecurityObject();
-    if (security_objs[AFSX_NULL] == NULL) {
-        uerror("rxnull_NewServerSecurityObject");
+    if (tor->func(parent_dir, name, type, &shdw_name)) {
+        /*log_error("[%s (%s)] %s/%s FAILED", tor->name, TYPE_TO_STR(msg_type),
+                  parent_dir, name);*/
         goto out;
     }
 
-    // instantiate our service
-    service = rx_NewService(0, AFSX_SERVICE_ID, (char *)"afsx", security_objs,
-                            N_SECURITY_OBJECTS, AFSX_ExecuteRequest);
-    if (service == NULL) {
-        uerror("rx_NewService");
+    log_info("[%s (%s)] %s/%s -> %s", tor->name, TYPE_TO_STR(type), parent_dir,
+             name, shdw_name);
+
+    /* now start encoding the response */
+    if (!xdr_string(xdr_out, &shdw_name, UCAFS_FNAME_MAX)) {
+        log_error("ERROR encoding");
         goto out;
     }
 
-    uinfo("Waiting for connections [0:%d]...", port);
-    rx_StartServer(1);
-    /* Note that the above call forks into another process */
+    ret = 0;
+out:
+    if (parent_dir) {
+        free(parent_dir);
+    }
 
-    uerror("StartServer returned: ");
+    if (name) {
+        free(name);
+    }
+
+    if (shdw_name) {
+        free(shdw_name);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_symlink(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1;
+    char *from_path = NULL, *target_link = NULL, *shdw_name = NULL;
+
+    // get the strings
+    if (!xdr_string(xdrs, &from_path, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &target_link, UCAFS_PATH_MAX)) {
+        uerror("uc_rpc_symlink decoding failed");
+        goto out;
+    }
+
+    if (dirops_symlink(from_path, target_link, &shdw_name)) {
+        log_error("[symlink] %s -> %s FAILED", from_path, target_link);
+        goto out;
+    }
+
+    log_info("[symlink] %s -> %s (%s)", from_path, target_link, shdw_name);
+
+    if (!xdr_string(xdr_out, &shdw_name, UCAFS_FNAME_MAX)) {
+        log_error("ERROR encoding symlink response");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (from_path) {
+        free(from_path);
+    }
+
+    if (target_link) {
+        free(target_link);
+    }
+
+    if (shdw_name) {
+        free(shdw_name);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_hardlink(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1;
+    char *from_path = NULL, *to_path = NULL, *shdw_name = NULL;
+
+    // get the strings
+    if (!xdr_string(xdrs, &from_path, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &to_path, UCAFS_PATH_MAX)) {
+        uerror("uc_rpc_hardlink decoding failed");
+        goto out;
+    }
+
+    // FIXME clarify what from and to imply
+    if (dirops_hardlink(from_path, to_path, &shdw_name)) {
+        log_error("[hardlink] %s -> %s FAILED", from_path, to_path);
+        goto out;
+    }
+
+    log_info("[hardlink] %s -> %s (%s)", from_path, to_path, shdw_name);
+
+    if (!xdr_string(xdr_out, &shdw_name, UCAFS_FNAME_MAX)) {
+        log_error("ERROR encoding hardlink response");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (from_path) {
+        free(from_path);
+    }
+
+    if (to_path) {
+        free(to_path);
+    }
+
+    if (shdw_name) {
+        free(shdw_name);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_rename(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, code;
+    char *from_path = NULL, *to_path = NULL, *newname = NULL, *oldname = NULL,
+         *old_shadowname = NULL, *new_shadowname = NULL;
+
+    if (!xdr_string(xdrs, &from_path, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &oldname, UCAFS_FNAME_MAX)
+        || !xdr_string(xdrs, &to_path, UCAFS_PATH_MAX)
+        || !xdr_string(xdrs, &newname, UCAFS_FNAME_MAX)) {
+        uerror("xdr rename failed");
+        goto out;
+    }
+
+    ret = dirops_move(from_path, oldname, to_path, newname, UC_ANY,
+                      &old_shadowname, &new_shadowname);
+    if (ret) {
+        log_error("[rename] %s/%s -> %s/%s FAILED", from_path, oldname, to_path,
+                  newname);
+        goto out;
+    }
+
+    log_info("[rename] %s/%s -> %s/%s", from_path, oldname, to_path, newname);
+
+    if (!xdr_string(xdr_out, &old_shadowname, UCAFS_FNAME_MAX)
+        || !xdr_string(xdr_out, &new_shadowname, UCAFS_FNAME_MAX)) {
+        uerror("encoding rename response failed");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (from_path) {
+        free(from_path);
+    }
+
+    if (newname) {
+        free(newname);
+    }
+
+    if (to_path) {
+        free(to_path);
+    }
+
+    if (oldname) {
+        free(oldname);
+    }
+
+    if (old_shadowname) {
+        free(old_shadowname);
+    }
+
+    if (new_shadowname) {
+        free(new_shadowname);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_storeacl(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, len;
+    char * path = NULL;
+    caddr_t acl_data = NULL;
+
+    if (!xdr_string(xdrs, &path, UCAFS_PATH_MAX) ||
+        !xdr_int(xdrs, &len)) {
+        uerror("xdr storeacl failed\n");
+        goto out;
+    }
+
+    if ((acl_data = (caddr_t)malloc(len)) == NULL) {
+        goto out;
+    }
+
+    if (!xdr_opaque(xdrs, acl_data, len)) {
+        uerror("xdr acl_data failed\n");
+        goto out;
+    }
+
+    if (dirops_setacl(path, acl_data)) {
+        uerror("dirops_setacl failed\n");
+        goto out;
+    }
+
+    log_info("[storeacl] %s", path);
+
+    ret = 0;
+out:
+    if (path) {
+        free(path);
+    }
+
+    if (acl_data) {
+        free(acl_data);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_checkacl(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, len, is_dir, code = 0;
+    acl_rights_t rights;
+    char * path = NULL;
+    caddr_t acl_data = NULL;
+
+    if (!xdr_string(xdrs, &path, UCAFS_PATH_MAX)
+        || !xdr_int(xdrs, (int *)(&rights)) || !xdr_int(xdrs, &is_dir)) {
+        uerror("xdr storeacl failed\n");
+        goto out;
+    }
+
+    code = dirops_checkacl(path, rights, is_dir);
+
+    if (!xdr_int(xdr_out, &code)) {
+        uerror("xdr checkacl failed\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (path) {
+        free(path);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_xfer_init(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, xfer_id, dummy;
+    size_t nbytes;
+    xfer_req_t xfer_req;
+    xfer_rsp_t xfer_rsp;
+    char * fpath = NULL;
+
+    /* get the data from the wire */
+    if (!xdr_opaque(xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t))
+        || !xdr_string(xdrs, &fpath, UCAFS_PATH_MAX)) {
+        uerror("xdr parsing for store start failed");
+        goto out;
+    }
+
+    // call fetchstore start
+    if (fetchstore_init(&xfer_req, fpath, &xfer_rsp)) {
+        log_error("fetchstore_start failed :(");
+        goto out;
+    }
+
+    // otherwise, lets just setup our response
+    if (!xdr_opaque(xdr_out, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
+        log_error("Error with setting xfer_rsp");
+        goto out;
+    }
+
+    log_info("[%s] id=%d (xfer_size=%d, file_size=%d, offset=%d) %s",
+             (xfer_req.op == UCAFS_STORE ? "ucafs_store" : "ucafs_fetch"),
+             xfer_rsp.xfer_id, xfer_req.xfer_size, xfer_req.file_size,
+             xfer_req.offset, fpath);
+
+    ret = 0;
+out:
+    if (fpath) {
+        free(fpath);
+    }
+
+    return ret;
+}
+
+int
+uc_rpc_xfer_run(XDR * xdrs, XDR * xdr_out)
+{
+    int ret = -1, xfer_id, xfer_len;
+
+    /* get params and call fetchstore to do some encryption */
+    if (!xdr_int(xdrs, &xfer_id) || !xdr_int(xdrs, &xfer_len)) {
+        uerror("xdr parsing of transfer run failed");
+        goto out;
+    }
+
+    if ((ret = fetchstore_run(xfer_id, xfer_len))) {
+        log_error("fetchstore_run faild ret=%d", ret);
+        goto out;
+    }
 
     ret = 0;
 out:
     return ret;
 }
 
-afs_int32
-SAFSX_fversion(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ int dummy,
-    /*OOU */ int * result)
+int
+uc_rpc_xfer_exit(XDR * xdrs, XDR * xdr_out)
 {
-    *result = 1;
-    printf("PING from kernel\n");
+    int ret = -1, xfer_id, xfer_len;
 
-    return 0;
-}
-
-static const char *
-struct_type_to_str(ucafs_entry_type type)
-{
-    switch (type) {
-    case UC_FILE:
-        return "touch";
-    case UC_DIR:
-        return "mkdir";
-    case UC_LINK:
-        return "softlink";
-    default:
-        return "(unknown)";
-    }
-}
-
-afs_int32
-SAFSX_create(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * path,
-    /*IN */ afs_int32 type,
-    /*OUT*/ char ** crypto_fname)
-{
-    int ret = dirops_new(path, type, crypto_fname);
-    if (ret) {
-        *crypto_fname = EMPTY_STR_HEAP;
-    } else {
-        uinfo("%s: %s ~> %s", struct_type_to_str(type), path, *crypto_fname);
-    }
-    return ret;
-}
-
-afs_int32 SAFSX_create1(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * parent_dir,
-	/*IN */ char * name,
-	/*IN */ afs_int32 type,
-	/*OUT*/ char * *shadow_name_dest)
-{
-    int ret = dirops_new1(parent_dir, name, type, shadow_name_dest);
-    if (ret) {
-        *shadow_name_dest = EMPTY_STR_HEAP;
-    } else {
-        uinfo("%s: %s/%s ~> %s", struct_type_to_str(type), parent_dir, name,
-              *shadow_name_dest);
-    }
-    return ret;
-}
-
-afs_int32
-SAFSX_find(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * fake_name,
-    /*IN */ char * path,
-    /*IN */ afs_int32 type,
-    /*OUT*/ char ** real_name)
-{
-    int ret = dirops_code2plain(fake_name, path, type, real_name);
-    if (ret) {
-        *real_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("> decode: %s ~> %s", fake_name, *real_name);
-    }
-    return ret;
-}
-
-afs_int32
-SAFSX_lookup(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * fpath,
-    /*IN */ afs_int32 type,
-    /*OUT*/ char ** fake_name)
-{
-    int ret = dirops_plain2code(fpath, type, fake_name);
-    if (ret) {
-        *fake_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("fencode: %s ~> %s", fpath, *fake_name);
-    }
-    return ret;
-}
-
-afs_int32
-SAFSX_rename(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * from_path,
-    /*IN */ char * oldname,
-    /*IN */ char * to_path,
-    /*IN */ char * newname,
-    /*IN */ afs_int32 type,
-    /*OUT*/ char ** old_shadow_name,
-    /*OUT*/ char ** new_shadow_name)
-{
-    int ret = dirops_move(from_path, oldname, to_path, newname, type,
-                          old_shadow_name, new_shadow_name);
-    if (ret) {
-        *old_shadow_name = EMPTY_STR_HEAP;
-        *new_shadow_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("Renamed '%s' -> '%s'", oldname, newname);
-    }
-
-    return ret;
-}
-
-afs_int32
-SAFSX_remove(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * fpath,
-    /*IN */ afs_int32 type,
-    /*OUT*/ char ** code_name)
-{
-    const char * str = (type == UC_DIR) ? "rmdir" : "rm";
-    int ret = dirops_remove(fpath, type, code_name);
-    if (ret) {
-        *code_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("%s: %s ~> %s", str, fpath, *code_name);
-    }
-    return ret;
-}
-
-afs_int32
-SAFSX_hardlink(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ char * old_path,
-    /*IN */ char * new_path,
-    /*OUT*/ char ** code_name)
-{
-    int ret = dirops_hardlink(old_path, new_path, code_name);
-    if (ret) {
-        *code_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("hardlink: %s (%s) ~> %s", new_path, *code_name, old_path);
-    }
-    return ret;
-}
-
-afs_int32 SAFSX_symlink(
-	/*IN */ struct rx_call *z_call,
-	/*IN */ char * old_path,
-	/*IN */ char * new_path,
-	/*OUT*/ char * *code_name)
-{
-    int ret = dirops_symlink(old_path, new_path, code_name);
-    if (ret) {
-        *code_name = EMPTY_STR_HEAP;
-    } else {
-        uinfo("symlink: %s (%s) ~> %s", new_path, *code_name, old_path);
-    }
-    return ret;
-}
-
-#define RWOP_TO_STR(op) (op == UC_ENCRYPT ? "write" : "read")
-afs_int32
-SAFSX_readwrite_start(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ int op,
-    /*IN */ char * fpath,
-    /*IN */ afs_uint32 max_chunk_size,
-    /*IN */ afs_uint32 offset,
-    /*IN */ afs_uint32 total_size,
-    /*OUT*/ afs_int32 * id)
-{
-    int ret;
-    xfer_context_t * ctx;
-
-    ret = fileops_start(op, fpath, max_chunk_size, offset, total_size, id);
-    if (ctx == NULL) {
-        if (ret == -2) {
-            uerror("rw: %s, enclave failed", fpath);
-            return AFSX_STATUS_ERROR;
-        }
-        return AFSX_STATUS_NOOP;
-    }
-
-    uinfo("begin %s: %s (%u, %u, %u) id=%d", RWOP_TO_STR(op), fpath,
-          max_chunk_size, offset, total_size, *id);
-
-    return AFSX_STATUS_SUCCESS;
-}
-
-afs_int32
-SAFSX_readwrite_finish(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ afs_int32 id)
-{
-    return fileops_finish(id);
-}
-
-afs_int32
-SAFSX_readwrite_data(
-    /*IN */ struct rx_call * z_call,
-    /*IN */ afs_int32 id,
-    /*IN */ afs_uint32 size,
-    /*OUT */ int * moredata)
-{
-    int ret = AFSX_STATUS_ERROR;
-    afs_uint32 abytes;
-
-    uint8_t ** buf = fileops_get_buffer(id, size);
-    if (buf == NULL) {
+    /* get params and call fetchstore to do some encryption */
+    if (!xdr_int(xdrs, &xfer_id)) {
+        uerror("xdr parsing of xfer_exit failed");
         goto out;
     }
 
-    if ((abytes = rx_Read(z_call, *buf, size)) != size) {
-        uerror("Read error. expecting: %u, actual: %u (err = %d)", size, abytes,
-               rx_Error(z_call));
-        goto out;
-    }
-
-    // TODO check return
-    fileops_process_data(buf);
-
-    if ((abytes = rx_Write(z_call, *buf, size)) != size) {
-        uerror("Write error. Expecting: %u, Actual: %u (err = %d)", size,
-               abytes, rx_Error(z_call));
+    if ((ret = fetchstore_finish(xfer_id))) {
+        log_error("fetchstore_finish faild ret=%d", ret);
         goto out;
     }
 

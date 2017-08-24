@@ -1,28 +1,35 @@
 #pragma once
 #include <stdint.h>
-#ifndef UCPRIV_ENCLAVE
-#include <uuid/uuid.h>
-#else
-typedef struct {
-    uint8_t bin[16];
-} uuid_t;
-#endif
-#include "ucafs_defs.h"
+#include <stdbool.h>
 
-#define GLOBAL_MAGIC 0x20160811
+#include <mbedtls/pk.h>
 
-#define CRYPTO_AES_KEY_SIZE 16
-#define CRYPTO_AES_KEY_SIZE_BITS CRYPTO_AES_KEY_SIZE << 3
-#define CRYPTO_CRYPTO_BLK_SIZE 16
-#define CRYPTO_MAC_KEY_SIZE 16
-#define CRYPTO_MAC_KEY_SIZE_BITS 16
-#define CRYPTO_MAC_DIGEST_SIZE 32
+#include "third/queue.h"
+
+#include "ucafs_header.h"
 
 #define CRYPTO_CEIL_TO_BLKSIZE(x)                                              \
     x + (CRYPTO_CRYPTO_BLK_SIZE - x % CRYPTO_CRYPTO_BLK_SIZE)
 
-#define DEFAULT_REPO_DIRNAME ".afsx"
-#define DEFAULT_DNODE_FNAME "main.dnode"
+#define UC_HARDLINK 0
+#define UC_SOFTLINK 1
+
+#define CONFIG_SHA256_BUFLEN 32
+#define CONFIG_NONCE_SIZE 64
+#define CONFIG_MRENCLAVE 32
+
+// based on AFS
+#define CONFIG_MAX_NAME 100
+
+#define CONFIG_DIRNODE_BUCKET_CAPACITY 128
+
+struct uc_dentry;
+struct metadata_entry;
+
+/* 128 bits */
+typedef struct {
+    uuid_t bin;
+} shadow_t;
 
 typedef enum {
     E_SUCCESS = 0,
@@ -30,22 +37,32 @@ typedef enum {
     E_ERROR_CRYPTO,
     E_ERROR_ALLOC,
     E_ERROR_KEYINIT,
-    E_ERROR_HASHMAP
+    E_ERROR_LOGIN,
+    E_ERROR_HASHMAP,
+    E_ERROR_NOTFOUND
 } enclave_error_t;
 
+typedef enum {
+    CRYPTO_SEAL,
+    CRYPTO_UNSEAL
+} seal_op_t;
+
 typedef struct {
-    int xfer_id;
-    int enclave_crypto_id;
-    int seg_id;
-    uc_crypto_op_t op;
-    char * buffer;
-    uint32_t buflen;
-    uint32_t valid_buflen; // how much "good" data can be read from the buffer
-    uint32_t completed;
-    int32_t position;
-    uint32_t total_len;
-    char * path;
-} xfer_context_t;
+    uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
+    uint8_t type; /* 0 for soft, 1 for hard */
+    union {
+        shadow_t meta_file;
+        char target_link[0];
+    };
+} __attribute__((packed)) link_info_t;
+
+/* cryptographic stuff */
+#define CRYPTO_AES_KEY_SIZE 16
+#define CRYPTO_AES_KEY_SIZE_BITS CRYPTO_AES_KEY_SIZE << 3
+#define CRYPTO_CRYPTO_BLK_SIZE 16
+#define CRYPTO_MAC_KEY_SIZE 16
+#define CRYPTO_MAC_KEY_SIZE_BITS 16
+#define CRYPTO_MAC_DIGEST_SIZE 32
 
 typedef struct {
     uint8_t bytes[16];
@@ -60,24 +77,6 @@ typedef struct {
 } crypto_mac_t;
 
 typedef struct {
-    uint8_t raw[0];
-} raw_fname_t;
-
-/* 128 bits */
-typedef struct {
-    uuid_t bin;
-} encoded_fname_t;
-
-typedef struct {
-    uint16_t total_len; /* sizeof(struct) + strlen(target_link) */
-    uint8_t type; /* 0 for soft, 1 for hard */
-    union {
-        encoded_fname_t meta_file;
-        char target_link[0];
-    };
-} __attribute__((packed)) link_info_t;
-
-typedef struct {
     crypto_ekey_t ekey;
     crypto_ekey_t mkey;
     crypto_iv_t iv;
@@ -85,19 +84,155 @@ typedef struct {
 } __attribute__((packed)) crypto_context_t;
 
 typedef struct {
-    encoded_fname_t uuid;
-    encoded_fname_t parent;
-    uint8_t is_root;
-    uint32_t count;
-    uint32_t protolen;
-    crypto_context_t crypto_ctx;
-} __attribute__((packed)) dnode_header_t;
+    uint8_t bytes[CONFIG_SHA256_BUFLEN];
+} __attribute__((packed)) pubkey_t;
+
+/* cryptographic definitions for GCM */
+typedef uint8_t gcm_iv_t[16];
+typedef uint8_t gcm_ekey_t[16];
+typedef uint8_t gcm_tag_t[16];
 
 typedef struct {
-    uint16_t link_count;
-    uuid_t uuid;
-    uint32_t chunk_count;
-    uint32_t filelen;
-    uint32_t protolen;
+   gcm_iv_t iv;
+   gcm_ekey_t ekey;
+   gcm_tag_t tag, ekey_auth;
+} __attribute__((packed)) gcm_context_t, gcm_crypto_t;
+
+/* access control stuff */
+typedef enum {
+    ACCESS_READ = 0x01,
+    ACCESS_WRITE = 0x02,
+    ACCESS_INSERT = 0x04,
+    ACCESS_LOOKUP = 0x08,
+    ACCESS_DELETE = 0x10,
+    ACCESS_LOCK = 0x20,
+    ACCESS_ADMIN = 0x40
+} acl_rights_t;
+
+typedef struct {
+    acl_rights_t rights;
+    uint8_t len; // 8 bits will do the job
+    char name[0];
+} __attribute__((packed)) acl_data_t;
+
+typedef struct acl_list_entry {
+    SIMPLEQ_ENTRY(acl_list_entry) next_entry;
+    acl_data_t acl_data;
+} __attribute__((packed)) acl_list_entry_t;
+
+typedef SIMPLEQ_HEAD(acl_head, acl_list_entry) acl_list_head_t;
+
+/** DIRNODE PARTIALS */
+typedef struct {
+   uint16_t count; /* the number of entries in this bucket */
+   uint32_t length; /* size of the buffer */
+   gcm_iv_t iv;
+   gcm_tag_t tag;
+} __attribute__((packed)) dirnode_bucket_t;
+
+typedef struct dirnode_bucket_entry {
+   TAILQ_ENTRY(dirnode_bucket_entry) next_entry;
+   dirnode_bucket_t bckt;
+   bool is_dirty, freeable;
+   uint8_t * buffer; /* initialized before writing */
+} dirnode_bucket_entry_t;
+
+typedef TAILQ_HEAD(bucket_list, dirnode_bucket_entry) bucket_list_head_t;
+
+/* contains the integrity protections of the different buckets */
+typedef struct {
+    shadow_t uuid, parent, root;
+    uint32_t dirbox_count, dirbox_len, lockbox_count, lockbox_len;
+    uint8_t bucket_count;
+    gcm_crypto_t gcm_crypto;
+} __attribute__((packed)) dirnode_header_t;
+
+typedef enum {
+   JRNL_NOOP = 0,
+   JRNL_CREATE = 1
+} jrnl_op_t;
+
+typedef struct {
+   uint8_t type;
+   uint8_t jrnl;
+} __attribute__((packed)) entry_info_t;
+
+// mainly for debug purposes in gdb
+#define DNODE_PAYLOAD                                                          \
+    entry_info_t info;                                                         \
+    uint16_t rec_len;                                                          \
+    uint16_t link_len;                                                         \
+    shadow_t shadow_name;                                                      \
+    uint8_t name_len;                                                          \
+    char real_name[0];
+
+typedef struct {
+   DNODE_PAYLOAD;
+} __attribute__((packed)) dnode_dir_payload_t;
+
+typedef struct dnode_data {
+    char * target;
+    DNODE_PAYLOAD;
+} __attribute__((packed)) dnode_data_t;
+
+typedef struct dnode_list_entry {
+   TAILQ_ENTRY(dnode_list_entry) next_entry;
+   dirnode_bucket_entry_t * bucket_entry;
+   dnode_data_t dnode_data;
+} __attribute__((packed)) dnode_list_entry_t;
+
+typedef TAILQ_HEAD(dnode_list_head, dnode_list_entry) dnode_list_head_t;
+
+typedef struct {
+    uint8_t pubkey_hash[CONFIG_SHA256_BUFLEN];
+    int len;
+    char username[0];
+} __attribute__((packed)) snode_user_t;
+
+typedef struct snode_user_entry {
+    SIMPLEQ_ENTRY(snode_user_entry) next_user;
+    snode_user_t user_data;
+} __attribute__((packed)) snode_user_entry_t;
+
+typedef struct snode_user_entry snode_user_entry_t;
+
+/* structs for supernode stuff */
+#define SUPERNODE_PAYLOAD                                                      \
+    uint32_t user_count;                                                       \
+    uint32_t users_buflen;                                                     \
+    shadow_t uuid;                                                             \
+    shadow_t root_dnode;                                                       \
+    uint8_t owner_pubkey[CONFIG_SHA256_BUFLEN];
+
+typedef struct {
+    SUPERNODE_PAYLOAD;
+} __attribute__((packed)) supernode_payload_t;
+
+#define SUPERNODE_HEADER                                                       \
+    SUPERNODE_PAYLOAD;                                                         \
     crypto_context_t crypto_ctx;
-} __attribute__((packed)) fbox_header_t;
+
+typedef struct {
+    SUPERNODE_HEADER;
+} __attribute__((packed)) supernode_header_t;
+
+typedef struct {
+    SUPERNODE_HEADER;
+    bool is_mounted;
+    uint8_t * users_buffer;
+    SIMPLEQ_HEAD(snode_user_list, snode_user_entry) users_list;
+} __attribute__((packed)) supernode_t;
+
+#define ENCLAVE_AUTH_DATA \
+    uint8_t nonce[CONFIG_NONCE_SIZE]; \
+    uint8_t mrenclave[CONFIG_MRENCLAVE];
+
+typedef struct {
+    ENCLAVE_AUTH_DATA;
+} auth_payload_t;
+
+typedef struct {
+    ENCLAVE_AUTH_DATA;
+    size_t sig_len;
+    uint8_t signature[MBEDTLS_MPI_MAX_SIZE];
+} auth_struct_t;

@@ -1,42 +1,64 @@
+#pragma once
+
 #include <stdbool.h>
 
 #include "third/sds.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "uc_types.h"
+
+#define MAX_SUPERNODE_PATHS 20
+
+typedef struct {
+    char * root_ucafs;
+    char * pubkey;
+    char * privkey;
+    char * mounts[MAX_SUPERNODE_PATHS];
+} ucafs_config_t;
+
+extern char * global_supernode_paths[MAX_SUPERNODE_PATHS];
+
+extern size_t global_supernode_count;
+
+extern supernode_t * global_supernode_object;
+
+extern uint8_t * global_xfer_addr;
+extern size_t global_xfer_buflen;
+
+struct dirnode;
 
 /**
- * path to the default home directory
+ * Derives the relative path with respect to the watch folder
+ * @param path is the full path
+ * @param is_dirpath if the path passed is the path to a parent folder
+ * @return the relative path, NULL if the prefix doesn't match the
+ * path to the watch folder
  */
-extern sds global_home_path;
+sds
+uc_derive_relpath(const char * fullpath, bool is_dirpath);
 
-/** path to the default repo director.  home_path/.afsx */
-extern sds global_repo_path;
+int metadata_init();
+void metadata_exit();
 
-extern bool global_env_is_afs;
+void dcache_init();
+void dcache_exit();
 
-/**
- * Sets the home path. Essentially, the directory where the metadata is stored
- */
-void
-uc_set_afs_home(const char * path, const char * watched_dir, bool is_afs);
+int ucafs_init_uspace();
+int ucafs_exit_uspace();
+
+int ucafs_init_vfs();
+int ucafs_exit_vfs();
+
+int ucafs_init_enclave();
+
+
+int
+ucafs_login(const char * user_root_path);
 
 sds
-uc_get_repo_path();
+ucafs_supernode_path(const char * root_path);
 
 sds
-uc_main_dnode_fpath();
+ucafs_metadata_path(const char * root_path, const char * meta_fname);
 
-sds
-uc_get_dnode_path(const char * fname);
-
-sds
-uc_get_relative_parentpath(const char * path);
-
-sds
-uc_get_relative_path(const char * path);
-
-#ifdef __cplusplus
-}
-#endif
+int
+ucafs_launch(const char * mount_file_path);

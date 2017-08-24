@@ -1,6 +1,11 @@
 *.o
 *.a
 *.so
+*.swp
 user/mbedtls
 *cscope.out*
 user/build.mk
+enclave_u.*
+enclave_t.*
+admin_ucafs
+ucafs

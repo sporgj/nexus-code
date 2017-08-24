@@ -1,81 +1,128 @@
 /*
- * Generic hashmap manipulation functions
+ * Copyright (C) 2007 The Android Open Source Project
  *
- * Originally by Elliot C Back - http://elliottback.com/wp/hashmap-implementation-in-c/
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Modified by Pete Warden to fix a serious performance problem, support strings as keys
- * and removed thread synchronization - http://petewarden.typepad.com
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-#ifndef __HASHMAP_H__
-#define __HASHMAP_H__
-
-#define MAP_MISSING -3  /* No such element */
-#define MAP_FULL -2 	/* Hashmap is full */
-#define MAP_OMEM -1 	/* Out of Memory */
-#define MAP_OK 0 	/* OK */
-
-/*
- * any_t is a pointer.  This allows you to put arbitrary structures in
- * the hashmap.
+/**
+ * Hash map.
  */
-typedef void *any_t;
-
-/*
- * PFany is a pointer to a function that can take two any_t arguments
- * and return an integer. Returns status code..
- */
-typedef int (*PFany)(any_t, any_t);
-
-/*
- * map_t is a pointer to an internally maintained data structure.
- * Clients of this package do not need to know how hashmaps are
- * represented.  They see and manipulate only map_t's.
- */
-typedef any_t map_t;
-
-/*
- * Return an empty hashmap. Returns NULL if empty.
-*/
-extern map_t hashmap_new();
-
-/*
- * Iteratively call f with argument (item, data) for
- * each element data in the hashmap. The function must
- * return a map status code. If it returns anything other
- * than MAP_OK the traversal is terminated. f must
- * not reenter any hashmap functions, or deadlock may arise.
- */
-extern int hashmap_iterate(map_t in, PFany f, any_t item);
-
-/*
- * Add an element to the hashmap. Return MAP_OK or MAP_OMEM.
- */
-extern int hashmap_put(map_t in, char* key, any_t value);
-
-/*
- * Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
- */
-extern int hashmap_get(map_t in, char* key, any_t *arg);
-
-/*
- * Remove an element from the hashmap. Return MAP_OK or MAP_MISSING.
- */
-extern int hashmap_remove(map_t in, char* key);
-
-/*
- * Get any element. Return MAP_OK or MAP_MISSING.
- * remove - should the element be removed from the hashmap
- */
-extern int hashmap_get_one(map_t in, any_t *arg, int remove);
-
-/*
- * Free the hashmap
- */
-extern void hashmap_free(map_t in);
-
-/*
- * Get the current size of a hashmap
- */
-extern int hashmap_length(map_t in);
-
+#ifndef __HASHMAP_H
+#define __HASHMAP_H
+#include <stdbool.h>
+#include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
 #endif
+/** A hash map. */
+typedef struct Hashmap Hashmap;
+/**
+ * Creates a new hash map. Returns NULL if memory allocation fails.
+ *
+ * @param initialCapacity number of expected entries
+ * @param hash function which hashes keys
+ * @param equals function which compares keys for equality
+ */
+Hashmap* hashmapCreate(size_t initialCapacity,
+        int (*hash)(void* key), bool (*equals)(void* keyA, void* keyB));
+/**
+ * Frees the hash map. Does not free the keys or values themselves.
+ */
+void hashmapFree(Hashmap* map);
+/**
+ * Hashes the memory pointed to by key with the given size. Useful for
+ * implementing hash functions.
+ */
+int hashmapHash(void* key, size_t keySize);
+/**
+ * Puts value for the given key in the map. Returns pre-existing value if
+ * any.
+ *
+ * If memory allocation fails, this function returns NULL, the map's size
+ * does not increase, and errno is set to ENOMEM.
+ */
+void* hashmapPut(Hashmap* map, void* key, void* value, int ** p_hashval);
+/**
+ * Gets a value from the map. Returns NULL if no entry for the given key is
+ * found or if the value itself is NULL.
+ */
+void* hashmapGet(Hashmap* map, void* key);
+/**
+ * Returns true if the map contains an entry for the given key.
+ */
+bool hashmapContainsKey(Hashmap* map, void* key);
+/**
+ * Gets the value for a key. If a value is not found, this function gets a 
+ * value and creates an entry using the given callback.
+ *
+ * If memory allocation fails, the callback is not called, this function
+ * returns NULL, and errno is set to ENOMEM.
+ */
+void* hashmapMemoize(Hashmap* map, void* key, 
+        void* (*initialValue)(void* key, void* context), void* context);
+/**
+ * Removes an entry from the map. Returns the removed value or NULL if no
+ * entry was present.
+ */
+void* hashmapRemove(Hashmap* map, void* key);
+/**
+ * Gets the number of entries in this map.
+ */
+size_t hashmapSize(Hashmap* map);
+/**
+ * Invokes the given callback on each entry in the map. Stops iterating if
+ * the callback returns false.
+ */
+void hashmapForEach(Hashmap* map, 
+        bool (*callback)(void* key, void* value, void* context),
+        void* context);
+/**
+ * Concurrency support.
+ */
+/**
+ * Locks the hash map so only the current thread can access it.
+ */
+void hashmapLock(Hashmap* map);
+/**
+ * Unlocks the hash map so other threads can access it.
+ */
+void hashmapUnlock(Hashmap* map);
+/**
+ * Key utilities.
+ */
+/**
+ * Hashes int keys. 'key' is a pointer to int.
+ */
+int hashmapIntHash(void* key);
+/**
+ * Compares two int keys for equality.
+ */
+bool hashmapIntEquals(void* keyA, void* keyB);
+/**
+ * For debugging.
+ */
+/**
+ * Gets current capacity.
+ */
+size_t hashmapCurrentCapacity(Hashmap* map);
+/**
+ * Counts the number of entry collisions.
+ */
+size_t hashmapCountCollisions(Hashmap* map);
+/**
+ * Computes the hash of the key
+ */
+int hashmapHashKey(Hashmap * map, void * key);
+#ifdef __cplusplus
+}
+#endif
+#endif /* __HASHMAP_H */

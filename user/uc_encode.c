@@ -172,34 +172,35 @@ static size_t encoded_str_size = 0;
 static inline void
 compute_encoded_str_size()
 {
-    encoded_fname_t code;
-    if (encoded_str_size == 0) {
-        ecryptfs_encode_for_filename(NULL, &encoded_str_size, (uint8_t *)&code,
-                                     sizeof(encoded_fname_t));
-    }
+    shadow_t code;
+    ecryptfs_encode_for_filename(NULL, &encoded_str_size, (uint8_t *)&code,
+                                 sizeof(shadow_t));
 }
 
 static char *
-encode_bin2str(const encoded_fname_t * code, char * prefix, size_t prefix_len)
+encode_bin2str(const shadow_t * code, char * prefix, size_t prefix_len)
 {
     char * result = NULL;
     size_t sz;
 
-    compute_encoded_str_size();
-    result = (char *)malloc(prefix_len + encoded_str_size + 1);
+    if (encoded_str_size == 0) {
+        compute_encoded_str_size();
+    }
+
+    result = (char *)calloc(1, prefix_len + encoded_str_size + 1);
     if (result == NULL) {
         return NULL;
     }
 
     memcpy(result, prefix, prefix_len);
     ecryptfs_encode_for_filename((uint8_t *)result + prefix_len, &sz,
-                                 (uint8_t *)code, sizeof(encoded_fname_t));
+                                 (uint8_t *)code, sizeof(shadow_t));
 
     result[sz] = '\0';
     return result;
 }
 
-static encoded_fname_t *
+static shadow_t *
 encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
 {
     size_t src_sz = strlen(encoded_filename);
@@ -222,11 +223,11 @@ encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
     src_sz -= prefix_len;
 
     dst_sz = ecryptfs_max_decoded_size(src_sz);
-    if (dst_sz != sizeof(encoded_fname_t)) {
+    if (dst_sz < sizeof(shadow_t)) {
         return NULL;
     }
 
-    encoded_fname_t * code = (encoded_fname_t *)malloc(sizeof(encoded_fname_t));
+    shadow_t * code = (shadow_t *)malloc(sizeof(shadow_t) + 1);
     if (code == NULL) {
         return NULL;
     }
@@ -238,13 +239,20 @@ encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
 }
 
 char *
-metaname_bin2str(const encoded_fname_t * bin)
+metadir_bin2str(const shadow_t * bin)
+{
+    return encode_bin2str(bin, UC_METADIR_PREFIX,
+                          UC_PREFIX_LEN(UC_METADIR_PREFIX));
+}
+
+char *
+metaname_bin2str(const shadow_t * bin)
 {
     return encode_bin2str(bin, UC_METADATA_PREFIX,
                           UC_PREFIX_LEN(UC_METADATA_PREFIX));
 }
 
-encoded_fname_t *
+shadow_t *
 metaname_str2bin(const char * str)
 {
     return encode_str2bin(str, UC_METADATA_PREFIX,
@@ -252,13 +260,13 @@ metaname_str2bin(const char * str)
 }
 
 char *
-filename_bin2str(const encoded_fname_t * bin)
+filename_bin2str(const shadow_t * bin)
 {
     return encode_bin2str(bin, UC_FILEDATA_PREFIX,
                           UC_PREFIX_LEN(UC_FILEDATA_PREFIX));
 }
 
-encoded_fname_t *
+shadow_t *
 filename_str2bin(const char * str)
 {
     return encode_str2bin(str, UC_FILEDATA_PREFIX,

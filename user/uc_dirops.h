@@ -43,15 +43,15 @@ dirops_symlink(const char * target_path,
 
 /**
  * Returns the raw file name of an encoded path
- * @param encoded_name is the encoded file name
  * @param dir_path is the directory in which the file resides
+ * @param encoded_name is the encoded file name
  * @param raw_name_dest is the resulting the raw file name,
  * set to NULL if error (ex. file not be found)
  * @return 0 on success
  */
 int
-dirops_code2plain(char * encoded_name,
-                  char * dir_path,
+dirops_code2plain(const char * dir_path,
+                  const char * encoded_name,
                   ucafs_entry_type type,
                   char ** raw_name_dest);
 
@@ -70,6 +70,12 @@ dirops_plain2code(const char * fpath_raw,
                   ucafs_entry_type type,
                   char ** encoded_fname_dest);
 
+int
+dirops_plain2code1(const char * parent_dir,
+                   const char * fname,
+                   ucafs_entry_type type,
+                   char ** encoded_fname_dest);
+
 /**
  * Removes a file from the respective file path
  * @param fpath_raw is the raw file name
@@ -79,6 +85,13 @@ int
 dirops_remove(const char * fpath_raw,
               ucafs_entry_type type,
               char ** encoded_fname_dest);
+
+int
+dirops_remove1(const char * parent_dir,
+               const char * fname,
+               ucafs_entry_type type,
+               char ** encoded_fname_dest);
+
 int
 dirops_move(const char * from_dir,
             const char * oldname,
@@ -96,11 +109,10 @@ dirops_move1(const char * from_fpath,
              char ** ptr_newname);
 
 int
-dirops_rename2(const char * parent_path,
-               const char * old_name,
-               const char * new_name,
-               ucafs_entry_type type,
-               char ** encoded_name_dest);
+dirops_setacl(const char * path, const char * acl);
+
+int
+dirops_checkacl(const char * path, acl_rights_t rights, int is_dir);
 #ifdef __cplusplus
 }
 #endif
