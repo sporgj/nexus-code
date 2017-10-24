@@ -44,6 +44,33 @@ libucafs.a: $(OBJS) libthird.a
 	@$(CC) $(CFLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
+
+
+build = \
+        @if [ -z "$V" ]; then \
+                echo '    [$1]  $@'; \
+                $2; \
+        else \
+                echo '$2'; \
+                $2; \
+        fi
+
+
+
+
+define cscope-all-sources
+	( find . $(RCS_FIND_IGNORE) \
+		\( -name '*.[chS]' -o -name '*.cc' \) -print; \
+	)
+endef
+
+
+cscope:
+	$(call build,FILELIST,(echo \-k; echo \-q; $(cscope-all-sources)) > cscope.files)
+	$(call build,MAKE,cscope -b)
+
+
+
 .PHONY: clean
 clean:
 	rm -rf $(GENS) $(PROGRAM) *.o
