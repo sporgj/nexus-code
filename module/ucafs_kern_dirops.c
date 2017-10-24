@@ -148,8 +148,8 @@ ucafs_kern_symlink(struct dentry  * dp,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     
-    if ( (xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX) == FALSE) ||
-	 (xdr_string(&xdrs, &target, UCAFS_FNAME_MAX)   == FALSE) )  {
+    if ( (xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX)  == FALSE) ||
+	 (xdr_string(&xdrs, &target,    UCAFS_FNAME_MAX) == FALSE) )  {
 
 	ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();
@@ -278,7 +278,7 @@ ucafs_kern_filldir(char              * parent_dir,
     /* create the XDR object */
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
 
-    if ( (xdr_string(&xdrs, &parent_dir, UCAFS_PATH_MAX)   == FALSE) ||
+    if ( (xdr_string(&xdrs, &parent_dir,  UCAFS_PATH_MAX)  == FALSE) ||
 	 (xdr_string(&xdrs, &shadow_name, UCAFS_FNAME_MAX) == FALSE) ||
 	 (xdr_int(&xdrs, (int *)&type)                     == FALSE) ) {
 
@@ -509,7 +509,8 @@ ucafs_kern_access(struct vcache * avc,
 	goto out;
     }
 
-    if (ucafs_mod_send(UCAFS_MSG_CHECKACL, &xdrs, &reply, &code) || code) {
+    if (ucafs_mod_send(UCAFS_MSG_CHECKACL, &xdrs, &reply, &code) ||
+	code) {
         ERROR("xdr setacl (%s) FAILED\n", path);
         goto out;
     }
