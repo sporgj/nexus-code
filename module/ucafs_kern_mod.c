@@ -1,6 +1,7 @@
 #include "ucafs_module.h"
 #include <asm/pgtable.h>
 #include <linux/mm.h>
+#include <linux/spinlock.h>
 
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "ucafs_mod: " fmt, ##args)
@@ -26,13 +27,13 @@ ucafs_open(struct inode * inode,
     
     spin_lock_irqsave(&(dev->dev_lock), flags);			
     {
-	if (dev->current == NULL) {
+	if (dev->daemon == NULL) {
 	    dev->daemon      = current;
 	    fp->private_data = dev;
 	    acquired         = 1;
 	} 	
     }
-    spin_lock_irqrestore(&(dev->dev_lock), flags);
+    spin_unlock_irqrestore(&(dev->dev_lock), flags);
 
     if (acquired == 0) {
 	return -EBUSY;
@@ -54,7 +55,7 @@ ucafs_release(struct inode * inode,
     {
 	dev->daemon = NULL;
     }
-    spin_lock_irqrestore(&(dev->dev_lock), flags);
+    spin_unlock_irqrestore(&(dev->dev_lock), flags);
 
     
     return 0;
@@ -139,7 +140,7 @@ ucafs_ioctl(struct file   * filp,
 	len  = strlen_user((char *)arg);
         path = (char *)kmalloc(len + 1, GFP_KERNEL);
 
-	printk(KERN_WARN "Unsafe string handling in Nexus IOCTL\n"); 
+	printk(KERN_WARNING "Unsafe string handling in Nexus IOCTL\n"); 
 	dump_stack();
 	
 
@@ -236,7 +237,7 @@ static int
 ucafs_mmap(struct file           * filp,
 	     struct vm_area_struct * vma)
 {
-    struct page   * page      = NUL;
+    struct page   * page      = NULL;
     unsigned long   user_addr = vma->vm_start;
 
     int err  = 0;
@@ -302,7 +303,7 @@ static int
 proc_open(struct inode * inode,
 	     struct file  * file)
 {
-    return single_open(file, ucafs_p_show, NULL);
+    return single_open(file, proc_show, NULL);
 }
 
 static struct file_operations ucafs_proc_fops = {

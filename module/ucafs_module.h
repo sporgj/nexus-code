@@ -38,6 +38,9 @@
 #define UCMOD_XFER_ORDER      5
 #define UCAFS_XFER_SIZE       (PAGE_SIZE << UCMOD_XFER_ORDER)
 
+#define FALSE 0
+#define TRUE 1
+
 typedef struct {
     struct list_head list;
     int              path_len;

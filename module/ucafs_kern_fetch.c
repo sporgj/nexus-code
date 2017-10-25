@@ -97,7 +97,7 @@ ucafs_fetch_exit(fetch_context_t * context,
     /* lets close the userspace context  */
     buf_ptr = READPTR_LOCK();
 
-    if (bf_ptr == 0) {
+    if (buf_ptr == 0) {
         goto next_op;
     }
 
