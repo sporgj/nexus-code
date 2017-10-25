@@ -61,6 +61,7 @@ enclave_siv_crypto(gcm_ekey_t * ekey,
                    uc_crypto_op_t op)
 {
     int ret = 0;
+#if 0
     AES_GCM_SIV_CONTEXT siv_ctx;
 
     /* initialize the gcm SIV context */
@@ -79,6 +80,7 @@ enclave_siv_crypto(gcm_ekey_t * ekey,
                                   sizeof(gcm_ekey_t), (const uint8_t *)uuid,
                                   (const uint8_t *)&__enclave_encryption_key__);
     }
+#endif
 
     return ret;
 }

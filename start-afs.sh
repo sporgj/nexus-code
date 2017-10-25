@@ -1,4 +1,9 @@
 #!/bin/bash
+if [ "$#" -lt 1 ]; then
+  echo "usage: $0 username"
+  exit 1
+fi
+
 set -e
 set -x
 
@@ -13,5 +18,5 @@ sudo chown $USER /dev/$module
 sudo chmod $mode /dev/$module
 
 sudo ./openafs/src/afsd/afsd
-kinit djoko
+kinit $1
 ./openafs/src/aklog/aklog -d

@@ -49,7 +49,7 @@ enclave_t.o: enclave_t.c
 
 
 
-enclave.so: enclave_t.o $(OBJS) $(GCMSIV_OBJECTS) libmbedcrypto.a
+enclave.so: enclave_t.o $(OBJS) libmbedcrypto.a
 	@echo $(SIV_OBJS)
 	$(CC) $^ -o $@ $(Enclave_Link_Flags) $(FLAGS)
 	@echo "LINK => $@"

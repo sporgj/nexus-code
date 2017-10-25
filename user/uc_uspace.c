@@ -145,6 +145,8 @@ ucafs_login(const char * user_root_path)
     mbedtls_sha256_finish(&sha256_ctx, hash);
     mbedtls_sha256_free(&sha256_ctx);
 
+#if 0
+	// XXX: not needed. to be removed
     /* parse the enclave public key */
     mbedtls_pk_init(enclave_pubkey);
     err = mbedtls_pk_parse_public_keyfile(enclave_pubkey,
@@ -162,6 +164,7 @@ ucafs_login(const char * user_root_path)
     }
 
     mbedtls_pk_free(enclave_pubkey);
+#endif
 
     // TODO verify that measurement matches
 
