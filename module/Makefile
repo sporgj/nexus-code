@@ -10,7 +10,8 @@ FILES :=	ucafs_kern.c         \
 		ucafs_kern_store.c   \
 		ucafs_module.h       \
 		ucafs_kern.h         \
-		ucafs_header.h
+		ucafs_header.h	     \
+		nexus_util.h
 
 
 all: install
