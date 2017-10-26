@@ -1,0 +1,35 @@
+srcdir=@srcdir@
+include @TOP_OBJDIR@/src/config/Makefile.config
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+
+OBJS=main.o
+
+all: growlagent-openafs
+
+growlagent-openafs: ${OBJS}
+	${CC} ${CFLAGS} -o $@ ${OBJS} -framework Security \
+		-framework AppKit -framework CoreFoundation
+
+main.o: GrowlDefines.h GrowlPathway.h
+
+clean:
+	$(RM) -f *.o growlagent-openafs
+
+install:
+
+dest: \
+	${DEST}/tools/growlagent-openafs.app
+
+${DEST}/tools/growlagent-openafs.app: growlagent-openafs
+	-mkdir -p $@
+	-mkdir -p $@/Contents/Resources/MacOS
+	-mkdir -p $@/Contents/MacOS
+	${INSTALL} $? $@/Contents/MacOS
+	${INSTALL} ${srcdir}/Andy.icns $@/Contents/Resources
+	${INSTALL} ${srcdir}/Info.plist $@/Contents
+
+include ../../../config/Makefile.version
+
