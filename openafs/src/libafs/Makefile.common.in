@@ -68,13 +68,13 @@ single_instdir_libafs: install_libafs
 single_destdir_libafs: dest_libafs
 
 # nexus objects
-NEXUSOBJS := nexus_kern_mod.o\
+NEXUSOBJS = nexus_kern_mod.o\
 	nexus_kern_store.o\
 	nexus_kern_fetch.o\
 	nexus_kern_dirops.o\
 	nexus_kern.o
 
-NEXUSDIR := ${TOP_OBJDIR}/shimlayer
+NEXUSDIR = ${TOP_OBJDIR}/shimlayer
 
 
 nexus_kern_store.o: $(NEXUSDIR)/nexus_kern_store.c

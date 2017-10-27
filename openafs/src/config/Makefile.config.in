@@ -25,6 +25,7 @@ prefix=@prefix@
 sbindir=@sbindir@
 sysconfdir=@sysconfdir@
 viceetcdir=@viceetcdir@
+nexusdir=@TOP_OBJDIR@/shimlayer
 
 
 #
