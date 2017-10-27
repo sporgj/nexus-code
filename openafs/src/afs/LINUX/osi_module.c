@@ -33,6 +33,8 @@
 
 #include "osi_pagecopy.h"
 
+#include "nexus_module.h"
+
 extern struct file_system_type afs_fs_type;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
@@ -90,6 +92,8 @@ afs_init(void)
     osi_ioctl_init();
     afs_init_pagecopy();
 
+    nexus_mod_init();
+
     return 0;
 }
 
@@ -119,7 +123,7 @@ afs_cleanup(void)
     return;
 }
 
-MODULE_LICENSE("http://www.openafs.org/dl/license10.html");
+MODULE_LICENSE("GPL");
 module_init(afs_init);
 module_exit(afs_cleanup);
 

@@ -58,6 +58,9 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     struct afs_fakestat_state fakestate;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    /* nexus code */
+    char * shadow_name = NULL;
+    int is_nexus_file = 0;
     OSI_VC_CONVERT(adp);
 
     AFS_STATCNT(afs_create);
@@ -299,6 +302,12 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 
     if (!AFS_IS_DISCONNECTED) {
 	/* If not disconnected, connect to the server.*/
+	if (nexus_kern_create(adp, aname, UC_FILE, &shadow_name) == 0) {
+	    is_nexus_file = 1;
+	} else {
+	    is_nexus_file = 0;
+	    shadow_name = aname;
+	}
 
     	InStatus.UnixModeBits = attrs->va_mode & 0xffff;	/* only care about protection bits */
     	do {
@@ -310,7 +319,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	    	RX_AFS_GUNLOCK();
 	    	code =
 		    RXAFS_CreateFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
-				 aname, &InStatus, (struct AFSFid *)
+				 shadow_name, &InStatus, (struct AFSFid *)
 				 &newFid.Fid, OutFidStatus, OutDirStatus,
 				 &CallBack, &tsync);
 	    	RX_AFS_GLOCK();
@@ -379,7 +388,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, OutDirStatus, 1)) {
 	/* we can do it locally */
 	ObtainWriteLock(&afs_xdcache, 291);
-	code = afs_dir_Create(tdc, aname, &newFid.Fid);
+	code = afs_dir_Create(tdc, shadow_name, &newFid.Fid);
 	ReleaseWriteLock(&afs_xdcache);
 	if (code) {
 	    ZapDCE(tdc);
@@ -503,6 +512,10 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     afs_DestroyReq(treq);
 
   done2:
+    /* nexus code */
+    if (is_nexus_file) {
+	kfree(shadow_name);
+    }
     osi_FreeSmallSpace(OutFidStatus);
     osi_FreeSmallSpace(OutDirStatus);
     return code;

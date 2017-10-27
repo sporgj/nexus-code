@@ -314,6 +314,9 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
     afs_size_t origOffset, tlen;
     cred_t *credp = crref();
     struct afs_fakestat_state fakestat;
+    /* nexus code */
+    char * nexus_path = NULL, * uc_name = NULL, * real_name = NULL;
+    int is_nexus_file = 0, uc_len, uc_offset, md_file;
 
     AFS_GLOCK();
     AFS_STATCNT(afs_readdir);
@@ -383,6 +386,10 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
 #else
     offset = (int) fp->f_pos;
 #endif
+
+    /* nexus code */
+    nexus_vnode_path(avc, &nexus_path);
+    uc_offset = offset;
     while (1) {
 	dirpos = BlobScan(tdc, offset);
 	if (!dirpos)
@@ -399,6 +406,11 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
 	ino = afs_calc_inum(avc->f.fid.Cell, avc->f.fid.Fid.Volume,
 	                    ntohl(de->fid.vnode));
 	len = strlen(de->name);
+
+	/* nexus code */
+	uc_name = de->name;
+	uc_len = len;
+	is_nexus_file = md_file = 0;
 
 	/* filldir returns -EINVAL when the buffer is full. */
 	{
@@ -431,18 +443,40 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
 		/* clean up from afs_FindVCache */
 		afs_PutVCache(tvc);
 	    }
+	    /* nexus code */
+	    if (nexus_path) {
+		nexus_entry_type uc_type = UC_ANY;
+
+		if (type == DT_REG) {
+		    uc_type = UC_FILE;
+		} else if (type == DT_DIR) {
+		    uc_type = UC_DIR;
+		}
+
+		if ((uc_name[0] == '.' && uc_name[1] == '\0') ||
+		    (uc_name[0] == '.' && uc_name[1] == '.' && uc_name[2] == '\0')) {
+		    goto skip;
+		}
+
+		if (nexus_kern_filldir(nexus_path, uc_name, uc_type, &real_name) == 0) {
+		    is_nexus_file = 1;
+		    uc_name = real_name;
+		    uc_len = strlen(uc_name);
+		}
+	    }
 	    /*
 	     * If this is NFS readdirplus, then the filler is going to
 	     * call getattr on this inode, which will deadlock if we're
 	     * holding the GLOCK.
 	     */
+skip:
 	    AFS_GUNLOCK();
 #if defined(STRUCT_FILE_OPERATIONS_HAS_ITERATE)
 	    /* dir_emit returns a bool - true when it succeeds.
 	     * Inverse the result to fit with how we check "code" */
-	    code = !dir_emit(ctx, de->name, len, ino, type);
+	    code = !dir_emit(ctx, uc_name, uc_len, ino, type);
 #else
-	    code = (*filldir) (dirbuf, de->name, len, offset, ino, type);
+	    code = (*filldir) (dirbuf, uc_name, uc_len, uc_offset, ino, type);
 #endif
 	    AFS_GLOCK();
 	}
@@ -450,6 +484,14 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
 	if (code)
 	    break;
 	offset = dirpos + 1 + ((len + 16) >> 5);
+	/* nexus code */
+	uc_offset = dirpos + 1 + ((uc_len + 16) >> 5);
+	if (is_nexus_file) {
+	    kfree(uc_name);
+	    real_name = NULL;
+	    // overkill
+	    is_nexus_file = 0;
+	}
     }
     /* If filldir didn't fill in the last one this is still pointing to that
      * last attempt.
@@ -475,6 +517,11 @@ out:
     afs_DestroyReq(treq);
 out1:
     AFS_GUNLOCK();
+    /* nexus code */
+    if (nexus_path) {
+	kfree(nexus_path);
+    }
+
     return code;
 }
 
@@ -1613,6 +1660,9 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
     cred_t *credp = crref();
     const char *name = newdp->d_name.name;
     struct inode *oldip = olddp->d_inode;
+    /* nexus code */
+    int is_nexus_file;
+    char * nexus_name;
 
     /* If afs_link returned the vnode, we could instantiate the
      * dentry. Since it's not, we drop this one and do a new lookup.
@@ -1620,7 +1670,20 @@ afs_linux_link(struct dentry *olddp, struct inode *dip, struct dentry *newdp)
     d_drop(newdp);
 
     AFS_GLOCK();
-    code = afs_link(VTOAFS(oldip), VTOAFS(dip), (char *)name, credp);
+    /* nexus code */
+    if (nexus_kern_hardlink(olddp, newdp, &nexus_name) == 0) {
+	is_nexus_file = 1;
+    } else {
+	is_nexus_file = 0;
+	nexus_name = (char *)name;
+    }
+
+    code = afs_link(VTOAFS(oldip), VTOAFS(dip), nexus_name, credp);
+
+    /* nexus code */
+    if (is_nexus_file) {
+	kfree(nexus_name);
+    }
 
     AFS_GUNLOCK();
     crfree(credp);
@@ -1722,6 +1785,9 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
     cred_t *credp = crref();
     struct vattr *vattr = NULL;
     const char *name = dp->d_name.name;
+    /* nexus code */
+    int is_nexus_file = 0;
+    char * nexus_name = NULL;
 
     /* If afs_symlink returned the vnode, we could instantiate the
      * dentry. Since it's not, we drop this one and do a new lookup.
@@ -1734,11 +1800,24 @@ afs_linux_symlink(struct inode *dip, struct dentry *dp, const char *target)
 	goto out;
     }
 
-    code = afs_symlink(VTOAFS(dip), (char *)name, vattr, (char *)target, NULL,
+    /* nexus code */
+    if (nexus_kern_symlink(dp, (char *)target, &nexus_name) == 0) {
+	is_nexus_file = 1;
+    } else {
+	is_nexus_file = 0;
+	nexus_name = (char *)name;
+    }
+
+    code = afs_symlink(VTOAFS(dip), (char *)nexus_name, vattr, (char *)target, NULL,
 			credp);
     afs_DestroyAttr(vattr);
 
 out:
+    /* nexus code */
+    if (is_nexus_file) {
+	kfree(nexus_name);
+    }
+
     AFS_GUNLOCK();
     crfree(credp);
     return afs_convert_code(code);

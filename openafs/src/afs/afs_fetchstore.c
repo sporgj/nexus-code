@@ -590,6 +590,15 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
     unsigned int first = 0;
     struct afs_conn *tc;
     struct rx_connection *rxconn;
+    /* nexus code */
+    int is_nexus_file = 1, ret;
+    struct rx_call * acall;
+    char * path = NULL;
+
+    if (UCAFS_DISCONNECTED() || vType(avc) == VDIR
+	    || nexus_vnode_path(avc, &path)) {
+	is_nexus_file = 0;
+    }
 
     for (bytes = 0, j = 0; !code && j <= high; j++) {
 	if (dcList[j]) {
@@ -641,11 +650,34 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
 #endif
 		code = rxfs_storeInit(avc, tc, rxconn, base, bytes, length,
 				      sync, &ops, &rock);
+
+		/* nexus code */
+		if (is_nexus_file == 0 || code) {
+		    goto post_nexus;
+		}
+
+		acall = ((struct rxfs_storeVariables*)rock)->call;
+                ret = nexus_kern_store(avc, dclist, bytes, anewDV, &doProcessFS,
+                                       &OutStatus, nchunks, nomore, acall, path,
+                                       base, ops, rock);
+		if (ret == 0) {
+		    // then we can proceed
+		    code = 0;
+		    goto post_dcache_store;
+		}
+
+		/* the next iteration should skip it altogether */
+		is_nexus_file = 0;
+		goto restart;
+post_nexus:
+
 		if ( !code ) {
 		    code = afs_CacheStoreDCaches(avc, dclist, bytes, anewDV,
 			                         &doProcessFS, &OutStatus,
 						 nchunks, nomore, ops, rock);
 		}
+
+post_dcache_store:
 
 #ifdef AFS_64BIT_CLIENT
 		if (code == RXGEN_OPCODE && !afs_serverHasNo64Bit(tc)) {
@@ -718,6 +750,11 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
 		       ICL_TYPE_POINTER, avc, ICL_TYPE_INT32, code);
 	    bytes = 0;
 	}
+    }
+
+    /* nexus code */
+    if (path) {
+	kfree(path);
     }
 
     return code;
@@ -1145,10 +1182,18 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
     osi_timeval_t xferStartTime;	/*FS xfer start time */
     afs_size_t bytesToXfer = 0, bytesXferred = 0;
 #endif
+    /* nexus code */
+    int is_nexus_file = 1;
+    struct rx_call * acall;
+    char * path = NULL;
 
     AFS_STATCNT(CacheFetchProc);
 
     XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
+
+    if (UCAFS_DISCONNECTED() || vType(avc) == VDIR || nexus_vnode_path(avc, &path)) {
+	is_nexus_file = 0;
+    }
 
     /*
      * Locks held:
@@ -1156,6 +1201,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      * avc->lock(W) if !setLocks || slowPass
      * adc->lock(W)
      */
+restart:
     code = rxfs_fetchInit(
 	tc, rxconn, avc, base, size, &length, adc, fP, &ops, &rock);
 
@@ -1167,6 +1213,20 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
 	adc->validPos = base;
     }
 
+    if (is_nexus_file == 0 || code) {
+	goto skip_nexus;
+    }
+
+    acall = ((struct rxfs_fetchVariables*) rock)->call;
+    if (!nexus_kern_fetch(tc, rxconn, fP, base, adc, avc, length, acall, path)) {
+	code = 0;
+	goto done;
+    }
+
+    is_nexus_file = 0;
+    goto restart;
+
+skip_nexus:
     if ( !code ) do {
 	if (avc->f.states & CForeign) {
 	    code = (*ops->more)(rock, &length, &moredata);
@@ -1211,6 +1271,13 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
 	}
 	code = 0;
     } while (moredata);
+
+    /* nexus code */
+done:
+    if (path) {
+	kfree(path);
+    }
+
     if (!code)
 	code = (*ops->close)(rock, avc, adc, tsmall);
     if (ops)

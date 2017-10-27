@@ -62,4 +62,6 @@
 
 #endif
 
+#include "nexus_kern.h"
+
 #endif /* AFS_INCLUDES_H */

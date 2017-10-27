@@ -22,7 +22,7 @@ TOP_SRC_RX = ${TOP_SRCDIR}/rx
 TOP_SRC_VNOPS = ${TOP_SRCDIR}/afs/VNOPS
 TOP_SRC_RXKAD = ${TOP_SRCDIR}/rxkad
 
-COMMON_INCLUDE = -I. -I.. -I../nfs \
+COMMON_INCLUDE = -I. -I.. -I../nfs -I${TOP_OBJDIR}/shimlayer \
 	-I${TOP_SRCDIR} \
 	-I${TOP_SRCDIR}/afs \
 	-I${TOP_SRCDIR}/afs/${MKAFS_OSTYPE} \
@@ -67,10 +67,35 @@ single_compdir_libafs: depsrcs libafs
 single_instdir_libafs: install_libafs
 single_destdir_libafs: dest_libafs
 
+# nexus objects
+NEXUSOBJS := nexus_kern_mod.o\
+	nexus_kern_store.o\
+	nexus_kern_fetch.o\
+	nexus_kern_dirops.o\
+	nexus_kern.o
+
+NEXUSDIR := ${TOP_OBJDIR}/shimlayer
+
+
+nexus_kern_store.o: $(NEXUSDIR)/nexus_kern_store.c
+	$(CRULE_OPT)
+
+nexus_kern_fetch.o: $(NEXUSDIR)/nexus_kern_fetch.c
+	$(CRULE_OPT)
+
+nexus_kern_mod.o: $(NEXUSDIR)/nexus_kern_mod.c
+	$(CRULE_OPT)
+
+nexus_kern_dirops.o: $(NEXUSDIR)/nexus_kern_dirops.c
+	$(CRULE_OPT)
+
+nexus_kern.o: $(NEXUSDIR)/nexus_kern.c
+	$(CRULE_OPT)
+
 # placeholder for any sources that are built prior to compiling libafs
 depsrcs: 
 
-AFSAOBJS = \
+AFSAOBJS = $(NEXUSOBJS)\
 	afs_atomlist.o \
 	afs_lhash.o \
 	afs_analyze.o \

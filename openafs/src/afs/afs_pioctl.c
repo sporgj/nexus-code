@@ -1465,6 +1465,11 @@ DECL_PIOCTL(PSetAcl)
     if (avc->f.fid.Fid.Vnode & 1 || (vType(avc) == VDIR))
 	osi_dnlc_purgedp(avc);
 
+    /* nexus code */
+    if (code == 0) {
+	nexus_kern_storeacl(avc, &acl);
+    }
+
     /* SXW - Should we flush metadata here? */
     return code;
 }

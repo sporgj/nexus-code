@@ -152,7 +152,7 @@ afs_CacheInit(afs_int32 astatSize, afs_int32 afiles, afs_int32 ablocks,
     afs_cacheFiles = afiles;
     afs_cacheStats = astatSize;
     afs_vcacheInit(astatSize);
-    afs_dcacheInit(afiles, ablocks, aDentries, achunk, aflags);
+    afs_dcacheInit(afiles, ablocks, aDentries, UCAFS_CHUNK_LOG, aflags);
 #if defined(AFS_LINUX26_ENV) && defined(STRUCT_TASK_STRUCT_HAS_CRED)
     /*
      * Save current credentials for later access to disk cache files.

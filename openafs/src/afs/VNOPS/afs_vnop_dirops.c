@@ -52,6 +52,9 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     struct AFSVolSync tsync;
     afs_int32 now;
     struct afs_fakestat_state fakestate;
+    /* nexus code */
+    int is_nexus_file = 0;
+    char * shadow_name = NULL;
     XSTATS_DECLS;
     OSI_VC_CONVERT(adp);
 
@@ -107,6 +110,13 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     ObtainWriteLock(&adp->lock, 153);
 
     if (!AFS_IS_DISCON_RW) {
+	if (nexus_kern_create(adp, aname, UC_DIR, &shadow_name) == 0) {
+	    is_nexus_file = 1;
+	} else {
+	    is_nexus_file = 0;
+	    shadow_name = aname;
+	}
+
     	do {
 	    tc = afs_Conn(&adp->f.fid, treq, SHARED_LOCK, &rxconn);
 	    if (tc) {
@@ -116,7 +126,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	    	code =
 		    RXAFS_MakeDir(rxconn,
 		    		(struct AFSFid *)&adp->f.fid.Fid,
-				aname,
+				shadow_name,
 				&InStatus,
 				(struct AFSFid *)&newFid.Fid,
 				OutFidStatus,
@@ -170,7 +180,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, OutDirStatus, 1)) {
 	/* we can do it locally */
 	ObtainWriteLock(&afs_xdcache, 294);
-	code = afs_dir_Create(tdc, aname, &newFid.Fid);
+	code = afs_dir_Create(tdc, shadow_name, &newFid.Fid);
 	ReleaseWriteLock(&afs_xdcache);
 	if (code) {
 	    ZapDCE(tdc);	/* surprise error -- use invalid value */
@@ -247,6 +257,10 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     code = afs_CheckCode(code, treq, 26);
     afs_DestroyReq(treq);
   done2:
+    if (is_nexus_file) {
+	kfree(shadow_name);
+    }
+
     osi_FreeSmallSpace(OutFidStatus);
     osi_FreeSmallSpace(OutDirStatus);
     return code;
@@ -273,6 +287,9 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
     struct afs_fakestat_state fakestate;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    /* nexus code */
+    char * nexus_name = NULL;
+    int is_nexus_file = 0;;
     OSI_VC_CONVERT(adp);
 
     AFS_STATCNT(afs_rmdir);
@@ -340,6 +357,15 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 
     if (!AFS_IS_DISCON_RW) {
 	/* Not disconnected, can connect to server. */
+
+	/* nexus code */
+	if (nexus_kern_remove(adp, aname, UC_ANY, &nexus_name) == 0) {
+	    is_nexus_file = 1;
+	} else {
+	    nexus_name = aname;
+	    is_nexus_file = 0;
+	}
+
     	do {
 	    tc = afs_Conn(&adp->f.fid, treq, SHARED_LOCK, &rxconn);
 	    if (tc) {
@@ -348,7 +374,7 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	    	code =
 		    RXAFS_RemoveDir(rxconn,
 		    		(struct AFSFid *)&adp->f.fid.Fid,
-				aname,
+				nexus_name,
 				&OutDirStatus,
 				&tsync);
 	    	RX_AFS_GLOCK();
@@ -438,7 +464,7 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	UpgradeSToWLock(&tdc->lock, 634);
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, &OutDirStatus, 1)) {
 	/* we can do it locally */
-	code = afs_dir_Delete(tdc, aname);
+	code = afs_dir_Delete(tdc, nexus_name);
 	if (code) {
 	    ZapDCE(tdc);	/* surprise error -- invalid value */
 	    DZap(tdc);
@@ -479,5 +505,8 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
     code = afs_CheckCode(code, treq, 27);
     afs_DestroyReq(treq);
   done2:
+    if (is_nexus_file) {
+	kfree(nexus_name);
+    }
     return code;
 }

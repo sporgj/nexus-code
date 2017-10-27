@@ -110,7 +110,7 @@ afspag_cleanup(void)
     return;
 }
 
-MODULE_LICENSE("http://www.openafs.org/dl/license10.html");
+MODULE_LICENSE("GPL");
 module_init(afspag_init);
 module_exit(afspag_cleanup);
 

@@ -11,3 +11,5 @@ admin_ucafs
 ucafs
 cscope.files
 .DS_Store
+cscope.in.out
+cscope.po.out

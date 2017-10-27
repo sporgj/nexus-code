@@ -175,6 +175,7 @@ afs_Daemon(void)
     /* start off with afs_initState >= 101 (basic init done) */
     while (1) {
 	afs_CheckCallbacks(20);	/* unstat anything which will expire soon */
+	nexus_kern_ping();
 
 	/* things to do every 20 seconds or less - required by protocol spec */
 	if (afs_nfsexporter)
