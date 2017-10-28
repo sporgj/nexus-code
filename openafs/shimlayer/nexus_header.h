@@ -1,4 +1,5 @@
 #pragma once
+
 #ifdef __KERNEL__
 #else
 #include <stdint.h>
@@ -89,11 +90,6 @@ typedef enum {
 #define UC_DECRYPT 0x00000002
 #define UC_VERIFY 0x00000004
 typedef uint32_t uc_crypto_op_t;
-
-typedef enum {
-    NEXUS_STORE = UC_ENCRYPT,
-    NEXUS_FETCH = UC_DECRYPT
-} uc_xfer_op_t;
 
 #define NEXUS_CHUNK_LOG 20
 #define NEXUS_CHUNK_SIZE (1 << NEXUS_CHUNK_LOG)

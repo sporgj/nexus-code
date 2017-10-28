@@ -282,9 +282,9 @@ proc_show(struct seq_file * sf,
     watch_path_t * curr;
 
     if (dev->daemon == NULL) {
-        seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon->pid);
-    } else {
         seq_printf(sf, "daemon offline :(\n");
+    } else {
+        seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon->pid);
     }
 
     seq_printf(sf, "outb=%zu, inb=%zu\n", dev->outb_len, dev->inb_len);

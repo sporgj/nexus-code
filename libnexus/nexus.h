@@ -9,6 +9,7 @@ extern "C" {
 
 typedef enum {
     
+    NEXUS_ANY  = 0,
     NEXUS_FILE = 1,
     NEXUS_DIR  = 2,
     NEXUS_LINK = 3
@@ -28,35 +29,23 @@ struct nexus_fs_acl {
     uint64_t    admin  : 1;
 };
 
-/**
- * Creates a new file at the corresponding file path
- * @param fpath is the file path
- * @param encoded_name_dest is the resulting encoded filename
- * the encoded file name (malloc), set to NULL if error
- * @return 0 on success
- */
 int
-dirops_new(const char          * fpath,
+dirops_new(const char           * parent_dir,
+           const char           * fname,
            nexus_fs_obj_type_t    type,
-           char                ** encoded_name_dest);
-
-int
-dirops_new1(const char           * parent_dir,
-            const char           * fname,
-            nexus_fs_obj_type_t    type,
-            char                ** shadow_name_dest);
+           char                ** shadow_name_dest);
 
 /**
  * Creates a hardlink between two paths.
  * @param new_path
  * @param old_path
- * @param encoded_name_dest
+ * @param dest_obfuscated_name
  * @return 0 on success
  */
 int
 dirops_hardlink(const char  * new_path,
                 const char  * old_path,
-                char       ** encoded_name_dest);
+                char       ** dest_obfuscated_name);
 
 int
 dirops_symlink(const char  * target_path,
@@ -72,63 +61,30 @@ dirops_symlink(const char  * target_path,
  * @return 0 on success
  */
 int
-dirops_code2plain(const char          * dir_path,
-                  const char          * encoded_name,
-                  nexus_fs_obj_type_t   type,
-                  char               ** raw_name_dest);
-
-/**
- * Returns the encoded name from a file path. This is used by the LINUX
- * vfs to lookup decoded directory entries (it's the complementary to the
- * decode operation
- *
- * @param fpath_raw is the raw file path
- * @param type dir/file
- * @param encoded_fname_dest is the encoded file name destination
- * @return 0 on success
- */
-int
-dirops_plain2code(const char           * fpath_raw,
-                  nexus_fs_obj_type_t    type,
-                  char                ** encoded_fname_dest);
+dirops_filldir(const char * dir_path,
+              const char * encoded_name,
+              nexus_fs_obj_type_t type,
+              char ** raw_name_dest);
 
 int
-dirops_plain2code1(const char           * parent_dir,
-                   const char           * fname,
-                   nexus_fs_obj_type_t    type,
-                   char                ** encoded_fname_dest);
-
-/**
- * Removes a file from the respective file path
- * @param fpath_raw is the raw file name
- * @return 0 on success
- */
-int
-dirops_remove(const char           * fpath_raw,
-              nexus_fs_obj_type_t    type,
-              char                ** encoded_fname_dest);
+dirops_lookup(const char * parent_dir,
+              const char * fname,
+              nexus_fs_obj_type_t type,
+              char ** dest_obfuscated_name);
 
 int
-dirops_remove1(const char           * parent_dir,
-               const char           * fname,
-               nexus_fs_obj_type_t    type,
-               char                ** encoded_fname_dest);
+dirops_remove(const char * parent_dir,
+              const char * fname,
+              nexus_fs_obj_type_t type,
+              char ** dest_obfuscated_name);
 
 int
-dirops_move(const char           * from_dir,
-            const char           * oldname,
-            const char           * to_dir,
-            const char           * newname,
-            nexus_fs_obj_type_t    type,
-            char                ** ptr_oldname,
-            char                ** ptr_newname);
-
-int
-dirops_move1(const char           * from_fpath,
-             const char           * to_fpath,
-             nexus_fs_obj_type_t    type,
-             char                ** ptr_oldname,
-             char                ** ptr_newname);
+dirops_move(const char * from_dir,
+            const char * oldname,
+            const char * to_dir,
+            const char * newname,
+            char ** dest_old_obfuscated_name,
+            char ** dest_new_obfuscated_name);
 
 int
 dirops_setacl(const char * path, const char * acl);

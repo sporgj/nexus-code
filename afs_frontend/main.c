@@ -13,9 +13,9 @@
 #include "afs.h"
 
 
-#define UCAFS_MOD_FILE "/dev/ucafs_mod"
+#define NEXUS_MOD_FILE "/dev/nexus_mod"
 
-static FILE * ucafs_mod_fid = NULL;
+static FILE * nexus_mod_fid = NULL;
 
 static uint64_t msg_counter = 0;
 
@@ -39,16 +39,13 @@ struct xdr_rsp {
 #define XDROUT_TOTALLEN (XDROUT_DATALEN + sizeof(XDR) + sizeof(afs_op_msg_t))
 
 /** we are going to have 3 buffers */
-uint8_t in_buffer[UCAFS_DATA_BUFLEN];
-uint8_t out_buffer[UCAFS_DATA_BUFLEN];
+uint8_t in_buffer[NEXUS_DATA_BUFLEN];
+uint8_t out_buffer[NEXUS_DATA_BUFLEN];
 struct afs_op_msg in_rpc = {0};
 
+/* the address and size of the global buffer */
 static size_t    global_xfer_buflen = 0;
 static uint8_t * global_xfer_addr   = NULL;
-
-
-
-
 
 static int
 connect_to_afs()
@@ -70,19 +67,19 @@ connect_to_afs()
     int    ret    = 0;
     int    fno    = 0;
 
-    if (ucafs_mod_fid) {
+    if (nexus_mod_fid) {
         return 0;
     }
 
-    ucafs_mod_fid = fopen(UCAFS_MOD_FILE, "rb+");
+    nexus_mod_fid = fopen(NEXUS_MOD_FILE, "rb+");
     
-    if (ucafs_mod_fid == NULL) {
-        log_error("opening '%s' failed", UCAFS_MOD_FILE);
+    if (nexus_mod_fid == NULL) {
+        log_error("opening '%s' failed", NEXUS_MOD_FILE);
         perror("Error: ");
         return -1;
     }
 
-    fno = fileno(ucafs_mod_fid);
+    fno = fileno(nexus_mod_fid);
 
     /* set the memory map */
     ret = ioctl(fno, IOCTL_MMAP_SIZE, &global_xfer_buflen);
@@ -108,7 +105,7 @@ connect_to_afs()
     log_debug("mmap %p for %zu bytes", global_xfer_addr, global_xfer_buflen);
 
     while (1) {
-        nbytes = fread(in_msg, 1, sizeof(struct afs_op_msg), ucafs_mod_fid);
+        nbytes = fread(in_msg, 1, sizeof(struct afs_op_msg), nexus_mod_fid);
 
         if (nbytes != sizeof(struct afs_op_msg)) {
 	    log_error("Invalid read size of %lu (expected %lu)\n", nbytes, sizeof(struct afs_op_msg));
@@ -116,13 +113,14 @@ connect_to_afs()
 	}
 	    
 	/* read the data on the wire */
-	nbytes = fread(x_data->data, 1, in_msg->len, ucafs_mod_fid);
+	nbytes = fread(x_data->data, 1, in_msg->len, nexus_mod_fid);
 	
 	/* create our XDR data */
 	xdrmem_create(xdr_in, (caddr_t)x_data->data, in_msg->len, XDR_DECODE);
 	xdrmem_create(xdr_out, x_rsp->msg.payload,    PAGE_SIZE,   XDR_ENCODE);
 	
 	/* dispatch to the corresponding function */
+
 	switch (in_msg->type) {
             case AFS_OP_PING:
                 status = rpc_ping(xdr_in, xdr_out);
@@ -173,7 +171,7 @@ connect_to_afs()
 	len = sizeof(struct afs_op_msg) + out_msg->len;
 
 	/* send the whole thing */
-	nbytes = fwrite(out_msg, 1, len, ucafs_mod_fid);
+	nbytes = fwrite(out_msg, 1, len, nexus_mod_fid);
 
 	/*log_debug("{ uc_mod } type=%d id=%d status=%d in=(%zu, %d), "
 	  "out=(%zu, %d)",
@@ -182,7 +180,7 @@ connect_to_afs()
 	status = 0;
     }
 
-    fclose(ucafs_mod_fid);
+    fclose(nexus_mod_fid);
 
     return 0;
 }
@@ -211,7 +209,7 @@ main(int argc, char ** argv)
         sds path = sdsnew(global_supernode_paths[i]);
 
 	path = sdscat(path, "/");
-        path = sdscat(path, UCAFS_WATCH_DIR);
+        path = sdscat(path, NEXUS_WATCH_DIR);
         
         if ((ret = ioctl(fno, IOCTL_ADD_PATH, path))) {
             log_error("ioctl ADD_PATH (%s) failed\n", path);

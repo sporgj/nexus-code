@@ -36,10 +36,10 @@ struct dirops_handler {
 };
 
 struct dirops_handler dirops_map[] = {
-    { AFS_OP_LOOKUP,  "lookup",  &dirops_plain2code1 },
-    { AFS_OP_FILLDIR, "filldir", &dirops_code2plain  },
-    { AFS_OP_REMOVE,  "remove",  &dirops_remove1     },
-    { AFS_OP_CREATE,  "create",  &dirops_new1        },
+    { AFS_OP_LOOKUP,  "lookup",  &dirops_lookup },
+    { AFS_OP_FILLDIR, "filldir", &dirops_filldir  },
+    { AFS_OP_REMOVE,  "remove",  &dirops_remove     },
+    { AFS_OP_CREATE,  "create",  &dirops_new        },
     {0, 0, 0}
 };
 
@@ -80,8 +80,8 @@ rpc_dirops(afs_op_type_t   msg_type,
         return -1;
     }
 
-    if ((xdr_string(xdrs, &parent_dir, UCAFS_PATH_MAX)  == FALSE) ||
-	(xdr_string(xdrs, &name,       UCAFS_FNAME_MAX) == FALSE) ||
+    if ((xdr_string(xdrs, &parent_dir, NEXUS_PATH_MAX)  == FALSE) ||
+	(xdr_string(xdrs, &name,       NEXUS_FNAME_MAX) == FALSE) ||
 	(xdr_int(xdrs, (int *)&type)                    == FALSE) ) {
 
         log_error("error decoding message (type = %d)", msg_type);
@@ -94,11 +94,10 @@ rpc_dirops(afs_op_type_t   msg_type,
         goto out;
     }
 
-    log_debug("[%s (%s)] %s/%s -> %s", handler->name, TYPE_TO_STR(type), parent_dir,
-	      name, shdw_name);
+    log_debug("[%s] %s/%s -> %s", handler->name, parent_dir, name, shdw_name);
 
     /* now start encoding the response */
-    if (!xdr_string(xdr_out, &shdw_name, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdr_out, &shdw_name, NEXUS_FNAME_MAX)) {
         log_error("ERROR encoding");
         goto out;
     }
@@ -131,8 +130,8 @@ rpc_symlink(XDR * xdrs,
     int ret = -1;
 
     // get the strings
-    if ( (xdr_string(xdrs, &from_path,   UCAFS_PATH_MAX) == FALSE) ||
-	 (xdr_string(xdrs, &target_link, UCAFS_PATH_MAX) == FALSE) ) {
+    if ( (xdr_string(xdrs, &from_path,   NEXUS_PATH_MAX) == FALSE) ||
+	 (xdr_string(xdrs, &target_link, NEXUS_PATH_MAX) == FALSE) ) {
         log_error("rpc_symlink decoding failed");
         goto out;
     }
@@ -144,7 +143,7 @@ rpc_symlink(XDR * xdrs,
 
     log_debug("[symlink] %s -> %s (%s)", from_path, target_link, shdw_name);
 
-    if (!xdr_string(xdr_out, &shdw_name, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdr_out, &shdw_name, NEXUS_FNAME_MAX)) {
         log_error("ERROR encoding symlink response");
         goto out;
     }
@@ -178,8 +177,8 @@ rpc_hardlink(XDR * xdrs,
 
     
     // get the strings
-    if ((xdr_string(xdrs, &from_path, UCAFS_PATH_MAX) == FALSE) ||
-        (xdr_string(xdrs, &to_path,   UCAFS_PATH_MAX) == FALSE) ) {
+    if ((xdr_string(xdrs, &from_path, NEXUS_PATH_MAX) == FALSE) ||
+        (xdr_string(xdrs, &to_path,   NEXUS_PATH_MAX) == FALSE) ) {
         log_error("rpc_hardlink decoding failed");
         goto out;
     }
@@ -192,7 +191,7 @@ rpc_hardlink(XDR * xdrs,
 
     log_debug("[hardlink] %s -> %s (%s)", from_path, to_path, shdw_name);
 
-    if (!xdr_string(xdr_out, &shdw_name, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdr_out, &shdw_name, NEXUS_FNAME_MAX)) {
         log_error("ERROR encoding hardlink response");
         goto out;
     }
@@ -228,10 +227,10 @@ rpc_rename(XDR * xdrs,
     int ret  = -1;
 
 
-    if ( (xdr_string(xdrs, &from_path, UCAFS_PATH_MAX ) == FALSE) ||
-	 (xdr_string(xdrs, &oldname,   UCAFS_FNAME_MAX) == FALSE) ||
-	 (xdr_string(xdrs, &to_path,   UCAFS_PATH_MAX ) == FALSE) ||
-	 (xdr_string(xdrs, &newname,   UCAFS_FNAME_MAX) == FALSE) ) {
+    if ( (xdr_string(xdrs, &from_path, NEXUS_PATH_MAX ) == FALSE) ||
+	 (xdr_string(xdrs, &oldname,   NEXUS_FNAME_MAX) == FALSE) ||
+	 (xdr_string(xdrs, &to_path,   NEXUS_PATH_MAX ) == FALSE) ||
+	 (xdr_string(xdrs, &newname,   NEXUS_FNAME_MAX) == FALSE) ) {
         log_error("xdr rename failed");
         goto out;
     }
@@ -240,7 +239,6 @@ rpc_rename(XDR * xdrs,
 		      oldname,
 		      to_path,
 		      newname,
-		      UC_ANY,
                       &old_shadowname,
 		      &new_shadowname);
     if (ret) {
@@ -251,8 +249,8 @@ rpc_rename(XDR * xdrs,
 
     log_debug("[rename] %s/%s -> %s/%s", from_path, oldname, to_path, newname);
 
-    if ( (xdr_string(xdr_out, &old_shadowname, UCAFS_FNAME_MAX) == FALSE) ||
-	 (xdr_string(xdr_out, &new_shadowname, UCAFS_FNAME_MAX) == FALSE) ) {
+    if ( (xdr_string(xdr_out, &old_shadowname, NEXUS_FNAME_MAX) == FALSE) ||
+	 (xdr_string(xdr_out, &new_shadowname, NEXUS_FNAME_MAX) == FALSE) ) {
         log_error("encoding rename response failed");
         goto out;
     }
@@ -296,7 +294,7 @@ rpc_storeacl(XDR * xdrs,
     int ret = -1;
     int len =  0;
 
-    if ( (xdr_string(xdrs, &path, UCAFS_PATH_MAX) == FALSE) ||
+    if ( (xdr_string(xdrs, &path, NEXUS_PATH_MAX) == FALSE) ||
 	 (xdr_int(xdrs, &len)                     == FALSE) ) {
         log_error("xdr storeacl failed\n");
         goto out;
@@ -345,7 +343,7 @@ rpc_checkacl(XDR * xdrs,
     int code   =  0;
 
     
-    if ( (xdr_string(xdrs, &path, UCAFS_PATH_MAX) == FALSE) ||
+    if ( (xdr_string(xdrs, &path, NEXUS_PATH_MAX) == FALSE) ||
 	 (xdr_int(xdrs, (int *)(&rights))         == FALSE) ||
 	 (xdr_int(xdrs, &is_dir)                  == FALSE) ) {
         log_error("xdr storeacl failed\n");
@@ -380,7 +378,7 @@ rpc_xfer_init(XDR * xdrs,
    
     /* get the data from the wire */
     if ((xdr_opaque(xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t)) == FALSE) ||
-	(xdr_string(xdrs, &fpath, UCAFS_PATH_MAX)                 == FALSE) ) {
+	(xdr_string(xdrs, &fpath, NEXUS_PATH_MAX)                 == FALSE) ) {
         log_error("xdr parsing for store start failed");
         goto out;
     }
@@ -394,13 +392,15 @@ rpc_xfer_init(XDR * xdrs,
         goto out;
     }
 
+#if 0
     log_debug("[%s] id=%d (xfer_size=%d, file_size=%d, offset=%d) %s",
-	      (xfer_req.op == UCAFS_STORE) ? "ucafs_store" : "ucafs_fetch",
+	      (xfer_req.op == NEXUS_STORE) ? "nexus_store" : "nexus_fetch",
 	      xfer_rsp.xfer_id,
 	      xfer_req.xfer_size,
 	      xfer_req.file_size,
 	      xfer_req.offset,
 	      fpath);
+#endif
 
     ret = 0;
 out:

@@ -10,23 +10,23 @@
 #define PAGE_SIZE (4096)
 
 
-#define UCAFS_IOC_MAGIC 'W'
+#define NEXUS_IOC_MAGIC 'W'
 
-#define IOCTL_ADD_PATH  _IOW(UCAFS_IOC_MAGIC, 1, char *)
-#define IOCTL_MMAP_SIZE _IOR(UCAFS_IOC_MAGIC, 2, int *)
+#define IOCTL_ADD_PATH  _IOW(NEXUS_IOC_MAGIC, 1, char *)
+#define IOCTL_MMAP_SIZE _IOR(NEXUS_IOC_MAGIC, 2, int *)
 
-#define UCAFS_IOC_MAXNR 2
+#define NEXUS_IOC_MAXNR 2
 
 typedef struct {
     int  len;
     char path[0];
 } watchlist_path_t;
 
-#define UCAFS_DATA_BUFPAGES (1)
-#define UCAFS_DATA_BUFLEN (PAGE_SIZE << UCAFS_DATA_BUFPAGES)
+#define NEXUS_DATA_BUFPAGES (1)
+#define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
 
-#define UCAFS_PATH_MAX  (4096)
-#define UCAFS_FNAME_MAX (256)
+#define NEXUS_PATH_MAX  (4096)
+#define NEXUS_FNAME_MAX (256)
 
 
 
@@ -36,6 +36,7 @@ typedef enum {
     UC_STATUS_ERROR
 } uc_err_t;
 
+// TODO change this to the nexus_fs_obj_type_t
 typedef enum {
     UC_ANY  = 0x0,
     UC_FILE = 0x1,

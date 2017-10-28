@@ -5,10 +5,13 @@
 #include <errno.h>
 #include <string.h>
 
-#define log_error(fmt, ...) fprintf(stderr, "error> %s(%d):" fmt, __FILE__, __LINE__, ##__VA_ARGS__)
+// TODO add flag to makefile
+#define DEBUG
+
+#define log_error(fmt, ...) fprintf(stderr, "error> %s(%d):" fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 
 #ifdef DEBUG
-#define log_debug(fmt, ...) fprintf(stderr, "debug> " fmt, ##__VA_ARGS__)
+#define log_debug(fmt, ...) fprintf(stderr, "debug> " fmt "\n", ##__VA_ARGS__)
 #else
 #define log_debug(fmt, ...)
 #endif

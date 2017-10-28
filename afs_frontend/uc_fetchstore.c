@@ -50,8 +50,8 @@ fetchstore_init(xfer_req_t * req,
     filebox = dcache_filebox(fpath, req->op);
     
     if (filebox == NULL) {
-        log_error("[ucafs_%s] finding filebox failed: '%s'",
-                  (req->op == UCAFS_STORE ? "store" : "fetch"), fpath);
+        log_error("[nexus_%s] finding filebox failed: '%s'",
+                  (req->op == NEXUS_STORE ? "store" : "fetch"), fpath);
         return ret;
     }
 
@@ -80,8 +80,8 @@ fetchstore_init(xfer_req_t * req,
     xfer_ctx->xfer_id = seqptrmap_add(xfer_context_array, xfer_ctx);
     if (xfer_ctx->xfer_id == -1) {
         // TODO delete context from enclave space
-        log_error("[ucafs_%s] fileops - Adding to list failed",
-                  (req->op == UCAFS_STORE ? "store" : "fetch"));
+        log_error("[nexus_%s] fileops - Adding to list failed",
+                  (req->op == NEXUS_STORE ? "store" : "fetch"));
         goto out;
     }
 
@@ -112,11 +112,11 @@ fetchstore_run(int id, size_t valid_buflen)
 
     xfer_ctx->valid_buflen = valid_buflen;
 
-#ifdef UCAFS_SGX
+#ifdef NEXUS_SGX
     if (xfer_ctx->enclave_crypto_id == -1) {
         /* calculate chunk left */
-        xfer_ctx->chunk_num = UCAFS_CHUNK_NUM(xfer_ctx->offset);
-        xfer_ctx->chunk_left = MIN(xfer_ctx->xfer_size, UCAFS_CHUNK_SIZE);
+        xfer_ctx->chunk_num = NEXUS_CHUNK_NUM(xfer_ctx->offset);
+        xfer_ctx->chunk_left = MIN(xfer_ctx->xfer_size, NEXUS_CHUNK_SIZE);
         /* get the chunk information */
         xfer_ctx->chunk
             = filebox_get_chunk(xfer_ctx->filebox, xfer_ctx->chunk_num);
@@ -174,7 +174,7 @@ fetchstore_finish(int id)
         return -1;
     }
 
-    if (xfer_ctx->xfer_op == UCAFS_STORE && !filebox_flush(xfer_ctx->filebox)) {
+    if (xfer_ctx->xfer_op == NEXUS_STORE && !filebox_flush(xfer_ctx->filebox)) {
         log_error("committing the filebox to disk failed");
         goto out;
     }

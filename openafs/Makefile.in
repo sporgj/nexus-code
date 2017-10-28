@@ -664,7 +664,7 @@ jafsadm: libjafsadm
 build_tools: config des comerr rxgen
 	+${COMPILE_PART1} util ${COMPILE_PART2A} buildtools_clean
 
-finale: project cmd comerr afsd butc tbutc tbudb @ENABLE_KERNEL_MODULE@ libuafs audit kauth log \
+finale: project cmd comerr afsd butc tbutc tbudb @ENABLE_KERNEL_MODULE@ audit kauth log \
 	ptserver tptserver scout bu_utils ubik uss bozo @VFSCK@ volser tvolser tsalvaged \
 	dviced dvolser libafscp \
 	venus venustests update xstat afsmonitor rxdebug libafsrpc \

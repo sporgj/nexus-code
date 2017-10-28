@@ -13,3 +13,4 @@ cscope.files
 .DS_Store
 cscope.in.out
 cscope.po.out
+afs_frontend/nexus-afs
