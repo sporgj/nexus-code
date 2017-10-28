@@ -36,8 +36,8 @@ __nexus_parent_aname_req(uc_msg_type_t       msg_type,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
 
-    if ( (xdr_string(&xdrs, &path, UCAFS_PATH_MAX)  == FALSE) ||
-	 (xdr_string(&xdrs, &name, UCAFS_FNAME_MAX) == FALSE) ||
+    if ( (xdr_string(&xdrs, &path, NEXUS_PATH_MAX)  == FALSE) ||
+	 (xdr_string(&xdrs, &name, NEXUS_FNAME_MAX) == FALSE) ||
 	 (xdr_int(&xdrs, (int *)&type)              == FALSE) ) {
 
         ERROR("xdr create failed (path=%s, type=%d, name=%s)\n", path,
@@ -58,13 +58,13 @@ __nexus_parent_aname_req(uc_msg_type_t       msg_type,
     /* read the response */
     xdr_reply = &reply->xdrs;
 
-    if (!xdr_string(xdr_reply, shadow_name, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdr_reply, shadow_name, NEXUS_FNAME_MAX)) {
         ERROR("parsing shadow_name failed (type=%d)\n", (int)type);
         goto out;
     }
 
     /* XXX create: should create remove the match? */
-    if (msg_type == UCAFS_MSG_REMOVE) {
+    if (msg_type == NEXUS_MSG_REMOVE) {
         // remove it from the cache
         //remove_shdw_name(*shadow_name);
     }
@@ -86,7 +86,7 @@ nexus_kern_create(struct vcache     * avc,
                   nexus_entry_type    type,
                   char             ** shadow_name)
 {
-    return __nexus_parent_aname_req(UCAFS_MSG_CREATE,
+    return __nexus_parent_aname_req(NEXUS_MSG_CREATE,
 				    avc,
 				    name,
 				    type,
@@ -99,7 +99,7 @@ nexus_kern_lookup(struct vcache     * avc,
                   nexus_entry_type    type,
                   char             ** shadow_name)
 {
-    return __nexus_parent_aname_req(UCAFS_MSG_LOOKUP,
+    return __nexus_parent_aname_req(NEXUS_MSG_LOOKUP,
 				    avc,
 				    name,
 				    type,
@@ -112,7 +112,7 @@ nexus_kern_remove(struct vcache     * avc,
                   nexus_entry_type    type,
                   char             ** shadow_name)
 {
-    return __nexus_parent_aname_req(UCAFS_MSG_REMOVE,
+    return __nexus_parent_aname_req(NEXUS_MSG_REMOVE,
 				    avc,
 				    name,
 				    type,
@@ -148,8 +148,8 @@ nexus_kern_symlink(struct dentry  * dp,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     
-    if ( (xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX)  == FALSE) ||
-	 (xdr_string(&xdrs, &target,    UCAFS_FNAME_MAX) == FALSE) )  {
+    if ( (xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX)  == FALSE) ||
+	 (xdr_string(&xdrs, &target,    NEXUS_FNAME_MAX) == FALSE) )  {
 
 	ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();
@@ -157,12 +157,12 @@ nexus_kern_symlink(struct dentry  * dp,
 	goto out;
     }
 
-    if (nexus_mod_send(UCAFS_MSG_SYMLINK, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(NEXUS_MSG_SYMLINK, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
     xdr_reply = &reply->xdrs;
-    if (!xdr_string(xdr_reply, dest, UCAFS_FNAME_MAX)) {
+    if (!xdr_string(xdr_reply, dest, NEXUS_FNAME_MAX)) {
         ERROR("parsing hardlink name failed\n");
         goto out;
     }
@@ -211,8 +211,8 @@ nexus_kern_hardlink(struct dentry  * olddp,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     
-    if ( (xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX) == FALSE)  ||
-	 (xdr_string(&xdrs, &to_path,   UCAFS_PATH_MAX) == FALSE) ) {
+    if ( (xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX) == FALSE)  ||
+	 (xdr_string(&xdrs, &to_path,   NEXUS_PATH_MAX) == FALSE) ) {
 
 	ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();
@@ -220,13 +220,13 @@ nexus_kern_hardlink(struct dentry  * olddp,
 	goto out;
     }
 
-    if (nexus_mod_send(UCAFS_MSG_HARDLINK, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(NEXUS_MSG_HARDLINK, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
     xdr_reply = &reply->xdrs;
     
-    if (xdr_string(xdr_reply, dest, UCAFS_FNAME_MAX) == FALSE) {
+    if (xdr_string(xdr_reply, dest, NEXUS_FNAME_MAX) == FALSE) {
         ERROR("parsing hardlink name failed\n");
         goto out;
     }
@@ -278,8 +278,8 @@ nexus_kern_filldir(char              * parent_dir,
     /* create the XDR object */
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
 
-    if ( (xdr_string(&xdrs, &parent_dir,  UCAFS_PATH_MAX)  == FALSE) ||
-	 (xdr_string(&xdrs, &shadow_name, UCAFS_FNAME_MAX) == FALSE) ||
+    if ( (xdr_string(&xdrs, &parent_dir,  NEXUS_PATH_MAX)  == FALSE) ||
+	 (xdr_string(&xdrs, &shadow_name, NEXUS_FNAME_MAX) == FALSE) ||
 	 (xdr_int(&xdrs, (int *)&type)                     == FALSE) ) {
 
 	ERROR("xdr filldir failed\n");
@@ -289,7 +289,7 @@ nexus_kern_filldir(char              * parent_dir,
     }
 
     /* send eveything */
-    if (nexus_mod_send(UCAFS_MSG_FILLDIR, &xdrs, &reply, &code) ||
+    if (nexus_mod_send(NEXUS_MSG_FILLDIR, &xdrs, &reply, &code) ||
 	code) {
         goto out;
     }
@@ -297,7 +297,7 @@ nexus_kern_filldir(char              * parent_dir,
     /* read the response */
     xdr_reply = &reply->xdrs;
     
-    if (xdr_string(xdr_reply, real_name, UCAFS_FNAME_MAX) == FALSE) {
+    if (xdr_string(xdr_reply, real_name, NEXUS_FNAME_MAX) == FALSE) {
         ERROR("parsing shadow_name failed\n");
         goto out;
     }
@@ -327,7 +327,7 @@ nexus_kern_rename(struct vcache  * from_vnode,
     caddr_t        payload      = NULL;
     XDR          * xdr_reply    = NULL;
     XDR            xdrs;
-    
+
     char         * from_path    = NULL;
     char         * to_path      = NULL;
 
@@ -347,10 +347,10 @@ nexus_kern_rename(struct vcache  * from_vnode,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     
-    if ( (xdr_string(&xdrs, &from_path, UCAFS_PATH_MAX)  == FALSE) ||
-	 (xdr_string(&xdrs, &oldname,   UCAFS_FNAME_MAX) == FALSE) ||
-	 (xdr_string(&xdrs, &to_path,   UCAFS_PATH_MAX)  == FALSE) ||
-	 (xdr_string(&xdrs, &newname,   UCAFS_FNAME_MAX) == FALSE) ) {
+    if ( (xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX)  == FALSE) ||
+	 (xdr_string(&xdrs, &oldname,   NEXUS_FNAME_MAX) == FALSE) ||
+	 (xdr_string(&xdrs, &to_path,   NEXUS_PATH_MAX)  == FALSE) ||
+	 (xdr_string(&xdrs, &newname,   NEXUS_FNAME_MAX) == FALSE) ) {
 	
         ERROR("xdr rename failed\n");
         READPTR_UNLOCK();
@@ -366,14 +366,14 @@ nexus_kern_rename(struct vcache  * from_vnode,
         unlocked = 1;
     }
 
-    if (nexus_mod_send(UCAFS_MSG_RENAME, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(NEXUS_MSG_RENAME, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
     xdr_reply = &reply->xdrs;
 
-    if ( (xdr_string(xdr_reply, old_shadowname, UCAFS_FNAME_MAX) == FALSE) ||
-	 (xdr_string(xdr_reply, new_shadowname, UCAFS_FNAME_MAX) == FALSE) ) {
+    if ( (xdr_string(xdr_reply, old_shadowname, NEXUS_FNAME_MAX) == FALSE) ||
+	 (xdr_string(xdr_reply, new_shadowname, NEXUS_FNAME_MAX) == FALSE) ) {
 
 	ERROR("parsing rename response failed\n");
         goto out;
@@ -437,7 +437,7 @@ nexus_kern_storeacl(struct vcache * avc,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     
-    if ( (xdr_string(&xdrs, &path, UCAFS_PATH_MAX)                 == FALSE) ||
+    if ( (xdr_string(&xdrs, &path, NEXUS_PATH_MAX)                 == FALSE) ||
 	 (xdr_int(&xdrs, &len)                                     == FALSE) ||
 	 (xdr_opaque(&xdrs, (caddr_t)acl_data->AFSOpaque_val, len) == FALSE) ) {
 
@@ -447,7 +447,7 @@ nexus_kern_storeacl(struct vcache * avc,
 	goto out;
     }
 
-    if (nexus_mod_send(UCAFS_MSG_STOREACL, &xdrs, &reply, &code) ||
+    if (nexus_mod_send(NEXUS_MSG_STOREACL, &xdrs, &reply, &code) ||
 	code) {
         ERROR("xdr setacl (%s) FAILED\n", path);
         goto out;
@@ -499,7 +499,7 @@ nexus_kern_access(struct vcache * avc,
 
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     
-    if ( (xdr_string(&xdrs, &path, UCAFS_PATH_MAX)  == FALSE) ||
+    if ( (xdr_string(&xdrs, &path, NEXUS_PATH_MAX)  == FALSE) ||
 	 (xdr_int(&xdrs, &rights)                   == FALSE) ||
 	 (xdr_int(&xdrs, &is_dir)                   == FALSE ) ) {
 
@@ -509,7 +509,7 @@ nexus_kern_access(struct vcache * avc,
 	goto out;
     }
 
-    if (nexus_mod_send(UCAFS_MSG_CHECKACL, &xdrs, &reply, &code) ||
+    if (nexus_mod_send(NEXUS_MSG_CHECKACL, &xdrs, &reply, &code) ||
 	code) {
         ERROR("xdr setacl (%s) FAILED\n", path);
         goto out;

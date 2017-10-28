@@ -28,14 +28,14 @@ nexus_fetch_init(fetch_context_t * context,
 
     xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
 
-    xfer_req = (xfer_req_t){.op        = UCAFS_FETCH,
+    xfer_req = (xfer_req_t){.op        = NEXUS_FETCH,
                             .xfer_size = size,
                             .offset    = offset,
                             .file_size = context->total_size};
 
 
     if ( (xdr_opaque(&xdrs, (caddr_t)&xfer_req,      sizeof(xfer_req_t)) == FALSE) ||
-	 (xdr_string(&xdrs, (char **)&context->path, UCAFS_PATH_MAX)     == FALSE) ) {
+	 (xdr_string(&xdrs, (char **)&context->path, NEXUS_PATH_MAX)     == FALSE) ) {
 
         READPTR_UNLOCK();
         ERROR("daemon_init xdr encoding failed\n");
@@ -43,7 +43,7 @@ nexus_fetch_init(fetch_context_t * context,
         goto out;
     }
 
-    ret = nexus_mod_send(UCAFS_MSG_XFER_INIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(NEXUS_MSG_XFER_INIT, &xdrs, &reply, &code);
 
     if (ret || code) {
         ERROR("fetch_init fail for %s (start=%d, size=%d)\n", context->path,
@@ -113,7 +113,7 @@ nexus_fetch_exit(fetch_context_t * context,
         goto next_op;
     }
 
-    ret = nexus_mod_send(UCAFS_MSG_XFER_EXIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(NEXUS_MSG_XFER_EXIT, &xdrs, &reply, &code);
     
     if (ret || code) {
         ERROR("could not get response from uspace\n");
@@ -241,7 +241,7 @@ nexus_fetch_xfer(fetch_context_t * context,
             goto out;
         }
 
-        ret = nexus_mod_send(UCAFS_MSG_XFER_RUN, &xdrs, &reply, &code);
+        ret = nexus_mod_send(NEXUS_MSG_XFER_RUN, &xdrs, &reply, &code);
 	
         if (ret || code) {
             ERROR("nexus_xfer code=%d, ret=%d\n", ret, code);

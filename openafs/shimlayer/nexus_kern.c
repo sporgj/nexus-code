@@ -76,10 +76,10 @@ add_path_to_cache(const char * shadow_name,
     }
 
     cached_file->shdw_name =
-        (char *)kstrndup(shadow_name, UCAFS_FNAME_MAX, GFP_KERNEL);
+        (char *)kstrndup(shadow_name, NEXUS_FNAME_MAX, GFP_KERNEL);
     cached_file->parent_path =
-        (char *)kstrndup(parent_path, UCAFS_PATH_MAX, GFP_KERNEL);
-    cached_file->fname = (char *)kstrndup(fname, UCAFS_FNAME_MAX, GFP_KERNEL);
+        (char *)kstrndup(parent_path, NEXUS_PATH_MAX, GFP_KERNEL);
+    cached_file->fname = (char *)kstrndup(fname, NEXUS_FNAME_MAX, GFP_KERNEL);
 
     if (!cached_file->shdw_name || !cached_file->parent_path ||
         !cached_file->fname) {
@@ -98,7 +98,7 @@ remove_shdw_name(const char * shadow_name)
 
     list_for_each_entry(curr, pathlist_ptr, list)
     {
-        if (strncmp(curr->shdw_name, shadow_name, UCAFS_FNAME_MAX)) {
+        if (strncmp(curr->shdw_name, shadow_name, NEXUS_FNAME_MAX)) {
             continue;
         }
 
@@ -116,8 +116,8 @@ remove_path_name(const char * parent_path, const char * fname)
 
     list_for_each_entry(curr, pathlist_ptr, list)
     {
-        if (strncmp(curr->fname, fname, UCAFS_FNAME_MAX) ||
-            strncmp(curr->parent_path, parent_path, UCAFS_PATH_MAX)) {
+        if (strncmp(curr->fname, fname, NEXUS_FNAME_MAX) ||
+            strncmp(curr->parent_path, parent_path, NEXUS_PATH_MAX)) {
             continue;
         }
 
@@ -148,7 +148,7 @@ lookup_shdw_name(const char * shadow_name)
 
     list_for_each_entry(curr, pathlist_ptr, list)
     {
-        if (strncmp(curr->shdw_name, shadow_name, UCAFS_FNAME_MAX)) {
+        if (strncmp(curr->shdw_name, shadow_name, NEXUS_FNAME_MAX)) {
             continue;
         }
 
@@ -165,8 +165,8 @@ lookup_path_name(const char * parent_path, const char * fname)
 
     list_for_each_entry(curr, pathlist_ptr, list)
     {
-        if (strncmp(curr->fname, fname, UCAFS_FNAME_MAX) ||
-            strncmp(curr->parent_path, parent_path, UCAFS_PATH_MAX)) {
+        if (strncmp(curr->fname, fname, NEXUS_FNAME_MAX) ||
+            strncmp(curr->parent_path, parent_path, NEXUS_PATH_MAX)) {
             continue;
         }
 
@@ -190,7 +190,7 @@ add_path_to_watchlist(const char * path)
     }
 
     /* if we are here, we need to add the entry to the list */
-    len = strnlen(path, UCAFS_PATH_MAX);
+    len = strnlen(path, NEXUS_PATH_MAX);
     curr = (watch_path_t *)kzalloc(sizeof(watch_path_t) + len, GFP_KERNEL);
     if (curr == NULL) {
         ERROR("allocation error, cannot add path to list");
@@ -222,9 +222,9 @@ clear_watchlist(void)
 }
 
 int
-UCAFS_DISCONNECTED()
+NEXUS_DISCONNECTED()
 {
-    return UCAFS_IS_OFFLINE;
+    return NEXUS_IS_OFFLINE;
 }
 
 static char path_buf[4096];
@@ -359,7 +359,7 @@ nexus_kern_ping(void)
     num++;
 
     /* send eveything */
-    if (nexus_mod_send(UCAFS_MSG_PING, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(NEXUS_MSG_PING, &xdrs, &reply, &code) || code) {
         num--;
         goto out;
     }

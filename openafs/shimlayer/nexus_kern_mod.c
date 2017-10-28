@@ -126,11 +126,11 @@ nexus_ioctl(struct file   * filp,
     int    err  = 0;
     int    len  = 0;
 
-    if (_IOC_TYPE(cmd) != UCAFS_IOC_MAGIC) {
+    if (_IOC_TYPE(cmd) != NEXUS_IOC_MAGIC) {
         return -ENOTTY;
     }
 
-    if (_IOC_NR(cmd)    > UCAFS_IOC_MAXNR) {
+    if (_IOC_NR(cmd)    > NEXUS_IOC_MAXNR) {
         return -ENOTTY;
     }
 
@@ -330,7 +330,7 @@ nexus_mod_send(uc_msg_type_t    type,
     int            err = -1;
 
     
-    if (UCAFS_IS_OFFLINE) {
+    if (NEXUS_IS_OFFLINE) {
         READPTR_UNLOCK();
         return -1;
     }
@@ -350,7 +350,7 @@ nexus_mod_send(uc_msg_type_t    type,
 
         DEFINE_WAIT(wait);
 
-        if (UCAFS_IS_OFFLINE) {
+        if (NEXUS_IS_OFFLINE) {
             printk(KERN_ERR "process is offline :(");
             goto out;
         }

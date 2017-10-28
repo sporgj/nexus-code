@@ -595,7 +595,7 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
     struct rx_call * acall;
     char * path = NULL;
 
-    if (UCAFS_DISCONNECTED() || vType(avc) == VDIR
+    if (NEXUS_DISCONNECTED() || vType(avc) == VDIR
 	    || nexus_vnode_path(avc, &path)) {
 	is_nexus_file = 0;
     }
@@ -1191,7 +1191,7 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
 
     XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHDATA);
 
-    if (UCAFS_DISCONNECTED() || vType(avc) == VDIR || nexus_vnode_path(avc, &path)) {
+    if (NEXUS_DISCONNECTED() || vType(avc) == VDIR || nexus_vnode_path(avc, &path)) {
 	is_nexus_file = 0;
     }
 

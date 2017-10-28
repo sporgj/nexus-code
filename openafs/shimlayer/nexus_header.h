@@ -24,12 +24,12 @@ typedef struct {
 #ifndef UCPRIV_ENCLAVE
 #include <linux/ioctl.h>
 
-#define UCAFS_IOC_MAGIC 'W'
+#define NEXUS_IOC_MAGIC 'W'
 
-#define IOCTL_ADD_PATH _IOW(UCAFS_IOC_MAGIC, 1, char *)
-#define IOCTL_MMAP_SIZE _IOR(UCAFS_IOC_MAGIC, 2, int *)
+#define IOCTL_ADD_PATH _IOW(NEXUS_IOC_MAGIC, 1, char *)
+#define IOCTL_MMAP_SIZE _IOR(NEXUS_IOC_MAGIC, 2, int *)
 
-#define UCAFS_IOC_MAXNR 2
+#define NEXUS_IOC_MAXNR 2
 
 typedef struct {
     int len;
@@ -37,17 +37,17 @@ typedef struct {
 } watchlist_path_t;
 #endif
 
-#define UCAFS_DATA_BUFPAGES 1
-#define UCAFS_DATA_BUFLEN (PAGE_SIZE << UCAFS_DATA_BUFPAGES)
+#define NEXUS_DATA_BUFPAGES 1
+#define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
 
-#define UCAFS_PATH_MAX 4096
-#define UCAFS_FNAME_MAX 256
+#define NEXUS_PATH_MAX 4096
+#define NEXUS_FNAME_MAX 256
 
-#define UCAFS_SUPER_FNAME "nexus"
-#define UCAFS_REPO_DIR ".afsx"
-#define UCAFS_WATCH_DIR "sgx"
-#define UCAFS_METADATA_DIR UCAFS_REPO_DIR
-#define UCAFS_ROOT_DIRNODE  "root_dnode"
+#define NEXUS_SUPER_FNAME "nexus"
+#define NEXUS_REPO_DIR ".afsx"
+#define NEXUS_WATCH_DIR "sgx"
+#define NEXUS_METADATA_DIR NEXUS_REPO_DIR
+#define NEXUS_ROOT_DIRNODE  "root_dnode"
 
 #define CONFIG_PUBKEY   "profile/public_key"
 #define CONFIG_PRIVKEY  "profile/private_key"
@@ -91,12 +91,12 @@ typedef enum {
 typedef uint32_t uc_crypto_op_t;
 
 typedef enum {
-    UCAFS_STORE = UC_ENCRYPT,
-    UCAFS_FETCH = UC_DECRYPT
+    NEXUS_STORE = UC_ENCRYPT,
+    NEXUS_FETCH = UC_DECRYPT
 } uc_xfer_op_t;
 
-#define UCAFS_CHUNK_LOG 20
-#define UCAFS_CHUNK_SIZE (1 << UCAFS_CHUNK_LOG)
+#define NEXUS_CHUNK_LOG 20
+#define NEXUS_CHUNK_SIZE (1 << NEXUS_CHUNK_LOG)
 
 typedef struct {
     uc_xfer_op_t op;
@@ -110,45 +110,45 @@ typedef struct {
 } __attribute__((packed)) xfer_rsp_t;
 
 static inline size_t
-UCAFS_CHUNK_BASE(size_t offset)
+NEXUS_CHUNK_BASE(size_t offset)
 {
-    return ((offset < UCAFS_CHUNK_SIZE)
+    return ((offset < NEXUS_CHUNK_SIZE)
                 ? 0
-                : (((offset - UCAFS_CHUNK_SIZE) & ~(UCAFS_CHUNK_SIZE - 1))
-                   + UCAFS_CHUNK_SIZE));
+                : (((offset - NEXUS_CHUNK_SIZE) & ~(NEXUS_CHUNK_SIZE - 1))
+                   + NEXUS_CHUNK_SIZE));
 }
 
 static inline size_t
-UCAFS_CHUNK_NUM(size_t offset)
+NEXUS_CHUNK_NUM(size_t offset)
 {
-    return ((offset < UCAFS_CHUNK_SIZE)
+    return ((offset < NEXUS_CHUNK_SIZE)
                 ? 0
-                : 1 + ((offset - (size_t)UCAFS_CHUNK_SIZE) >> UCAFS_CHUNK_LOG));
+                : 1 + ((offset - (size_t)NEXUS_CHUNK_SIZE) >> NEXUS_CHUNK_LOG));
 }
 
 static inline size_t
-UCAFS_CHUNK_COUNT(size_t file_size)
+NEXUS_CHUNK_COUNT(size_t file_size)
 {
-    return UCAFS_CHUNK_NUM(file_size) + 1;
+    return NEXUS_CHUNK_NUM(file_size) + 1;
 }
 
 /* module-userspace data structures */
 typedef uint16_t mid_t;
 
 typedef enum {
-    UCAFS_MSG_PING = 1,
-    UCAFS_MSG_FILLDIR,
-    UCAFS_MSG_CREATE,
-    UCAFS_MSG_LOOKUP,
-    UCAFS_MSG_REMOVE,
-    UCAFS_MSG_HARDLINK,
-    UCAFS_MSG_SYMLINK,
-    UCAFS_MSG_RENAME,
-    UCAFS_MSG_STOREACL,
-    UCAFS_MSG_CHECKACL,
-    UCAFS_MSG_XFER_INIT,
-    UCAFS_MSG_XFER_RUN,
-    UCAFS_MSG_XFER_EXIT,
+    NEXUS_MSG_PING = 1,
+    NEXUS_MSG_FILLDIR,
+    NEXUS_MSG_CREATE,
+    NEXUS_MSG_LOOKUP,
+    NEXUS_MSG_REMOVE,
+    NEXUS_MSG_HARDLINK,
+    NEXUS_MSG_SYMLINK,
+    NEXUS_MSG_RENAME,
+    NEXUS_MSG_STOREACL,
+    NEXUS_MSG_CHECKACL,
+    NEXUS_MSG_XFER_INIT,
+    NEXUS_MSG_XFER_RUN,
+    NEXUS_MSG_XFER_EXIT,
 } uc_msg_type_t;
 
 typedef struct {

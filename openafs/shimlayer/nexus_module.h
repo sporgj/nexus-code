@@ -36,7 +36,7 @@
 #define UCMOD_BUFFER_FREE(x)  free_page(x)
 
 #define UCMOD_XFER_ORDER      5
-#define UCAFS_XFER_SIZE       (PAGE_SIZE << UCMOD_XFER_ORDER)
+#define NEXUS_XFER_SIZE       (PAGE_SIZE << UCMOD_XFER_ORDER)
 
 #define FALSE 0
 #define TRUE 1
@@ -86,7 +86,7 @@ extern struct nexus_mod * dev;
 
 int nexus_kern_init(void);
 
-#define UCAFS_IS_OFFLINE					\
+#define NEXUS_IS_OFFLINE					\
     (dev->daemon == NULL || task_is_stopped(dev->daemon))
 
 #undef ERROR

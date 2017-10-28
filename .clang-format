@@ -1,0 +1,9 @@
+{
+    BasedOnStyle: "Webkit",
+    PointerAlignment: "Middle",
+    ColumnLimit: "80",
+    AlwaysBreakAfterReturnType: "TopLevel",
+    AlignAfterOpenBracket: "Align",
+    BinPackParameters: "false"
+    AlignConsecutiveDeclarations: "false"
+}

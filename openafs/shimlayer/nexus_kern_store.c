@@ -37,7 +37,7 @@ nexus_store_exit(store_context_t * context,
         goto out;
     }
 
-    ret = nexus_mod_send(UCAFS_MSG_XFER_EXIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(NEXUS_MSG_XFER_EXIT, &xdrs, &reply, &code);
     
     if (ret || code) {
         ERROR("store_close, could not get response from uspace\n");
@@ -79,13 +79,13 @@ nexus_store_init(store_context_t * context,
 
     xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
 
-    xfer_req = (xfer_req_t){.op         = UCAFS_STORE,
+    xfer_req = (xfer_req_t){.op         = NEXUS_STORE,
                             .xfer_size  = bytes,
                             .offset     = start_pos,
                             .file_size  = avc->f.m.Length};
 
     if ((xdr_opaque(&xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t)) == FALSE) ||
-        (xdr_string(&xdrs, &context->path, UCAFS_PATH_MAX)         == FALSE) ) {
+        (xdr_string(&xdrs, &context->path, NEXUS_PATH_MAX)         == FALSE) ) {
 	
         READPTR_UNLOCK();
         ERROR("could not encode xfer_req XDR object\n");
@@ -93,7 +93,7 @@ nexus_store_init(store_context_t * context,
 	goto out;
     }
 
-    ret = nexus_mod_send(UCAFS_MSG_XFER_INIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(NEXUS_MSG_XFER_INIT, &xdrs, &reply, &code);
     
     if (ret || code) {
         ERROR("init '%s' (start=%d, len=%d)\n", context->path, start_pos,
@@ -246,7 +246,7 @@ nexus_store_xfer(store_context_t * context,
 	    goto out;
         }
 
-        ret = nexus_mod_send(UCAFS_MSG_XFER_RUN, &xdrs, &reply, &code);
+        ret = nexus_mod_send(NEXUS_MSG_XFER_RUN, &xdrs, &reply, &code);
 
         if (ret || code) {
             ERROR("could not send data to uspace (code=%d)\n", code);
