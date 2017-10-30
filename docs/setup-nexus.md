@@ -1,13 +1,6 @@
 # Fetching Sources
+First, get the nexus sources
 
-## OpenAFS
-```bash
-git clone https://github.com/openafs/openafs
-cd openafs
-git checkout openafs-stable-1_6_18
-```
-
-## NeXUS
 ```
 git clone https://gitlab.prognosticlab.org/sgx/nexus.git
 ```
@@ -74,41 +67,21 @@ exit
 ```
 
 ## Building
+Go AFS and build it all. It should take some time :)
 ```bash
-cd ~/openafs    # return to the source code
-./regen.sh
-```
-
-Now, let's apply the patch that enables the NeXUS daemon to connect to the
-kernel.
-```
-patch -p1 < ~/nexus/module/openafs.afsx.patch
-```
-
-Traverse to the NeXUS module code and copy the source files
-```
-cd ~/nexus/module
-make install        # this assumes that you have the sources installed
-```
-
-Return to OpenAFS and build it all. It should take some time :)
-```
-cd ~/openafs
-./configure
+cd ~/nexus/openafs    # return to the source code
+./regen.sh -q
+./configure --enable-debug --enable-kernel-debug    # enables debug mode
 make -j$(nproc)
 ```
 
-Add `fs` ACL utility as a system binary.
-```bash
-sudo ln -s /home/$USER/openafs/src/venus/fs /usr/bin/fs
-```
 Before proceeding, make sure the `fs` command works. Otherwise, run `make`
 in the `~/openafs/src/venus/` directory to build it.
 
 The openafs module is now ready to be mounted in the kernel.
 ```bash
-cd
-cp nexus/start_afs.sh .
+cd ~/nexus
+./makelinks     # will create all symlinks
 ./start_afs.sh alice
 ```
 

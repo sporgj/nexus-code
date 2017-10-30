@@ -43,7 +43,7 @@ nexus_fetch_init(fetch_context_t * context,
         goto out;
     }
 
-    ret = nexus_mod_send(NEXUS_MSG_XFER_INIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(AFS_OP_DECRYPT_START, &xdrs, &reply, &code);
 
     if (ret || code) {
         ERROR("fetch_init fail for %s (start=%d, size=%d)\n", context->path,
@@ -113,7 +113,7 @@ nexus_fetch_exit(fetch_context_t * context,
         goto next_op;
     }
 
-    ret = nexus_mod_send(NEXUS_MSG_XFER_EXIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(AFS_OP_DECRYPT_STOP, &xdrs, &reply, &code);
     
     if (ret || code) {
         ERROR("could not get response from uspace\n");
@@ -241,7 +241,7 @@ nexus_fetch_xfer(fetch_context_t * context,
             goto out;
         }
 
-        ret = nexus_mod_send(NEXUS_MSG_XFER_RUN, &xdrs, &reply, &code);
+        ret = nexus_mod_send(AFS_OP_DECRYPT_READY, &xdrs, &reply, &code);
 	
         if (ret || code) {
             ERROR("nexus_xfer code=%d, ret=%d\n", ret, code);

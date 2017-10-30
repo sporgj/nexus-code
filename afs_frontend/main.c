@@ -162,6 +162,7 @@ connect_to_afs()
 	/* send the response */
 	nbytes = xdr_out->x_private - xdr_out->x_base;
 
+        /* construct the message by writing over the buffer */
 	*out_msg = (struct afs_op_msg){.msg_id  = get_new_msg_id(),
 				       .ack_id  = in_msg->msg_id,
 				       .len     = nbytes,

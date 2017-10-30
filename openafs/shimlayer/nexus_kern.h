@@ -1,5 +1,4 @@
 #pragma once
-#include "nexus_header.h"
 
 // clang-format off
 // the headers have to be in this specific order
@@ -8,6 +7,8 @@
 #include "afs/sysincludes.h"
 #include "afsincludes.h"
 // clang-format on
+
+#include "nexus_afs.h"
 
 int
 NEXUS_DISCONNECTED(void);
@@ -40,7 +41,7 @@ nexus_vnode_path(const struct vcache * vcache, char ** dest);
 int
 nexus_kern_create(struct vcache *  parent_directory,
                   char *           plain_name,
-                  nexus_entry_type type,
+                  nexus_fs_obj_type_t type,
                   char **          dest_obfuscated_name);
 
 /**
@@ -52,7 +53,7 @@ nexus_kern_create(struct vcache *  parent_directory,
 int
 nexus_kern_lookup(struct vcache *  parent_directory,
                   char *           plain_name,
-                  nexus_entry_type type,
+                  nexus_fs_obj_type_t type,
                   char **          dest_obfuscated_name);
 
 /**
@@ -64,7 +65,7 @@ nexus_kern_lookup(struct vcache *  parent_directory,
 int
 nexus_kern_remove(struct vcache *  parent_directory,
                   char *           plain_name,
-                  nexus_entry_type type,
+                  nexus_fs_obj_type_t type,
                   char **          dest_obfuscated_name);
 
 /**
@@ -76,7 +77,7 @@ nexus_kern_remove(struct vcache *  parent_directory,
 int
 nexus_kern_filldir(char *           parent_directory,
                    char *           obfuscated_name,
-                   nexus_entry_type type,
+                   nexus_fs_obj_type_t type,
                    char **          dest_plain_name);
 
 /**
@@ -189,35 +190,35 @@ remove_path_name(const char * parent_path, const char * fname);
 void
 remove_shdw_name(const char * shadow_name);
 
-static inline nexus_entry_type
+static inline nexus_fs_obj_type_t
 dentry_type(const struct dentry * dentry)
 {
     if (d_is_file(dentry)) {
-        return UC_FILE;
+        return NEXUS_FILE;
     } else if (d_is_dir(dentry)) {
-        return UC_DIR;
+        return NEXUS_DIR;
     } else if (d_is_symlink(dentry)) {
-        return UC_LINK;
+        return NEXUS_LINK;
     }
 
-    return UC_ANY;
+    return NEXUS_ANY;
 }
 
-static inline nexus_entry_type
+static inline nexus_fs_obj_type_t
 vnode_type(const struct vcache * vnode)
 {
     if (vnode == NULL) {
-        return UC_ANY;
+        return NEXUS_ANY;
     }
 
     switch (vType(vnode)) {
     case VREG:
-        return UC_FILE;
+        return NEXUS_FILE;
     case VDIR:
-        return UC_DIR;
+        return NEXUS_DIR;
     case VLNK:
-        return UC_LINK;
+        return NEXUS_LINK;
     }
 
-    return UC_ANY;
+    return NEXUS_ANY;
 }

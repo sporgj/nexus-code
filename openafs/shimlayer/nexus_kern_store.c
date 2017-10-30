@@ -37,7 +37,7 @@ nexus_store_exit(store_context_t * context,
         goto out;
     }
 
-    ret = nexus_mod_send(NEXUS_MSG_XFER_EXIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(AFS_OP_ENCRYPT_STOP, &xdrs, &reply, &code);
     
     if (ret || code) {
         ERROR("store_close, could not get response from uspace\n");
@@ -93,7 +93,7 @@ nexus_store_init(store_context_t * context,
 	goto out;
     }
 
-    ret = nexus_mod_send(NEXUS_MSG_XFER_INIT, &xdrs, &reply, &code);
+    ret = nexus_mod_send(AFS_OP_ENCRYPT_START, &xdrs, &reply, &code);
     
     if (ret || code) {
         ERROR("init '%s' (start=%d, len=%d)\n", context->path, start_pos,
@@ -234,6 +234,7 @@ nexus_store_xfer(store_context_t * context,
         if ((rpc_ptr = READPTR_LOCK()) == 0) {
             goto out;
         }
+
         /* 2 - tell uspace we have data */
         xdrmem_create(&xdrs, rpc_ptr, READPTR_BUFLEN(), XDR_ENCODE);
 
@@ -246,7 +247,7 @@ nexus_store_xfer(store_context_t * context,
 	    goto out;
         }
 
-        ret = nexus_mod_send(NEXUS_MSG_XFER_RUN, &xdrs, &reply, &code);
+        ret = nexus_mod_send(AFS_OP_ENCRYPT_READY, &xdrs, &reply, &code);
 
         if (ret || code) {
             ERROR("could not send data to uspace (code=%d)\n", code);

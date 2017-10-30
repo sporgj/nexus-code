@@ -14,3 +14,4 @@ cscope.files
 cscope.in.out
 cscope.po.out
 afs_frontend/nexus-afs
+*.orig

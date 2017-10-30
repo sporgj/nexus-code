@@ -110,7 +110,8 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     ObtainWriteLock(&adp->lock, 153);
 
     if (!AFS_IS_DISCON_RW) {
-	if (nexus_kern_create(adp, aname, UC_DIR, &shadow_name) == 0) {
+	/* nexus code */
+	if (nexus_kern_create(adp, aname, NEXUS_DIR, &shadow_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    is_nexus_file = 0;
@@ -359,7 +360,7 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	/* Not disconnected, can connect to server. */
 
 	/* nexus code */
-	if (nexus_kern_remove(adp, aname, UC_ANY, &nexus_name) == 0) {
+	if (nexus_kern_remove(adp, aname, NEXUS_ANY, &nexus_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    nexus_name = aname;

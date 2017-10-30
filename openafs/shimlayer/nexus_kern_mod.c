@@ -10,13 +10,16 @@ static struct nexus_mod   nexus_device;
 struct nexus_mod        * dev = &nexus_device;
 
 /* major & minor numbers for our modules */
-static int uc_mod_major            = 0;
-static int uc_mod_minor            = 0;
+static int nx_mod_major            = 0;
+static int nx_mod_minor            = 0;
 static int uc_mod_devno            = 0;
 
 static int nexus_module_is_mounted = 0;
 
-mid_t msg_counter = 0;
+mid_t message_counter = 0;
+
+DEFINE_MUTEX(xfer_buffer_mutex);
+DEFINE_MUTEX(message_counter_mutex);
 
 static int
 nexus_open(struct inode * inode,
@@ -317,14 +320,14 @@ static struct file_operations nexus_proc_fops = {
  * hold dev->send_mut
  */
 int
-nexus_mod_send(uc_msg_type_t    type,
+nexus_mod_send(afs_op_type_t    type,
                XDR            * xdrs,
                reply_data_t  ** pp_reply,
                int            * p_err)
 {
     reply_data_t * p_reply     = NULL;
-    ucrpc_msg_t  * msg_out     = NULL;
-    ucrpc_msg_t  * msg_in      = NULL; 
+    struct afs_op_msg  * msg_out     = NULL;
+    struct afs_op_msg  * msg_in      = NULL; 
     size_t         payload_len = (xdrs->x_private - xdrs->x_base);
 
     int            err = -1;
@@ -336,12 +339,12 @@ nexus_mod_send(uc_msg_type_t    type,
     }
 
     /* write the message to the buffer */
-    msg_out           = (ucrpc_msg_t *)dev->outb;
+    msg_out           = (struct afs_op_msg *)dev->outb;
     msg_out->type     = type;
     msg_out->msg_id   = ucrpc__genid();
     msg_out->len      = payload_len;
 
-    dev->outb_len     = MSG_SIZE(msg_out);
+    dev->outb_len     = AFS_OP_MSG_SIZE(msg_out);
 
 
     
@@ -367,7 +370,7 @@ nexus_mod_send(uc_msg_type_t    type,
 
         finish_wait(&dev->msgq, &wait);
 
-        msg_in = (ucrpc_msg_t *)(dev->inb);
+        msg_in = (struct afs_op_msg *)(dev->inb);
 
 
 	/* JRL: Still an old reply? */
@@ -375,7 +378,7 @@ nexus_mod_send(uc_msg_type_t    type,
 	    continue;
 	}
 
-	dev->inb_len -= MSG_SIZE(msg_in);
+	dev->inb_len -= AFS_OP_MSG_SIZE(msg_in);
 
 	/* allocate the response data */
 	p_reply       = kmalloc((sizeof(reply_data_t) + msg_in->len), GFP_KERNEL);
@@ -414,7 +417,7 @@ nexus_mod_init(void)
     struct page * page = NULL;
 
     int ret   = 0;
-    int order = UCMOD_XFER_ORDER;
+    int order = NXMOD_XFER_ORDER;
     int i     = 0;
 
     if (nexus_module_is_mounted) {
@@ -422,7 +425,7 @@ nexus_mod_init(void)
         return 0;
     }
 
-    ret = alloc_chrdev_region(&uc_mod_devno, 0, 1, "nexus_mod");
+    ret = alloc_chrdev_region(&uc_mod_devno, 0, 1, NEXUS_MOD_NAME);
 
     if (ret) {
         printk(KERN_NOTICE "register_chrdev_region failed %d\n", ret);
@@ -439,8 +442,8 @@ nexus_mod_init(void)
     spin_lock_init(&(dev->dev_lock));
     
     // FIXME dev-outb != NULL?
-    dev->outb = UCMOD_BUFFER_ALLOC();
-    dev->inb  = UCMOD_BUFFER_ALLOC();
+    dev->outb = NXMOD_BUFFER_ALLOC();
+    dev->inb  = NXMOD_BUFFER_ALLOC();
 
     if ( (dev->outb == NULL) ||
 	 (dev->inb  == NULL) ) {
@@ -464,7 +467,7 @@ nexus_mod_init(void)
     dev->xfer_pages = (1               << order);
     dev->xfer_len   = (dev->xfer_pages << PAGE_SHIFT);
 
-    dev->buffersize = UCMOD_BUFFER_SIZE;
+    dev->buffersize = NXMOD_BUFFER_SIZE;
     dev->inb_len    = 0;
     dev->outb_len   = 0;
     
@@ -476,8 +479,8 @@ nexus_mod_init(void)
     mutex_init(&xfer_buffer_mutex);
 
     /* lets setup the character device */
-    uc_mod_major = MAJOR(uc_mod_devno);
-    uc_mod_minor = MINOR(uc_mod_devno);
+    nx_mod_major = MAJOR(uc_mod_devno);
+    nx_mod_minor = MINOR(uc_mod_devno);
     
     cdev_init(&dev->cdev, &nexus_mod_fops);
 
@@ -488,19 +491,21 @@ nexus_mod_init(void)
         return ret;
     }
 
+    /* create the proc file */
+    proc_create_data(NEXUS_PROC_NAME, 0, NULL, &nexus_proc_fops, NULL);
+
     nexus_module_is_mounted = 1;
 
     printk(KERN_INFO
            "nexus_mod: mounted (%d,%d), xfer: %zuB [%p - %p] %d pages\n",
-           uc_mod_major,
-	   uc_mod_minor,
+           nx_mod_major,
+	   nx_mod_minor,
 	   dev->xfer_len,
 	   dev->xfer_buffer,
            dev->xfer_buffer + dev->xfer_len,
 	   dev->xfer_pages);
 
-    proc_create_data("nexus_mod", 0, NULL, &nexus_proc_fops, NULL);
-
+    /* initialize the kernel data structures */
     nexus_kern_init();
 
     return 0;

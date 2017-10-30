@@ -1,48 +1,31 @@
 #pragma once
+#ifndef MODULE
 #include <stdint.h>
 #include <stdlib.h>
 
 #include <linux/ioctl.h>
 
 #include <uuid/uuid.h>
+#endif
 
+#include <nexus.h>
 
+#ifndef PAGE_SIZE
 #define PAGE_SIZE (4096)
-
+#endif
 
 #define NEXUS_IOC_MAGIC 'W'
-
 #define IOCTL_ADD_PATH  _IOW(NEXUS_IOC_MAGIC, 1, char *)
 #define IOCTL_MMAP_SIZE _IOR(NEXUS_IOC_MAGIC, 2, int *)
-
 #define NEXUS_IOC_MAXNR 2
+
+#define NEXUS_MOD_NAME      "nx_mod"
+#define NEXUS_PROC_NAME     "nx_proc"
 
 typedef struct {
     int  len;
     char path[0];
 } watchlist_path_t;
-
-#define NEXUS_DATA_BUFPAGES (1)
-#define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
-
-#define NEXUS_PATH_MAX  (4096)
-#define NEXUS_FNAME_MAX (256)
-
-
-
-typedef enum {
-    UC_STATUS_GOOD = 0,
-    UC_STATUS_NOOP,
-    UC_STATUS_ERROR
-} uc_err_t;
-
-// TODO change this to the nexus_fs_obj_type_t
-typedef enum {
-    UC_ANY  = 0x0,
-    UC_FILE = 0x1,
-    UC_DIR  = 0x2,
-    UC_LINK = 0x3
-} __attribute__((packed)) nexus_entry_type;
 
 typedef enum {
     ACL_READ       = 0x1,
@@ -66,7 +49,7 @@ typedef struct {
     int xfer_id;
 } __attribute__((packed)) xfer_rsp_t;
 
-
+/* the shim layer messages between kernel and userspace */
 typedef enum {
     AFS_OP_INVALID       = 0,
     AFS_OP_PING          = 1,
@@ -79,11 +62,6 @@ typedef enum {
     AFS_OP_RENAME        = 8,
 
     AFS_OP_STOREACL      = 9,  /* Do we need this */
-    AFS_OP_CHECKACL      = 10, /* We almost certainly don't need this */
-    
-    AFS_OP_XFER_INIT     = 11, /* These are crap and need to go */
-    AFS_OP_XFER_RUN      = 12,
-    AFS_OP_XFER_EXIT     = 13,
 
     AFS_OP_ENCRYPT_START = 14,
     AFS_OP_ENCRYPT_READY = 15,
@@ -94,7 +72,6 @@ typedef enum {
     AFS_OP_DECRYPT_STOP  = 19
 } afs_op_type_t;
 
-
 struct afs_op_msg {
     afs_op_type_t type;
     uint16_t      msg_id; /* the ID of the message */
@@ -103,3 +80,9 @@ struct afs_op_msg {
     int32_t       status; /* status from the call, set by return */
     char          payload[0];
 };
+
+#define AFS_OP_MSG_SIZE(m)\
+    sizeof(struct afs_op_msg) + (((struct afs_op_msg *)m)->len)
+
+/* counter for request and response messages */
+typedef uint16_t mid_t;

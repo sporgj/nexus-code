@@ -302,7 +302,8 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 
     if (!AFS_IS_DISCONNECTED) {
 	/* If not disconnected, connect to the server.*/
-	if (nexus_kern_create(adp, aname, UC_FILE, &shadow_name) == 0) {
+	/* nexus code */
+	if (nexus_kern_create(adp, aname, NEXUS_FILE, &shadow_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    is_nexus_file = 0;

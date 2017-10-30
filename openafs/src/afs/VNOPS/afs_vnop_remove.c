@@ -69,7 +69,7 @@ afsremove(struct vcache *adp, struct dcache *tdc,
 
     if (!AFS_IS_DISCONNECTED) {
 	/* nexus code */
-	if (nexus_kern_remove(adp, aname, UC_ANY, &nexus_name) == 0) {
+	if (nexus_kern_remove(adp, aname, NEXUS_ANY, &nexus_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    nexus_name = aname;

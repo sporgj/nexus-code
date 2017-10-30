@@ -1685,7 +1685,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	/* above now implemented by Check_AtSys and Next_AtSys */
 
 	/* nexus code */
-	if (nexus_kern_lookup(adp, aname, UC_ANY, &nexus_name) == 0) {
+	if (nexus_kern_lookup(adp, aname, NEXUS_ANY, &nexus_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    is_nexus_file = 0;

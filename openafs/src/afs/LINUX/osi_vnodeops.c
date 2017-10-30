@@ -445,12 +445,12 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
 	    }
 	    /* nexus code */
 	    if (nexus_path) {
-		nexus_entry_type uc_type = UC_ANY;
+		nexus_fs_obj_type_t uc_type = NEXUS_ANY;
 
 		if (type == DT_REG) {
-		    uc_type = UC_FILE;
+		    uc_type = NEXUS_FILE;
 		} else if (type == DT_DIR) {
-		    uc_type = UC_DIR;
+		    uc_type = NEXUS_DIR;
 		}
 
 		if ((uc_name[0] == '.' && uc_name[1] == '\0') ||

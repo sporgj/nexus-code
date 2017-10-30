@@ -1,10 +1,10 @@
 #include "nexus_module.h"
 
 static int
-__nexus_parent_aname_req(uc_msg_type_t       msg_type,
+__nexus_parent_aname_req(afs_op_type_t       msg_type,
                          struct vcache    *  avc,
                          char             *  name,
-                         nexus_entry_type    type,
+                         nexus_fs_obj_type_t    type,
                          char             ** shadow_name)
 {
 
@@ -64,7 +64,7 @@ __nexus_parent_aname_req(uc_msg_type_t       msg_type,
     }
 
     /* XXX create: should create remove the match? */
-    if (msg_type == NEXUS_MSG_REMOVE) {
+    if (msg_type == AFS_OP_REMOVE) {
         // remove it from the cache
         //remove_shdw_name(*shadow_name);
     }
@@ -83,10 +83,10 @@ out:
 int
 nexus_kern_create(struct vcache     * avc,
                   char              * name,
-                  nexus_entry_type    type,
+                  nexus_fs_obj_type_t    type,
                   char             ** shadow_name)
 {
-    return __nexus_parent_aname_req(NEXUS_MSG_CREATE,
+    return __nexus_parent_aname_req(AFS_OP_CREATE,
 				    avc,
 				    name,
 				    type,
@@ -96,10 +96,10 @@ nexus_kern_create(struct vcache     * avc,
 int
 nexus_kern_lookup(struct vcache     * avc,
                   char              * name,
-                  nexus_entry_type    type,
+                  nexus_fs_obj_type_t    type,
                   char             ** shadow_name)
 {
-    return __nexus_parent_aname_req(NEXUS_MSG_LOOKUP,
+    return __nexus_parent_aname_req(AFS_OP_LOOKUP,
 				    avc,
 				    name,
 				    type,
@@ -109,10 +109,10 @@ nexus_kern_lookup(struct vcache     * avc,
 int
 nexus_kern_remove(struct vcache     * avc,
                   char              * name,
-                  nexus_entry_type    type,
+                  nexus_fs_obj_type_t    type,
                   char             ** shadow_name)
 {
-    return __nexus_parent_aname_req(NEXUS_MSG_REMOVE,
+    return __nexus_parent_aname_req(AFS_OP_REMOVE,
 				    avc,
 				    name,
 				    type,
@@ -157,7 +157,7 @@ nexus_kern_symlink(struct dentry  * dp,
 	goto out;
     }
 
-    if (nexus_mod_send(NEXUS_MSG_SYMLINK, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(AFS_OP_SYMLINK, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
@@ -220,7 +220,7 @@ nexus_kern_hardlink(struct dentry  * olddp,
 	goto out;
     }
 
-    if (nexus_mod_send(NEXUS_MSG_HARDLINK, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(AFS_OP_HARDLINK, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
@@ -251,7 +251,7 @@ out:
 int
 nexus_kern_filldir(char              * parent_dir,
                    char              * shadow_name,
-                   nexus_entry_type    type,
+                   nexus_fs_obj_type_t    type,
                    char             ** real_name)
 {
     //char * fname;
@@ -289,7 +289,7 @@ nexus_kern_filldir(char              * parent_dir,
     }
 
     /* send eveything */
-    if (nexus_mod_send(NEXUS_MSG_FILLDIR, &xdrs, &reply, &code) ||
+    if (nexus_mod_send(AFS_OP_FILLDIR, &xdrs, &reply, &code) ||
 	code) {
         goto out;
     }
@@ -366,7 +366,7 @@ nexus_kern_rename(struct vcache  * from_vnode,
         unlocked = 1;
     }
 
-    if (nexus_mod_send(NEXUS_MSG_RENAME, &xdrs, &reply, &code) || code) {
+    if (nexus_mod_send(AFS_OP_RENAME, &xdrs, &reply, &code) || code) {
         goto out;
     }
 
@@ -447,7 +447,7 @@ nexus_kern_storeacl(struct vcache * avc,
 	goto out;
     }
 
-    if (nexus_mod_send(NEXUS_MSG_STOREACL, &xdrs, &reply, &code) ||
+    if (nexus_mod_send(AFS_OP_STOREACL, &xdrs, &reply, &code) ||
 	code) {
         ERROR("xdr setacl (%s) FAILED\n", path);
         goto out;
@@ -461,75 +461,6 @@ out:
 
     if (reply) {
         kfree(reply);
-    }
-
-    return ret;
-}
-
-int
-nexus_kern_access(struct vcache * avc,
-		  afs_int32       rights)
-{
-    reply_data_t * reply     = NULL;
-    caddr_t        payload   = NULL;
-    char         * path      = NULL;
-    XDR          * xdr_reply = NULL;
-    XDR            xdrs;
-    
-    // by default, access is always granted
-    int is_dir = (vType(avc) == VDIR);
-    int code   = 0;
-    int ret    = 0;
- 
-    // if it's a lookup, just return it's ok
-    if ( (rights == ACL_LOOKUP) ||
-	 ( (is_dir) &&
-	   (rights == ACL_READ) ) ) {
-        return 0;
-    }
-
-    if (nexus_vnode_path(avc, &path)) {
-        return 0;
-    }
-
-    if ((payload = READPTR_LOCK()) == 0) {
-        kfree(path);
-        return 0;
-    }
-
-    xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
-    
-    if ( (xdr_string(&xdrs, &path, NEXUS_PATH_MAX)  == FALSE) ||
-	 (xdr_int(&xdrs, &rights)                   == FALSE) ||
-	 (xdr_int(&xdrs, &is_dir)                   == FALSE ) ) {
-
-        READPTR_UNLOCK();
-        ERROR("xdr kern access failed\n");
-
-	goto out;
-    }
-
-    if (nexus_mod_send(NEXUS_MSG_CHECKACL, &xdrs, &reply, &code) ||
-	code) {
-        ERROR("xdr setacl (%s) FAILED\n", path);
-        goto out;
-    }
-
-    /* read in the response into ret */
-    xdr_reply = &reply->xdrs;
-
-    if (!xdr_int(xdr_reply, &ret)) {
-        ERROR("reading response fails");
-        goto out;
-    }
-
-out:
-    if (reply) {
-        kfree(reply);
-    }
-
-    if (path) {
-        kfree(path);
     }
 
     return ret;
