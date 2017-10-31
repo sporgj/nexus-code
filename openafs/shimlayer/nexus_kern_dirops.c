@@ -43,7 +43,7 @@ __nexus_dirpath_name_afs_op(afs_op_type_t       afs_op_type,
         || (xdr_string(&xdrs, &name, NEXUS_FNAME_MAX) == FALSE)
         || (xdr_int(&xdrs, (int *)&type) == FALSE)) {
 
-        ERROR("xdr create failed (path=%s, type=%d, name=%s)\n",
+        NEXUS_ERROR("xdr create failed (path=%s, type=%d, name=%s)\n",
               path,
               (int)afs_op_type,
               name);
@@ -63,7 +63,7 @@ __nexus_dirpath_name_afs_op(afs_op_type_t       afs_op_type,
     xdr_reply = &reply->xdrs;
 
     if (!xdr_string(xdr_reply, shadow_name, NEXUS_FNAME_MAX)) {
-        ERROR("parsing shadow_name failed (type=%d)\n", (int)type);
+        NEXUS_ERROR("parsing shadow_name failed (type=%d)\n", (int)type);
         goto out;
     }
 
@@ -138,7 +138,7 @@ nexus_kern_symlink(struct dentry * dp, char * target, char ** dest)
     if ((xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX) == FALSE)
         || (xdr_string(&xdrs, &target, NEXUS_FNAME_MAX) == FALSE)) {
 
-        ERROR("xdr hardlink failed\n");
+        NEXUS_ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();
 
         goto out;
@@ -150,7 +150,7 @@ nexus_kern_symlink(struct dentry * dp, char * target, char ** dest)
 
     xdr_reply = &reply->xdrs;
     if (!xdr_string(xdr_reply, dest, NEXUS_FNAME_MAX)) {
-        ERROR("parsing hardlink name failed\n");
+        NEXUS_ERROR("parsing hardlink name failed\n");
         goto out;
     }
 
@@ -200,7 +200,7 @@ nexus_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest)
     if ((xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX) == FALSE)
         || (xdr_string(&xdrs, &to_path, NEXUS_PATH_MAX) == FALSE)) {
 
-        ERROR("xdr hardlink failed\n");
+        NEXUS_ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();
 
         goto out;
@@ -213,7 +213,7 @@ nexus_kern_hardlink(struct dentry * olddp, struct dentry * newdp, char ** dest)
     xdr_reply = &reply->xdrs;
 
     if (xdr_string(xdr_reply, dest, NEXUS_FNAME_MAX) == FALSE) {
-        ERROR("parsing hardlink name failed\n");
+        NEXUS_ERROR("parsing hardlink name failed\n");
         goto out;
     }
 
@@ -261,7 +261,7 @@ nexus_kern_filldir(char *              parent_dir,
         || (xdr_string(&xdrs, &shadow_name, NEXUS_FNAME_MAX) == FALSE)
         || (xdr_int(&xdrs, (int *)&type) == FALSE)) {
 
-        ERROR("xdr filldir failed\n");
+        NEXUS_ERROR("xdr filldir failed\n");
         READPTR_UNLOCK();
 
         goto out;
@@ -276,7 +276,7 @@ nexus_kern_filldir(char *              parent_dir,
     xdr_reply = &reply->xdrs;
 
     if (xdr_string(xdr_reply, real_name, NEXUS_FNAME_MAX) == FALSE) {
-        ERROR("parsing shadow_name failed\n");
+        NEXUS_ERROR("parsing shadow_name failed\n");
         goto out;
     }
 
@@ -327,7 +327,7 @@ nexus_kern_rename(struct vcache * from_vnode,
         || (xdr_string(&xdrs, &to_path, NEXUS_PATH_MAX) == FALSE)
         || (xdr_string(&xdrs, &newname, NEXUS_FNAME_MAX) == FALSE)) {
 
-        ERROR("xdr rename failed\n");
+        NEXUS_ERROR("xdr rename failed\n");
         READPTR_UNLOCK();
 
         goto out;
@@ -350,7 +350,7 @@ nexus_kern_rename(struct vcache * from_vnode,
     if ((xdr_string(xdr_reply, old_shadowname, NEXUS_FNAME_MAX) == FALSE)
         || (xdr_string(xdr_reply, new_shadowname, NEXUS_FNAME_MAX) == FALSE)) {
 
-        ERROR("parsing rename response failed\n");
+        NEXUS_ERROR("parsing rename response failed\n");
         goto out;
     }
 
@@ -416,14 +416,14 @@ nexus_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data)
         || (xdr_opaque(&xdrs, (caddr_t)acl_data->AFSOpaque_val, len)
             == FALSE)) {
 
-        ERROR("xdr storeacl failed\n");
+        NEXUS_ERROR("xdr storeacl failed\n");
         READPTR_UNLOCK();
 
         goto out;
     }
 
     if (nexus_mod_send(AFS_OP_STOREACL, &xdrs, &reply, &code) || code) {
-        ERROR("xdr setacl (%s) FAILED\n", path);
+        NEXUS_ERROR("xdr setacl (%s) FAILED\n", path);
         goto out;
     }
 

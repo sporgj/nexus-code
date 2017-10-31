@@ -34,14 +34,14 @@ nexus_store_exit(struct kern_xfer_context * context,
 	(xdr_int(&xdrs, &error)       == FALSE) ) {
 	
         READPTR_UNLOCK();
-        ERROR("store_close: could not parse response\n");
+        NEXUS_ERROR("store_close: could not parse response\n");
         goto out;
     }
 
     ret = nexus_mod_send(AFS_OP_ENCRYPT_STOP, &xdrs, &reply, &code);
     
     if (ret || code) {
-        ERROR("store_close, could not get response from uspace\n");
+        NEXUS_ERROR("store_close, could not get response from uspace\n");
         goto out;
     }
 
@@ -97,7 +97,7 @@ nexus_store_init(struct kern_xfer_context * context,
         (xdr_string(&xdrs, &context->path, NEXUS_PATH_MAX)         == FALSE) ) {
 	
         READPTR_UNLOCK();
-        ERROR("could not encode xfer_req XDR object\n");
+        NEXUS_ERROR("could not encode xfer_req XDR object\n");
 
 	goto out;
     }
@@ -105,7 +105,7 @@ nexus_store_init(struct kern_xfer_context * context,
     ret = nexus_mod_send(AFS_OP_ENCRYPT_START, &xdrs, &reply, &code);
     
     if (ret || code) {
-        ERROR("init '%s' (start=%d, len=%d)\n", context->path, start_pos,
+        NEXUS_ERROR("init '%s' (start=%d, len=%d)\n", context->path, start_pos,
               (int)bytes);
         goto out;
     }
@@ -114,12 +114,12 @@ nexus_store_init(struct kern_xfer_context * context,
     x_data = &reply->xdrs;
     
     if (!xdr_opaque(x_data, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
-        ERROR("could not parse from init\n");
+        NEXUS_ERROR("could not parse from init\n");
         goto out;
     }
 
     if (xfer_rsp.xfer_id == -1) {
-        ERROR("store_init '%s' FAILED\n", context->path);
+        NEXUS_ERROR("store_init '%s' FAILED\n", context->path);
         goto out;
     }
 
@@ -169,7 +169,7 @@ nexus_store_write_to_fserver(struct kern_xfer_context * context,
 	nbytes = rx_Write(afs_call, buf, size);
 	
         if (nbytes != size) {
-            ERROR("afs_server exp=%d, act=%d\n", tlen, (int)nbytes);
+            NEXUS_ERROR("afs_server exp=%d, act=%d\n", tlen, (int)nbytes);
             ret = -1;
             goto out;
         }
@@ -203,7 +203,7 @@ nexus_store_read_chunk_file(struct osi_file * fp,
         nbytes = afs_osi_Read(fp, -1, buf, size);
 
         if (nbytes != size) {
-            ERROR("nbytes=%d, size=%d\n", nbytes, size);
+            NEXUS_ERROR("nbytes=%d, size=%d\n", nbytes, size);
             goto out;
         }
 
@@ -258,7 +258,7 @@ nexus_store_xfer(struct kern_xfer_context * context,
 	     (xdr_int(&xdrs, &size)        == FALSE) ) {
 
 	    READPTR_UNLOCK();
-            ERROR("xdr store_xfer failed\n");
+            NEXUS_ERROR("xdr store_xfer failed\n");
 
 	    goto out;
         }
@@ -266,7 +266,7 @@ nexus_store_xfer(struct kern_xfer_context * context,
         ret = nexus_mod_send(AFS_OP_ENCRYPT_READY, &xdrs, &reply, &code);
 
         if (ret || code) {
-            ERROR("could not send data to uspace (code=%d)\n", code);
+            NEXUS_ERROR("could not send data to uspace (code=%d)\n", code);
             goto out;
         }
 
@@ -348,7 +348,7 @@ nexus_kern_store(struct vcache          * avc,
 
         // TODO add code for afs_wakeup for cases file is locked at the server
         if (nexus_store_xfer(&context, dclist[i], &nbytes)) {
-            ERROR("nexus_store_xfer error :(");
+            NEXUS_ERROR("nexus_store_xfer error :(");
             goto out;
         }
 
@@ -358,7 +358,7 @@ nexus_kern_store(struct vcache          * avc,
     }
 
     if (bytes_stored != bytes) {
-        ERROR("incomplete store (%s) stored=%d, size=%d\n", path, bytes_stored,
+        NEXUS_ERROR("incomplete store (%s) stored=%d, size=%d\n", path, bytes_stored,
               (int)bytes);
     }
 

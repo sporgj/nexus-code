@@ -36,7 +36,7 @@ nexus_add_volume(const char * path)
     curr = (struct nexus_volume_path *)kzalloc(
         sizeof(struct nexus_volume_path) + len, GFP_KERNEL);
     if (curr == NULL) {
-        ERROR("allocation error, cannot add path to list");
+        NEXUS_ERROR("allocation error, cannot add path to list");
         return -1;
     }
 
@@ -172,7 +172,7 @@ nexus_kern_ping(void)
     /* create the XDR object */
     xdrmem_create(&xdrs, payload, READPTR_BUFLEN(), XDR_ENCODE);
     if (!xdr_int(&xdrs, &num)) {
-        ERROR("xdr_int failed\n");
+        NEXUS_ERROR("xdr_int failed\n");
         READPTR_UNLOCK();
         goto out;
     }

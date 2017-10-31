@@ -5,6 +5,9 @@
 
 
 
+u64 nexus_ptrs_freed   = 0;
+u64 nexus_ptrs_alloced = 0;
+
 
 void *
 nexus_kmalloc(size_t size,

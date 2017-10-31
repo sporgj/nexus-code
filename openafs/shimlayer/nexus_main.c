@@ -3,16 +3,15 @@
 #include <linux/mm.h>
 #include <linux/spinlock.h>
 
-#undef ERROR
-#define ERROR(fmt, args...) printk(KERN_ERR "nexus_mod: " fmt, ##args)
+#include "nexus_util.h"
+
 
 static struct nexus_mod nexus_device;
-struct nexus_mod *      dev = &nexus_device;
+struct nexus_mod * dev = &nexus_device;
 
 /* major & minor numbers for our modules */
-static int nx_mod_major = 0;
-static int nx_mod_minor = 0;
-static int uc_mod_devno = 0;
+static struct class * nexus_class = NULL;
+static int nexus_major_num = 0;
 
 static int nexus_module_is_mounted = 0;
 
@@ -130,20 +129,20 @@ nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
     case IOCTL_ADD_PATH:
         /* copy the path len */
         if (copy_from_user(&pathlen, (size_t *)arg, sizeof(size_t))) {
-            ERROR("copy_from_user FAILED\n");
+            NEXUS_ERROR("copy_from_user FAILED\n");
             return -EFAULT;
         }
 
         /* allocate the path for the buffer */
         path = (char *)kzalloc(pathlen + 1, GFP_KERNEL);
         if (path == NULL) {
-            ERROR("allocation error");
+            NEXUS_ERROR("allocation error");
             return -ENOMEM;
         }
 
         /* copy the string from userspace */
         if (copy_from_user(path, (char *)arg, pathlen)) {
-            ERROR("copy_from_user failed\n");
+            NEXUS_ERROR("copy_from_user failed\n");
             return -EFAULT;
         }
 
@@ -151,7 +150,7 @@ nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
         printk(KERN_INFO "path: %s\n", path);
 
         if (nexus_add_volume(path)) {
-            ERROR("adding '%s' FAILED\n", path);
+            NEXUS_ERROR("adding '%s' FAILED\n", path);
             err = -1;
         }
 
@@ -161,7 +160,7 @@ nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
     case IOCTL_MMAP_SIZE:
 
         if (copy_to_user((char *)arg, &dev->xfer_len, sizeof(dev->xfer_len))) {
-            ERROR("sending mmap order FAILED\n");
+            NEXUS_ERROR("sending mmap order FAILED\n");
             err = -1;
         }
         break;
@@ -181,7 +180,7 @@ nexus_mmap_fault(struct vm_area_struct * vma, struct vm_fault * fault_info)
     pgoff_t       index = fault_info->pgoff;
 
     if (index >= dev->xfer_pages) {
-        ERROR("mmap_fault pgoff=%d, pages=%d\n", (int)index, dev->xfer_pages);
+        NEXUS_ERROR("mmap_fault pgoff=%d, pages=%d\n", (int)index, dev->xfer_pages);
         return VM_FAULT_NOPAGE;
     }
 
@@ -190,7 +189,7 @@ nexus_mmap_fault(struct vm_area_struct * vma, struct vm_fault * fault_info)
     page = virt_to_page(addr);
 
     /*
-    ERROR("nexus_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
+    NEXUS_ERROR("nexus_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
           (int)index, addr, (int)current->pid, current->comm,
           fault_info->virtual_address, page);
           */
@@ -211,7 +210,7 @@ nexus_mmap_fault(struct vm_area_struct * vma, struct vm_fault * fault_info)
 	index = (((unsigned long)fault_info->virtual_address - vma->vm_start) >> PAGE_SHIFT);
 
 	if (index >= dev->xfer_pages) {
-	    ERROR("mmap_error out of range index=%d", index);
+	    NEXUS_ERROR("mmap_error out of range index=%d", index);
 	    return VM_FAULT_SIGBUS;
 	}
 	
@@ -244,7 +243,7 @@ nexus_mmap(struct file * filp, struct vm_area_struct * vma)
         err  = vm_insert_page(vma, user_addr, page);
 
         if (err) {
-            ERROR("mmap error (%d)\n", err);
+            NEXUS_ERROR("mmap error (%d)\n", err);
             return err;
         }
 
@@ -365,7 +364,7 @@ nexus_mod_send(afs_op_type_t           type,
             *p_err    = msg_in->status;
             *pp_reply = NULL;
 
-            ERROR("allocation error\n");
+            NEXUS_ERROR("allocation error\n");
 
             goto out;
         }
@@ -390,6 +389,8 @@ out:
 int
 nexus_mod_init(void)
 {
+    dev_t devno = MKDEV(0, 0); // Dynamically assign the major number
+    
     struct page * page = NULL;
 
     int ret   = 0;
@@ -399,13 +400,6 @@ nexus_mod_init(void)
     if (nexus_module_is_mounted) {
         printk(KERN_NOTICE "nexus_mod is already mounted\n");
         return 0;
-    }
-
-    ret = alloc_chrdev_region(&uc_mod_devno, 0, 1, NEXUS_MOD_NAME);
-
-    if (ret) {
-        printk(KERN_NOTICE "register_chrdev_region failed %d\n", ret);
-        return ret;
     }
 
     /* lets now initialize the data structures */
@@ -422,7 +416,7 @@ nexus_mod_init(void)
     dev->inb  = NXMOD_BUFFER_ALLOC();
 
     if ((dev->outb == NULL) || (dev->inb == NULL)) {
-        ERROR("allocating buffers failed\n");
+        NEXUS_ERROR("allocating buffers failed\n");
         return -1;
     }
 
@@ -453,28 +447,52 @@ nexus_mod_init(void)
 
     mutex_init(&xfer_buffer_mutex);
 
+
+    nexus_class = class_create(THIS_MODULE, "nexus");
+    if (IS_ERR(nexus_class)) {
+	NEXUS_ERROR("Failed to register Nexus device class\n");
+	return PTR_ERR(nexus_class);
+    }
+
+    printk("intializing Nexus Control device\n");
+
+    
     /* lets setup the character device */
-    nx_mod_major = MAJOR(uc_mod_devno);
-    nx_mod_minor = MINOR(uc_mod_devno);
+    ret = alloc_chrdev_region(&devno, 0, 1, "nexus");
+
+    if (ret < 0) {
+	NEXUS_ERROR("Error registering device region for V3 devices\n");
+	goto failure1;
+    }
+
+    nexus_major_num = MAJOR(devno);
+    devno           = MKDEV(nexus_major_num, 1);
+
+    NEXUS_DEBUG("Creating Nexus Device file: Major %d, Minor %d\n", nexus_major_num, MINOR(devno));
+    
 
     cdev_init(&dev->cdev, &nexus_mod_fops);
-
     dev->cdev.owner = THIS_MODULE;
+    dev->cdev.ops   = &nexus_mod_fops;
+    ret = cdev_add(&dev->cdev, devno, 1);
 
-    if ((ret = cdev_add(&dev->cdev, uc_mod_devno, 1))) {
-        printk(KERN_ERR "adding %d cdev failed: %d\n", uc_mod_devno, ret);
+    if (ret != 0) {
+	NEXUS_ERROR("Could not add nexus dev file\n");
         return ret;
     }
 
+
+    device_create(nexus_class, NULL, devno, NULL, "nexus");
+
+    
+    
     /* create the proc file */
     proc_create_data(NEXUS_PROC_NAME, 0, NULL, &nexus_proc_fops, NULL);
 
     nexus_module_is_mounted = 1;
 
     printk(KERN_INFO
-           "nexus_mod: mounted (%d,%d), xfer: %zuB [%p - %p] %d pages\n",
-           nx_mod_major,
-           nx_mod_minor,
+           "nexus_mod: mounted, xfer: %zuB [%p - %p] %d pages\n",
            dev->xfer_len,
            dev->xfer_buffer,
            dev->xfer_buffer + dev->xfer_len,
@@ -484,6 +502,10 @@ nexus_mod_init(void)
     nexus_kern_init();
 
     return 0;
+
+ failure1:
+    return -1;
+
 }
 
 int

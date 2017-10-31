@@ -7,8 +7,8 @@
 #include <linux/gfp.h>
 
 
-u64 nexus_ptrs_freed   = 0;
-u64 nexus_ptrs_alloced = 0;
+extern u64 nexus_ptrs_freed;
+extern u64 nexus_ptrs_alloced;
 
 
 int nexus_get_cpu(void);
@@ -33,21 +33,21 @@ void * nexus_kmalloc(size_t size, gfp_t  flags);
         task_unlock(current);                                           \
     } while (0)
 
-#define ERROR(fmt, args...)                                             \
+#define NEXUS_ERROR(fmt, args...)                                             \
     do {                                                                \
         task_lock(current);                                             \
         printk(KERN_ERR "NEXUS> [%s] (%u) %s(%d): " fmt, current->comm, nexus_get_cpu(),  __FILE__, __LINE__, ##args); \
         task_unlock(current);                                           \
     } while (0)
 
-#define WARNING(fmt, args...)                                           \
+#define NEXUS_WARNING(fmt, args...)                                           \
     do {                                                                \
         task_lock(current);                                             \
         printk(KERN_WARNING "NEXUS> [%s] (%u): " fmt, current->comm, nexus_get_cpu(), ##args); \
         task_unlock(current);                                           \
     } while (0)
 
-#define DEBUG(fmt, args...)                                             \
+#define NEXUS_DEBUG(fmt, args...)                                             \
     do {                                                                \
         task_lock(current);                                             \
         printk(KERN_DEBUG "NEXUS> [%s] (%u): " fmt, current->comm, nexus_get_cpu(), ##args); \

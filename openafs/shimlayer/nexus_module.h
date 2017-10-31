@@ -27,6 +27,7 @@
 
 #include "afs.h"
 #include "nexus.h"
+#include "nexus_util.h"
 
 #define MAX_FSERV_SIZE        PAGE_SIZE
 
@@ -43,10 +44,6 @@
 
 #define FALSE 0
 #define TRUE 1
-
-#undef ERROR
-#define ERROR(fmt, args...) printk(KERN_ERR "nexus: " fmt " [%s():%d]", \
-				   ##args, __func__, __LINE__)
 
 
 
@@ -168,7 +165,7 @@ READPTR_LOCK(void)
     AFS_GUNLOCK();
     if (mutex_lock_interruptible(&dev->send_mutex)) {
         AFS_GLOCK();
-        ERROR("locking mutex failed\n");
+        NEXUS_ERROR("locking mutex failed\n");
         return 0;
     }
 
