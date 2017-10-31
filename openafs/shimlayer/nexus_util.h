@@ -1,11 +1,17 @@
 #ifndef __NEXUS_UTIL_H__
 #define __NEXUS_UTIL_H__
 
-uint64_t nexus_ptrs_freed   = 0;
-uint64_t nexus_ptrs_alloced = 0;
+
+#include <linux/kernel.h>
+#include <linux/smp.h>
+#include <linux/gfp.h>
 
 
-int nexus_get_cpu();
+u64 nexus_ptrs_freed   = 0;
+u64 nexus_ptrs_alloced = 0;
+
+
+int nexus_get_cpu(void);
 
 
 void * nexus_kmalloc(size_t size, gfp_t  flags);

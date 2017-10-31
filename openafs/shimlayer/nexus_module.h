@@ -24,6 +24,10 @@
 #include "afsincludes.h"
 // clang-format on
 
+
+#include "afs.h"
+#include "nexus.h"
+
 #define MAX_FSERV_SIZE        PAGE_SIZE
 
 #define NXKERN_NBR_DEVS       1
@@ -43,6 +47,12 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "nexus: " fmt " [%s():%d]", \
 				   ##args, __func__, __LINE__)
+
+
+
+
+
+typedef uint16_t mid_t;
 
 extern struct list_head nexus_volumes_head;
 

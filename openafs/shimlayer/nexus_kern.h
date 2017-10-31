@@ -8,7 +8,46 @@
 #include "afsincludes.h"
 // clang-format on
 
-#include "nexus_afs.h"
+
+typedef enum {
+    NEXUS_ANY  = 0,
+    NEXUS_FILE = 1,
+    NEXUS_DIR  = 2,
+    NEXUS_LINK = 3
+} nexus_fs_obj_type_t;
+
+
+
+
+/* chunk size */
+#define NEXUS_CHUNK_LOG 20
+#define NEXUS_CHUNK_SIZE (1 << NEXUS_CHUNK_LOG)
+
+
+ 
+static inline size_t
+NEXUS_CHUNK_BASE(size_t offset)
+{
+    return ((offset < NEXUS_CHUNK_SIZE)
+                ? 0
+                : (((offset - NEXUS_CHUNK_SIZE) & ~(NEXUS_CHUNK_SIZE - 1))
+                   + NEXUS_CHUNK_SIZE));
+}
+
+static inline size_t
+NEXUS_CHUNK_NUM(size_t offset)
+{
+    return ((offset < NEXUS_CHUNK_SIZE)
+                ? 0
+                : 1 + ((offset - (size_t)NEXUS_CHUNK_SIZE) >> NEXUS_CHUNK_LOG));
+}
+
+static inline size_t
+NEXUS_CHUNK_COUNT(size_t file_size)
+{
+    return NEXUS_CHUNK_NUM(file_size) + 1;
+}
+
 
 int
 NEXUS_DISCONNECTED(void);

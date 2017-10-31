@@ -1,4 +1,8 @@
+
+#include <linux/slab.h>
+#include <linux/mm.h>
 #include "nexus_util.h"
+
 
 
 
@@ -17,7 +21,7 @@ nexus_kmalloc(size_t size,
 int
 nexus_get_cpu()
 {
-    uint32_t cpu_id = get_cpu(); 
+    u32 cpu_id = get_cpu(); 
     put_cpu();
     return cpu_id;
 }

@@ -5,8 +5,17 @@ Client-side SGX.
 
 ## Setup Instructions
 ```bash
-make -C openafs         # builds openafs
-./makelinks.sh          # creates the symlinks
+cd openafs
+./regen.sh
+./configure-libafs
+make libafs
+make venus
+
+cp openafs/src/aklog/aklog ./bin
+cp openafs/src/afsd/afsd ./bin
+cp openafs/src/venus/fs ./bin
+
+
 make -C libnexus        # builds the nexus vfs core library
 make -C afs_frontend    # builds the application
 ```

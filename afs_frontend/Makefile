@@ -12,7 +12,8 @@ exec_objs :=	main.o \
 		xdr.o  \
 		xdr_mem.o
 
-LIBNEXUS := ../libnexus/libnexus.a
+
+libs := ../libnexus/libnexus.a
 
 build = \
         @if [ -z "$V" ]; then \
@@ -39,8 +40,8 @@ all: nexus-afs
 
 
 
-nexus-afs: $(exec_objs) $(LIBNEXUS)
-	$(call build,CC,$(CC) $(CFLAGS) $^ -o $@)
+nexus-afs: $(exec_objs)
+	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
 
 
 
