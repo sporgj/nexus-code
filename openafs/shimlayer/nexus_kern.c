@@ -4,33 +4,28 @@
 #include <linux/list.h>
 #include <linux/string.h>
 
-#define PATH_CACHE_CAPACITY 64
+static const char *   AFS_PREFIX     = "/afs";
+static const uint32_t AFS_PREFIX_LEN = 4;
 
-#undef ERROR
-#define ERROR(fmt, args...) printk(KERN_ERR "nexus_kern: " fmt, ##args)
-
-#define SGX_PATH "sgx"
-#define SGX_PATHLEN 3
-
-static const char * afs_prefix = "/afs";
-static const uint32_t afs_prefix_len = 4;
-
-LIST_HEAD(_watchlist), *watchlist_ptr = &_watchlist;
+/* the list of all paths watched */
+LIST_HEAD(nexus_volumes_head);
 
 bool
 startsWith(const char * pre, const char * str)
 {
-    size_t lenpre = strlen(pre), lenstr = strlen(str);
-    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
+    size_t lenpre = strlen(pre);
+    size_t lenstr = strlen(str);
+
+    return (lenstr < lenpre) ? 0 : (strncmp(pre, str, lenpre) == 0);
 }
 
 int
-add_path_to_watchlist(const char * path)
+nexus_add_volume(const char * path)
 {
-    watch_path_t * curr;
-    int len;
+    struct nexus_volume_path * curr = NULL;
+    int                        len  = strnlen(path, NEXUS_PATH_MAX);
 
-    list_for_each_entry(curr, watchlist_ptr, list)
+    list_for_each_entry(curr, &nexus_volumes_head, list)
     {
         if (strncmp(curr->afs_path, path, curr->path_len) == 0) {
             return 0;
@@ -38,35 +33,40 @@ add_path_to_watchlist(const char * path)
     }
 
     /* if we are here, we need to add the entry to the list */
-    len = strnlen(path, NEXUS_PATH_MAX);
-    curr = (watch_path_t *)kzalloc(sizeof(watch_path_t) + len, GFP_KERNEL);
+    curr = (struct nexus_volume_path *)kzalloc(
+        sizeof(struct nexus_volume_path) + len, GFP_KERNEL);
     if (curr == NULL) {
         ERROR("allocation error, cannot add path to list");
         return -1;
     }
 
     curr->path_len = len;
-    if (startsWith(afs_prefix, path)) {
-        strncpy(curr->afs_path, path + afs_prefix_len, len - afs_prefix_len);
+
+    /* we should allow for paths that do not contain '/afs' */
+    if (startsWith(AFS_PREFIX, path)) {
+        strncpy(curr->afs_path, path + AFS_PREFIX_LEN, len - AFS_PREFIX_LEN);
+    } else {
+        strncpy(curr->afs_path, path, len);
     }
 
-    list_add(&curr->list, watchlist_ptr);
+    list_add(&curr->list, &nexus_volumes_head);
 
     return 0;
 }
 
 void
-clear_watchlist(void)
+nexus_clear_volume_list(void)
 {
-    watch_path_t *curr_wp, *prev_wp;
+    struct nexus_volume_path * curr_wp = NULL;
+    struct nexus_volume_path * prev_wp = NULL;
 
-    list_for_each_entry_safe(curr_wp, prev_wp, watchlist_ptr, list)
+    list_for_each_entry_safe(curr_wp, prev_wp, &nexus_volumes_head, list)
     {
         list_del(&curr_wp->list);
         kfree(curr_wp);
     }
 
-    INIT_LIST_HEAD(watchlist_ptr);
+    INIT_LIST_HEAD(&nexus_volumes_head);
 }
 
 int
@@ -76,7 +76,7 @@ NEXUS_DISCONNECTED()
 }
 
 // a dummy buffer that checks if a dentry path is in the watchlist
-static char path_buf[4096];
+static char   path_buf[4096];
 static size_t path_buf_len = sizeof(path_buf);
 static DEFINE_MUTEX(path_buf_mutex);
 
@@ -88,69 +88,44 @@ nexus_kern_init(void)
     return 0;
 }
 
-static int
-d_is_subdir(const struct dentry * dentry)
-{
-    struct dentry *d = (struct dentry *)dentry, *parent;
-
-    while (!IS_ROOT(d)) {
-        parent = d->d_parent;
-        prefetch(parent);
-
-        /* check if the names match */
-        if (d->d_name.len == SGX_PATHLEN &&
-                memcmp(d->d_name.name, SGX_PATH, SGX_PATHLEN) == 0) {
-            return 1;
-        }
-
-        d = parent;
-    }
-
-    return 0;
-}
-
 int
 nexus_dentry_path(const struct dentry * dentry, char ** dest)
 {
-    int len = 0;
-    int total_len = 0;
-    char *path, *result, *buf;
-    watch_path_t * curr_entry;
+    int                        len        = 0;
+    int                        total_len  = 0;
+    char *                     path       = NULL;
+    char *                     result     = NULL;
+    char *                     buf        = NULL;
+    struct nexus_volume_path * curr_entry = NULL;
 
-    if (dentry == NULL || d_is_special(dentry) || !d_is_subdir(dentry)) {
+    if (dentry == NULL || d_is_special(dentry)) {
         return 1;
     }
 
     buf = path_buf;
 
-    /* TODO cache the inode number
-    printk(KERN_ERR "\npar=%p, dentry=%p, iname=%s d_name.len=%d
-    dentry_name=%s",
-           dentry->d_parent, dentry, dentry->d_iname, dentry->d_name.len,
-           dentry->d_name.name); */
-
     mutex_lock(&path_buf_mutex);
     path = dentry_path_raw((struct dentry *)dentry, buf, path_buf_len);
 
     if (IS_ERR_OR_NULL(path)) {
-        print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf,
-                       sizeof(buf), 1);
+        print_hex_dump(
+            KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf), 1);
 
         mutex_unlock(&path_buf_mutex);
         return 1;
     }
 
-    list_for_each_entry(curr_entry, watchlist_ptr, list)
+    list_for_each_entry(curr_entry, &nexus_volumes_head, list)
     {
         if (startsWith(curr_entry->afs_path, path) && dest) {
             len = strlen(path);
 
-            total_len = afs_prefix_len + len;
-            result = kmalloc(total_len + 1, GFP_KERNEL);
-            memcpy(result, afs_prefix, afs_prefix_len);
-            memcpy(result + afs_prefix_len, path, len);
+            total_len = AFS_PREFIX_LEN + len;
+            result    = kmalloc(total_len + 1, GFP_KERNEL);
+            memcpy(result, AFS_PREFIX, AFS_PREFIX_LEN);
+            memcpy(result + AFS_PREFIX_LEN, path, len);
             result[total_len] = '\0';
-            *dest = result;
+            *dest             = result;
 
             mutex_unlock(&path_buf_mutex);
             return 0;
@@ -164,7 +139,7 @@ nexus_dentry_path(const struct dentry * dentry, char ** dest)
 int
 nexus_vnode_path(const struct vcache * avc, char ** dest)
 {
-    int ret = -1;
+    int             ret = -1;
     struct dentry * dentry;
 
     if (avc == NULL || vnode_type(avc) == NEXUS_ANY) {
@@ -184,11 +159,11 @@ nexus_vnode_path(const struct vcache * avc, char ** dest)
 void
 nexus_kern_ping(void)
 {
-    static int num = 0;
-    int err, code;
-    XDR xdrs;
-    reply_data_t * reply = NULL;
-    caddr_t payload;
+    static int             num = 0;
+    int                    err, code;
+    XDR                    xdrs;
+    struct nx_daemon_rsp * reply = NULL;
+    caddr_t                payload;
 
     if ((payload = READPTR_TRYLOCK()) == 0) {
         return;
@@ -215,4 +190,3 @@ out:
         kfree(reply);
     }
 }
-

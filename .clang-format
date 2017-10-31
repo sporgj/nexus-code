@@ -4,6 +4,8 @@
     ColumnLimit: "80",
     AlwaysBreakAfterReturnType: "TopLevel",
     AlignAfterOpenBracket: "Align",
-    BinPackParameters: "false"
-    AlignConsecutiveDeclarations: "false"
+    BinPackParameters: "false",
+    BinPackArguments: "false",
+    AlignConsecutiveDeclarations: "true",
+    AlignConsecutiveAssignments: "true"
 }

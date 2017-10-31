@@ -6,13 +6,13 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "nexus_mod: " fmt, ##args)
 
-static struct nexus_mod   nexus_device;
-struct nexus_mod        * dev = &nexus_device;
+static struct nexus_mod nexus_device;
+struct nexus_mod *      dev = &nexus_device;
 
 /* major & minor numbers for our modules */
-static int nx_mod_major            = 0;
-static int nx_mod_minor            = 0;
-static int uc_mod_devno            = 0;
+static int nx_mod_major = 0;
+static int nx_mod_minor = 0;
+static int uc_mod_devno = 0;
 
 static int nexus_module_is_mounted = 0;
 
@@ -22,55 +22,47 @@ DEFINE_MUTEX(xfer_buffer_mutex);
 DEFINE_MUTEX(message_counter_mutex);
 
 static int
-nexus_open(struct inode * inode,
-	   struct file  * fp)
+nexus_open(struct inode * inode, struct file * fp)
 {
     unsigned long flags    = 0;
     int           acquired = 0;
-    
-    spin_lock_irqsave(&(dev->dev_lock), flags);			
+
+    spin_lock_irqsave(&(dev->dev_lock), flags);
     {
-	if (dev->daemon == NULL) {
-	    dev->daemon      = current;
-	    fp->private_data = dev;
-	    acquired         = 1;
-	} 	
+        if (dev->daemon == NULL) {
+            dev->daemon      = current;
+            fp->private_data = dev;
+            acquired         = 1;
+        }
     }
     spin_unlock_irqrestore(&(dev->dev_lock), flags);
 
     if (acquired == 0) {
-	return -EBUSY;
+        return -EBUSY;
     }
 
     return 0;
 }
 
 static int
-nexus_release(struct inode * inode,
-	      struct file  * fp)
+nexus_release(struct inode * inode, struct file * fp)
 {
     /* grab the lock, reset all variables */
     unsigned long flags = 0;
 
-    clear_watchlist();
+    nexus_clear_volume_list();
 
-    spin_lock_irqsave(&(dev->dev_lock), flags);			
+    spin_lock_irqsave(&(dev->dev_lock), flags);
     {
-	dev->daemon = NULL;
+        dev->daemon = NULL;
     }
     spin_unlock_irqrestore(&(dev->dev_lock), flags);
 
-    
     return 0;
 }
 
-
-
 static ssize_t
-nexus_read(struct file * fp,
-	     char __user * buf,
-	     size_t        count,
-	     loff_t      * f_pos)
+nexus_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 {
     size_t len;
 
@@ -94,18 +86,17 @@ nexus_read(struct file * fp,
     if (dev->outb_len == dev->outb_sent) {
 
         dev->outb_len  = 0;
-	dev->outb_sent = 0;
-
+        dev->outb_sent = 0;
     }
 
     return len;
 }
 
 static ssize_t
-nexus_write(struct file       * fp,
-              const char __user * buf,
-              size_t              count,
-              loff_t            * f_pos)
+nexus_write(struct file * fp,
+            const char __user * buf,
+            size_t              count,
+            loff_t *            f_pos)
 {
     /* copy the message in full */
     if (copy_from_user(dev->inb, buf, count)) {
@@ -121,46 +112,45 @@ nexus_write(struct file       * fp,
 }
 
 static long
-nexus_ioctl(struct file   * filp,
-	      unsigned int    cmd,
-	      unsigned long   arg)
+nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
 {
-    char * path = NULL;
-    int    err  = 0;
-    int    len  = 0;
+    int    err     = 0;
+    size_t pathlen = 0;
+    char * path    = NULL;
 
     if (_IOC_TYPE(cmd) != NEXUS_IOC_MAGIC) {
         return -ENOTTY;
     }
 
-    if (_IOC_NR(cmd)    > NEXUS_IOC_MAXNR) {
+    if (_IOC_NR(cmd) > NEXUS_IOC_MAXNR) {
         return -ENOTTY;
     }
 
     switch (cmd) {
     case IOCTL_ADD_PATH:
+        /* copy the path len */
+        if (copy_from_user(&pathlen, (size_t *)arg, sizeof(size_t))) {
+            ERROR("copy_from_user FAILED\n");
+            return -EFAULT;
+        }
 
-	len  = strlen_user((char *)arg);
-        path = (char *)kmalloc(len + 1, GFP_KERNEL);
-
-	printk(KERN_WARNING "Unsafe string handling in Nexus IOCTL\n"); 
-	dump_stack();
-	
-
+        /* allocate the path for the buffer */
+        path = (char *)kzalloc(pathlen + 1, GFP_KERNEL);
         if (path == NULL) {
             ERROR("allocation error");
             return -ENOMEM;
         }
 
-        if (copy_from_user(path, (char *)arg, len)) {
+        /* copy the string from userspace */
+        if (copy_from_user(path, (char *)arg, pathlen)) {
             ERROR("copy_from_user failed\n");
             return -EFAULT;
         }
 
-        path[len] = '\0';
+        path[pathlen] = '\0';
         printk(KERN_INFO "path: %s\n", path);
 
-        if (add_path_to_watchlist(path)) {
+        if (nexus_add_volume(path)) {
             ERROR("adding '%s' FAILED\n", path);
             err = -1;
         }
@@ -169,7 +159,7 @@ nexus_ioctl(struct file   * filp,
         break;
 
     case IOCTL_MMAP_SIZE:
-	
+
         if (copy_to_user((char *)arg, &dev->xfer_len, sizeof(dev->xfer_len))) {
             ERROR("sending mmap order FAILED\n");
             err = -1;
@@ -184,10 +174,9 @@ nexus_ioctl(struct file   * filp,
 }
 
 static int
-nexus_mmap_fault(struct vm_area_struct * vma,
-		 struct vm_fault       * fault_info)
+nexus_mmap_fault(struct vm_area_struct * vma, struct vm_fault * fault_info)
 {
-    char        * addr  = NULL;
+    char *        addr  = NULL;
     struct page * page  = NULL;
     pgoff_t       index = fault_info->pgoff;
 
@@ -199,16 +188,18 @@ nexus_mmap_fault(struct vm_area_struct * vma,
     /* convert the address to a page */
     addr = dev->xfer_buffer + (index << PAGE_SHIFT);
     page = virt_to_page(addr);
-    
+
+    /*
     ERROR("nexus_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
           (int)index, addr, (int)current->pid, current->comm,
           fault_info->virtual_address, page);
+          */
 
     if (!page) {
         return VM_FAULT_SIGBUS;
     }
 
-    //get_page(page);
+    // get_page(page);
     fault_info->page = page;
 
 #if 0
@@ -232,29 +223,26 @@ nexus_mmap_fault(struct vm_area_struct * vma,
     return 0;
 }
 
-static struct vm_operations_struct mmap_ops = {
-    .fault = nexus_mmap_fault
-};
+static struct vm_operations_struct mmap_ops = {.fault = nexus_mmap_fault };
 
 static int
-nexus_mmap(struct file           * filp,
-	     struct vm_area_struct * vma)
+nexus_mmap(struct file * filp, struct vm_area_struct * vma)
 {
-    struct page   * page      = NULL;
-    unsigned long   user_addr = vma->vm_start;
+    struct page * page      = NULL;
+    unsigned long user_addr = vma->vm_start;
 
-    int err  = 0;
-    int i    = 0;
+    int err = 0;
+    int i   = 0;
 
-    vma->vm_ops           = &mmap_ops;
-    vma->vm_flags        |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
-    vma->vm_private_data  = filp->private_data;
+    vma->vm_ops = &mmap_ops;
+    vma->vm_flags |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
+    vma->vm_private_data = filp->private_data;
 
     for (i = 0; i < dev->xfer_pages; i++) {
 
-	page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
+        page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
         err  = vm_insert_page(vma, user_addr, page);
-	
+
         if (err) {
             ERROR("mmap error (%d)\n", err);
             return err;
@@ -266,23 +254,18 @@ nexus_mmap(struct file           * filp,
     return 0;
 }
 
-static struct file_operations nexus_mod_fops = {
-    .owner          = THIS_MODULE,
-    .unlocked_ioctl = nexus_ioctl,
-    .open           = nexus_open,
-    .release        = nexus_release,
-    .mmap           = nexus_mmap,
-    .write          = nexus_write,
-    .read           = nexus_read
-};
-
-
+static struct file_operations nexus_mod_fops = {.owner          = THIS_MODULE,
+                                                .unlocked_ioctl = nexus_ioctl,
+                                                .open           = nexus_open,
+                                                .release        = nexus_release,
+                                                .mmap           = nexus_mmap,
+                                                .write          = nexus_write,
+                                                .read           = nexus_read };
 
 static int
-proc_show(struct seq_file * sf,
-	  void            * v)
+proc_show(struct seq_file * sf, void * v)
 {
-    watch_path_t * curr;
+    struct nexus_volume_path * curr;
 
     if (dev->daemon == NULL) {
         seq_printf(sf, "daemon offline :(\n");
@@ -293,8 +276,7 @@ proc_show(struct seq_file * sf,
     seq_printf(sf, "outb=%zu, inb=%zu\n", dev->outb_len, dev->inb_len);
 
     seq_printf(sf, "paths:\n");
-
-    list_for_each_entry(curr, watchlist_ptr, list)
+    list_for_each_entry(curr, &nexus_volumes_head, list)
     {
         seq_printf(sf, "%s\n", curr->afs_path);
     }
@@ -303,51 +285,45 @@ proc_show(struct seq_file * sf,
 }
 
 static int
-proc_open(struct inode * inode,
-	     struct file  * file)
+proc_open(struct inode * inode, struct file * file)
 {
     return single_open(file, proc_show, NULL);
 }
 
-static struct file_operations nexus_proc_fops = {
-    .open    = proc_open,
-    .read    = seq_read,
-    .llseek  = seq_lseek,
-    .release = single_release
-};
+static struct file_operations nexus_proc_fops = {.open    = proc_open,
+                                                 .read    = seq_read,
+                                                 .llseek  = seq_lseek,
+                                                 .release = single_release };
 
 /**
- * hold dev->send_mut
+ * hold dev->send_mutex
  */
 int
-nexus_mod_send(afs_op_type_t    type,
-               XDR            * xdrs,
-               reply_data_t  ** pp_reply,
-               int            * p_err)
+nexus_mod_send(afs_op_type_t           type,
+               XDR *                   xdrs,
+               struct nx_daemon_rsp ** pp_reply,
+               int *                   p_err)
 {
-    reply_data_t * p_reply     = NULL;
-    struct afs_op_msg  * msg_out     = NULL;
-    struct afs_op_msg  * msg_in      = NULL; 
-    size_t         payload_len = (xdrs->x_private - xdrs->x_base);
+    int                    err         = -1;
+    struct nx_daemon_rsp * p_reply     = NULL;
+    struct afs_op_msg *    msg_out     = NULL;
+    struct afs_op_msg *    msg_in      = NULL;
+    size_t                 payload_len = (xdrs->x_private - xdrs->x_base);
+    size_t                 inbound_len;
 
-    int            err = -1;
-
-    
     if (NEXUS_IS_OFFLINE) {
         READPTR_UNLOCK();
         return -1;
     }
 
-    /* write the message to the buffer */
-    msg_out           = (struct afs_op_msg *)dev->outb;
-    msg_out->type     = type;
-    msg_out->msg_id   = ucrpc__genid();
-    msg_out->len      = payload_len;
+    /* write the message to the outbuffer buffer */
+    msg_out         = (struct afs_op_msg *)dev->outb;
+    msg_out->type   = type;
+    msg_out->msg_id = ucrpc__genid();
+    msg_out->len    = payload_len;
 
-    dev->outb_len     = AFS_OP_MSG_SIZE(msg_out);
+    dev->outb_len = AFS_OP_MSG_SIZE(msg_out);
 
-
-    
     /* now, lets wait for the response */
     while (1) {
 
@@ -361,7 +337,7 @@ nexus_mod_send(afs_op_type_t    type,
         wake_up_interruptible(&dev->outq);
         /* sleep the kernel thread */
 
-	prepare_to_wait(&dev->msgq, &wait, TASK_INTERRUPTIBLE);
+        prepare_to_wait(&dev->msgq, &wait, TASK_INTERRUPTIBLE);
 
         /* the buffer is "empty", nothing to read */
         if (dev->inb_len == 0) {
@@ -370,39 +346,39 @@ nexus_mod_send(afs_op_type_t    type,
 
         finish_wait(&dev->msgq, &wait);
 
-        msg_in = (struct afs_op_msg *)(dev->inb);
+        msg_in      = (struct afs_op_msg *)(dev->inb);
+        inbound_len = AFS_OP_MSG_SIZE(msg_in);
 
+        // XXX: the following lines are redundant as the lock ensures that
+        // messages cannot
+        // be interleaved. Remove this?
+        /* JRL: Still an old reply? */
+        if (msg_in->ack_id != msg_out->msg_id) {
+            continue;
+        }
 
-	/* JRL: Still an old reply? */
-	if (msg_in->ack_id != msg_out->msg_id) {
-	    continue;
-	}
+        dev->inb_len -= inbound_len;
 
-	dev->inb_len -= AFS_OP_MSG_SIZE(msg_in);
+        /* allocate the response data */
+        p_reply = kmalloc(inbound_len, GFP_KERNEL);
+        if (p_reply == NULL) {
+            *p_err    = msg_in->status;
+            *pp_reply = NULL;
 
-	/* allocate the response data */
-	p_reply       = kmalloc((sizeof(reply_data_t) + msg_in->len), GFP_KERNEL);
-	
-	if (p_reply == NULL) {
-	    
-	    *p_err    = msg_in->status;
-	    *pp_reply = NULL;
-	    
-	    ERROR("allocation error\n");
-	    
-	    goto out;
-	}
-	
-	/* instantiate everything */
-	memcpy(p_reply->data, msg_in->payload, msg_in->len);
+            ERROR("allocation error\n");
 
-	xdrmem_create(&p_reply->xdrs, p_reply->data, msg_in->len, XDR_DECODE);
-	
-	*p_err    = msg_in->status;
-	*pp_reply = p_reply;
-	err       = 0;
-	
-	break;
+            goto out;
+        }
+
+        /* copy the XDR raw data and decode the fields */
+        memcpy(p_reply->data, msg_in->payload, msg_in->len);
+        xdrmem_create(&p_reply->xdrs, p_reply->data, msg_in->len, XDR_DECODE);
+
+        *p_err    = msg_in->status;
+        *pp_reply = p_reply;
+        err       = 0;
+
+        break;
     }
 
 out:
@@ -440,13 +416,12 @@ nexus_mod_init(void)
 
     mutex_init(&(dev->send_mutex));
     spin_lock_init(&(dev->dev_lock));
-    
+
     // FIXME dev-outb != NULL?
     dev->outb = NXMOD_BUFFER_ALLOC();
     dev->inb  = NXMOD_BUFFER_ALLOC();
 
-    if ( (dev->outb == NULL) ||
-	 (dev->inb  == NULL) ) {
+    if ((dev->outb == NULL) || (dev->inb == NULL)) {
         ERROR("allocating buffers failed\n");
         return -1;
     }
@@ -464,13 +439,13 @@ nexus_mod_init(void)
     }
 
     dev->xfer_order = (order);
-    dev->xfer_pages = (1               << order);
+    dev->xfer_pages = (1 << order);
     dev->xfer_len   = (dev->xfer_pages << PAGE_SHIFT);
 
     dev->buffersize = NXMOD_BUFFER_SIZE;
     dev->inb_len    = 0;
     dev->outb_len   = 0;
-    
+
     for (i = 0; i < dev->xfer_pages; i++) {
         page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
         get_page(page);
@@ -481,7 +456,7 @@ nexus_mod_init(void)
     /* lets setup the character device */
     nx_mod_major = MAJOR(uc_mod_devno);
     nx_mod_minor = MINOR(uc_mod_devno);
-    
+
     cdev_init(&dev->cdev, &nexus_mod_fops);
 
     dev->cdev.owner = THIS_MODULE;
@@ -499,11 +474,11 @@ nexus_mod_init(void)
     printk(KERN_INFO
            "nexus_mod: mounted (%d,%d), xfer: %zuB [%p - %p] %d pages\n",
            nx_mod_major,
-	   nx_mod_minor,
-	   dev->xfer_len,
-	   dev->xfer_buffer,
+           nx_mod_minor,
+           dev->xfer_len,
+           dev->xfer_buffer,
            dev->xfer_buffer + dev->xfer_len,
-	   dev->xfer_pages);
+           dev->xfer_pages);
 
     /* initialize the kernel data structures */
     nexus_kern_init();

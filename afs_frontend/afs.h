@@ -22,10 +22,10 @@
 #define NEXUS_MOD_NAME      "nx_mod"
 #define NEXUS_PROC_NAME     "nx_proc"
 
-typedef struct {
-    int  len;
-    char path[0];
-} watchlist_path_t;
+struct nexus_watched_path {
+    size_t len;
+    char   path[0];
+};
 
 typedef enum {
     ACL_READ       = 0x1,

@@ -124,7 +124,7 @@ ucafs_ioctl(struct file   * filp,
 {
     char * path = NULL;
     int    err  = 0;
-    int    len  = 0;
+    size_t pathlen;
 
     if (_IOC_TYPE(cmd) != UCAFS_IOC_MAGIC) {
         return -ENOTTY;
@@ -136,28 +136,29 @@ ucafs_ioctl(struct file   * filp,
 
     switch (cmd) {
     case IOCTL_ADD_PATH:
+        /* copy the path len */
+        if (copy_from_user(&pathlen, (size_t *)arg, sizeof(size_t))) {
+            ERROR("copy_from_user FAILED\n");
+            return -EFAULT;
+        }
 
-	len  = strlen_user((char *)arg);
-        path = (char *)kmalloc(len + 1, GFP_KERNEL);
-
-	printk(KERN_WARNING "Unsafe string handling in Nexus IOCTL\n"); 
-	dump_stack();
-	
-
+        /* allocate the path for the buffer */
+        path = (char *)kzalloc(pathlen + 1, GFP_KERNEL);
         if (path == NULL) {
             ERROR("allocation error");
             return -ENOMEM;
         }
 
-        if (copy_from_user(path, (char *)arg, len)) {
+        /* copy the string from userspace */
+        if (copy_from_user(path, (char *)arg, pathlen)) {
             ERROR("copy_from_user failed\n");
             return -EFAULT;
         }
 
-        path[len] = '\0';
+        path[pathlen] = '\0';
         printk(KERN_INFO "path: %s\n", path);
 
-        if (add_path_to_watchlist(path)) {
+        if (nexus_add_volume(path)) {
             ERROR("adding '%s' FAILED\n", path);
             err = -1;
         }
@@ -166,7 +167,6 @@ ucafs_ioctl(struct file   * filp,
         break;
 
     case IOCTL_MMAP_SIZE:
-	
         if (copy_to_user((char *)arg, &dev->xfer_len, sizeof(dev->xfer_len))) {
             ERROR("sending mmap order FAILED\n");
             err = -1;

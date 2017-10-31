@@ -48,17 +48,19 @@
 #define ERROR(fmt, args...) printk(KERN_ERR "nexus: " fmt " [%s():%d]", \
 				   ##args, __func__, __LINE__)
 
+extern struct list_head nexus_volumes_head;
+
 /* the list of paths to watch for */
-typedef struct {
+struct nexus_volume_path {
     struct list_head list;
     int              path_len;
     char             afs_path[0];
-} watch_path_t;
+};
 
-extern struct list_head * watchlist_ptr;
+/** Add a new NeXUS volume to the watchlist */
+int nexus_add_volume(const char * path);
 
-int add_path_to_watchlist(const char * path);
-void clear_watchlist(void);
+void nexus_clear_volume_list(void);
 
 /* We should probably get rid of this, since there is only one. */
 
@@ -116,7 +118,7 @@ ucrpc__genid(void)
 }
 
 /* Is that what this thing is?? */
-struct rpc_context {
+struct kern_xfer_context {
     int              id;
     int              xfer_size;
     int              offset;
@@ -130,23 +132,19 @@ struct rpc_context {
 
 
 /* TODO: Remove these */
-typedef struct rpc_context store_context_t;
-typedef struct rpc_context fetch_context_t;
+typedef struct kern_xfer_context fetch_context_t;
 
 /* reply data from the wire */
-struct reply_data {
+struct nx_daemon_rsp {
     XDR  xdrs;
     char data[0];
 };
-
-/* TODO: Remove this */
-typedef struct reply_data reply_data_t;
 
 /* the name function to send data */
 int
 nexus_mod_send(afs_op_type_t   type,
                XDR           * xdrs,
-               reply_data_t ** pp_rsp,
+               struct nx_daemon_rsp ** pp_rsp,
                int           * p_code);
 
 

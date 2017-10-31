@@ -6,19 +6,19 @@
 #define ERROR(fmt, args...) printk(KERN_ERR "nexus_fetch: " fmt, ##args)
 
 static int
-nexus_fetch_init(fetch_context_t * context,
-                 struct vcache   * avc,
-                 int               offset,
-                 int               size)
+nexus_fetch_init(struct kern_xfer_context * context,
+                 struct vcache *            avc,
+                 int                        offset,
+                 int                        size)
 {
-    int            ret       = -1;
-    int            code      =  0;
-    XDR            xdrs;
-    XDR          * x_data    = NULL;
-    caddr_t        buf_ptr;
-    reply_data_t * reply     = NULL;
-    xfer_req_t     xfer_req;
-    xfer_rsp_t     xfer_rsp;
+    int                    ret  = -1;
+    int                    code = 0;
+    XDR                    xdrs;
+    XDR *                  x_data = NULL;
+    caddr_t                buf_ptr;
+    struct nx_daemon_rsp * reply = NULL;
+    xfer_req_t             xfer_req;
+    xfer_rsp_t             xfer_rsp;
 
     buf_ptr = READPTR_LOCK();
 
@@ -31,11 +31,11 @@ nexus_fetch_init(fetch_context_t * context,
     xfer_req = (xfer_req_t){.op        = NEXUS_FETCH,
                             .xfer_size = size,
                             .offset    = offset,
-                            .file_size = context->total_size};
+                            .file_size = context->total_size };
 
-
-    if ( (xdr_opaque(&xdrs, (caddr_t)&xfer_req,      sizeof(xfer_req_t)) == FALSE) ||
-	 (xdr_string(&xdrs, (char **)&context->path, NEXUS_PATH_MAX)     == FALSE) ) {
+    if ((xdr_opaque(&xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t)) == FALSE)
+        || (xdr_string(&xdrs, (char **)&context->path, NEXUS_PATH_MAX)
+            == FALSE)) {
 
         READPTR_UNLOCK();
         ERROR("daemon_init xdr encoding failed\n");
@@ -46,8 +46,10 @@ nexus_fetch_init(fetch_context_t * context,
     ret = nexus_mod_send(AFS_OP_DECRYPT_START, &xdrs, &reply, &code);
 
     if (ret || code) {
-        ERROR("fetch_init fail for %s (start=%d, size=%d)\n", context->path,
-              offset, size);
+        ERROR("fetch_init fail for %s (start=%d, size=%d)\n",
+              context->path,
+              offset,
+              size);
         goto out;
     }
 
@@ -78,17 +80,16 @@ out:
 }
 
 static int
-nexus_fetch_exit(fetch_context_t * context,
-		 int               error)
+nexus_fetch_exit(struct kern_xfer_context * context, int error)
 {
-    XDR            xdrs;
-    reply_data_t * reply   = NULL;
+    XDR                    xdrs;
+    struct nx_daemon_rsp * reply = NULL;
 
-    caddr_t        buf_ptr = 0;
-    size_t         buflen  = 0;
- 
-    int            ret     = -1;
-    int            code    =  0;
+    caddr_t buf_ptr = 0;
+    size_t  buflen  = 0;
+
+    int ret  = -1;
+    int code = 0;
 
     if (context->id == -1) {
         return -1;
@@ -104,17 +105,17 @@ nexus_fetch_exit(fetch_context_t * context,
     buflen = READPTR_BUFLEN();
 
     xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
-    
-    if ((xdr_int(&xdrs, &context->id) == FALSE) &&
-	(xdr_int(&xdrs, &error)       == FALSE) ) {
 
-	READPTR_UNLOCK();
+    if ((xdr_int(&xdrs, &context->id) == FALSE)
+        && (xdr_int(&xdrs, &error) == FALSE)) {
+
+        READPTR_UNLOCK();
         ERROR("could not parse xdr response\n");
         goto next_op;
     }
 
     ret = nexus_mod_send(AFS_OP_DECRYPT_STOP, &xdrs, &reply, &code);
-    
+
     if (ret || code) {
         ERROR("could not get response from uspace\n");
         goto next_op;
@@ -129,10 +130,10 @@ next_op:
 }
 
 static int
-nexus_fetch_write(struct osi_file * fp,
-                  caddr_t           buf,
-                  int               bytes_left,
-                  int             * byteswritten)
+nexus_fetch_write_chunk_file(struct osi_file * fp,
+                             caddr_t           buf,
+                             int               bytes_left,
+                             int *             byteswritten)
 {
     afs_int32 nbytes = 0;
     afs_int32 size   = 0;
@@ -144,14 +145,14 @@ nexus_fetch_write(struct osi_file * fp,
         size = MIN(MAX_FSERV_SIZE, bytes_left);
 
         nbytes = afs_osi_Write(fp, -1, buf, size);
-	
+
         if (nbytes != size) {
             ERROR("nbytes=%d, size=%d\n", nbytes, size);
             goto out;
         }
 
-        buf           += size;
-        bytes_left    -= size;
+        buf += size;
+        bytes_left -= size;
         *byteswritten += size;
     }
 
@@ -160,16 +161,16 @@ out:
 }
 
 static int
-nexus_fetch_read(fetch_context_t * context,
-                 caddr_t           buf,
-                 int               bytes_left,
-                 int             * byteswritten)
+nexus_fetch_read_from_fserver(struct kern_xfer_context * context,
+                              caddr_t                    buf,
+                              int                        bytes_left,
+                              int *                      byteswritten)
 {
     struct rx_call * afs_call = context->afs_call;
     afs_int32        nbytes   = 0;
     afs_int32        size     = 0;
     int              ret      = 0;
-    
+
     *byteswritten = 0;
 
     /* send the data to the server */
@@ -184,9 +185,9 @@ nexus_fetch_read(fetch_context_t * context,
             goto out;
         }
 
-         buf           += size;
-         bytes_left    -= size;
-        *byteswritten  += size;
+        buf += size;
+        bytes_left -= size;
+        *byteswritten += size;
     }
 
 out:
@@ -195,33 +196,33 @@ out:
 }
 
 static int
-nexus_fetch_xfer(fetch_context_t * context,
-                 struct dcache   * adc,
-                 struct osi_file * fp,
-                 int               pos,
-                 int               bytes_left,
-                 int             * xferred)
+nexus_fetch_xfer(struct kern_xfer_context * context,
+                 struct dcache *            adc,
+                 struct osi_file *          fp,
+                 int                        pos,
+                 int                        bytes_left,
+                 int *                      xferred)
 {
-    caddr_t        buf_ptr = NULL;
-    reply_data_t * reply   = NULL;
-    XDR            xdrs;
+    caddr_t                buf_ptr = NULL;
+    struct nx_daemon_rsp * reply   = NULL;
+    XDR                    xdrs;
 
-    int            nbytes  = 0;
-    int            size    = 0;
-    int            code    = 0;
+    int nbytes = 0;
+    int size   = 0;
+    int code   = 0;
 
     int ret = -1;
 
-    
     *xferred = 0;
 
     while (bytes_left > 0) {
 
-	size = MIN(bytes_left, context->buflen);
+        size = MIN(bytes_left, context->buflen);
 
         // read from the server
-        // mutex_lock_interruptible(&xfer_buffer_mutex);
-        if (nexus_fetch_read(context, context->buffer, size, &nbytes)) {
+        mutex_lock_interruptible(&xfer_buffer_mutex);
+        if (nexus_fetch_read_from_fserver(
+                context, context->buffer, size, &nbytes)) {
             goto out;
         }
 
@@ -231,9 +232,9 @@ nexus_fetch_xfer(fetch_context_t * context,
 
         /* tell userspace to encrypt */
         xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
-	
-        if ((xdr_int(&xdrs, &context->id) == FALSE) ||
-	    (xdr_int(&xdrs, &size)        == FALSE) ) {
+
+        if ((xdr_int(&xdrs, &context->id) == FALSE)
+            || (xdr_int(&xdrs, &size) == FALSE)) {
 
             READPTR_UNLOCK();
             ERROR("xdr fetch_data failed\n");
@@ -242,30 +243,29 @@ nexus_fetch_xfer(fetch_context_t * context,
         }
 
         ret = nexus_mod_send(AFS_OP_DECRYPT_READY, &xdrs, &reply, &code);
-	
+
         if (ret || code) {
             ERROR("nexus_xfer code=%d, ret=%d\n", ret, code);
             goto out;
         }
-        
 
         kfree(reply);
         reply = NULL;
 
         /* move our pointers and copy the data into the tdc file */
-        if (nexus_fetch_write(fp, context->buffer, size, &nbytes)) {
+        if (nexus_fetch_write_chunk_file(fp, context->buffer, size, &nbytes)) {
             goto out;
         }
 
-        // mutex_unlock(&xfer_buffer_mutex);
+        mutex_unlock(&xfer_buffer_mutex);
 
-         pos          += size;
-         bytes_left   -= size;
-        *xferred      += size;
+        pos += size;
+        bytes_left -= size;
+        *xferred += size;
 
         adc->validPos = pos;
 
-	afs_osi_Wakeup(&adc->validPos);
+        afs_osi_Wakeup(&adc->validPos);
     }
 
     ret = 0;
@@ -274,33 +274,30 @@ out:
         kfree(reply);
     }
 
-    /*
     if (mutex_is_locked(&xfer_buffer_mutex)) {
         mutex_unlock(&xfer_buffer_mutex);
     }
-    */
 
     return ret;
 }
 
 int
-nexus_kern_fetch(struct afs_conn      * tc,
+nexus_kern_fetch(struct afs_conn *      tc,
                  struct rx_connection * rxconn,
-                 struct osi_file      * fp,
+                 struct osi_file *      fp,
                  afs_size_t             base,
-                 struct dcache        * adc,
-                 struct vcache        * avc,
+                 struct dcache *        adc,
+                 struct vcache *        avc,
                  afs_int32              size,
-                 struct rx_call       * acall,
-                 char                 * path)
+                 struct rx_call *       acall,
+                 char *                 path)
 {
-    fetch_context_t context;
+    struct kern_xfer_context context;
 
-    int nbytes =  0;
+    int nbytes = 0;
     int ret    = -1;
-    
-    
-    memset(&context, 0, sizeof(fetch_context_t));
+
+    memset(&context, 0, sizeof(struct kern_xfer_context));
 
     context.id         = -1;
     context.path       = path;
@@ -327,7 +324,7 @@ nexus_kern_fetch(struct afs_conn      * tc,
 
     ret = 0;
 
- out:
+out:
     nexus_fetch_exit(&context, ret);
     // TODO if the userspace returns an error, erase the tdc contents
     return ret;
