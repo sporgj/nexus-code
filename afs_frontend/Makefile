@@ -1,7 +1,7 @@
 
 
 INCLUDES := -I../libnexus
-CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
+CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
 
 CC = gcc
 AR = ar

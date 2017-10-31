@@ -37,10 +37,6 @@
 #define NXMOD_XFER_ORDER      5
 #define NEXUS_XFER_SIZE       (PAGE_SIZE << NXMOD_XFER_ORDER)
 
-/* for the transfer buffers */
-#define NEXUS_DATA_BUFPAGES (1)
-#define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
-
 #define FALSE 0
 #define TRUE 1
 

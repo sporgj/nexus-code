@@ -332,41 +332,6 @@ out:
 }
 
 int
-rpc_checkacl(XDR * xdrs,
-	     XDR * xdr_out)
-{
-    struct nexus_fs_acl rights;
-    char         * path     = NULL;
-
-    int ret    = -1;
-    int is_dir =  0;
-    int code   =  0;
-
-    
-    if ( (xdr_string(xdrs, &path, NEXUS_PATH_MAX) == FALSE) ||
-	 (xdr_int(xdrs, (int *)(&rights))         == FALSE) ||
-	 (xdr_int(xdrs, &is_dir)                  == FALSE) ) {
-        log_error("xdr storeacl failed\n");
-        goto out;
-    }
-
-    code = dirops_checkacl(path, rights, is_dir);
-
-    if (xdr_int(xdr_out, &code) == FALSE) {
-        log_error("xdr checkacl failed\n");
-        goto out;
-    }
-
-    ret = 0;
-out:
-    if (path) {
-        free(path);
-    }
-
-    return ret;
-}
-
-int
 rpc_xfer_init(XDR * xdrs,
 	      XDR * xdr_out)
 {

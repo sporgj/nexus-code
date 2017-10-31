@@ -1,11 +1,16 @@
 #pragma once
 
+
 /**
  * defines the data structures common across nexus
- * DO NOT INCLUDE any file from libc here.
  *
  * @author Judicael <jbriand@cs.pitt.edu>
  */
+
+#if !defined(KERNEL)
+#include <stdlib.h>
+#include <stdint.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +47,7 @@ typedef enum {
 } nexus_fs_obj_type_t;
 
 // clang-format off
-#define FSTYPE_STR(t)                                                         \
+#define FSTYPE_STR(t)\
     (t == NEXUS_FILE ? "F" :\
      (t == NEXUS_DIR ? "D" :\
       (t == NEXUS_LINK ? "L" : "A")))
@@ -149,9 +154,6 @@ dirops_move(const char * from_dir,
 
 int
 dirops_setacl(const char * path, const char * acl);
-
-int
-dirops_checkacl(const char * path, struct nexus_fs_acl rights, int is_dir);
 #ifdef __cplusplus
 }
 #endif

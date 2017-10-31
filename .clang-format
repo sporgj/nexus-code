@@ -7,5 +7,7 @@
     BinPackParameters: "false",
     BinPackArguments: "false",
     AlignConsecutiveDeclarations: "true",
-    AlignConsecutiveAssignments: "true"
+    AlignConsecutiveAssignments: "true",
+    AlignOperands: "true",
+    AlignTrailingComments: "true"
 }

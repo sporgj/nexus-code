@@ -19,8 +19,12 @@
 #define IOCTL_MMAP_SIZE _IOR(NEXUS_IOC_MAGIC, 2, int *)
 #define NEXUS_IOC_MAXNR 2
 
-#define NEXUS_MOD_NAME      "nx_mod"
-#define NEXUS_PROC_NAME     "nx_proc"
+#define NEXUS_MOD_NAME      "nexus_mod"
+#define NEXUS_PROC_NAME     "nexus_proc"
+
+/* for the transfer buffers */
+#define NEXUS_DATA_BUFPAGES (1)
+#define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
 
 struct nexus_watched_path {
     size_t len;
