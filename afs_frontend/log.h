@@ -9,7 +9,6 @@
 #define DEBUG
 
 #define log_error(fmt, ...) fprintf(stderr, "error> %s(%d): " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
-#define log_info(fmt, ...) fprintf(stdout, "info> %s(%d): " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 
 #ifdef DEBUG
 #define log_debug(fmt, ...) fprintf(stderr, "debug> " fmt "\n", ##__VA_ARGS__)

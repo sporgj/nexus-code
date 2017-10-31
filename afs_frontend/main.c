@@ -84,7 +84,7 @@ send_nexus_volume_paths(int fno)
             return -1;
         }
 
-        log_info("Added: %s", path);
+        log_debug("Added: %s", path);
         free(nx_path);
     }
 
