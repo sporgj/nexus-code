@@ -21,7 +21,8 @@ DEFINE_MUTEX(xfer_buffer_mutex);
 DEFINE_MUTEX(message_counter_mutex);
 
 static int
-nexus_open(struct inode * inode, struct file * fp)
+nexus_open(struct inode * inode,
+	   struct file  * fp)
 {
     unsigned long flags    = 0;
     int           acquired = 0;
@@ -44,7 +45,8 @@ nexus_open(struct inode * inode, struct file * fp)
 }
 
 static int
-nexus_release(struct inode * inode, struct file * fp)
+nexus_release(struct inode * inode,
+	      struct file  * fp)
 {
     /* grab the lock, reset all variables */
     unsigned long flags = 0;
@@ -61,7 +63,10 @@ nexus_release(struct inode * inode, struct file * fp)
 }
 
 static ssize_t
-nexus_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
+nexus_read(struct file * fp,
+	   char __user * buf,
+	   size_t        count,
+	   loff_t      * f_pos)
 {
     size_t len;
 
@@ -92,7 +97,7 @@ nexus_read(struct file * fp, char __user * buf, size_t count, loff_t * f_pos)
 }
 
 static ssize_t
-nexus_write(struct file * fp,
+nexus_write(struct file       * fp,
             const char __user * buf,
             size_t              count,
             loff_t *            f_pos)
@@ -111,11 +116,13 @@ nexus_write(struct file * fp,
 }
 
 static long
-nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
+nexus_ioctl(struct file    * filp,
+	    unsigned int     cmd,
+	    unsigned long    arg)
 {
-    int    err     = 0;
-    size_t pathlen = 0;
-    char * path    = NULL;
+    int      err     = 0;
+    size_t   pathlen = 0;
+    char   * path    = NULL;
 
     if (_IOC_TYPE(cmd) != NEXUS_IOC_MAGIC) {
         return -ENOTTY;
@@ -173,9 +180,10 @@ nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
 }
 
 static int
-nexus_mmap_fault(struct vm_area_struct * vma, struct vm_fault * fault_info)
+nexus_mmap_fault(struct vm_area_struct * vma,
+		 struct vm_fault       * fault_info)
 {
-    char *        addr  = NULL;
+    char        * addr  = NULL;
     struct page * page  = NULL;
     pgoff_t       index = fault_info->pgoff;
 
@@ -222,20 +230,23 @@ nexus_mmap_fault(struct vm_area_struct * vma, struct vm_fault * fault_info)
     return 0;
 }
 
-static struct vm_operations_struct mmap_ops = {.fault = nexus_mmap_fault };
+static struct vm_operations_struct mmap_ops = {
+    .fault = nexus_mmap_fault
+};
 
 static int
-nexus_mmap(struct file * filp, struct vm_area_struct * vma)
+nexus_mmap(struct file           * filp,
+	   struct vm_area_struct * vma)
 {
-    struct page * page      = NULL;
-    unsigned long user_addr = vma->vm_start;
+    struct page   * page      = NULL;
+    unsigned long   user_addr = vma->vm_start;
 
     int err = 0;
     int i   = 0;
 
-    vma->vm_ops = &mmap_ops;
-    vma->vm_flags |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
-    vma->vm_private_data = filp->private_data;
+    vma->vm_ops           = &mmap_ops;
+    vma->vm_flags        |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
+    vma->vm_private_data  = filp->private_data;
 
     for (i = 0; i < dev->xfer_pages; i++) {
 
@@ -253,16 +264,19 @@ nexus_mmap(struct file * filp, struct vm_area_struct * vma)
     return 0;
 }
 
-static struct file_operations nexus_mod_fops = {.owner          = THIS_MODULE,
-                                                .unlocked_ioctl = nexus_ioctl,
-                                                .open           = nexus_open,
-                                                .release        = nexus_release,
-                                                .mmap           = nexus_mmap,
-                                                .write          = nexus_write,
-                                                .read           = nexus_read };
+static struct file_operations nexus_mod_fops = {
+    .owner          = THIS_MODULE,
+    .unlocked_ioctl = nexus_ioctl,
+    .open           = nexus_open,
+    .release        = nexus_release,
+    .mmap           = nexus_mmap,
+    .write          = nexus_write,
+    .read           = nexus_read
+};
 
 static int
-proc_show(struct seq_file * sf, void * v)
+proc_show(struct seq_file * sf,
+	  void            * v)
 {
     struct nexus_volume_path * curr;
 
@@ -284,32 +298,38 @@ proc_show(struct seq_file * sf, void * v)
 }
 
 static int
-proc_open(struct inode * inode, struct file * file)
+proc_open(struct inode * inode,
+	  struct file  * file)
 {
     return single_open(file, proc_show, NULL);
 }
 
-static struct file_operations nexus_proc_fops = {.open    = proc_open,
-                                                 .read    = seq_read,
-                                                 .llseek  = seq_lseek,
-                                                 .release = single_release };
+static struct file_operations nexus_proc_fops = {
+    .open    = proc_open,
+    .read    = seq_read,
+    .llseek  = seq_lseek,
+    .release = single_release
+};
 
 /**
  * hold dev->send_mutex
  */
 int
 nexus_mod_send(afs_op_type_t           type,
-               XDR *                   xdrs,
+               XDR                   * xdrs,
                struct nx_daemon_rsp ** pp_reply,
-               int *                   p_err)
+               int                   * p_err)
 {
-    int                    err         = -1;
     struct nx_daemon_rsp * p_reply     = NULL;
-    struct afs_op_msg *    msg_out     = NULL;
-    struct afs_op_msg *    msg_in      = NULL;
-    size_t                 payload_len = (xdrs->x_private - xdrs->x_base);
-    size_t                 inbound_len;
+    struct afs_op_msg    * msg_out     = NULL;
+    struct afs_op_msg    * msg_in      = NULL;
 
+    size_t payload_len = (xdrs->x_private - xdrs->x_base);
+    size_t inbound_len;
+
+    int err = -1;
+
+    
     if (NEXUS_IS_OFFLINE) {
         READPTR_UNLOCK();
         return -1;
@@ -487,12 +507,11 @@ nexus_mod_init(void)
     
     
     /* create the proc file */
-    proc_create_data(NEXUS_PROC_NAME, 0, NULL, &nexus_proc_fops, NULL);
+    proc_create_data("nexus", 0, NULL, &nexus_proc_fops, NULL);
 
     nexus_module_is_mounted = 1;
 
-    printk(KERN_INFO
-           "nexus_mod: mounted, xfer: %zuB [%p - %p] %d pages\n",
+    printk(KERN_INFO "nexus_mod: mounted, xfer: %zuB [%p - %p] %d pages\n",
            dev->xfer_len,
            dev->xfer_buffer,
            dev->xfer_buffer + dev->xfer_len,
@@ -511,6 +530,21 @@ nexus_mod_init(void)
 int
 nexus_mod_exit(void)
 {
+    dev_t devno;
+
+    devno = MKDEV(nexus_major_num, 0);
+
+    unregister_chrdev_region(devno, 1);
+
+    cdev_del(&dev->cdev);
+
+    device_destroy(nexus_class, devno);
+    class_destroy(nexus_class);
+
+
+    remove_proc_entry("nexus", NULL);
+    
+    
     // TODO just free the buffers
     return 0;
 }

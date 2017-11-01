@@ -128,6 +128,7 @@ nexus_kern_symlink(struct dentry * dp, char * target, char ** dest)
     }
 
     global_outbuffer = READPTR_LOCK();
+
     if (global_outbuffer == 0) {
         kfree(from_path);
         return -1;
@@ -135,8 +136,8 @@ nexus_kern_symlink(struct dentry * dp, char * target, char ** dest)
 
     xdrmem_create(&xdrs, global_outbuffer, READPTR_BUFLEN(), XDR_ENCODE);
 
-    if ((xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX) == FALSE)
-        || (xdr_string(&xdrs, &target, NEXUS_FNAME_MAX) == FALSE)) {
+    if ( (xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX)  == FALSE) || 
+	 (xdr_string(&xdrs, &target,    NEXUS_FNAME_MAX) == FALSE)) {
 
         NEXUS_ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();

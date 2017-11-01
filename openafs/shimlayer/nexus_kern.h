@@ -52,8 +52,8 @@ NEXUS_CHUNK_COUNT(size_t file_size)
 int
 NEXUS_DISCONNECTED(void);
 
-int
-nexus_mod_init(void);
+int nexus_mod_init(void);
+int nexus_mod_exit(void);
 
 /* prototypes called from afs */
 void
