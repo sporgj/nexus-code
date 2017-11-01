@@ -100,6 +100,8 @@ afs_init(void)
 void __exit
 afs_cleanup(void)
 {
+    nexus_mod_exit();
+    
     afs_shutdown_pagecopy();
 
 #ifdef LINUX_KEYRING_SUPPORT
