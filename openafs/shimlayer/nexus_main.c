@@ -6,19 +6,46 @@
 #include "nexus_util.h"
 
 
+struct nexus_cmd_queue {
+    wait_queue_head_t   daemon_waitq;
+    struct mutex        lock;
+
+    uint32_t            cmd_len;
+    uint8_t           * cmd_data;
+
+    uint8_t             active;
+    uint8_t             complete;
+    uint8_t             error;
+    
+    uint32_t            resp_len;
+    uint8_t           * resp_data;
+};
+
+
+
+/* major & minor numbers for our modules */
+static struct class * nexus_class     = NULL;
+static int            nexus_major_num = 0;
+
+
+static struct nexus_cmd_queue cmd_queue;
+
+/***********************/
+/* Stuff to get rid of */
+/***********************/
+
 static struct nexus_mod nexus_device;
 struct nexus_mod * dev = &nexus_device;
 
-/* major & minor numbers for our modules */
-static struct class * nexus_class = NULL;
-static int nexus_major_num = 0;
-
-static int nexus_module_is_mounted = 0;
-
 mid_t message_counter = 0;
+
 
 DEFINE_MUTEX(xfer_buffer_mutex);
 DEFINE_MUTEX(message_counter_mutex);
+
+/***********************/
+/***********************/
+
 
 static int
 nexus_open(struct inode * inode,
@@ -63,13 +90,37 @@ nexus_release(struct inode * inode,
 }
 
 static ssize_t
-nexus_read(struct file * fp,
+nexus_read(struct file * filp,
 	   char __user * buf,
 	   size_t        count,
 	   loff_t      * f_pos)
 {
     size_t len;
 
+
+    NEXUS_DEBUG("Read of size %lu\n", count);
+
+
+    // if cmd_queue is not active return 0
+
+    // if read length = 0, return cmd_len
+    //         TODO: Check if a read of length 0 actually makes it here? 
+    // else if length < cmd_len return -EINVAL
+    // else copy cmd data up
+    // return count;
+
+
+
+
+
+
+
+
+
+
+
+
+    
     /* we wait until we have data to send to the user */
     while (dev->outb_len == 0) {
 
@@ -102,6 +153,28 @@ nexus_write(struct file       * fp,
             size_t              count,
             loff_t *            f_pos)
 {
+
+
+    // check size of resp
+    // too large: set error flag in cmd_queue, mark cmd_queue complete, and return -EINVAL
+
+    // kmalloc buffer for resp
+
+    // copy_from_user
+
+    // set resp fields in cmd_queue
+
+    // __asm__ ("":::"memory");
+
+    // mark cmd_queue as complete
+
+    // return count;
+
+
+
+
+
+    
     /* copy the message in full */
     if (copy_from_user(dev->inb, buf, count)) {
         return -EFAULT;
@@ -183,6 +256,10 @@ static int
 nexus_mmap_fault(struct vm_area_struct * vma,
 		 struct vm_fault       * fault_info)
 {
+
+    // Should never fault, the mapping was screwed up.
+
+    
     char        * addr  = NULL;
     struct page * page  = NULL;
     pgoff_t       index = fault_info->pgoff;
@@ -209,23 +286,6 @@ nexus_mmap_fault(struct vm_area_struct * vma,
     // get_page(page);
     fault_info->page = page;
 
-#if 0
-    {
-	struct page * page  = NULL;;
-	int           ret   = 0;
-	size_t        index = 0;
-
-	index = (((unsigned long)fault_info->virtual_address - vma->vm_start) >> PAGE_SHIFT);
-
-	if (index >= dev->xfer_pages) {
-	    NEXUS_ERROR("mmap_error out of range index=%d", index);
-	    return VM_FAULT_SIGBUS;
-	}
-	
-	page = virt_to_page(dev->xfer_buffer + (index << PAGE_SHIFT));
-	ret  = vm_insert_page(vma, (unsigned long)vmf->virtual_address, page);
-    }
-#endif
 
     return 0;
 }
@@ -264,6 +324,21 @@ nexus_mmap(struct file           * filp,
     return 0;
 }
 
+static unsigned int
+nexus_poll(struct file              * filp,
+	   struct poll_table_struct * poll_tb)
+{
+    unsigned int  mask = POLLIN | POLLRDNORM;
+
+    poll_wait(filp, &(cmd_queue.daemon_waitq), poll_tb);
+
+    if (cmd_queue.active == 1) {
+	return mask;
+    }
+    
+    return 0;
+}
+
 static struct file_operations nexus_mod_fops = {
     .owner          = THIS_MODULE,
     .unlocked_ioctl = nexus_ioctl,
@@ -271,7 +346,8 @@ static struct file_operations nexus_mod_fops = {
     .release        = nexus_release,
     .mmap           = nexus_mmap,
     .write          = nexus_write,
-    .read           = nexus_read
+    .read           = nexus_read,
+    .poll           = nexus_poll
 };
 
 static int
@@ -310,6 +386,67 @@ static struct file_operations nexus_proc_fops = {
     .llseek  = seq_lseek,
     .release = single_release
 };
+
+
+int
+nexus_send_cmd(uint32_t    cmd_len,
+	       uint8_t   * cmd_data,
+	       uint32_t  * resp_len,
+	       uint8_t  ** resp_data)
+{
+    int ret = 0;
+    
+    // acquire cmd_queue mutex
+    ret = mutex_lock_interruptible(&(cmd_queue.lock));
+
+    if (ret != 0) {
+	NEXUS_ERROR("Command Queue Mutex lock was interrupted...\n");
+	goto out;
+    }
+    
+    // set data + len
+    // mark as active
+    cmd_queue.cmd_data  = cmd_data;
+    cmd_queue.cmd_len   = cmd_len;    
+    cmd_queue.resp_len  = 0;
+    cmd_queue.resp_data = NULL;
+    
+    cmd_queue.active    = 1;
+    cmd_queue.complete  = 0;
+
+    __asm__ ("":::"memory");
+    
+    // wakeup waiting daemon
+    wake_up_interruptible(&(cmd_queue.daemon_waitq));
+
+    // wait on kernel waitq until cmd is complete
+    // ...Eh fuck it, lets just burn the cpu
+    while (cmd_queue.complete == 0) schedule();
+
+    __asm__ ("":::"memory");
+
+
+    if (cmd_queue.error == 1) {
+	ret = -1;
+	goto out;
+    }
+    
+    // copy resp len/data ptrs
+    *resp_len  = cmd_queue.resp_len;
+    *resp_data = cmd_queue.resp_data;
+
+    // reset cmd_queue
+    cmd_queue.active    = 0;
+    cmd_queue.complete  = 0;
+    
+    // release mutex
+    mutex_unlock(&(cmd_queue.lock));
+
+ out:
+    
+    return ret;
+}
+
 
 /**
  * hold dev->send_mutex
@@ -406,6 +543,19 @@ out:
     return err;
 }
 
+static int
+init_cmd_queue(void)
+{
+    memset(&cmd_queue, 0, sizeof(struct nexus_cmd_queue));
+
+    init_waitqueue_head(&(cmd_queue.daemon_waitq));
+
+    mutex_init(&(cmd_queue.lock));
+    
+    return 0;
+}
+
+
 int
 nexus_mod_init(void)
 {
@@ -417,11 +567,14 @@ nexus_mod_init(void)
     int order = NXMOD_XFER_ORDER;
     int i     = 0;
 
-    if (nexus_module_is_mounted) {
-        printk(KERN_NOTICE "nexus_mod is already mounted\n");
-        return 0;
-    }
 
+    init_cmd_queue();
+
+
+    /********************************/
+    /* Going to get rid of all this */
+    /********************************/
+    
     /* lets now initialize the data structures */
     memset(dev, 0, sizeof(struct nexus_mod));
 
@@ -468,6 +621,11 @@ nexus_mod_init(void)
     mutex_init(&xfer_buffer_mutex);
 
 
+    /********************************/
+    /********************************/
+    /********************************/
+    
+
     nexus_class = class_create(THIS_MODULE, "nexus");
     if (IS_ERR(nexus_class)) {
 	NEXUS_ERROR("Failed to register Nexus device class\n");
@@ -508,8 +666,6 @@ nexus_mod_init(void)
     
     /* create the proc file */
     proc_create_data("nexus", 0, NULL, &nexus_proc_fops, NULL);
-
-    nexus_module_is_mounted = 1;
 
     printk(KERN_INFO "nexus_mod: mounted, xfer: %zuB [%p - %p] %d pages\n",
            dev->xfer_len,
