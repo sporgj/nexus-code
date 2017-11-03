@@ -25,7 +25,8 @@ __nexus_dirpath_name_afs_op(afs_op_type_t       afs_op_type,
     *shadow_name = NULL;
 
     // sometimes, AFS tries to create special files...
-    if ((name[0] == '\\') || (nexus_vnode_path(avc, &path)) != 0) {
+    if ( (name[0]                       == '\\') ||
+	 (nexus_vnode_path(avc, &path)  != 0) ) {
         return -1;
     }
 
@@ -39,14 +40,14 @@ __nexus_dirpath_name_afs_op(afs_op_type_t       afs_op_type,
 
     xdrmem_create(&xdrs, global_outbuffer, READPTR_BUFLEN(), XDR_ENCODE);
 
-    if ((xdr_string(&xdrs, &path, NEXUS_PATH_MAX) == FALSE)
-        || (xdr_string(&xdrs, &name, NEXUS_FNAME_MAX) == FALSE)
-        || (xdr_int(&xdrs, (int *)&type) == FALSE)) {
+    if (    (xdr_string(&xdrs, &path, NEXUS_PATH_MAX)  == FALSE)
+         || (xdr_string(&xdrs, &name, NEXUS_FNAME_MAX) == FALSE)
+         || (xdr_int(&xdrs, (int *)&type)              == FALSE)) {
 
         NEXUS_ERROR("xdr create failed (path=%s, type=%d, name=%s)\n",
-              path,
-              (int)afs_op_type,
-              name);
+		    path,
+		    (int)afs_op_type,
+		    name);
 
         READPTR_UNLOCK();
 
@@ -79,13 +80,15 @@ out:
 }
 
 int
-nexus_kern_create(struct vcache *     avc,
-                  char *              name,
-                  nexus_fs_obj_type_t type,
-                  char **             shadow_name)
+nexus_kern_create(struct vcache        * avc,
+		  char                 * name,
+		  nexus_fs_obj_type_t    type,
+		  char                ** shadow_name)
 {
-    return __nexus_dirpath_name_afs_op(
-        AFS_OP_CREATE, avc, name, type, shadow_name);
+    
+
+    
+    return __nexus_dirpath_name_afs_op(AFS_OP_CREATE, avc, name, type, shadow_name);
 }
 
 int
@@ -136,8 +139,8 @@ nexus_kern_symlink(struct dentry * dp, char * target, char ** dest)
 
     xdrmem_create(&xdrs, global_outbuffer, READPTR_BUFLEN(), XDR_ENCODE);
 
-    if ( (xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX)  == FALSE) || 
-	 (xdr_string(&xdrs, &target,    NEXUS_FNAME_MAX) == FALSE)) {
+    if (    (xdr_string(&xdrs, &from_path, NEXUS_PATH_MAX)  == FALSE)
+ 	 || (xdr_string(&xdrs, &target,    NEXUS_FNAME_MAX) == FALSE)) {
 
         NEXUS_ERROR("xdr hardlink failed\n");
         READPTR_UNLOCK();

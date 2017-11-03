@@ -6,6 +6,8 @@
 #include "nexus_util.h"
 
 
+#define MAX_CMD_RESP_SIZE 1024
+
 struct nexus_cmd_queue {
     wait_queue_head_t   daemon_waitq;
     struct mutex        lock;
@@ -98,25 +100,24 @@ nexus_read(struct file * filp,
     size_t len;
 
 
-    NEXUS_DEBUG("Read of size %lu\n", count);
+    nexus_printk("Read of size %lu\n", count);
 
 
-    // if cmd_queue is not active return 0
+    if (cmd_queue.active == 0) {
+	return 0;
+    }
 
-    // if read length = 0, return cmd_len
-    //         TODO: Check if a read of length 0 actually makes it here? 
-    // else if length < cmd_len return -EINVAL
-    // else copy cmd data up
-    // return count;
+    if (count == 0) {
+	return cmd_queue.cmd_len;
+    }
 
+    if (count < cmd_queue.cmd_len) {
+	return -EINVAL;
+    }
+    
+    copy_to_user(buf, cmd_queue.cmd_data, cmd_queue.cmd_len);
 
-
-
-
-
-
-
-
+    return cmd_queue.cmd_len;
 
 
 
@@ -153,25 +154,43 @@ nexus_write(struct file       * fp,
             size_t              count,
             loff_t *            f_pos)
 {
-
-
+    uint8_t * resp = NULL;
+    int       ret  = 0;
+    
     // check size of resp
     // too large: set error flag in cmd_queue, mark cmd_queue complete, and return -EINVAL
+    if (count > MAX_CMD_RESP_SIZE) {
+	return -EINVAL;
+    }
 
+    
     // kmalloc buffer for resp
+    resp = kmalloc(count, GFP_KERNEL);
 
+    if (PTR_ERR(resp)) {
+	NEXUS_ERROR("Could not allocate kernel memory for response\n");
+	return -ENOMEM;
+    }
+    
     // copy_from_user
-
+    ret = copy_from_user(resp, buf, count);
+    
+    if (ret) {
+	NEXUS_ERROR("Could not copy response from userspace\n");
+	return -EFAULT;
+    }
+    
     // set resp fields in cmd_queue
-
-    // __asm__ ("":::"memory");
+    cmd_queue.resp_data = resp;
+    cmd_queue.resp_len  = count;
+    
+    __asm__ ("":::"memory");
 
     // mark cmd_queue as complete
-
+    cmd_queue.complete  = 1;
+    
     // return count;
-
-
-
+    return count;
 
 
     
@@ -568,6 +587,8 @@ nexus_mod_init(void)
     int i     = 0;
 
 
+    nexus_printk("Initializing Nexus\n");
+
     init_cmd_queue();
 
 
@@ -687,6 +708,9 @@ int
 nexus_mod_exit(void)
 {
     dev_t devno;
+
+    nexus_printk("Deinitializing Nexus\n");
+    
 
     devno = MKDEV(nexus_major_num, 0);
 
