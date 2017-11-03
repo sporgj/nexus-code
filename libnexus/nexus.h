@@ -14,9 +14,14 @@ extern "C" {
 
 
 /* volume information */
+// clang-format off
 #define NEXUS_FS_METADATA_FOLDER    ".nxs"
 #define NEXUS_FS_DATA_FOLDER        "nexus"
 
+#define NEXUS_METANAME_PREFIX       "m"
+#define NEXUS_FILENAME_PREFIX       "f"
+#define NEXUS_PREFIX_SIZE(s)        (sizeof(s) - 1)
+// clang-format on
 
 
 /* filesystem object types */
@@ -46,6 +51,34 @@ struct nexus_fs_acl {
 };
 
 
+/* nx_volume.c */
+/**
+ * Creates an empty supernode.
+ * @param publickey_fpath path to the user's public key
+ * @param dest_supernode destination pointer for the supernode
+ * @param dest_supernode_size is the size of the supernode
+ * @return 0 on success
+ */
+int
+nexus_create_volume(const char *     publickey_fpath,
+                    const uint8_t ** dest_supernode,
+                    int *            dest_supernode_size);
+/**
+ * Authenticates into a NeXUS volume
+ * @param publickey_fpath path to the user's public key
+ * @param supernode_fpath destination pointer for the supernode
+ * @return 0 on success
+ */
+int
+nexus_login_volume(const char * publickey_fpath, const char * supernode_fpath);
+
+/**
+ * Mounts a volume into the nexus filesystem
+ * @param supernode_fpath path to the supernode
+ * @return 0 on success
+ */
+int
+nexus_mount_volume(const char * supernode_fpath);
 
 int
 dirops_new(const char           * parent_dir,

@@ -4,7 +4,11 @@ CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=
 
 
 
-objs := nx_dirops.o
+objs := nx_main.o\
+	nx_volume.o\
+	nx_utils.o\
+	nx_dirops.o\
+	nx_encode.o
 
 build = \
         @if [ -z "$V" ]; then \
