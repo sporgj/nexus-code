@@ -1,123 +1,300 @@
+#include <linux/kernel.h>
+#include <linux/limits.h>
+
 #include "nexus_module.h"
+#include "nexus_json.h"
+#include "nexus_util.h"
 
-/**
- * Refactored function that is called by create, remove, lookup etc.
- * @param 
+
+/* from <linux/limits.h>
+ * PATH_MAX ==> Maximum Path Length 
+ * NAME_MAX ==> Maximum File Name Length 
  */
-static int
-__nexus_dirpath_name_afs_op(afs_op_type_t       afs_op_type,
-                            struct vcache *     avc,
-                            char *              name,
-                            nexus_fs_obj_type_t type,
-                            char **             shadow_name)
+
+static char * 
+__get_path(struct vcache * avc)
 {
+    struct dentry * dentry = NULL;
+    char          * path   = NULL;
 
-    int ret  = -1;
-    int code = 0;
-
-    XDR   xdrs;
-    XDR * xdr_reply = NULL;
-
-    struct nx_daemon_rsp * reply = NULL;
-    char *                 path  = NULL;
-    caddr_t                global_outbuffer;
-
-    *shadow_name = NULL;
-
-    // sometimes, AFS tries to create special files...
-    if ( (name[0]                       == '\\') ||
-	 (nexus_vnode_path(avc, &path)  != 0) ) {
-        return -1;
+    int ret = 0;
+    
+    if ( (avc             == NULL) ||
+	 (vnode_type(avc) == NEXUS_ANY) ) {
+        return NULL;
     }
 
-    // acquires the message lock
-    global_outbuffer = READPTR_LOCK();
+    /* this calls a dget(dentry) */
+    dentry = d_find_alias(AFSTOV(avc));
 
-    if (global_outbuffer == 0) {
-        kfree(path);
-        return -1;
+    /* maybe check that the dentry is not disconnected? */
+    ret = nexus_dentry_path(dentry, &path);
+
+    dput(dentry);
+
+    if (ret != 0) {
+	return NULL;
     }
-
-    xdrmem_create(&xdrs, global_outbuffer, READPTR_BUFLEN(), XDR_ENCODE);
-
-    if (    (xdr_string(&xdrs, &path, NEXUS_PATH_MAX)  == FALSE)
-         || (xdr_string(&xdrs, &name, NEXUS_FNAME_MAX) == FALSE)
-         || (xdr_int(&xdrs, (int *)&type)              == FALSE)) {
-
-        NEXUS_ERROR("xdr create failed (path=%s, type=%d, name=%s)\n",
-		    path,
-		    (int)afs_op_type,
-		    name);
-
-        READPTR_UNLOCK();
-
-        goto out;
-    }
-
-    ret = nexus_mod_send(afs_op_type, &xdrs, &reply, &code);
-
-    if ((ret == -1) || (code != 0)) {
-        goto out;
-    }
-
-    /* read the response */
-    xdr_reply = &reply->xdrs;
-
-    if (!xdr_string(xdr_reply, shadow_name, NEXUS_FNAME_MAX)) {
-        NEXUS_ERROR("parsing shadow_name failed (type=%d)\n", (int)type);
-        goto out;
-    }
-
-    ret = 0;
-out:
-    kfree(path);
-
-    if (reply) {
-        kfree(reply);
-    }
-
-    return ret;
+    
+    return path;
 }
+
+
+
+
+
+static const char * generic_cmd_str =		\
+    "{\n"					\
+    "\"op\"   : %d,"     "\n"			\
+    "\"name\" : \"%s\"," "\n"			\
+    "\"path\" : \"%s\"," "\n"			\
+    "\"type\" : %d"      "\n"			\
+    "}";
+
 
 int
 nexus_kern_create(struct vcache        * avc,
 		  char                 * name,
 		  nexus_fs_obj_type_t    type,
-		  char                ** shadow_name)
+		  char                ** nexus_name)
 {
+    char * cmd_str   = NULL;
+    char * path      = NULL;
+
+    char * resp_data = NULL;
+    u32    resp_len  = 0;
+
+    int    ret       = 0;
+
     
+    if (name[0] == '\\') {
+	NEXUS_ERROR("Tried to create strange file (%s)\n", name);
+	return -1;
+    }
+
+    path = __get_path(avc);
+
+    if (path == NULL) {
+	NEXUS_ERROR("Could not get path for new file (%s)\n", name);
+	return -1;
+    }
+    
+    cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_CREATE, name, path, type);
+
+    kfree(path);
+    
+    if (cmd_str == NULL) {
+	NEXUS_ERROR("Could not create command string\n");
+	return -1;
+    }
+
+
+    AFS_GUNLOCK();
+    ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
+    RX_AFS_GLOCK();
+    
+    kfree(cmd_str);
+    
+    if (ret == -1) {
+	NEXUS_ERROR("Error Sending Nexus Command\n");
+	return -1;
+    }
+
+    // handle response...
+    {
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
+					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+
+	s32 ret_code = 0;
+	
+	ret = nexus_json_parse(resp_data, resp, 2);
+	
+	if (ret != 0) {
+	    NEXUS_ERROR("Could not parse JSON response\n");
+	    return -1;
+	}
+
+	ret_code = (s32)resp[0].val;
+	
+	if (ret_code != 0) {
+	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
+	    return -1;
+	}
+
+	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
+    }
+    
+    
+    return 0;
+}
+
+int
+nexus_kern_lookup(struct vcache        * avc,
+                  char                 * name,
+                  nexus_fs_obj_type_t    type,
+                  char                ** nexus_name)
+{
+    char * cmd_str   = NULL;
+    char * path      = NULL;
+
+    char * resp_data = NULL;
+    u32    resp_len  = 0;
+
+    int    ret       = 0;
 
     
-    return __nexus_dirpath_name_afs_op(AFS_OP_CREATE, avc, name, type, shadow_name);
+    if (name[0] == '\\') {
+	NEXUS_ERROR("Tried to create strange file (%s)\n", name);
+	return -1;
+    }
+
+    path = __get_path(avc);
+
+    if (path == NULL) {
+	NEXUS_ERROR("Could not get path for new file (%s)\n", name);
+	return -1;
+    }
+    
+    cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_LOOKUP, name, path, type);
+
+    if (cmd_str == NULL) {
+	NEXUS_ERROR("Could not create command string\n");
+	return -1;
+    }
+
+    AFS_GUNLOCK();
+    ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
+    RX_AFS_GLOCK();
+    
+    kfree(cmd_str);
+    
+    if (ret == -1) {
+	NEXUS_ERROR("Error Sending Nexus Command\n");
+	return -1;
+    }
+
+    // handle response...
+    {
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
+					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+
+	s32 ret_code = 0;
+	
+	ret = nexus_json_parse(resp_data, resp, 2);
+	
+	if (ret != 0) {
+	    NEXUS_ERROR("Could not parse JSON response\n");
+	    return -1;
+	}
+
+	ret_code = (s32)resp[0].val;
+	
+	if (ret_code != 0) {
+	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
+	    return -1;
+	}
+
+	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
+    }
+    
+    
+    return 0;
 }
 
 int
-nexus_kern_lookup(struct vcache *     avc,
-                  char *              name,
-                  nexus_fs_obj_type_t type,
-                  char **             shadow_name)
+nexus_kern_remove(struct vcache        * avc,
+                  char                 * name,
+                  nexus_fs_obj_type_t    type,
+                  char                ** nexus_name)
 {
-    return __nexus_dirpath_name_afs_op(
-        AFS_OP_LOOKUP, avc, name, type, shadow_name);
+    char * cmd_str   = NULL;
+    char * path      = NULL;
+
+    char * resp_data = NULL;
+    u32    resp_len  = 0;
+
+    int    ret       = 0;
+
+    
+    if (name[0] == '\\') {
+	NEXUS_ERROR("Tried to create strange file (%s)\n", name);
+	return -1;
+    }
+
+    path = __get_path(avc);
+
+    if (path == NULL) {
+	NEXUS_ERROR("Could not get path for new file (%s)\n", name);
+	return -1;
+    }
+    
+    cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_REMOVE, name, path, type);
+
+    if (cmd_str == NULL) {
+	NEXUS_ERROR("Could not create command string\n");
+	return -1;
+    }
+
+    AFS_GUNLOCK();
+    ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
+    RX_AFS_GLOCK();
+    
+    kfree(cmd_str);
+    
+    if (ret == -1) {
+	NEXUS_ERROR("Error Sending Nexus Command\n");
+	return -1;
+    }
+
+    // handle response...
+    {
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
+					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+
+	s32 ret_code = 0;
+	
+	ret = nexus_json_parse(resp_data, resp, 2);
+	
+	if (ret != 0) {
+	    NEXUS_ERROR("Could not parse JSON response\n");
+	    return -1;
+	}
+
+	ret_code = (s32)resp[0].val;
+	
+	if (ret_code != 0) {
+	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
+	    return -1;
+	}
+
+	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
+    }
+        
+    return 0;
+    
 }
 
-int
-nexus_kern_remove(struct vcache *     avc,
-                  char *              name,
-                  nexus_fs_obj_type_t type,
-                  char **             shadow_name)
-{
-    return __nexus_dirpath_name_afs_op(
-        AFS_OP_REMOVE, avc, name, type, shadow_name);
-}
 
+
+/*
+
+static const char * symlink_cmd_str =		\
+    "{\n"					\
+    "\"op\"   : %d,"     "\n"			\
+    "\"source\" : \"%s\"," "\n"			\
+    "\"target\" : \"%s\"," "\n"			\
+    "}";
+
+*/		    
 int
-nexus_kern_symlink(struct dentry * dp, char * target, char ** dest)
+nexus_kern_symlink(struct dentry  * dp,
+		   char           * target,
+		   char          ** dest)
 {
     struct nx_daemon_rsp * reply     = NULL;
     caddr_t                global_outbuffer   = NULL;
-    char *                 from_path = NULL;
-    XDR *                  xdr_reply = NULL;
+    char                 * from_path = NULL;
+    XDR                  * xdr_reply = NULL;
     XDR                    xdrs;
 
     int code = 0;

@@ -89,16 +89,20 @@ nexus_kern_init(void)
 }
 
 int
-nexus_dentry_path(const struct dentry * dentry, char ** dest)
+nexus_dentry_path(const struct dentry  * dentry,
+		  char                ** dest)
 {
-    int                        len        = 0;
-    int                        total_len  = 0;
-    char *                     path       = NULL;
-    char *                     result     = NULL;
-    char *                     buf        = NULL;
     struct nexus_volume_path * curr_entry = NULL;
 
-    if (dentry == NULL || d_is_special(dentry)) {
+    char * path       = NULL;
+    char * result     = NULL;
+    char * buf        = NULL;
+
+    int    len        = 0;
+    int    total_len  = 0;
+
+    if ( (dentry == NULL) ||
+	 (d_is_special(dentry)) ) {
         return 1;
     }
 

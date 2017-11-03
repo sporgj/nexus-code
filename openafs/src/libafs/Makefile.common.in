@@ -73,7 +73,9 @@ NEXUSOBJS = nexus_main.o\
 	nexus_kern_fetch.o\
 	nexus_dir_ops.o\
 	nexus_kern.o \
-	nexus_util.o
+	nexus_util.o \
+	nexus_jsmn.o \
+	nexus_json.o
 
 NEXUSDIR = ${TOP_OBJDIR}/shimlayer
 
@@ -88,6 +90,12 @@ nexus_main.o: $(NEXUSDIR)/nexus_main.c
 	$(CRULE_OPT)
 
 nexus_dir_ops.o: $(NEXUSDIR)/nexus_dir_ops.c
+	$(CRULE_OPT)
+
+nexus_jsmn.o: $(NEXUSDIR)/nexus_jsmn.c
+	$(CRULE_OPT)
+
+nexus_json.o: $(NEXUSDIR)/nexus_json.c
 	$(CRULE_OPT)
 
 nexus_kern.o: $(NEXUSDIR)/nexus_kern.c

@@ -420,7 +420,7 @@ nexus_send_cmd(uint32_t    cmd_len,
 
     if (ret != 0) {
 	NEXUS_ERROR("Command Queue Mutex lock was interrupted...\n");
-	goto out;
+	goto out2;
     }
     
     // set data + len
@@ -431,7 +431,6 @@ nexus_send_cmd(uint32_t    cmd_len,
     cmd_queue.resp_data = NULL;
     
     cmd_queue.active    = 1;
-    cmd_queue.complete  = 0;
 
     __asm__ ("":::"memory");
     
@@ -447,7 +446,8 @@ nexus_send_cmd(uint32_t    cmd_len,
 
     if (cmd_queue.error == 1) {
 	ret = -1;
-	goto out;
+	
+	goto out1;
     }
     
     // copy resp len/data ptrs
@@ -457,11 +457,13 @@ nexus_send_cmd(uint32_t    cmd_len,
     // reset cmd_queue
     cmd_queue.active    = 0;
     cmd_queue.complete  = 0;
+
+ out1:
     
     // release mutex
     mutex_unlock(&(cmd_queue.lock));
 
- out:
+ out2:
     
     return ret;
 }

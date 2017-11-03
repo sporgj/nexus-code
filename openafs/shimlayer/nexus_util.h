@@ -5,6 +5,8 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/gfp.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
 
 
 extern u64 nexus_ptrs_freed;
@@ -23,6 +25,17 @@ void * nexus_kmalloc(size_t size, gfp_t  flags);
 						\
 	nexus_ptrs_freed++;			\
     } while (0)
+
+
+
+s8  nexus_atoi8 (s8  dflt, char * str);
+u8  nexus_atou8 (u8  dflt, char * str);
+s16 nexus_atoi16(s16 dflt, char * str);
+u16 nexus_atou16(u16 dflt, char * str);
+s32 nexus_atoi32(s32 dflt, char * str);
+u32 nexus_atou32(u32 dflt, char * str);
+s64 nexus_atoi64(s64 dflt, char * str);
+u64 nexus_atou64(u64 dflt, char * str);
 
 
 
