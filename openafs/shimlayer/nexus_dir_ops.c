@@ -76,16 +76,16 @@ nexus_kern_create(struct vcache        * avc,
 
     if (path == NULL) {
 	NEXUS_ERROR("Could not get path for new file (%s)\n", name);
-	return -1;
+	ret = -1;
+	goto out;
     }
     
     cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_CREATE, name, path, type);
 
-    kfree(path);
-    
     if (cmd_str == NULL) {
 	NEXUS_ERROR("Could not create command string\n");
-	return -1;
+	ret = -1;
+	goto out;
     }
 
 
@@ -93,11 +93,10 @@ nexus_kern_create(struct vcache        * avc,
     ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     RX_AFS_GLOCK();
     
-    kfree(cmd_str);
-    
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
-	return -1;
+	ret = -1;
+	goto out;
     }
 
     // handle response...
@@ -111,21 +110,27 @@ nexus_kern_create(struct vcache        * avc,
 	
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
-	    return -1;
+	    ret = -1;
+	    goto out;
 	}
 
 	ret_code = (s32)resp[0].val;
 	
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
-	    return -1;
+	    ret = -1;
+	    goto out;
 	}
 
-	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
+	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);	
     }
+
+ out:
+    if (path)      nexus_kfree(path);
+    if (cmd_str)   nexus_kfree(cmd_str);
+    if (resp_data) nexus_kfree(resp_data);
     
-    
-    return 0;
+    return ret;
 }
 
 int
@@ -144,33 +149,36 @@ nexus_kern_lookup(struct vcache        * avc,
 
     
     if (name[0] == '\\') {
-	NEXUS_ERROR("Tried to create strange file (%s)\n", name);
-	return -1;
+	NEXUS_ERROR("Tried to lookup strange file (%s)\n", name);
+	ret = -1;
+	goto out;
     }
 
     path = __get_path(avc);
 
     if (path == NULL) {
-	NEXUS_ERROR("Could not get path for new file (%s)\n", name);
-	return -1;
+	NEXUS_ERROR("Could not get path for file (%s)\n", name);
+	ret = -1;
+	goto out;
     }
     
     cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_LOOKUP, name, path, type);
 
     if (cmd_str == NULL) {
 	NEXUS_ERROR("Could not create command string\n");
-	return -1;
+	ret = -1;
+	goto out;
     }
 
     AFS_GUNLOCK();
     ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     RX_AFS_GLOCK();
     
-    kfree(cmd_str);
     
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
-	return -1;
+	ret = -1;
+	goto out;
     }
 
     // handle response...
@@ -184,21 +192,27 @@ nexus_kern_lookup(struct vcache        * avc,
 	
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
-	    return -1;
+	    ret = -1;
+	    goto out;
 	}
 
 	ret_code = (s32)resp[0].val;
 	
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
-	    return -1;
+	    ret = -1;
+	    goto out;
 	}
 
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
     
-    
-    return 0;
+ out:
+    if (path)      nexus_kfree(path);
+    if (cmd_str)   nexus_kfree(cmd_str);
+    if (resp_data) nexus_kfree(resp_data);
+
+    return ret;
 }
 
 int
@@ -217,33 +231,36 @@ nexus_kern_remove(struct vcache        * avc,
 
     
     if (name[0] == '\\') {
-	NEXUS_ERROR("Tried to create strange file (%s)\n", name);
-	return -1;
+	NEXUS_ERROR("Tried to remove strange file (%s)\n", name);
+	ret = -1;
+	goto out;
     }
 
     path = __get_path(avc);
 
     if (path == NULL) {
-	NEXUS_ERROR("Could not get path for new file (%s)\n", name);
-	return -1;
+	NEXUS_ERROR("Could not get path for file (%s)\n", name);
+	ret = -1;
+	goto out;
     }
     
     cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_REMOVE, name, path, type);
 
     if (cmd_str == NULL) {
 	NEXUS_ERROR("Could not create command string\n");
-	return -1;
+	ret = -1;
+	goto out;
     }
 
     AFS_GUNLOCK();
     ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     RX_AFS_GLOCK();
     
-    kfree(cmd_str);
     
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
-	return -1;
+	ret = -1;
+	goto out;
     }
 
     // handle response...
@@ -257,21 +274,27 @@ nexus_kern_remove(struct vcache        * avc,
 	
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
-	    return -1;
+	    ret = -1;
+	    goto out;
 	}
 
 	ret_code = (s32)resp[0].val;
 	
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
-	    return -1;
+	    ret = -1;
+	    goto out;
 	}
 
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
-        
-    return 0;
-    
+
+ out:
+    if (path)      nexus_kfree(path);
+    if (cmd_str)   nexus_kfree(cmd_str);
+    if (resp_data) nexus_kfree(resp_data);
+
+    return ret;
 }
 
 
