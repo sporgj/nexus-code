@@ -71,7 +71,7 @@ single_destdir_libafs: dest_libafs
 NEXUSOBJS = nexus_main.o\
 	nexus_kern_store.o\
 	nexus_kern_fetch.o\
-	nexus_kern_dirops.o\
+	nexus_dir_ops.o\
 	nexus_kern.o \
 	nexus_util.o
 
@@ -87,7 +87,7 @@ nexus_kern_fetch.o: $(NEXUSDIR)/nexus_kern_fetch.c
 nexus_main.o: $(NEXUSDIR)/nexus_main.c
 	$(CRULE_OPT)
 
-nexus_kern_dirops.o: $(NEXUSDIR)/nexus_kern_dirops.c
+nexus_dir_ops.o: $(NEXUSDIR)/nexus_dir_ops.c
 	$(CRULE_OPT)
 
 nexus_kern.o: $(NEXUSDIR)/nexus_kern.c
