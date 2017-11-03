@@ -56,12 +56,14 @@ struct nexus_fs_acl {
  * Creates an empty supernode.
  * @param publickey_fpath path to the user's public key
  * @param dest_supernode destination pointer for the supernode
+ * @param dest_root_dirnode destination pointer for the root dirnode
  * @param dest_supernode_size is the size of the supernode
  * @return 0 on success
  */
 int
 nexus_create_volume(const char *     publickey_fpath,
                     const uint8_t ** dest_supernode,
+                    const uint8_t ** dest_root_dirnode,
                     int *            dest_supernode_size);
 /**
  * Authenticates into a NeXUS volume

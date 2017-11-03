@@ -3,19 +3,62 @@
  *
  * @author Judicael Djoko <jdb@djoko.me>
  */
+#include <sys/stat.h>
 
 #include "nx_untrusted.h"
 
 int
 nexus_create_volume(const char *     publickey_fpath,
                     const uint8_t ** dest_supernode,
+                    const uint8_t ** dest_root_dirnode,
                     int *            dest_supernode_size)
 {
+    int         ret        = -1;
+    size_t      flen       = 0;
+    size_t      nbytes     = 0;
+    char *      pubkey_buf = NULL;
+    FILE *      fd         = NULL;
+    struct stat st;
+
     /* 1 -- Read the public key into a buffer */
+    if (stat(publickey_fpath, &st)) {
+        log_error("file not found (%s)", publickey_fpath);
+        return -1;
+    }
+
+    flen = st.st_size;
+
+    fd = fopen(publickey_fpath, "rb");
+    if (fd == NULL) {
+        log_error("fopen('%s') FAILED", publickey_fpath);
+        return -1;
+    }
+
+    pubkey_buf = calloc(1, flen);
+    if (pubkey_buf == NULL) {
+        log_error("allocation error");
+        goto exit;
+    }
+
+    nbytes = fread(pubkey_buf, 1, flen, fd);
+    if (nbytes != flen) {
+        log_error("read_error. tried=%zu, got=%zu", flen, nbytes);
+        goto exit;
+    }
 
     /* 2 -- Call the enclave */
 
-    return 0;
+    ret = 0;
+exit:
+    if (fd) {
+        fclose(fd);
+    }
+
+    if (pubkey_buf) {
+        free(pubkey_buf);
+    }
+
+    return ret;
 }
 
 int
@@ -40,21 +83,4 @@ nexus_mount_volume(const char * supernode_fpath)
     /* 3 -- Call the enclave */
 
     return 0;
-}
-
-struct supernode *
-supernode_new()
-{
-    struct supernode * supernode = NULL;
-
-    supernode = calloc(1, sizeof(*supernode));
-    if (supernode == NULL) {
-        log_error("allocation error");
-        return NULL;
-    }
-
-    generate_uuid(&supernode->uuid);
-    generate_uuid(&supernode->root_uuid);
-
-    return supernode;
 }

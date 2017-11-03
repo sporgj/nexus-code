@@ -1,10 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-#include <uuid/uuid.h>
-
-#include "nexus.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

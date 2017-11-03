@@ -1,0 +1,27 @@
+enclave {
+
+    include "nx_types.h"
+
+    trusted {
+
+        public int ecall_init_enclave();
+
+        /**
+         * Creates a new nexus volume
+         * @param supernode_uuid_in is the uuid of the supernode
+         * @param root_uuid_in will be the root uuid
+         * @param supernode_buffer_out will be the output buffer of the supernode
+         * @param dirnode_buffer_out will be the output buffer of the dirnode
+         */
+        public int ecall_create_volume(
+            [user_check] struct uuid * supernode_uuid_in,
+            [user_check] struct uuid * root_uuid_in,
+            [in] const char * publickey_str_in,
+            size_t publickey_str_len,
+            [user_check] uint8_t * supernode_buffer_out,
+            [user_check] uint8_t * dirnode_buffer_out
+        );
+                                    
+    };
+
+};

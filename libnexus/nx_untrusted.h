@@ -28,12 +28,3 @@ filename_str2bin(const char * str);
 
 
 /* nx_volume.h */
-
-// supernode
-
-/**
- * Creates a new supernode & initializes the uuid.
- * @return NULL on fail
- */
-struct supernode *
-supernode_new();
