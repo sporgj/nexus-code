@@ -58,9 +58,14 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     struct afs_fakestat_state fakestate;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+
     /* nexus code */
+#ifndef UKERNEL
     char * shadow_name = NULL;
     int is_nexus_file = 0;
+#endif
+    /**/
+
     OSI_VC_CONVERT(adp);
 
     AFS_STATCNT(afs_create);
@@ -302,13 +307,17 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 
     if (!AFS_IS_DISCONNECTED) {
 	/* If not disconnected, connect to the server.*/
+	
 	/* nexus code */
+#ifndef UKERNEL
 	if (nexus_kern_create(adp, aname, NEXUS_FILE, &shadow_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    is_nexus_file = 0;
 	    shadow_name = aname;
 	}
+#endif
+	/**/
 
     	InStatus.UnixModeBits = attrs->va_mode & 0xffff;	/* only care about protection bits */
     	do {
@@ -318,11 +327,23 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	    	now = osi_Time();
 	    	XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_CREATEFILE);
 	    	RX_AFS_GUNLOCK();
+
+		/* Nexus */
+#ifndef UKERNEL
 	    	code =
 		    RXAFS_CreateFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
 				 shadow_name, &InStatus, (struct AFSFid *)
 				 &newFid.Fid, OutFidStatus, OutDirStatus,
 				 &CallBack, &tsync);
+#else
+		code =
+		    RXAFS_CreateFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
+				 aname, &InStatus, (struct AFSFid *)
+				 &newFid.Fid, OutFidStatus, OutDirStatus,
+				 &CallBack, &tsync);
+#endif
+		/**/
+ 
 	    	RX_AFS_GLOCK();
 	    	XSTATS_END_TIME;
 	    	CallBack.ExpirationTime += now;
@@ -389,7 +410,15 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, OutDirStatus, 1)) {
 	/* we can do it locally */
 	ObtainWriteLock(&afs_xdcache, 291);
+
+	/* Nexus */
+#ifndef UKERNEL
 	code = afs_dir_Create(tdc, shadow_name, &newFid.Fid);
+#else
+	code = afs_dir_Create(tdc, aname, &newFid.Fid);
+#endif
+	/**/
+	
 	ReleaseWriteLock(&afs_xdcache);
 	if (code) {
 	    ZapDCE(tdc);
@@ -513,10 +542,15 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     afs_DestroyReq(treq);
 
   done2:
+
     /* nexus code */
+#ifndef UKERNEL
     if (is_nexus_file) {
 	kfree(shadow_name);
     }
+#endif
+    /**/
+
     osi_FreeSmallSpace(OutFidStatus);
     osi_FreeSmallSpace(OutDirStatus);
     return code;

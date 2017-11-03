@@ -63,27 +63,47 @@ afsremove(struct vcache *adp, struct dcache *tdc,
     struct AFSVolSync tsync;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+
     /* nexus code */
+#ifndef UKERNEL
     char * nexus_name = NULL;
     int is_nexus_file = 0;
+#endif
+    /**/
 
+    
     if (!AFS_IS_DISCONNECTED) {
+	
 	/* nexus code */
+#ifndef UKERNEL
 	if (nexus_kern_remove(adp, aname, NEXUS_ANY, &nexus_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    nexus_name = aname;
 	}
-
+#endif
+	/**/
+	
         do {
 	  tc = afs_Conn(&adp->f.fid, treqp, SHARED_LOCK, &rxconn);
 	    if (tc) {
 	        XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_REMOVEFILE);
 	        RX_AFS_GUNLOCK();
+
+		/* Nexus */
+#ifndef UKERNEL
 	        code =
 		    RXAFS_RemoveFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
 		  		     nexus_name, &OutDirStatus, &tsync);
-	        RX_AFS_GLOCK();
+#else
+	        code =
+		    RXAFS_RemoveFile(rxconn, (struct AFSFid *)&adp->f.fid.Fid,
+		    aname, &OutDirStatus, &tsync);
+#endif
+		/**/
+
+		
+		RX_AFS_GLOCK();
 	        XSTATS_END_TIME;
 	    } else
 	        code = -1;
@@ -94,13 +114,17 @@ afsremove(struct vcache *adp, struct dcache *tdc,
 
 
     osi_dnlc_remove(adp, aname, tvc);
-
+    
     if (code) {
+
 	/* nexus code */
+#ifndef UKERNEL
 	if (is_nexus_file) {
 	    kfree(nexus_name);
 	}
-
+#endif
+	/**/
+	
 	if (tdc) {
 	    ReleaseSharedLock(&tdc->lock);
 	    afs_PutDCache(tdc);
@@ -124,16 +148,26 @@ afsremove(struct vcache *adp, struct dcache *tdc,
 	UpgradeSToWLock(&tdc->lock, 637);
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, &OutDirStatus, 1)) {
 	/* we can do it locally */
+
+	/* Nexus */
+#ifndef UKERNEL
 	code = afs_dir_Delete(tdc, nexus_name);
+#else
+	code = afs_dir_Delete(tdc, aname);
+#endif
 	if (code) {
 	    ZapDCE(tdc);	/* surprise error -- invalid value */
 	    DZap(tdc);
 	}
 
 	/* nexus code */
+#ifndef UKERNEL
 	if (is_nexus_file) {
 	    kfree(nexus_name);
 	}
+#endif
+	/**/
+	
     }
     if (tdc) {
 	ReleaseWriteLock(&tdc->lock);

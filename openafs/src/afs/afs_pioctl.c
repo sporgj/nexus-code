@@ -1466,9 +1466,12 @@ DECL_PIOCTL(PSetAcl)
 	osi_dnlc_purgedp(avc);
 
     /* nexus code */
+#ifndef UKERNEL
     if (code == 0) {
 	nexus_kern_storeacl(avc, &acl);
     }
+#endif
+    /**/
 
     /* SXW - Should we flush metadata here? */
     return code;

@@ -1390,10 +1390,14 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
     int dynrootRetry = 1;
     struct afs_fakestat_state fakestate;
     int tryEvalOnly = 0;
+
     /* nexus code */
+#ifndef UKERNEL
     char * nexus_name = NULL;
     int is_nexus_file = 0;
-
+#endif
+    /**/
+    
     OSI_VC_CONVERT(adp);
 
     AFS_STATCNT(afs_lookup);
@@ -1685,15 +1689,22 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	/* above now implemented by Check_AtSys and Next_AtSys */
 
 	/* nexus code */
+#ifndef UKERNEL
 	if (nexus_kern_lookup(adp, aname, NEXUS_ANY, &nexus_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    is_nexus_file = 0;
 	    nexus_name = sysState.name;
 	}
+#endif
+	/**/
 
+	
 	/* lookup the name in the appropriate dir, and return a cache entry
 	 * on the resulting fid */
+
+	/* Nexus */
+#ifndef UKERNEL
 	code =
 	    afs_dir_LookupOffset(tdc, nexus_name, &tfid.Fid,
 				 &dirCookie);
@@ -1701,6 +1712,13 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	if (is_nexus_file) {
 	    kfree(nexus_name);
 	}
+
+#else
+	code =
+	    afs_dir_LookupOffset(tdc, sysState.name, &tfid.Fid,
+				 &dirCookie);
+#endif
+	
 
 	/* If the first lookup doesn't succeed, maybe it's got @sys in the name */
 	while (code == ENOENT && Next_AtSys(adp, treq, &sysState))

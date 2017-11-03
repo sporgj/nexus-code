@@ -62,6 +62,10 @@
 
 #endif
 
+/* Nexus */
+#ifndef UKERNEL
 #include "nexus_kern.h"
+#endif
+/**/
 
 #endif /* AFS_INCLUDES_H */

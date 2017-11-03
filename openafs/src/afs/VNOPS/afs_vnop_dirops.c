@@ -52,9 +52,14 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     struct AFSVolSync tsync;
     afs_int32 now;
     struct afs_fakestat_state fakestate;
+
     /* nexus code */
+#ifndef UKERNEL
     int is_nexus_file = 0;
     char * shadow_name = NULL;
+#endif
+    /**/
+    
     XSTATS_DECLS;
     OSI_VC_CONVERT(adp);
 
@@ -111,12 +116,14 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 
     if (!AFS_IS_DISCON_RW) {
 	/* nexus code */
+#ifndef UKERNEL
 	if (nexus_kern_create(adp, aname, NEXUS_DIR, &shadow_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    is_nexus_file = 0;
 	    shadow_name = aname;
 	}
+#endif
 
     	do {
 	    tc = afs_Conn(&adp->f.fid, treq, SHARED_LOCK, &rxconn);
@@ -124,6 +131,8 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	    	XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_MAKEDIR);
 	    	now = osi_Time();
 	    	RX_AFS_GUNLOCK();
+		/* Nexus */
+#ifndef UKERNEL
 	    	code =
 		    RXAFS_MakeDir(rxconn,
 		    		(struct AFSFid *)&adp->f.fid.Fid,
@@ -134,7 +143,20 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 				OutDirStatus,
 				&CallBack,
 				&tsync);
-	    	RX_AFS_GLOCK();
+#else
+	    	code =
+		    RXAFS_MakeDir(rxconn,
+		    		(struct AFSFid *)&adp->f.fid.Fid,
+				aname,
+				&InStatus,
+				(struct AFSFid *)&newFid.Fid,
+				OutFidStatus,
+				OutDirStatus,
+				&CallBack,
+				&tsync);
+#endif
+
+		RX_AFS_GLOCK();
 	    	XSTATS_END_TIME;
 	    	CallBack.ExpirationTime += now;
 	    	/* DON'T forget to Set the callback value... */
@@ -181,7 +203,15 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, OutDirStatus, 1)) {
 	/* we can do it locally */
 	ObtainWriteLock(&afs_xdcache, 294);
+	
+	/* Nexus */
+#ifndef UKERNEL
 	code = afs_dir_Create(tdc, shadow_name, &newFid.Fid);
+#else
+	code = afs_dir_Create(tdc, aname, &newFid.Fid);
+#endif
+	/**/
+
 	ReleaseWriteLock(&afs_xdcache);
 	if (code) {
 	    ZapDCE(tdc);	/* surprise error -- use invalid value */
@@ -258,10 +288,14 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     code = afs_CheckCode(code, treq, 26);
     afs_DestroyReq(treq);
   done2:
+    /* Nexus */
+#ifndef UKERNEL
     if (is_nexus_file) {
 	kfree(shadow_name);
     }
-
+#endif
+    /**/
+    
     osi_FreeSmallSpace(OutFidStatus);
     osi_FreeSmallSpace(OutDirStatus);
     return code;
@@ -288,9 +322,14 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
     struct afs_fakestat_state fakestate;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+
     /* nexus code */
+#ifndef UKERNEL
     char * nexus_name = NULL;
     int is_nexus_file = 0;;
+#endif
+    /**/
+
     OSI_VC_CONVERT(adp);
 
     AFS_STATCNT(afs_rmdir);
@@ -360,25 +399,43 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	/* Not disconnected, can connect to server. */
 
 	/* nexus code */
+#ifndef UKERNEL
 	if (nexus_kern_remove(adp, aname, NEXUS_ANY, &nexus_name) == 0) {
 	    is_nexus_file = 1;
 	} else {
 	    nexus_name = aname;
 	    is_nexus_file = 0;
 	}
+#endif
+	/**/
 
+	
     	do {
 	    tc = afs_Conn(&adp->f.fid, treq, SHARED_LOCK, &rxconn);
 	    if (tc) {
 	    	XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_REMOVEDIR);
 	    	RX_AFS_GUNLOCK();
+		
+		/* Nexus */
+#ifndef UKERNEL
 	    	code =
 		    RXAFS_RemoveDir(rxconn,
 		    		(struct AFSFid *)&adp->f.fid.Fid,
 				nexus_name,
 				&OutDirStatus,
 				&tsync);
-	    	RX_AFS_GLOCK();
+#else
+	    	code =
+		    RXAFS_RemoveDir(rxconn,
+		    		(struct AFSFid *)&adp->f.fid.Fid,
+				aname,
+				&OutDirStatus,
+				&tsync);
+
+#endif
+		/**/
+
+		RX_AFS_GLOCK();
 	    	XSTATS_END_TIME;
 	    } else
 	    	code = -1;
@@ -465,7 +522,16 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	UpgradeSToWLock(&tdc->lock, 634);
     if (AFS_IS_DISCON_RW || afs_LocalHero(adp, tdc, &OutDirStatus, 1)) {
 	/* we can do it locally */
+
+	/* Nexus */
+#ifndef UKERNEL
 	code = afs_dir_Delete(tdc, nexus_name);
+#else
+	code = afs_dir_Delete(tdc, aname);
+#endif
+	/**/
+
+	
 	if (code) {
 	    ZapDCE(tdc);	/* surprise error -- invalid value */
 	    DZap(tdc);
@@ -506,8 +572,14 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
     code = afs_CheckCode(code, treq, 27);
     afs_DestroyReq(treq);
   done2:
+
+    /* Nexus */
+#ifndef UKERNEL
     if (is_nexus_file) {
 	kfree(nexus_name);
     }
+#endif
+    /**/
+    
     return code;
 }

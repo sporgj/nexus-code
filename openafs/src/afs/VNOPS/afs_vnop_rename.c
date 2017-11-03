@@ -46,9 +46,16 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
     struct AFSVolSync tsync;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+
     /* nexus code */
-    char * nexus_name1 = NULL, * nexus_name2 = NULL;
-    int is_nexus_file = 0, ret;
+#ifndef UKERNEL
+    char * nexus_name1 = NULL;
+    char * nexus_name2 = NULL;
+    int is_nexus_file = 0;
+    int ret;
+#endif
+    /**/
+
     AFS_STATCNT(afs_rename);
     afs_Trace4(afs_iclSetp, CM_TRACE_RENAME, ICL_TYPE_POINTER, aodp,
 	       ICL_TYPE_STRING, aname1, ICL_TYPE_POINTER, andp,
@@ -153,7 +160,9 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 	    goto tagain;
 	}
     }
-
+    
+    /* Nexus */
+#ifndef UKERNEL
     ret = nexus_kern_rename(aodp, aname1, andp, aname2, &nexus_name1, &nexus_name2);
     if (ret == 0) {
 	is_nexus_file = 1;
@@ -165,6 +174,12 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 
     if (code == 0)
 	code = afs_dir_Lookup(tdc1, nexus_name1, &fileFid.Fid);
+#else
+    if (code == 0)
+	code = afs_dir_Lookup(tdc1, aname1, &fileFid.Fid);
+#endif
+    /**/
+    
     if (code) {
 	if (tdc1) {
 	    ReleaseWriteLock(&tdc1->lock);
@@ -188,7 +203,10 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 	    if (tc) {
 	    	XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_RENAME);
 	    	RX_AFS_GUNLOCK();
-	    	code =
+
+		/* Nexus */
+#ifndef UKERNEL
+		code =
 		    RXAFS_Rename(rxconn,
 		    			(struct AFSFid *)&aodp->f.fid.Fid,
 					nexus_name1,
@@ -197,7 +215,20 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 					OutOldDirStatus,
 					OutNewDirStatus,
 					&tsync);
-	        RX_AFS_GLOCK();
+#else
+		code =
+		    RXAFS_Rename(rxconn,
+		    			(struct AFSFid *)&aodp->f.fid.Fid,
+					aname1,
+					(struct AFSFid *)&andp->f.fid.Fid,
+					aname2,
+					OutOldDirStatus,
+					OutNewDirStatus,
+					&tsync);
+#endif
+		/**/
+		
+		RX_AFS_GLOCK();
 	        XSTATS_END_TIME;
 	    } else
 	    	code = -1;
@@ -286,11 +317,16 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 	/* now really do the work */
 	if (doLocally) {
 	    /* first lookup the fid of the dude we're moving */
-	    code = afs_dir_Lookup(tdc1, nexus_name1, &fileFid.Fid);
+
+	    /* Nexus */
+#ifndef UKERNEL
+	    code = afs_dir_Lookup(tdc1, nexus_name1, &fileFid.Fid);	    
+	    
 	    if (code == 0) {
-		/* delete the source */
-		code = afs_dir_Delete(tdc1, nexus_name1);
+	        /* delete the source */
+	        code = afs_dir_Delete(tdc1, nexus_name1);
 	    }
+
 	    /* first see if target is there */
 	    if (code == 0
 		&& afs_dir_Lookup(tdc2, nexus_name2,
@@ -303,6 +339,31 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 		code = afs_dir_Create(tdc2, nexus_name2, &fileFid.Fid);
 		ReleaseWriteLock(&afs_xdcache);
 	    }
+
+#else 
+	    code = afs_dir_Lookup(tdc1, aname1, &fileFid.Fid);
+
+	    if (code == 0) {
+	        /* delete the source */
+	        code = afs_dir_Delete(tdc1, aname1);
+	    }
+
+	    /* first see if target is there */
+	    if (code == 0
+		&& afs_dir_Lookup(tdc2, aname2,
+				  &unlinkFid.Fid) == 0) {
+		/* target already exists, and will be unlinked by server */
+		code = afs_dir_Delete(tdc2, aname2);
+	    }
+	    if (code == 0) {
+		ObtainWriteLock(&afs_xdcache, 292);
+		code = afs_dir_Create(tdc2, aname2, &fileFid.Fid);
+		ReleaseWriteLock(&afs_xdcache);
+	    }
+#endif
+	    /**/
+	    
+
 	    if (code != 0) {
 		ZapDCE(tdc1);
 		DZap(tdc1);
