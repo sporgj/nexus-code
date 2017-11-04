@@ -118,34 +118,6 @@ nexus_read(struct file * filp,
     copy_to_user(buf, cmd_queue.cmd_data, cmd_queue.cmd_len);
 
     return cmd_queue.cmd_len;
-
-
-
-    
-    /* we wait until we have data to send to the user */
-    while (dev->outb_len == 0) {
-
-        if (wait_event_interruptible(dev->outq, dev->outb_len > 0)) {
-            return -ERESTARTSYS;
-        }
-    }
-
-    /* send it to userspace */
-    len = min(count, (dev->outb_len - dev->outb_sent));
-
-    if (copy_to_user(buf, (dev->outb + dev->outb_sent), count)) {
-        return -EFAULT;
-    }
-
-    dev->outb_sent += len;
-
-    if (dev->outb_len == dev->outb_sent) {
-
-        dev->outb_len  = 0;
-        dev->outb_sent = 0;
-    }
-
-    return len;
 }
 
 static ssize_t
@@ -190,20 +162,6 @@ nexus_write(struct file       * fp,
     cmd_queue.complete  = 1;
     
     // return count;
-    return count;
-
-
-    
-    /* copy the message in full */
-    if (copy_from_user(dev->inb, buf, count)) {
-        return -EFAULT;
-    }
-
-    /* this will be reincremented */
-    dev->inb_len += count;
-
-    wake_up_interruptible(&dev->msgq);
-
     return count;
 }
 
@@ -714,7 +672,7 @@ nexus_mod_exit(void)
     nexus_printk("Deinitializing Nexus\n");
     
 
-    devno = MKDEV(nexus_major_num, 0);
+    devno = MKDEV(nexus_major_num, 1);
 
     unregister_chrdev_region(devno, 1);
 
@@ -727,6 +685,5 @@ nexus_mod_exit(void)
     remove_proc_entry("nexus", NULL);
     
     
-    // TODO just free the buffers
     return 0;
 }

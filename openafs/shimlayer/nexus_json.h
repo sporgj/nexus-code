@@ -1,3 +1,5 @@
+#pragma once
+
 typedef enum {
     NEXUS_JSON_U8,
     NEXUS_JSON_S8,

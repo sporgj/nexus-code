@@ -8,12 +8,14 @@ AR = ar
 
 
 exec_objs :=	main.o \
-	 	rpc.o  \
-		xdr.o  \
-		xdr_mem.o
+
+#	 	rpc.o  \
+#		xdr.o  \
+#		xdr_mem.o
 
 
-libs := ../libnexus/libnexus.a
+libs := 
+#../libnexus/libnexus.a
 
 build = \
         @if [ -z "$V" ]; then \

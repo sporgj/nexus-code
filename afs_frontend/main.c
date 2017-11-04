@@ -3,7 +3,12 @@
 #include <unistd.h>
 
 #include <sys/ioctl.h>
+#include <sys/epoll.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 #include "afs.h"
 #include "log.h"
@@ -11,9 +16,8 @@
 #include "xdr.h"
 #include "xdr_prototypes.h"
 
-#define NEXUS_MOD_FILE "/dev/nexus_mod"
+#define NEXUS_MOD_FILE "/dev/nexus"
 
-static FILE * nexus_mod_fid = NULL;
 
 static uint64_t msg_counter = 0;
 
@@ -36,41 +40,32 @@ struct xdr_rsp {
 #define XDROUT_DATALEN 64
 #define XDROUT_TOTALLEN (XDROUT_DATALEN + sizeof(XDR) + sizeof(afs_op_msg_t))
 
+// TODO this is temporary
+// For now, we can only watch files from alice and kdb
+#define AFS_CELL_PATH "/afs/maatta.sgx/user"
+static const char * global_volume_paths = AFS_CELL_PATH "/alice/nexus";
+
 /** we are going to have 3 buffers */
 uint8_t           in_buffer[NEXUS_DATA_BUFLEN];
 uint8_t           out_buffer[NEXUS_DATA_BUFLEN];
 struct afs_op_msg in_rpc = { 0 };
 
-/* the address and size of the global buffer */
-static size_t    global_xfer_buflen = 0;
 
-// TODO this is temporary
-// For now, we can only watch files from alice and kdb
-#define AFS_CELL_PATH "/afs/maatta.sgx/user"
-static const char * global_volume_paths[]
-    = { AFS_CELL_PATH "/kdb/nexus",   // user kdb
-        AFS_CELL_PATH "/alice/nexus", // user alice
-        NULL };
+
+
 
 static int
 send_nexus_volume_paths(int fno)
 {
-    int                         ret;
-    int                         tlen;
-    int                         len;
-    struct nexus_watched_path * nx_path = NULL;
-    const char *                path    = NULL;
+    struct nexus_watched_path * cmd = NULL;
 
-    /* send all the paths */
-    for (size_t i = 0; (global_volume_paths[i] != NULL); i++) {
-        path = global_volume_paths[i];
-        len  = strlen(path);
-
-        tlen    = sizeof(struct nexus_watched_path) + len;
-        nx_path = (struct nexus_watched_path *)calloc(1, tlen);
-        if (nx_path == NULL) {
-            log_error("allocation error");
-            return -1;
+    len  = strlen(path);
+	
+    cmd_len    = sizeof(struct nexus_watched_path) + strlen(;
+    nx_path = (struct nexus_watched_path *)calloc(1, tlen);
+    if (nx_path == NULL) {
+	log_error("allocation error");
+	return -1;
         }
 
         // copy the string data into the struct
@@ -91,50 +86,56 @@ send_nexus_volume_paths(int fno)
     return 0;
 }
 
-static uint8_t * global_xfer_addr   = NULL;
+
+int
+handle_afs_command(uint8_t   * cmd_buf,
+		   uint32_t    cmd_size,
+		   uint8_t  ** resp_buf,
+		   uint32_t  * resp_size)
+{
+    
+    return 0;    
+}
 
 static int
 connect_to_afs()
 {
 
-    /* Despite the misleading naming convention, these are actually local types
-     */
-    struct xdr_data * x_data = (struct xdr_data *)in_buffer;
-    struct xdr_rsp *  x_rsp  = (struct xdr_rsp *)out_buffer;
+    struct epoll_event afs_evt;    
 
-    struct afs_op_msg * in_msg  = &in_rpc;
-    struct afs_op_msg * out_msg = &x_rsp->msg;
+    int   afs_fd = 0;
+    int epoll_fd = 0;
 
-    XDR * xdr_in  = &x_data->xdrs;
-    XDR * xdr_out = &x_rsp->xdrs;
+    int ret      = 0;
 
-    size_t nbytes = 0;
-    int    len    = 0;
-    int    status = 0;
-    int    ret    = 0;
-    int    fno    = 0;
+    
+    
 
-    if (nexus_mod_fid) {
-        return 0;
+    epoll_fd = epoll_create1(0);
+
+    if (epoll_fd == -1) {	
+	perror("Could not create epoll instance:");
+	return -1;
     }
 
-    nexus_mod_fid = fopen(NEXUS_MOD_FILE, "rb+");
+    
+    afs_fd = open(NEXUS_MOD_FILE, O_RDWR);
 
-    if (nexus_mod_fid == NULL) {
+    if (afs_fd == -1) {
         log_error("opening '%s' failed", NEXUS_MOD_FILE);
         perror("Error: ");
         return -1;
     }
 
-    fno = fileno(nexus_mod_fid);
-
     /* send the volume paths */
-    if (send_nexus_volume_paths(fno)) {
+    if (send_nexus_volume_paths(afs_fd)) {
         return -1;
     }
 
+
+#if 0
     /* set the memory map */
-    ret = ioctl(fno, IOCTL_MMAP_SIZE, &global_xfer_buflen);
+    ret = ioctl(fd, IOCTL_MMAP_SIZE, &global_xfer_buflen);
 
     if (ret != 0) {
         log_error("ioctl MMAP_SIZE failed");
@@ -151,24 +152,89 @@ connect_to_afs()
     }
 
     log_debug("mmap %p for %zu bytes", global_xfer_addr, global_xfer_buflen);
+#endif
 
+    
+
+    afs_evt.events  = EPOLLIN;
+    afs_evt.data.fd = afs_fd;
+
+    ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, afs_fd, &afs_evt);
+
+    if (ret == -1) {
+	log_error("Could not add afs fd to epoll instance\n");
+	return -1;
+    }
+    
     while (1) {
-        nbytes = fread(in_msg, 1, sizeof(struct afs_op_msg), nexus_mod_fid);
+	struct epoll_event event;
 
-        if (nbytes != sizeof(struct afs_op_msg)) {
-            log_error("Invalid read size of %lu (expected %lu)\n",
-                      nbytes,
-                      sizeof(struct afs_op_msg));
-            return -1;
-        }
+	uint8_t * cmd_buf  = NULL;
+	uint8_t * resp_buf = NULL;
 
-        /* read the data on the wire */
-        nbytes = fread(x_data->data, 1, in_msg->len, nexus_mod_fid);
+	int resp_size = 0;
 
-        /* create our XDR data */
-        xdrmem_create(xdr_in, (caddr_t)x_data->data, in_msg->len, XDR_DECODE);
-        xdrmem_create(xdr_out, x_rsp->msg.payload, PAGE_SIZE, XDR_ENCODE);
+	int num_fds = 0;
+	int size    = 0;
+	
+	num_fds = epoll_wait(epoll_fd, &event, 1, -1);
 
+	if (num_fds == -1) {
+	    log_error("epoll wait returned error (%d)\n", num_fds);
+	    perror("Error: ");
+	}
+	
+	if (event.data.fd != afs_fd) {
+	    log_error("epoll returned an invalid FD (%d)\n", event.data.fd);
+	    return -1;
+	}
+
+	
+	size = read(afs_fd, NULL, 0);
+
+	if (size <= 0) {
+	    log_error("Invalid read size from AFS module (size=%d)\n", size);
+	    return -1;
+	}
+
+	cmd_buf = calloc(1, size);
+
+	if (cmd_buf == NULL) {
+	    log_error("Could not allocate command buffer of size (%d)\n", size);
+	    return -1;
+	}
+	
+	ret = read(afs_fd, cmd_buf, size);
+	
+	if (ret != size) {
+	    log_error("Could not read command from AFS module (ret = %d)\n", ret);
+	    return -1;
+	}
+
+
+	printf("AFS Command = %s\n", cmd_buf);
+
+	return -1;
+
+
+	
+	ret = handle_afs_command(cmd_buf, size, &resp_buf, (uint32_t *)&resp_size);
+
+	if (ret == -1) {
+	    log_error("Error handling AFS command\n");
+	    return -1;
+	}
+	
+	ret = write(afs_fd, resp_buf, resp_size);
+
+	if (ret != resp_size) {
+	    log_error("Error writing response to AFS module\n");
+	}
+	
+	free(resp_buf);
+
+#if 0
+	
         /* dispatch to the corresponding function */
 
         switch (in_msg->type) {
@@ -217,10 +283,12 @@ connect_to_afs()
           out_msg->type, out_msg->ack_id, status, MSG_SIZE(in_msg),
           in_msg->len, nbytes, out_msg->len); */
         status = 0;
+
+#endif
     }
 
-    fclose(nexus_mod_fid);
-
+    close(afs_fd);
+    
     return 0;
 }
 

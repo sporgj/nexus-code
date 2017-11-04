@@ -91,7 +91,7 @@ nexus_kern_create(struct vcache        * avc,
 
     AFS_GUNLOCK();
     ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
-    RX_AFS_GLOCK();
+    AFS_GLOCK();
     
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
@@ -172,7 +172,7 @@ nexus_kern_lookup(struct vcache        * avc,
 
     AFS_GUNLOCK();
     ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
-    RX_AFS_GLOCK();
+    AFS_GLOCK();
     
     
     if (ret == -1) {
@@ -254,7 +254,7 @@ nexus_kern_remove(struct vcache        * avc,
 
     AFS_GUNLOCK();
     ret = nexus_send_cmd(strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
-    RX_AFS_GLOCK();
+    AFS_GLOCK();
     
     
     if (ret == -1) {

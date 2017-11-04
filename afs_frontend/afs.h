@@ -26,8 +26,8 @@
 #define NEXUS_DATA_BUFPAGES (1)
 #define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
 
-struct nexus_watched_path {
-    size_t len;
+struct nexus_volume_path {
+    uint32_t len;
     char   path[0];
 };
 

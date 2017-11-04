@@ -7,9 +7,8 @@ Client-side SGX.
 ```bash
 cd openafs
 ./regen.sh
-./configure-libafs
-make libafs
-make venus
+./configure
+make
 
 cp openafs/src/aklog/aklog ./bin
 cp openafs/src/afsd/afsd ./bin
