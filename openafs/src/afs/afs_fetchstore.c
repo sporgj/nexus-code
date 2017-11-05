@@ -593,20 +593,21 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
 
     /* nexus code */
 #ifndef UKERNEL
+
+    struct rx_call * acall = NULL;
+    char           * path  = NULL;
+
     int is_nexus_file = 1;
-    int ret = 0;
-#endif
-    /**/
+    int ret           = 0;
 
-    struct rx_call * acall;
-    char * path = NULL;
+    if ( (NEXUS_DISCONNECTED()) ||
+	 (vType(avc) == VDIR) ) {
+	is_nexus_file = 0;
+    }
 
-    /* Nexus */
-#ifndef UKERNEL
-    if ((NEXUS_DISCONNECTED()) ||
-	(vType(avc) == VDIR)   ||
-	(nexus_vnode_path(avc, &path))) {
+    path = nexus_get_path_from_vcache(avc);
 
+    if (path == NULL) {
 	is_nexus_file = 0;
     }
 #endif
@@ -1223,10 +1224,14 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
 
     /* Nexus */
 #ifndef UKERNEL
-    if ((NEXUS_DISCONNECTED()) ||
-	(vType(avc) == VDIR)   ||
-	(nexus_vnode_path(avc, &path))) {
+    if ( (NEXUS_DISCONNECTED()) ||
+	 (vType(avc) == VDIR) ) {
+	is_nexus_file = 0;
+    }
 
+    path = nexus_get_path_from_vcache(avc);
+
+    if (path == NULL) {
 	is_nexus_file = 0;
     }
 #endif

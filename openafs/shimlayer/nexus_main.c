@@ -4,24 +4,8 @@
 #include <linux/spinlock.h>
 
 #include "nexus_util.h"
+#include "nexus_volume.h"
 
-
-#define MAX_CMD_RESP_SIZE 1024
-
-struct nexus_cmd_queue {
-    wait_queue_head_t   daemon_waitq;
-    struct mutex        lock;
-
-    uint32_t            cmd_len;
-    uint8_t           * cmd_data;
-
-    uint8_t             active;
-    uint8_t             complete;
-    uint8_t             error;
-    
-    uint32_t            resp_len;
-    uint8_t           * resp_data;
-};
 
 
 
@@ -29,8 +13,6 @@ struct nexus_cmd_queue {
 static struct class * nexus_class     = NULL;
 static int            nexus_major_num = 0;
 
-
-static struct nexus_cmd_queue cmd_queue;
 
 /***********************/
 /* Stuff to get rid of */
@@ -97,27 +79,7 @@ nexus_read(struct file * filp,
 	   size_t        count,
 	   loff_t      * f_pos)
 {
-    size_t len;
-
-
-    nexus_printk("Read of size %lu\n", count);
-
-
-    if (cmd_queue.active == 0) {
-	return 0;
-    }
-
-    if (count == 0) {
-	return cmd_queue.cmd_len;
-    }
-
-    if (count < cmd_queue.cmd_len) {
-	return -EINVAL;
-    }
-    
-    copy_to_user(buf, cmd_queue.cmd_data, cmd_queue.cmd_len);
-
-    return cmd_queue.cmd_len;
+    return 0;
 }
 
 static ssize_t
@@ -126,43 +88,7 @@ nexus_write(struct file       * fp,
             size_t              count,
             loff_t *            f_pos)
 {
-    uint8_t * resp = NULL;
-    int       ret  = 0;
-    
-    // check size of resp
-    // too large: set error flag in cmd_queue, mark cmd_queue complete, and return -EINVAL
-    if (count > MAX_CMD_RESP_SIZE) {
-	return -EINVAL;
-    }
-
-    
-    // kmalloc buffer for resp
-    resp = kmalloc(count, GFP_KERNEL);
-
-    if (PTR_ERR(resp)) {
-	NEXUS_ERROR("Could not allocate kernel memory for response\n");
-	return -ENOMEM;
-    }
-    
-    // copy_from_user
-    ret = copy_from_user(resp, buf, count);
-    
-    if (ret) {
-	NEXUS_ERROR("Could not copy response from userspace\n");
-	return -EFAULT;
-    }
-    
-    // set resp fields in cmd_queue
-    cmd_queue.resp_data = resp;
-    cmd_queue.resp_len  = count;
-    
-    __asm__ ("":::"memory");
-
-    // mark cmd_queue as complete
-    cmd_queue.complete  = 1;
-    
-    // return count;
-    return count;
+    return 0;
 }
 
 static long
@@ -170,9 +96,7 @@ nexus_ioctl(struct file    * filp,
 	    unsigned int     cmd,
 	    unsigned long    arg)
 {
-    int      err     = 0;
-    size_t   pathlen = 0;
-    char   * path    = NULL;
+    int ret = 0;
 
     if (_IOC_TYPE(cmd) != NEXUS_IOC_MAGIC) {
         return -ENOTTY;
@@ -183,50 +107,55 @@ nexus_ioctl(struct file    * filp,
     }
 
     switch (cmd) {
-    case IOCTL_ADD_PATH:
-        /* copy the path len */
-        if (copy_from_user(&pathlen, (size_t *)arg, sizeof(size_t))) {
-            NEXUS_ERROR("copy_from_user FAILED\n");
-            return -EFAULT;
-        }
+	case IOCTL_ADD_PATH: {
+	    char * path = kmalloc(PATH_MAX, GFP_KERNEL);
+	    
+	    if (path == NULL) {
+		NEXUS_ERROR("Could not allocate space for path\n");
+		ret = -1;
+		break;
+	    }
+	    
+	    ret = strncpy_from_user(path, (char *)arg, PATH_MAX);
 
-        /* allocate the path for the buffer */
-        path = (char *)kzalloc(pathlen + 1, GFP_KERNEL);
-        if (path == NULL) {
-            NEXUS_ERROR("allocation error");
-            return -ENOMEM;
-        }
-
-        /* copy the string from userspace */
-        if (copy_from_user(path, (char *)arg, pathlen)) {
-            NEXUS_ERROR("copy_from_user failed\n");
-            return -EFAULT;
-        }
-
-        path[pathlen] = '\0';
-        printk(KERN_INFO "path: %s\n", path);
-
-        if (nexus_add_volume(path)) {
-            NEXUS_ERROR("adding '%s' FAILED\n", path);
-            err = -1;
-        }
-
-        kfree(path);
-        break;
+	    if ( (ret == 0) ||
+		 (ret == PATH_MAX) ) {
+		NEXUS_ERROR("Tried to register a path with invalid length (ret = %d)\n", ret);
+		ret = -ERANGE;
+		break;
+	    } else if (ret < 0) {
+		NEXUS_ERROR("Error copying path from userspace\n");
+		break;
+	    }
+ 	    	    
+	    /* copy the string from userspace */
+	    nexus_printk("path: %s\n", path);
+	    
+	    ret = create_nexus_volume(path);
+	    
+	    if (ret == -1) {
+		NEXUS_ERROR("Could not create volume '%s'\n", path);
+		ret = -1;
+	    }
+	    
+	    kfree(path);
+	    
+	    break;
+	}
 
     case IOCTL_MMAP_SIZE:
 
         if (copy_to_user((char *)arg, &dev->xfer_len, sizeof(dev->xfer_len))) {
             NEXUS_ERROR("sending mmap order FAILED\n");
-            err = -1;
+            ret = -1;
         }
         break;
 
     default:
-        err = -1;
+        ret = -1;
     }
 
-    return err;
+    return ret;
 }
 
 static int
@@ -301,21 +230,6 @@ nexus_mmap(struct file           * filp,
     return 0;
 }
 
-static unsigned int
-nexus_poll(struct file              * filp,
-	   struct poll_table_struct * poll_tb)
-{
-    unsigned int  mask = POLLIN | POLLRDNORM;
-
-    poll_wait(filp, &(cmd_queue.daemon_waitq), poll_tb);
-
-    if (cmd_queue.active == 1) {
-	return mask;
-    }
-    
-    return 0;
-}
-
 static struct file_operations nexus_mod_fops = {
     .owner          = THIS_MODULE,
     .unlocked_ioctl = nexus_ioctl,
@@ -324,7 +238,6 @@ static struct file_operations nexus_mod_fops = {
     .mmap           = nexus_mmap,
     .write          = nexus_write,
     .read           = nexus_read,
-    .poll           = nexus_poll
 };
 
 static int
@@ -365,66 +278,7 @@ static struct file_operations nexus_proc_fops = {
 };
 
 
-int
-nexus_send_cmd(uint32_t    cmd_len,
-	       uint8_t   * cmd_data,
-	       uint32_t  * resp_len,
-	       uint8_t  ** resp_data)
-{
-    int ret = 0;
-    
-    // acquire cmd_queue mutex
-    ret = mutex_lock_interruptible(&(cmd_queue.lock));
 
-    if (ret != 0) {
-	NEXUS_ERROR("Command Queue Mutex lock was interrupted...\n");
-	goto out2;
-    }
-    
-    // set data + len
-    // mark as active
-    cmd_queue.cmd_data  = cmd_data;
-    cmd_queue.cmd_len   = cmd_len;    
-    cmd_queue.resp_len  = 0;
-    cmd_queue.resp_data = NULL;
-    
-    cmd_queue.active    = 1;
-
-    __asm__ ("":::"memory");
-    
-    // wakeup waiting daemon
-    wake_up_interruptible(&(cmd_queue.daemon_waitq));
-
-    // wait on kernel waitq until cmd is complete
-    // ...Eh fuck it, lets just burn the cpu
-    while (cmd_queue.complete == 0) schedule();
-
-    __asm__ ("":::"memory");
-
-
-    if (cmd_queue.error == 1) {
-	ret = -1;
-	
-	goto out1;
-    }
-    
-    // copy resp len/data ptrs
-    *resp_len  = cmd_queue.resp_len;
-    *resp_data = cmd_queue.resp_data;
-
-    // reset cmd_queue
-    cmd_queue.active    = 0;
-    cmd_queue.complete  = 0;
-
- out1:
-    
-    // release mutex
-    mutex_unlock(&(cmd_queue.lock));
-
- out2:
-    
-    return ret;
-}
 
 
 /**
@@ -522,17 +376,6 @@ out:
     return err;
 }
 
-static int
-init_cmd_queue(void)
-{
-    memset(&cmd_queue, 0, sizeof(struct nexus_cmd_queue));
-
-    init_waitqueue_head(&(cmd_queue.daemon_waitq));
-
-    mutex_init(&(cmd_queue.lock));
-    
-    return 0;
-}
 
 
 int
@@ -548,8 +391,6 @@ nexus_mod_init(void)
 
 
     nexus_printk("Initializing Nexus\n");
-
-    init_cmd_queue();
 
 
     /********************************/

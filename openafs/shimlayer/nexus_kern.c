@@ -4,8 +4,104 @@
 #include <linux/list.h>
 #include <linux/string.h>
 
+#include "nexus_kern.h"
+
 static const char *   AFS_PREFIX     = "/afs";
 static const uint32_t AFS_PREFIX_LEN = 4;
+
+
+
+
+
+static char   __path_buf[PATH_MAX];
+static DEFINE_MUTEX(__path_buf_mutex);
+
+
+int
+nexus_kern_init(void)
+{
+    mutex_init(&__path_buf_mutex);
+
+    return 0;
+}
+
+
+static char *
+__get_path_buffer(void)
+{
+    mutex_lock(&__path_buf_mutex);
+    return __path_buf;
+}
+
+
+static void
+__put_path_buffer(char * buffer)
+{
+    mutex_unlock(&__path_buf_mutex);
+}
+
+char *
+nexus_get_path_from_dentry(struct dentry * dentry)
+{
+    char * afs_path    = NULL;
+    char * tmp_path    = NULL;
+    char * path_buffer = NULL;
+
+    path_buffer = __get_path_buffer();
+
+    if (path_buffer == NULL) {
+	NEXUS_ERROR("Could not get path buffer\n");
+	goto out1;
+    }
+    
+    tmp_path = dentry_path_raw(dentry, path_buffer, PATH_MAX);
+
+    if (IS_ERR_OR_NULL(tmp_path)) {
+	NEXUS_ERROR("Could not decode dentry path\n");
+	goto out2;
+    }
+    
+    afs_path = kasprintf(GFP_KERNEL, "%s%s", AFS_PREFIX, tmp_path);
+
+    if (afs_path == NULL) {
+	NEXUS_ERROR("Could not allocate full path\n");
+	goto out2;
+    }
+    
+ out2:    
+    __put_path_buffer(path_buffer);
+ out1:
+    return afs_path;
+}
+
+
+char * 
+nexus_get_path_from_vcache(struct vcache * vcache)
+{
+    struct dentry * dentry = NULL;
+    char          * path   = NULL;
+
+    if ( (vcache             == NULL) ||
+	 (vnode_type(vcache) == NEXUS_ANY) ) {
+        return NULL;
+    }
+
+    /* this calls a dget(dentry) */
+    dentry = d_find_alias(AFSTOV(vcache));
+
+    /* maybe check that the dentry is not disconnected? */
+    path = nexus_get_path_from_dentry(dentry);
+
+    dput(dentry);
+    
+    return path;
+}
+
+
+
+
+
+
 
 /* the list of all paths watched */
 LIST_HEAD(nexus_volumes_head);
@@ -75,90 +171,10 @@ NEXUS_DISCONNECTED()
     return NEXUS_IS_OFFLINE;
 }
 
-// a dummy buffer that checks if a dentry path is in the watchlist
-static char   path_buf[4096];
-static size_t path_buf_len = sizeof(path_buf);
-static DEFINE_MUTEX(path_buf_mutex);
 
-int
-nexus_kern_init(void)
-{
-    mutex_init(&path_buf_mutex);
 
-    return 0;
-}
 
-int
-nexus_dentry_path(const struct dentry  * dentry,
-		  char                ** dest)
-{
-    struct nexus_volume_path * curr_entry = NULL;
 
-    char * path       = NULL;
-    char * result     = NULL;
-    char * buf        = NULL;
-
-    int    len        = 0;
-    int    total_len  = 0;
-
-    if ( (dentry == NULL) ||
-	 (d_is_special(dentry)) ) {
-        return 1;
-    }
-
-    buf = path_buf;
-
-    mutex_lock(&path_buf_mutex);
-    path = dentry_path_raw((struct dentry *)dentry, buf, path_buf_len);
-
-    if (IS_ERR_OR_NULL(path)) {
-        print_hex_dump(
-            KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 1, buf, sizeof(buf), 1);
-
-        mutex_unlock(&path_buf_mutex);
-        return 1;
-    }
-
-    list_for_each_entry(curr_entry, &nexus_volumes_head, list)
-    {
-        if (startsWith(curr_entry->afs_path, path) && dest) {
-            len = strlen(path);
-
-            total_len = AFS_PREFIX_LEN + len;
-            result    = kmalloc(total_len + 1, GFP_KERNEL);
-            memcpy(result, AFS_PREFIX, AFS_PREFIX_LEN);
-            memcpy(result + AFS_PREFIX_LEN, path, len);
-            result[total_len] = '\0';
-            *dest             = result;
-
-            mutex_unlock(&path_buf_mutex);
-            return 0;
-        }
-    }
-
-    mutex_unlock(&path_buf_mutex);
-    return 1;
-}
-
-int
-nexus_vnode_path(const struct vcache * avc, char ** dest)
-{
-    int             ret = -1;
-    struct dentry * dentry;
-
-    if (avc == NULL || vnode_type(avc) == NEXUS_ANY) {
-        return -1;
-    }
-
-    /* this calls a dget(dentry) */
-    dentry = d_find_alias(AFSTOV((struct vcache *)avc));
-    /* maybe check that the dentry is not disconnected? */
-    ret = nexus_dentry_path(dentry, dest);
-
-    dput(dentry);
-
-    return ret;
-}
 
 void
 nexus_kern_ping(void)

@@ -1,35 +1,26 @@
 #pragma once
-#ifndef MODULE
 #include <stdint.h>
 #include <stdlib.h>
 
 #include <linux/ioctl.h>
 
-#include <uuid/uuid.h>
-#endif
+//#include <uuid/uuid.h>
 
 #include <nexus.h>
 
-#ifndef PAGE_SIZE
-#define PAGE_SIZE (4096)
-#endif
 
 #define NEXUS_IOC_MAGIC 'W'
-#define IOCTL_ADD_PATH  _IOW(NEXUS_IOC_MAGIC, 1, char *)
+#define NEXUS_IOCTL_CREATE_VOLUME  _IOW(NEXUS_IOC_MAGIC, 1, char *)
 #define IOCTL_MMAP_SIZE _IOR(NEXUS_IOC_MAGIC, 2, int *)
 #define NEXUS_IOC_MAXNR 2
 
-#define NEXUS_MOD_NAME      "nexus_mod"
-#define NEXUS_PROC_NAME     "nexus_proc"
 
-/* for the transfer buffers */
-#define NEXUS_DATA_BUFPAGES (1)
-#define NEXUS_DATA_BUFLEN (PAGE_SIZE << NEXUS_DATA_BUFPAGES)
+#define NEXUS_DEVICE "/dev/nexus"
 
-struct nexus_volume_path {
-    uint32_t len;
-    char   path[0];
-};
+
+#define NEXUS_DATABUF_SIZE (4096 * 32)
+
+
 
 typedef enum {
     ACL_READ       = 0x1,
@@ -42,16 +33,6 @@ typedef enum {
 } acl_type_t;
 
 
-typedef struct {
-    uint32_t      op;
-    uint32_t      xfer_size;
-    uint64_t      offset;
-    uint64_t      file_size;
-} __attribute__((packed)) xfer_req_t;
-
-typedef struct {
-    int xfer_id;
-} __attribute__((packed)) xfer_rsp_t;
 
 /* the shim layer messages between kernel and userspace */
 typedef enum {
@@ -76,17 +57,5 @@ typedef enum {
     AFS_OP_DECRYPT_STOP  = 19
 } afs_op_type_t;
 
-struct afs_op_msg {
-    afs_op_type_t type;
-    uint16_t      msg_id; /* the ID of the message */
-    uint16_t      ack_id; /* the message it responds to */
-    uint32_t      len;    /* the length of the payload */
-    int32_t       status; /* status from the call, set by return */
-    char          payload[0];
-};
 
-#define AFS_OP_MSG_SIZE(m)\
-    sizeof(struct afs_op_msg) + (((struct afs_op_msg *)m)->len)
 
-/* counter for request and response messages */
-typedef uint16_t mid_t;

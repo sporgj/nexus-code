@@ -1,12 +1,14 @@
 #pragma once
 
-// clang-format off
-// the headers have to be in this specific order
+
+#include <linux/dcache.h>
+
 #include <afsconfig.h>
 #include "afs/param.h"
 #include "afs/sysincludes.h"
 #include "afsincludes.h"
-// clang-format on
+
+
 
 
 typedef enum {
@@ -15,6 +17,12 @@ typedef enum {
     NEXUS_DIR  = 2,
     NEXUS_LINK = 3
 } nexus_fs_obj_type_t;
+
+
+
+
+char * nexus_get_path_from_dentry(struct dentry * dentry);
+char * nexus_get_path_from_vcache(struct vcache * vcache);
 
 
 

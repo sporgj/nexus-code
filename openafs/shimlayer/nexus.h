@@ -31,9 +31,3 @@ struct nexus_fs_acl {
 };
 
 
-
-int
-nexus_send_cmd(u32    cmd_len,
-	       u8   * cmd_data,
-	       u32  * resp_len,
-	       u8  ** resp_data);
