@@ -18,12 +18,10 @@
 
 
 static const char * generic_cmd_str =		\
-    "{\n"					\
     "\"op\"   : %d,"     "\n"			\
     "\"name\" : \"%s\"," "\n"			\
     "\"path\" : \"%s\"," "\n"			\
-    "\"type\" : %d"      "\n"			\
-    "}";
+    "\"type\" : %d"      "\n";
 
 
 int
@@ -320,11 +318,10 @@ nexus_kern_remove(struct vcache        * avc,
 
 
 static const char * symlink_cmd_str =		\
-    "{\n"					\
     "\"op\"     : %d,"     "\n"			\
     "\"source\" : \"%s\"," "\n"			\
-    "\"target\" : \"%s\"" "\n"			\
-    "}";
+    "\"target\" : \"%s\"" "\n";
+
 
 int
 nexus_kern_symlink(struct dentry  * dentry,
@@ -416,11 +413,9 @@ nexus_kern_symlink(struct dentry  * dentry,
 
 
 static const char * hardlink_cmd_str =		\
-    "{\n"					\
     "\"op\"     : %d,"     "\n"			\
     "\"source\" : \"%s\"," "\n"			\
-    "\"target\" : \"%s\"," "\n"			\
-    "}";
+    "\"target\" : \"%s\"," "\n";
 
 int
 nexus_kern_hardlink(struct dentry  * old_dentry,
@@ -532,18 +527,16 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 }
 
 static const char * filldir_cmd_str =			\
-    "{\n"						\
-    "\"op\"          : %d,"     "\n"			\
-    "\"parent_dir\"  : \"%s\"," "\n"			\
-    "\"shadow_name\" : \"%s\"," "\n"			\
-    "\"type\"        : %d"      "\n"			\
-    "}";
+    "\"op\"         : %d,"     "\n"			\
+    "\"path\"       : \"%s\"," "\n"			\
+    "\"nexus_name\" : \"%s\"," "\n"			\
+    "\"type\"       : %d"      "\n";
 
 int
 nexus_kern_filldir(char                 * parent_dir,
-                   char                 * shadow_name,
+                   char                 * nexus_name,
                    nexus_fs_obj_type_t    type,
-                   char                ** nexus_name)
+                   char                ** real_name)
 {
     struct nexus_volume * vol = NULL;
     
@@ -562,7 +555,7 @@ nexus_kern_filldir(char                 * parent_dir,
     }
 
     
-    cmd_str = kasprintf(GFP_KERNEL, filldir_cmd_str, AFS_OP_FILLDIR, parent_dir, shadow_name, type);
+    cmd_str = kasprintf(GFP_KERNEL, filldir_cmd_str, AFS_OP_FILLDIR, parent_dir, nexus_name, type);
 
     if (cmd_str == NULL) {
 	NEXUS_ERROR("Could not create command string\n");
@@ -583,8 +576,8 @@ nexus_kern_filldir(char                 * parent_dir,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
-					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",      NEXUS_JSON_S32,    0},
+					    {"real_name", NEXUS_JSON_STRING, 0} };
 
 	s32 ret_code = 0;
 	
@@ -604,7 +597,9 @@ nexus_kern_filldir(char                 * parent_dir,
 	    goto out;
 	}
 
-	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
+	*real_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
+
+	nexus_json_release_params(resp, 2);
     }
 
     
@@ -616,13 +611,12 @@ nexus_kern_filldir(char                 * parent_dir,
 }
 
 static const char * rename_cmd_str =		\
-    "{\n"					\
     "\"op\"        : %d,"     "\n"		\
     "\"old_path\"  : \"%s\"," "\n"		\
     "\"old_name\"  : \"%s\"," "\n"		\
     "\"new_path\"  : \"%s\"," "\n"		\
-    "\"new_name\"  : \"%s\""  "\n"		\
-    "}";
+    "\"new_name\"  : \"%s\""  "\n";
+
 
 int
 nexus_kern_rename(struct vcache  * old_vcache,

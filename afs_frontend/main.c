@@ -9,15 +9,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <nexus_log.h>
+#include <nexus_util.h>
 
 #include "afs.h"
-#include "log.h"
-
-
-
-// TODO this is temporary
-// For now, we can only watch files from alice and kdb
-#define AFS_CELL_PATH "/afs/maatta.sgx/user"
+#include "handler.h"
 
 
 
@@ -50,15 +46,6 @@ create_nexus_volume(char * path)
 }
     
 
-int
-handle_afs_command(uint8_t   * cmd_buf,
-		   uint32_t    cmd_size,
-		   uint8_t  ** resp_buf,
-		   uint32_t  * resp_size)
-{
-    
-    return 0;    
-}
 
 static int
 handle_afs_cmds(int volume_fd)
@@ -156,16 +143,17 @@ handle_afs_cmds(int volume_fd)
 
 	printf("AFS Command = %s\n", cmd_buf);
 
-	return -1;
 
-
-	
-	ret = handle_afs_command(cmd_buf, size, &resp_buf, (uint32_t *)&resp_size);
+	ret = dispatch_nexus_command(cmd_buf, size, &resp_buf, (uint32_t *)&resp_size);
 
 	if (ret == -1) {
 	    log_error("Error handling AFS command\n");
 	    return -1;
 	}
+
+	printf("Writing response at %p (size = %d)\n", resp_buf, resp_size);
+	printf("Response: %s\n", resp_buf);
+	
 	
 	ret = write(volume_fd, resp_buf, resp_size);
 

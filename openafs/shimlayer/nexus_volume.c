@@ -232,12 +232,14 @@ static ssize_t
 volume_write(struct file       * filp,
 	     const char __user * buf,
 	     size_t              count,
-	     loff_t *            f_pos)
+	     loff_t            * f_pos)
 {
     struct nexus_volume * vol = filp->private_data;
     
     uint8_t * resp = NULL;
     int       ret  = 0;
+
+    nexus_printk("Write of Size %lu\n", count);
     
     // check size of resp
     // too large: set error flag in cmd_queue, mark cmd_queue complete, and return -EINVAL
@@ -249,13 +251,15 @@ volume_write(struct file       * filp,
     // kmalloc buffer for resp
     resp = kmalloc(count, GFP_KERNEL);
 
-    if (PTR_ERR(resp)) {
-	NEXUS_ERROR("Could not allocate kernel memory for response\n");
+    if (IS_ERR(resp)) {
+	NEXUS_ERROR("Could not allocate kernel memory for response (count=%lu)\n", count);
 	return -ENOMEM;
     }
     
     // copy_from_user
     ret = copy_from_user(resp, buf, count);
+
+    NEXUS_DEBUG("Write copy_from_user returned %d\n", ret);
     
     if (ret) {
 	NEXUS_ERROR("Could not copy response from userspace\n");

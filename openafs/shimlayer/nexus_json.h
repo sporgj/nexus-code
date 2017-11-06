@@ -17,7 +17,8 @@ struct nexus_json_param {
     char              * name;
 
     nexus_json_type_t   type;
-    uintptr_t           val;    
+
+    uintptr_t       val;
 };
 
 
@@ -25,3 +26,11 @@ int
 nexus_json_parse(char                    * str,
 		 struct nexus_json_param * params,
 		 u32                       num_params);
+
+
+
+int
+nexus_json_release_params(struct nexus_json_param * params,
+                          uint32_t                  num_params);
+
+

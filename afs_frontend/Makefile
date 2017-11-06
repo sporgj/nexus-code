@@ -8,14 +8,13 @@ AR = ar
 
 
 exec_objs :=	main.o \
+		handler.o
 
-#	 	rpc.o  \
-#		xdr.o  \
-#		xdr_mem.o
+test_objs :=	test.o \
+		handler.o
 
 
-libs := 
-#../libnexus/libnexus.a
+libs := ../libnexus/libnexus.a
 
 build = \
         @if [ -z "$V" ]; then \
@@ -27,7 +26,7 @@ build = \
         fi
 
 
-all: nexus-afs
+all: nexus-afs nexus-test
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -45,7 +44,8 @@ all: nexus-afs
 nexus-afs: $(exec_objs)
 	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
 
-
+nexus-test: $(test_objs)
+	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
 
 
 
