@@ -4,13 +4,10 @@ CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=
 
 
 
-objs := nx_enclave_u.o\
-	nx_main.o\
-	nx_volume.o\
-	nx_utils.o\
-	nx_dirops.o\
-	nx_encode.o
-
+objs :=	nexus_fs_ops.o \
+	nexus_json.o \
+	jsmn.o \
+	nexus_util.o 
 build = \
         @if [ -z "$V" ]; then \
                 echo '    [$1]  $@'; \
@@ -32,14 +29,6 @@ all: libnexus.a
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
-
-nx_enclave_u.c: enclave/nx_enclave.edl
-	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
-	@echo "GEN =>  $@"
-
-nx_enclave_u.o: nx_enclave_u.c
-	$(CC) $(App_C_Flags) -c $< -o $@
-	@echo "CC <= $^"
 
 
 libnexus.a: $(objs)
