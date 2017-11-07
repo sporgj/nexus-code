@@ -5,12 +5,16 @@ CC=gcc
 APP_PATH = ..
 OBJS = nx_enclave_main.o
 
+CRYPTO_LIB := mbedtls/library/libmbedcrypto.a
+CRYPTO_CONFIG := mbedtls/include/mbedtls/config.h
+CRYPTO_PATCH_FILE := force-aesni-mbedtls.patch
+
 FLAGS := $(Enclave_C_Flags)
 
 .PHONY: all
 all: nx_enclave.signed.so
 
-Enclave_C_Flags += -DNEXUS_ENCLAVE  -I../ \
+Enclave_C_Flags += -DNEXUS_ENCLAVE -Imbedtls/include  -I../ \
 
 %.o: %.cc
 	@$(CXX) $(Enclave_Cpp_Flags) -c $< -o $@
@@ -35,11 +39,19 @@ nx_enclave_t.o: nx_enclave_t.c
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC => $@"
 
+$(CRYPTO_CONFIG): mbedtls-config.h
+	cp $^ $@
 
+$(CRYPTO_LIB): $(CRYPTO_CONFIG)
+	make -C mbedtls/library
 
-nx_enclave.so: nx_enclave_t.o $(OBJS)
+libmbedcrypto.a: $(CRYPTO_LIB)
+	@make -C mbedtls/library && cp $^ .
+	@echo "cp $^ => $@"
+
+nx_enclave.so: nx_enclave_t.o $(OBJS) $(CRYPTO_LIB)
 	@echo $(SIV_OBJS)
-	$(CC) $^ -o $@ $(Enclave_Link_Flags) $(FLAGS)
+	@$(CC) $^ -o $@ $(Enclave_Link_Flags) $(FLAGS)
 	@echo "LINK => $@"
 
 nx_enclave.signed.so: nx_enclave.so private_key.pem
@@ -49,3 +61,7 @@ nx_enclave.signed.so: nx_enclave.so private_key.pem
 .PHONY: clean
 clean:
 	rm -rf *.so *.o nx_enclave_t.*
+
+.PHONY: distclean
+distclean: clean
+	make clean -C mbedtls/library
