@@ -14,6 +14,8 @@ struct nexus_volume {
 
     struct kref refcount; 
 
+    bool is_online;
+
     struct {
 	wait_queue_head_t   daemon_waitq;
 	struct mutex        lock;

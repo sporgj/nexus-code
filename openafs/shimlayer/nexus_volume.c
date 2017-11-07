@@ -168,7 +168,14 @@ nexus_send_cmd(struct nexus_volume * vol,
 
     // wait on kernel waitq until cmd is complete
     // ...Eh fuck it, lets just burn the cpu
-    while (vol->cmd_queue.complete == 0) schedule();
+    while (vol->cmd_queue.complete == 0) {
+	if (!vol->is_online) {
+	    ret = -1;
+	    goto out1;
+	}
+
+	schedule();
+    }
 
     __asm__ ("":::"memory");
 
@@ -306,6 +313,7 @@ volume_release(struct inode * inode,
     struct nexus_volume * vol = filp->private_data;
 
     NEXUS_DEBUG("Release Volume (%s)\n", vol->path);
+    vol->is_online = 0;
     
     nexus_put_volume(vol);
     
@@ -382,6 +390,7 @@ create_nexus_volume(char * path)
 	goto err4;
     }
 
+    vol->is_online = 1;
     
     return vol_fd;
 
