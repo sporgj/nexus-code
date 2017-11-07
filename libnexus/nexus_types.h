@@ -13,6 +13,7 @@ extern "C" {
 #define CONFIG_EKEY_BYTES   16
 #define CONFIG_IV_BYTES     16
 #define CONFIG_TAG_BYTES    16
+#define CONFIG_HASH_BYTES   32 // sha256
 // clang-format on
 
 struct uuid {

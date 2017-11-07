@@ -4,14 +4,10 @@
 #include <stdlib.h>
 
 #include "nexus.h"
-#include "log.h"
+#include "nexus_log.h"
 
-#include "nx_types.h"
-
-/* nx_utils.c */
-void
-generate_uuid(struct uuid * uuid);
-
+#include "nexus_types.h"
+#include "nexus_util.h"
 
 /* nx_encode.c */
 char *

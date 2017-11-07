@@ -1,5 +1,9 @@
 include build.mk
 
+MBEDTLS_PATH ?= /usr/local/include/mbedtls/include
+MBEDTLS_LIB ?= -lmbedtls
+
+INCLUDES += -I$(MBEDTLS_PATH)
 CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES) $(App_C_Flags)
 
 
