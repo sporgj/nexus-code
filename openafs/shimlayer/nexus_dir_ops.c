@@ -87,8 +87,8 @@ nexus_kern_create(struct vcache        * avc,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
-					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    {0}},
+					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
 	
@@ -184,8 +184,8 @@ nexus_kern_lookup(struct vcache        * avc,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
-					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    {0}},
+					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
 	
@@ -280,8 +280,8 @@ nexus_kern_remove(struct vcache        * avc,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
-					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    {0}},
+					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
 	
@@ -378,8 +378,8 @@ nexus_kern_symlink(struct dentry  * dentry,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
-					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    {0}},
+					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
 	
@@ -491,8 +491,8 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    0},
-					    {"nexus_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",       NEXUS_JSON_S32,    {0}},
+					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
 	
@@ -576,8 +576,8 @@ nexus_kern_filldir(char                 * parent_dir,
 
     // handle response...
     {
-	struct nexus_json_param resp[2] = { {"code",      NEXUS_JSON_S32,    0},
-					    {"real_name", NEXUS_JSON_STRING, 0} };
+	struct nexus_json_param resp[2] = { {"code",      NEXUS_JSON_S32,    {0}},
+					    {"real_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
 	
@@ -721,10 +721,10 @@ nexus_kern_rename(struct vcache  * old_vcache,
 
     // handle response...
     {
-	struct nexus_json_param resp[3] = { {"code",           NEXUS_JSON_S32,    0},
-					    {"old_nexus_name", NEXUS_JSON_STRING, 0},
-					    {"new_nexus_name", NEXUS_JSON_STRING, 0} };
-
+	struct nexus_json_param resp[3] = { {"code",           NEXUS_JSON_S32,    {0}},
+					    {"old_nexus_name", NEXUS_JSON_STRING, {0}},
+					    {"new_nexus_name", NEXUS_JSON_STRING, {0}} };
+	
 	s32 ret_code = 0;
 	
 	ret = nexus_json_parse(resp_data, resp, 2);

@@ -18,7 +18,11 @@ struct nexus_json_param {
 
     nexus_json_type_t   type;
 
-    uintptr_t       val;
+    union {
+	uintptr_t       val;
+	void          * ptr;
+    };
+    
 };
 
 

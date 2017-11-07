@@ -211,7 +211,8 @@ volume_read(struct file * filp,
     nexus_printk("Read of size %lu\n", count);
 
 
-    if (vol->cmd_queue.active == 0) {
+    if ((vol->cmd_queue.active   == 0) ||
+	(vol->cmd_queue.complete == 1)) {
 	return 0;
     }
 
@@ -289,7 +290,8 @@ volume_poll(struct file              * filp,
 
     poll_wait(filp, &(vol->cmd_queue.daemon_waitq), poll_tb);
 
-    if (vol->cmd_queue.active == 1) {
+    if ((vol->cmd_queue.active   == 1) &&
+	(vol->cmd_queue.complete == 0)) {
 	return mask;
     }
     

@@ -330,7 +330,7 @@ nexus_json_parse(char                    * str,
     int param_overflow = 0;
     
 
-    log_debug("JSON String:\n%s\n", str);
+    log_debug("Parsing JSON String:\n%s\n", str);
     
     /* Initialize JSMN parser */
     jsmn_init(&parser);
@@ -377,10 +377,6 @@ nexus_json_parse(char                    * str,
 	    goto out;
 	}
 
-
-
-	printf("val_tok.start=%d\n", val_tok->start);
-	printf("name_tok.start=%d\n", name_tok->start);
 
 	switch (params[i].type) {
 	    case NEXUS_JSON_U8:

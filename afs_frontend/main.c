@@ -121,7 +121,11 @@ handle_afs_cmds(int volume_fd)
 	
 	size = read(volume_fd, NULL, 0);
 
-	if (size <= 0) {
+	
+	if (size == 0) {
+	    log_error("Read of size (0). continuing...\n");
+	    continue;
+	} else if (size < 0) {
 	    log_error("Invalid read size from AFS module (size=%d)\n", size);
 	    return -1;
 	}
@@ -141,7 +145,7 @@ handle_afs_cmds(int volume_fd)
 	}
 
 
-	printf("AFS Command = %s\n", cmd_buf);
+
 
 
 	ret = dispatch_nexus_command(cmd_buf, size, &resp_buf, (uint32_t *)&resp_size);
@@ -151,7 +155,6 @@ handle_afs_cmds(int volume_fd)
 	    return -1;
 	}
 
-	printf("Writing response at %p (size = %d)\n", resp_buf, resp_size);
 	printf("Response: %s\n", resp_buf);
 	
 	

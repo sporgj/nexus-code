@@ -59,7 +59,6 @@ handle_lookup(uint8_t   * cmd_buf,
  out:
     
     nexus_json_release_params(lookup_cmd, 4);
-    printf("lookup returning %d\n", ret);
     
     return ret;
 	
@@ -96,7 +95,7 @@ handle_filldir(uint8_t   * cmd_buf,
 
 
     /* Handle Lookup */
-    ret = nexus_lookup(filldir_cmd[2].ptr, filldir_cmd[1].ptr, filldir_cmd[3].val, &real_name);
+    ret = nexus_lookup(filldir_cmd[1].ptr, filldir_cmd[2].ptr, filldir_cmd[3].val, &real_name);
 
     ret = asprintf((char **)resp_buf, "code : %d, real_name : \"%s\"", ret, real_name);
 	
@@ -112,7 +111,6 @@ handle_filldir(uint8_t   * cmd_buf,
  out:
     
     nexus_json_release_params(filldir_cmd, 4);
-    printf("filldir returning %d\n", ret);
     
     return ret;
 

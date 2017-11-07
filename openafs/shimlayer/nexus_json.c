@@ -17,7 +17,7 @@ nexus_json_parse(char                    * str,
     int ret            = -1;
     int i              = 0;
 
-    
+    NEXUS_DEBUG("PARSING (%s)\n", str);
     
     /* Initialize JSMN parser */
     jsmn_init(&parser);
@@ -54,7 +54,7 @@ nexus_json_parse(char                    * str,
 	char * value = str +  val_tok->start;
 	
 	if (strncmp(params[i].name, name, strlen(params[i].name)) != 0) {
-	    NEXUS_ERROR("Erro matching JSON format\n");
+	    NEXUS_ERROR("Error matching JSON format\n");
 	    goto out;
 	}	
 
@@ -180,8 +180,8 @@ nexus_json_parse(char                    * str,
 		    goto out;
 		}
 
-		params[i].val = kzalloc(tmp_len + 1, GFP_KERNEL);
-		strncpy(params[i].val, value, tmp_len);
+		params[i].ptr = kzalloc(tmp_len + 1, GFP_KERNEL);
+		strncpy(params[i].ptr, value, tmp_len);
 		
 		break;
 	    }
