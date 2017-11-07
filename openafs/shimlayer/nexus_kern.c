@@ -47,6 +47,11 @@ nexus_get_path_from_dentry(struct dentry * dentry)
     char * tmp_path    = NULL;
     char * path_buffer = NULL;
 
+    if (dentry == NULL) {
+	NEXUS_DEBUG("Tried to get path from NULL dentry...\n");
+	return NULL;
+    }
+    
     path_buffer = __get_path_buffer();
 
     if (path_buffer == NULL) {

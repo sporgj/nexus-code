@@ -130,6 +130,15 @@ nexus_ioctl(struct file    * filp,
  	    	    
 	    /* copy the string from userspace */
 	    nexus_printk("path: %s\n", path);
+
+
+	    /* We need some way to check the input path against the actual file system structure....
+	     * Probably do a dentry lookup and verify that it esists....
+	     */
+	    if (path[0] == '\0') {
+		NEXUS_ERROR("Tried to register empty path\n");
+		return -1;
+	    }
 	    
 	    ret = create_nexus_volume(path);
 	    

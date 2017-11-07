@@ -11,11 +11,6 @@ cd openafs
 make
 make install
 
-cp openafs/src/aklog/aklog ./bin
-cp openafs/src/afsd/afsd ./bin
-cp openafs/src/venus/fs ./bin
-cp openafs/src/libafs/MODLOAD-4.4.0-62-generic-MP/libafs.ko ./
-
 make -C libnexus        # builds the nexus vfs core library
 make -C afs_frontend    # builds the application
 
