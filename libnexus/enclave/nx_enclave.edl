@@ -1,6 +1,6 @@
 enclave {
 
-    include "nx_types.h"
+    include "nexus_types.h"
 
     trusted {
 
@@ -12,16 +12,22 @@ enclave {
          * @param root_uuid_in will be the root uuid
          * @param supernode_buffer_out will be the output buffer of the supernode
          * @param dirnode_buffer_out will be the output buffer of the dirnode
+         * @param volume_rootkey_out sealed rootkey
          */
         public int ecall_create_volume(
             [user_check] struct uuid * supernode_uuid_in,
             [user_check] struct uuid * root_uuid_in,
-            [in] const char * publickey_str_in,
+            [in, string] const char * publickey_str_in,
             size_t publickey_str_len,
             [user_check] uint8_t * supernode_buffer_out,
-            [user_check] uint8_t * dirnode_buffer_out
+            [user_check] uint8_t * dirnode_buffer_out,
+            [user_check] crypto_ekey_t * volume_rootkey_out
         );
                                     
+    };
+
+    untrusted {
+        void ocall_print([in, string] const char * str);
     };
 
 };

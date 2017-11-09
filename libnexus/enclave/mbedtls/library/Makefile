@@ -24,12 +24,12 @@ WINDOWS_BUILD=1
 endif
 
 # To compile as a shared library:
-ifdef SHARED
+# ifdef SHARED
 # all code is position-indep with mingw, avoid warning about useless flag
 ifndef WINDOWS_BUILD
 LOCAL_CFLAGS += -fPIC -fpic
 endif
-endif
+# endif
 
 SOEXT_TLS=so.10
 SOEXT_X509=so.0

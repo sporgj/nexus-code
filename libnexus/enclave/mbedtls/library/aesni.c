@@ -45,13 +45,14 @@
 /*
  * AES-NI support detection routine
  */
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 int mbedtls_aesni_has_support( unsigned int what )
 {
+    /* NEXUS enclave stuff */
+#if 0
     static int done = 0;
     static unsigned int c = 0;
 
-    /* NEXUS enclave stuff */
-#if 0
     if( ! done )
     {
         asm( "movl  $1, %%eax   \n\t"
@@ -66,6 +67,7 @@ int mbedtls_aesni_has_support( unsigned int what )
 #endif
     return 1;
 }
+#pragma GCC diagnostic pop
 
 /*
  * Binutils needs to be at least 2.19 to support AES-NI instructions.
