@@ -24,6 +24,32 @@ enclave {
             [user_check] crypto_ekey_t * volume_rootkey_out
         );
                                     
+        /**
+         * Initiates a user authentication with the enclave. The enclave responds
+         * with a nonce challenge.
+         * @param publickey_str_in is the user's public key
+         * @param nonce_out will be the attached challenge
+         */
+        public int ecall_authentication_request(
+            [in, string] const char * publickey_str_in,
+            [out] nonce_t * nonce_out
+        );
+
+        /**
+         * Responds to the enclave challenge from above.
+         * @param volume_rootkey_in the sealed volume rootkey
+         * @param supernode_in the supernode to authenticate
+         * @param signature_in [nonce | supernode_in] user_privatekey
+         * @param signature_len
+         * @return 0 on success
+         */
+        public int ecall_authentication_response(
+            [user_check] crypto_ekey_t * volume_rootkey_in,
+            [user_check] struct supernode * supernode_in,
+            [user_check] uint8_t * signature_in,
+            size_t signature_len
+        );
+
     };
 
     untrusted {

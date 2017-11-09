@@ -2,6 +2,12 @@
 
 sgx_key_128bit_t enclave_sealing_key;
 
+// the public key of the authenticating user
+static const char * auth_user_pubkey = NULL;
+
+// the nonce of the authentication challenge
+static nonce_t auth_nonce;
+
 int
 ecall_init_enclave()
 {
@@ -81,4 +87,31 @@ ecall_create_volume(struct uuid * supernode_uuid_in,
     ret = 0;
 out:
     return ret;
+}
+
+// TODO
+int
+ecall_authentication_request(const char * publickey_str_in, nonce_t * nonce_out)
+{
+    // copy the publickey into the enclave
+
+    // generate challenge and copy out
+
+    return 0;
+}
+
+// TODO
+int
+ecall_authentication_response(crypto_ekey_t *    volume_rootkey_in,
+                              struct supernode * supernode_in,
+                              uint8_t *          signature_in,
+                              size_t             signature_len)
+{
+    // unseal rootkey and verify supernode mac
+
+    // make sure hash(auth_user_pubkey) == supernode.owner
+
+    // validate signature
+
+    return 0;
 }

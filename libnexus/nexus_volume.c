@@ -62,7 +62,9 @@ exit:
 }
 
 int
-nexus_login_volume(const char * privatekey_fpath, const char * supernode_fpath)
+nexus_login_volume(const char * publickey_fpath,
+                   const char * privatekey_fpath,
+                   const char * supernode_fpath)
 {
     /* 1 -- Read the private key into a buffer */
 

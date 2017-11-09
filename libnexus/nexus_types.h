@@ -8,6 +8,9 @@ extern "C" {
 
 #define CONFIG_UUID_BYTES 16
 
+// the size of nonces in NEXUS
+#define CONFIG_NONCE_BYTES  64
+
 // for now, let's stick with GCM
 // clang-format off
 #define CONFIG_EKEY_BYTES   16
@@ -15,6 +18,8 @@ extern "C" {
 #define CONFIG_TAG_BYTES    16
 #define CONFIG_HASH_BYTES   32 // sha256
 // clang-format on
+
+typedef uint8_t nonce_t[CONFIG_NONCE_BYTES];
 
 typedef struct crypto_ekey {
     uint8_t bytes[CONFIG_EKEY_BYTES];
