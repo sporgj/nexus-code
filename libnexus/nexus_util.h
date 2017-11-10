@@ -13,6 +13,13 @@ extern "C" {
 #include <mbedtls/sha256.h>
 
 /**
+ * Generates a UUID in-place
+ * @param uuid is the uuid object
+ */
+void
+nexus_uuid(struct uuid * uuid);
+
+/**
  * Signs a blob
  * @param pk the private key
  * @param data what to sign
@@ -31,6 +38,24 @@ util_generate_signature(mbedtls_pk_context * pk,
         free(ptr);              \
         ptr = NULL;             \
 }
+
+// JDB: I rather not have an if statement in a macro
+static inline void
+nexus_free2(void * ptr)
+{
+    if (ptr != NULL) {
+        nexus_free(ptr);
+    }
+}
+
+char *
+my_strnjoin(char * dest, const char * join, const char * src, size_t max);
+
+char *
+pathjoin(char * directory, const char * filename);
+
+char *
+my_strncat(char * dest, const char * src, size_t max);
 
 #ifdef __cplusplus
 }

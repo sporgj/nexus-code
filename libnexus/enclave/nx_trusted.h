@@ -12,18 +12,18 @@
 extern sgx_key_128bit_t enclave_sealing_key;
 
 int
-supernode_encrypt_and_seal(struct supernode * supernode,
-                           crypto_ekey_t *    rootkey);
+supernode_encrypt_and_seal(struct supernode  * supernode,
+                           struct volume_key * volkey);
 
 int
-dirnode_encrypt_and_seal(struct dirnode * dirnode, crypto_ekey_t * rootkey);
+dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volume_key * volkey);
 
 /**
- * Protects the rootkey with the enclave sealing key before it is sent to
+ * Protects the volkey with the enclave sealing key before it is sent to
  * untrusted memory.
  */
 int
-volume_rootkey_wrap(crypto_ekey_t * rootkey);
+volume_key_wrap(struct volume_key * volkey);
 
 int
-volume_rootkey_unwrap(crypto_ekey_t * rootkey);
+volume_key_unwrap(struct volume_key * volkey);

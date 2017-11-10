@@ -15,13 +15,13 @@ enclave {
          * @param volume_rootkey_out sealed rootkey
          */
         public int ecall_create_volume(
-            [user_check] struct uuid * supernode_uuid_in,
-            [user_check] struct uuid * root_uuid_in,
+            [user_check] struct uuid * supernode_uuid_ext,
+            [user_check] struct uuid * root_uuid_ext,
             [in, string] const char * publickey_str_in,
             size_t publickey_str_len,
-            [user_check] uint8_t * supernode_buffer_out,
-            [user_check] uint8_t * dirnode_buffer_out,
-            [user_check] crypto_ekey_t * volume_rootkey_out
+            [user_check] struct supernode * supernode_buffer_ext,
+            [user_check] struct dirnode * dirnode_buffer_ext,
+            [user_check] struct volume_key * volume_rootkey_ext
         );
                                     
         /**

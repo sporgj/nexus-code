@@ -7,46 +7,24 @@
 extern "C" {
 #endif
 
+#include "nexus_types.h"
+
 /* volume information */
 /* JRL: What is this doing in here? */
 #define NEXUS_FS_METADATA_FOLDER    ".nxs"
 #define NEXUS_FS_DATA_FOLDER        "nexus"
+#define NEXUS_FS_SUPERNODE_NAME	    "supernode"
 
 #define NEXUS_METANAME_PREFIX       "m"
 #define NEXUS_FILENAME_PREFIX       "f"
 #define NEXUS_PREFIX_SIZE(s)        (sizeof(s) - 1)
 
 
-/* filesystem object types */
-/* JRL: What is an ANY object? */
-typedef enum {
-    NEXUS_ANY  = 0,
-    NEXUS_FILE = 1,
-    NEXUS_DIR  = 2,
-    NEXUS_LINK = 3
-} nexus_fs_obj_type_t;
-
-
-
-
+// global operations
 int
-nexus_create_volume(char      * publickey_path,
-                    uint8_t  ** supernode,
-                    uint8_t  ** root_dirnode,
-                    uint32_t  * supernode_size);
+nexus_init_enclave(const char * enclave_fpath);
 
-int
-nexus_mount_volume(char * supernode_path);
-
-
-int
-nexus_login_volume(char * publickey_path,
-		   char * supernode_path);
-
-
-
-
-
+// directory operations
 
 int
 nexus_new(char                 * parent_dir,

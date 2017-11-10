@@ -29,16 +29,16 @@ ecall_init_enclave()
 }
 
 int
-ecall_create_volume(struct uuid * supernode_uuid_in,
-                    struct uuid * root_uuid_in,
-                    const char *  publickey_str_in,
-                    size_t        publickey_str_len,
-                    uint8_t *     supernode_buffer_out,
-                    uint8_t *     dirnode_buffer_out,
-                    crypto_ekey_t * volume_rootkey_out)
+ecall_create_volume(struct uuid *       supernode_uuid_ext,
+                    struct uuid *       root_uuid_ext,
+                    const char *        publickey_str_in,
+                    size_t              publickey_str_len,
+                    uint8_t *           supernode_buffer_ext,
+                    uint8_t *           dirnode_buffer_ext,
+                    struct volume_key * volume_volkey_ext)
 {
     int                ret       = -1;
-    crypto_ekey_t      rootkey   = { 0 };
+    struct volume_key  volkey   = { 0 };
     struct supernode   supernode = { 0 };
     struct dirnode     dirnode   = { 0 };
     mbedtls_pk_context pk;
@@ -51,38 +51,39 @@ ecall_create_volume(struct uuid * supernode_uuid_in,
         goto out;
     }
 
-    sgx_read_rand((uint8_t *)&rootkey, sizeof(crypto_ekey_t));
+    sgx_read_rand((uint8_t *)&volkey, sizeof(crypto_ekey_t));
 
-    memcpy(&supernode.uuid, supernode_uuid_in, sizeof(struct uuid));
-    memcpy(&supernode.root_uuid, root_uuid_in, sizeof(struct uuid));
-    mbedtls_sha256(
-        publickey_str_in, publickey_str_len, (uint8_t *)&supernode.owner, 0);
+    memcpy(&supernode.header.uuid, supernode_uuid_ext, sizeof(struct uuid));
+    memcpy(&supernode.header.root_uuid, root_uuid_ext, sizeof(struct uuid));
+    mbedtls_sha256(publickey_str_in,
+                   publickey_str_len,
+                   (uint8_t *)&supernode.header.owner,
+                   0);
 
-    memcpy(&dirnode.uuid, root_uuid_in, sizeof(struct uuid));
-    memcpy(&dirnode.root_uuid, root_uuid_in, sizeof(struct uuid));
+    memcpy(&dirnode.header.uuid, root_uuid_in, sizeof(struct uuid));
+    memcpy(&dirnode.header.root_uuid, root_uuid_in, sizeof(struct uuid));
 
 
     // seal the structures
-    if (supernode_encrypt_and_seal(&supernode, &rootkey)) {
+    if (supernode_encrypt_and_seal(&supernode, &volkey)) {
         ocall_print("supernode sealage FAILED");
         goto out;
     }
 
-    if (dirnode_encrypt_and_seal(&dirnode, &rootkey)) {
+    if (dirnode_encrypt_and_seal(&dirnode, &volkey)) {
         ocall_print("dirnode sealing FAILED");
         goto out;
     }
 
-    if (volume_rootkey_wrap(&rootkey)) {
-        ocall_print("rootkey sealing FAILED");
+    if (volume_key_wrap(&volkey)) {
+        ocall_print("volkey sealing FAILED");
         goto out;
     }
 
-
     // copy out to untrusted memory
-    memcpy(supernode_buffer_out, &supernode, sizeof(struct supernode));
-    memcpy(dirnode_buffer_out, &dirnode, sizeof(struct dirnode));
-    memcpy(volume_rootkey_out, &rootkey, sizeof(crypto_ekey_t));
+    memcpy(supernode_buffer_ext, &supernode, sizeof(struct supernode));
+    memcpy(dirnode_buffer_ext, &dirnode, sizeof(struct dirnode));
+    memcpy(volume_volkey_ext, &volkey, sizeof(struct volume_key));
 
     ret = 0;
 out:
@@ -102,12 +103,12 @@ ecall_authentication_request(const char * publickey_str_in, nonce_t * nonce_out)
 
 // TODO
 int
-ecall_authentication_response(crypto_ekey_t *    volume_rootkey_in,
+ecall_authentication_response(crypto_ekey_t *    volume_volkey_in,
                               struct supernode * supernode_in,
                               uint8_t *          signature_in,
                               size_t             signature_len)
 {
-    // unseal rootkey and verify supernode mac
+    // unseal volkey and verify supernode mac
 
     // make sure hash(auth_user_pubkey) == supernode.owner
 

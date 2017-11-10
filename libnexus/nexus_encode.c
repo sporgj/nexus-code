@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "nx_untrusted.h"
+#include "nexus_untrusted.h"
 
 /* 64 characters forming a 6-bit target field */
 char portable_filename_chars[] = ("-.0123456789ABCD"

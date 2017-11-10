@@ -1,4 +1,12 @@
+#include <uuid/uuid.h>
+
 #include "nexus_untrusted.h"
+
+void
+nexus_uuid(struct uuid * uuid)
+{
+    uuid_generate((uint8_t *)uuid);
+}
 
 int
 util_generate_signature(mbedtls_pk_context * pk,
@@ -26,7 +34,6 @@ util_generate_signature(mbedtls_pk_context * pk,
     buf = (uint8_t *) calloc(1, MBEDTLS_MPI_MAX_SIZE);
     if (buf == NULL) {
 	log_error("allocation error");
-	goto out;
     }
 
     mbedtls_sha256(data, len, hash, 0);
@@ -53,4 +60,45 @@ out:
     }
 
     return ret;
+}
+
+char *
+my_strnjoin(char * dest, const char * join, const char * src, size_t max)
+{
+    size_t len1 = strnlen(dest, max);
+    size_t len2 = (join == NULL) ? 0 : strnlen(join, max);
+    size_t len3 = strnlen(src, max);
+    size_t total = len1 + len2 + len3;
+
+    if (total > max) {
+        // XXX should we report here??
+        return NULL;
+    }
+
+    char * result = realloc(dest, total + 1);
+    if (result == NULL) {
+        log_error("allocation error");
+        return NULL;
+    }
+
+    if (join != NULL) {
+        memcpy(result + len1, join, len2);
+    }
+
+    memcpy(result + len1 + len2, src, len3);
+    result[total] = '\0';
+
+    return result;
+}
+
+char *
+my_strncat(char * dest, const char * src, size_t max)
+{
+    return my_strnjoin(dest, NULL, src, max);
+}
+
+char *
+pathjoin(char * directory, const char * filename)
+{
+    return my_strnjoin(directory, "/", filename, PATH_MAX);
 }
