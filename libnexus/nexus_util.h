@@ -36,19 +36,19 @@ util_generate_signature(mbedtls_pk_context * pk,
                         uint8_t **           signature,
                         size_t *             signature_len);
 
-#define nexus_free(ptr) {       \
-        free(ptr);              \
-        ptr = NULL;             \
-}
+#define nexus_free(ptr)                                                        \
+    do {                                                                       \
+        free(ptr);                                                             \
+        ptr = NULL;                                                            \
+    } while (0)
 
-// JDB: I rather not have an if statement in a macro
-static inline void
-nexus_free2(void * ptr)
-{
-    if (ptr != NULL) {
-        nexus_free(ptr);
-    }
-}
+// checks pointer and then frees
+#define nexus_free2(ptr)                                                       \
+    do {                                                                       \
+        if (ptr != NULL) {                                                     \
+            nexus_free(ptr);                                                   \
+        }                                                                      \
+    } while (0)
 
 char *
 my_strnjoin(char * dest, const char * join, const char * src, size_t max);

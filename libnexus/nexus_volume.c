@@ -12,24 +12,23 @@ sgx_enclave_id_t global_enclave_id = 0;
 void
 ocall_print(const char * str)
 {
-    printf("enclave: %s\n", str);
+    printf("%s", str);
     fflush(stdout);
 }
 
 static char *
-read_pubkey_file(char * publickey_fpath, size_t * p_flen)
+fread_public_or_private_key(const char * key_fpath, size_t * p_klen)
 {
-    int    ret        = -1;
-    char * pubkey_buf = NULL;
+    int    ret = -1;
+    char * buf = NULL;
 
-    ret = mbedtls_pk_load_file(
-        publickey_fpath, (uint8_t **)&pubkey_buf, p_flen);
+    ret = mbedtls_pk_load_file(key_fpath, (uint8_t **)&buf, p_klen);
     if (ret) {
-        log_error("Could not load public key: %s", publickey_fpath);
+        log_error("Could not load key: %s", key_fpath);
         return NULL;
     }
 
-    return pubkey_buf;
+    return buf;
 }
 
 int
@@ -65,27 +64,27 @@ int
 nexus_create_volume(char *               publickey_fpath,
                     struct supernode **  p_supernode,
                     struct dirnode **    p_root_dirnode,
-                    struct volume_key ** p_sealed_volume_key)
+                    struct volumekey ** p_sealed_volumekey)
 {
     int                 ret          = -1;
     size_t              pubkey_len   = 0;
     char *              pubkey_buf   = NULL;
     struct supernode *  supernode    = NULL;
     struct dirnode *    root_dirnode = NULL;
-    struct volume_key * volkey       = NULL;
+    struct volumekey * volkey       = NULL;
     struct uuid         supernode_uuid;
     struct uuid         root_uuid;
 
-    pubkey_buf = read_pubkey_file(publickey_fpath, &pubkey_len);
+    pubkey_buf = fread_public_or_private_key(publickey_fpath, &pubkey_len);
     if (pubkey_buf == NULL) {
         log_error("could not read public key file");
-        goto out;
+        return -1;
     }
 
     /* 2 -- allocate our structs and call the enclave */
     supernode    = (struct supernode *)calloc(1, sizeof(struct supernode));
     root_dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode));
-    volkey       = (struct volume_key *)calloc(1, sizeof(struct volume_key));
+    volkey       = (struct volumekey *)calloc(1, sizeof(struct volumekey));
     if (supernode == NULL || root_dirnode == NULL || volkey == NULL) {
         log_error("allocation error");
         goto out;
@@ -111,13 +110,11 @@ nexus_create_volume(char *               publickey_fpath,
 
     *p_supernode         = supernode;
     *p_root_dirnode      = root_dirnode;
-    *p_sealed_volume_key = volkey;
+    *p_sealed_volumekey = volkey;
 
     ret = 0;
 out:
-    if (pubkey_buf) {
-        free(pubkey_buf);
-    }
+    nexus_free(pubkey_buf);
 
     if (ret) {
         nexus_free2(supernode);
@@ -128,18 +125,139 @@ out:
     return ret;
 }
 
-int
-nexus_login_volume(const char * publickey_fpath,
-                   const char * privatekey_fpath,
-                   const char * supernode_fpath)
+static int
+login_sign_response(nonce_t *           auth_nonce,
+                    struct supernode *  supernode,
+                    struct volumekey * volumekey,
+                    char *              privatekey,
+                    size_t              privatekey_len,
+                    uint8_t *           signature,
+                    size_t *            p_signature_len)
 {
-    /* 1 -- Read the private key into a buffer */
+    int                      ret                             = -1;
+    uint8_t                  auth_hash[CONFIG_HASH_BYTES]    = { 0 };
+    mbedtls_entropy_context  entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_sha256_context   sha_ctx;
+    mbedtls_pk_context       pk;
 
-    /* 2 -- Read and parse the supernode */
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_sha256_init(&sha_ctx);
+    mbedtls_pk_init(&pk);
 
-    /* 3 -- Start the challenge-response with the enclave */
+    ret = mbedtls_ctr_drbg_seed(
+        &ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+    if (ret != 0) {
+        log_error("mbedtls_ctr_drbg_seed(ret = %#x) FAILED", ret);
+        goto out;
+    }
 
-    return 0;
+    // sha256(nonce | supernode | volkey)
+    mbedtls_sha256_starts(&sha_ctx, 0);
+    mbedtls_sha256_update(&sha_ctx, (uint8_t *)auth_nonce, sizeof(nonce_t));
+    mbedtls_sha256_update(
+        &sha_ctx, (uint8_t *)supernode, supernode->header.total_size);
+    mbedtls_sha256_update(
+        &sha_ctx, (uint8_t *)volumekey, sizeof(struct volumekey));
+    mbedtls_sha256_finish(&sha_ctx, auth_hash);
+
+    // sign the hash
+    ret = mbedtls_pk_parse_key(
+        &pk, (uint8_t *)privatekey, privatekey_len, NULL, 0);
+    if (ret != 0) {
+        log_error("mbedtls_pk_parse_key(ret=%#x)", ret);
+        goto out;
+    }
+
+    ret = mbedtls_pk_sign(&pk,
+                          MBEDTLS_MD_SHA256,
+                          auth_hash,
+                          0,
+                          signature,
+                          p_signature_len,
+                          mbedtls_ctr_drbg_random,
+                          &ctr_drbg);
+    if (ret != 0) {
+        log_error("mbedtls_pk_sign(ret=%#x)", ret);
+        goto out;
+    }
+
+out:
+    mbedtls_entropy_free(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_sha256_free(&sha_ctx);
+    mbedtls_pk_free(&pk);
+
+    return ret;
+}
+
+int
+nexus_login_volume(const char *        publickey_fpath,
+                   const char *        privatekey_fpath,
+                   struct supernode *  supernode,
+                   struct volumekey * volumekey)
+{
+    int     ret                             = -1;
+    char *  publickey                       = NULL;
+    char *  privatekey                      = NULL;
+    uint8_t signature[MBEDTLS_MPI_MAX_SIZE] = { 0 };
+    size_t  publickey_len                   = 0;
+    size_t  privatekey_len                  = 0;
+    size_t  signature_len                   = 0;
+    nonce_t auth_nonce                      = { 0 };
+
+    // read the public keypair
+    publickey = fread_public_or_private_key(publickey_fpath, &publickey_len);
+    if (publickey == NULL) {
+        log_error("reading public key: '%s' FAILED", publickey_fpath);
+        goto out;
+    }
+
+    privatekey = fread_public_or_private_key(privatekey_fpath, &privatekey_len);
+    if (privatekey == NULL) {
+        log_error("reading private key: '%s' FAILED", privatekey_fpath);
+        goto out;
+    }
+
+    // call the enclave to receive a challenge
+    ecall_authentication_request(
+        global_enclave_id, &ret, publickey, publickey_len, &auth_nonce);
+    if (ret != 0) {
+        log_error("ecall_authentication_request() FAILED");
+        goto out;
+    }
+
+    // generate a response and send to the enclave
+    ret = login_sign_response(&auth_nonce,
+                              supernode,
+                              volumekey,
+                              privatekey,
+                              privatekey_len,
+                              signature,
+                              &signature_len);
+    if (ret != 0 ) {
+        log_error("could not create signature response");
+        goto out;
+    }
+
+    ecall_authentication_response(global_enclave_id,
+                                  &ret,
+                                  volumekey,
+                                  supernode,
+                                  signature,
+                                  signature_len);
+    if (ret != 0) {
+        log_error("ecall_authentication_response() FAILED");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    nexus_free2(publickey);
+    nexus_free2(privatekey);
+
+    return ret;
 }
 
 int

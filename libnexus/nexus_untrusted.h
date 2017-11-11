@@ -34,4 +34,4 @@ int
 nexus_create_volume(char               * publickey_fpath,
                     struct supernode  ** p_supernode,
                     struct dirnode    ** p_root_dirnode,
-                    struct volume_key ** p_sealed_volume_key);
+                    struct volumekey ** p_sealed_volumekey);

@@ -12,7 +12,7 @@ static char * pubkey_fpath = NULL;
 static int
 write_metadata_files(struct supernode *  supernode,
                      struct dirnode *    root_dirnode,
-                     struct volume_key * volkey)
+                     struct volumekey * volkey)
 {
     int    ret             = -1;
     size_t nbytes          = 0;
@@ -78,7 +78,7 @@ main(int argc, char ** argv)
     int                 ret          = -1;
     struct supernode *  supernode    = NULL;
     struct dirnode *    root_dirnode = NULL;
-    struct volume_key * volkey       = NULL;
+    struct volumekey * volkey       = NULL;
 
     printf("NeXUS ADMIN tool\n");
     fflush(stdout);

@@ -21,7 +21,7 @@ enclave {
             size_t publickey_str_len,
             [user_check] struct supernode * supernode_buffer_ext,
             [user_check] struct dirnode * dirnode_buffer_ext,
-            [user_check] struct volume_key * volume_rootkey_ext
+            [user_check] struct volumekey * volume_rootkey_ext
         );
                                     
         /**
@@ -32,7 +32,8 @@ enclave {
          */
         public int ecall_authentication_request(
             [in, string] const char * publickey_str_in,
-            [out] nonce_t * nonce_out
+            size_t publickey_str_len,
+            [out] nonce_t * nonce_ext
         );
 
         /**
@@ -44,9 +45,9 @@ enclave {
          * @return 0 on success
          */
         public int ecall_authentication_response(
-            [user_check] crypto_ekey_t * volume_rootkey_in,
-            [user_check] struct supernode * supernode_in,
-            [user_check] uint8_t * signature_in,
+            [in] struct volumekey * volume_key_in,
+            [user_check] struct supernode * supernode_ext,
+            [user_check] uint8_t * signature_ext,
             size_t signature_len
         );
 

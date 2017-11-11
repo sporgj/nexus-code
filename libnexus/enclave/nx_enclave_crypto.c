@@ -3,28 +3,42 @@
 // TODO
 int
 supernode_encrypt_and_seal(struct supernode  * supernode,
-                           struct volume_key * volkey)
+                           struct volumekey * volkey)
+{
+    return 0;
+}
+
+int
+supernode_decrypt_and_unseal(struct supernode *  supernode,
+                             struct volumekey * volkey)
 {
     return 0;
 }
 
 // TODO
 int
-dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volume_key * volkey)
+dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volumekey * volkey)
+{
+    return 0;
+}
+
+int
+dirnode_decrypt_and_unseal(struct dirnode *    dirnode,
+                           struct volumekey * volkey)
 {
     return 0;
 }
 
 // TODO
 int
-volume_key_wrap(struct volume_key * volkey)
+volumekey_wrap(struct volumekey * volkey)
 {
     return 0;
 }
 
 // TODO
 int
-volume_key_unwrap(struct volume_key * volkey)
+volumekey_unwrap(struct volumekey * volkey)
 {
     return 0;
 }

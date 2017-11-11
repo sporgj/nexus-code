@@ -35,7 +35,7 @@ typedef struct crypto_ekey {
 } crypto_ekey_t;
 
 // TODO for now sealing is just ECB(rootkey). Investigate SGX sealing
-struct volume_key {
+struct volumekey {
     uint8_t bytes[CONFIG_EKEY_BYTES];
 };
 

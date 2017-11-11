@@ -6,24 +6,43 @@
 #include <sgx_utils.h>
 
 #include <mbedtls/pk.h>
+#include <mbedtls/sha256.h>
 
 #include "nx_enclave_t.h"
+
+#define ocall_debug(str) ocall_print("enclave> %s(%d): " str "\n")
+
+#define my_free(x)                                                             \
+    do {                                                                       \
+        if (x != NULL) {                                                       \
+            free(x);                                                           \
+            x = NULL;                                                          \
+        }                                                                      \
+    } while (0)
 
 extern sgx_key_128bit_t enclave_sealing_key;
 
 int
 supernode_encrypt_and_seal(struct supernode  * supernode,
-                           struct volume_key * volkey);
+                           struct volumekey * volkey);
 
 int
-dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volume_key * volkey);
+supernode_decrypt_and_unseal(struct supernode *  supernode,
+                             struct volumekey * volkey);
+
+int
+dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volumekey * volkey);
+
+int
+dirnode_decrypt_and_unseal(struct dirnode *    dirnode,
+                           struct volumekey * volkey);
 
 /**
  * Protects the volkey with the enclave sealing key before it is sent to
  * untrusted memory.
  */
 int
-volume_key_wrap(struct volume_key * volkey);
+volumekey_wrap(struct volumekey * volkey);
 
 int
-volume_key_unwrap(struct volume_key * volkey);
+volumekey_unwrap(struct volumekey * volkey);
