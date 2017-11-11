@@ -12,6 +12,8 @@ extern "C" {
 #include <mbedtls/entropy.h>
 #include <mbedtls/sha256.h>
 
+#include "nexus.h"
+
 /**
  * Generates a UUID in-place
  * @param uuid is the uuid object

@@ -69,6 +69,9 @@ out:
     return ret;
 }
 
+// this is temporary
+#define ENCLAVE_PATH "./enclave/nx_enclave.signed.so"
+
 int
 main(int argc, char ** argv)
 {
@@ -79,6 +82,10 @@ main(int argc, char ** argv)
 
     printf("NeXUS ADMIN tool\n");
     fflush(stdout);
+
+    if (nexus_init_enclave(ENCLAVE_PATH)) {
+        return -1;
+    }
 
     if (argc < 3) {
         printf("usage: %s public_key metatada_path volkey_fpath\n", argv[0]);

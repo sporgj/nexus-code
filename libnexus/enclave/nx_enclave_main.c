@@ -33,8 +33,8 @@ ecall_create_volume(struct uuid *       supernode_uuid_ext,
                     struct uuid *       root_uuid_ext,
                     const char *        publickey_str_in,
                     size_t              publickey_str_len,
-                    uint8_t *           supernode_buffer_ext,
-                    uint8_t *           dirnode_buffer_ext,
+                    struct supernode *  supernode_buffer_ext,
+                    struct dirnode *    dirnode_buffer_ext,
                     struct volume_key * volume_volkey_ext)
 {
     int                ret       = -1;
@@ -59,9 +59,11 @@ ecall_create_volume(struct uuid *       supernode_uuid_ext,
                    publickey_str_len,
                    (uint8_t *)&supernode.header.owner,
                    0);
+    supernode.header.total_size = sizeof(struct supernode);
 
-    memcpy(&dirnode.header.uuid, root_uuid_in, sizeof(struct uuid));
-    memcpy(&dirnode.header.root_uuid, root_uuid_in, sizeof(struct uuid));
+    memcpy(&dirnode.header.uuid, root_uuid_ext, sizeof(struct uuid));
+    memcpy(&dirnode.header.root_uuid, root_uuid_ext, sizeof(struct uuid));
+    dirnode.header.total_size = sizeof(struct dirnode);
 
 
     // seal the structures

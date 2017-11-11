@@ -12,53 +12,21 @@ sgx_enclave_id_t global_enclave_id = 0;
 void
 ocall_print(const char * str)
 {
-    printf("enclave: %s", str);
+    printf("enclave: %s\n", str);
     fflush(stdout);
 }
 
 static char *
 read_pubkey_file(char * publickey_fpath, size_t * p_flen)
 {
-    int         ret        = -1;
-    size_t      nbytes     = 0;
-    size_t      flen       = 0;
-    FILE *      fd         = NULL;
-    char *      pubkey_buf = NULL;
-    struct stat st         = { 0 };
+    int    ret        = -1;
+    char * pubkey_buf = NULL;
 
-    /* 1 -- Read the public key into a buffer */
-    if (stat(publickey_fpath, &st)) {
-        log_error("file not found (%s)", publickey_fpath);
-        return NULL;
-    }
-
-    flen = st.st_size;
-
-    fd = fopen(publickey_fpath, "rb");
-    if (fd == NULL) {
-        log_error("fopen('%s') FAILED", publickey_fpath);
-        return NULL;
-    }
-
-    pubkey_buf = calloc(1, flen);
-    if (pubkey_buf == NULL) {
-        log_error("allocation error");
-        goto exit;
-    }
-
-    nbytes = fread(pubkey_buf, 1, flen, fd);
-    if (nbytes != flen) {
-        log_error("read_error. tried=%zu, got=%zu", flen, nbytes);
-        goto exit;
-    }
-
-    *p_flen = flen;
-    ret     = 0;
-exit:
-    fclose(fd);
-
+    ret = mbedtls_pk_load_file(
+        publickey_fpath, (uint8_t **)&pubkey_buf, p_flen);
     if (ret) {
-        nexus_free2(pubkey_buf); // gets set to NULL
+        log_error("Could not load public key: %s", publickey_fpath);
+        return NULL;
     }
 
     return pubkey_buf;
