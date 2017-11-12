@@ -193,9 +193,9 @@ out:
 }
 
 int
-nexus_login_volume(const char *        publickey_fpath,
-                   const char *        privatekey_fpath,
-                   struct supernode *  supernode,
+nexus_login_volume(const char *       publickey_fpath,
+                   const char *       privatekey_fpath,
+                   struct supernode * supernode,
                    struct volumekey * volumekey)
 {
     int     ret                             = -1;

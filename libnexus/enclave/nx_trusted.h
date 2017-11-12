@@ -10,7 +10,8 @@
 
 #include "nx_enclave_t.h"
 
-#define ocall_debug(str) ocall_print("enclave> %s(%d): " str "\n")
+#define ocall_debug(str)                                                       \
+    ocall_print("enclave> " str "\n")
 
 #define my_free(x)                                                             \
     do {                                                                       \

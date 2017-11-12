@@ -22,6 +22,35 @@ void
 nexus_uuid(struct uuid * uuid);
 
 /**
+ * Reads the volume key and supernode
+ * @param metadata_path
+ * @param volumekey_fpath
+ * @param p_supernode
+ * @param p_volumekey
+ */
+int
+read_volume_metadata_files(const char *        metadata_path,
+                           const char *        volumekey_fpath,
+                           struct supernode ** p_supernode,
+                           struct volumekey ** p_volumekey);
+
+/**
+ * Used to initialize the enclave. Uses the objects generated
+ * from nexus_create_volume(), it writes the NeXUS metadata into files
+ *
+ * @param supernode
+ * @param root_dirnode
+ * @param volumekey
+ * @param metadata_path
+ * @param volumekey_fpath
+ */
+int
+write_volume_metadata_files(struct supernode * supernode,
+                            struct dirnode *   root_dirnode,
+                            struct volumekey * volkey,
+                            const char *       metadata_path,
+                            const char *       volumekey_fpath);
+/**
  * Signs a blob
  * @param pk the private key
  * @param data what to sign

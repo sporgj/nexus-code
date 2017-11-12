@@ -35,3 +35,8 @@ nexus_create_volume(char               * publickey_fpath,
                     struct supernode  ** p_supernode,
                     struct dirnode    ** p_root_dirnode,
                     struct volumekey ** p_sealed_volumekey);
+int
+nexus_login_volume(const char *       publickey_fpath,
+                   const char *       privatekey_fpath,
+                   struct supernode * supernode,
+                   struct volumekey * volumekey);

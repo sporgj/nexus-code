@@ -1,5 +1,6 @@
 {
-    "publickey": "./tests/profile/public_key",
-    "metadata_dir": "./tests/dummy-volume",
-    "volume_key": "./tests/profile/volkey"
+    "publickey": "tests/profile/public_key",
+    "privatekey": "tests/profile/private_key",
+    "metadata_dir": "tests/dummy-volume",
+    "volume_key": "tests/profile/volkey"
 }
