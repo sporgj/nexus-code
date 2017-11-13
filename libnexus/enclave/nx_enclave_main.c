@@ -3,7 +3,7 @@
 sgx_key_128bit_t enclave_sealing_key;
 
 // the user's identity
-struct supernode *  owner_supernode           = NULL;
+struct supernode * owner_supernode           = NULL;
 struct volumekey * owner_supernode_volumekey = NULL;
 
 // the public key of the authenticating user
@@ -35,18 +35,20 @@ ecall_init_enclave()
 }
 
 int
-ecall_create_volume(struct uuid *       supernode_uuid_ext,
-                    struct uuid *       root_uuid_ext,
-                    const char *        publickey_str_in,
-                    size_t              publickey_str_len,
-                    struct supernode *  supernode_buffer_ext,
-                    struct dirnode *    dirnode_buffer_ext,
+ecall_create_volume(struct uuid *      supernode_uuid_ext,
+                    struct uuid *      root_uuid_ext,
+                    const char *       publickey_str_in,
+                    size_t             publickey_str_len,
+                    struct supernode * supernode_buffer_ext,
+                    struct dirnode *   dirnode_buffer_ext,
                     struct volumekey * volume_volkey_ext)
 {
-    int                ret       = -1;
-    struct volumekey  volkey   = { 0 };
-    struct supernode   supernode = { 0 };
-    struct dirnode     dirnode   = { 0 };
+    int                ret              = -1;
+    struct supernode * sealed_supernode = NULL;
+    struct dirnode *   sealed_dirnode   = NULL;
+    struct volumekey   volkey           = { 0 };
+    struct supernode   supernode        = { 0 };
+    struct dirnode     dirnode          = { 0 };
     mbedtls_pk_context pk;
 
     // 1 -- Parse the public key string and initialize out structures
@@ -71,9 +73,8 @@ ecall_create_volume(struct uuid *       supernode_uuid_ext,
     memcpy(&dirnode.header.root_uuid, root_uuid_ext, sizeof(struct uuid));
     dirnode.header.total_size = sizeof(struct dirnode);
 
-
     // seal the structures
-    if (supernode_encrypt_and_seal(&supernode, &volkey)) {
+    if (supernode_encrypt_and_seal(&supernode, &volkey, &sealed_supernode)) {
         ocall_debug("supernode sealage FAILED");
         goto out;
     }
@@ -89,12 +90,14 @@ ecall_create_volume(struct uuid *       supernode_uuid_ext,
     }
 
     // copy out to untrusted memory
-    memcpy(supernode_buffer_ext, &supernode, sizeof(struct supernode));
+    memcpy(supernode_buffer_ext, sealed_supernode, sizeof(struct supernode));
     memcpy(dirnode_buffer_ext, &dirnode, sizeof(struct dirnode));
     memcpy(volume_volkey_ext, &volkey, sizeof(struct volumekey));
 
     ret = 0;
 out:
+    my_free(sealed_supernode);
+
     return ret;
 }
 
@@ -127,12 +130,13 @@ ecall_authentication_request(const char * publickey_str_in,
 
 int
 nx_authentication_response(struct volumekey * _volumekey,
-                           struct supernode *  _supernode,
-                           uint8_t *           signature,
-                           size_t              signature_len)
+                           struct supernode * sealed_supernode,
+                           uint8_t *          signature,
+                           size_t             signature_len)
 {
     int                    ret                     = -1;
     uint8_t                hash[CONFIG_HASH_BYTES] = { 0 };
+    struct supernode *     _supernode              = NULL;
     mbedtls_sha256_context sha_ctx;
     mbedtls_pk_context     pk;
 
@@ -142,12 +146,12 @@ nx_authentication_response(struct volumekey * _volumekey,
     // sha256(nonce | supernode | volkey)
     mbedtls_sha256_starts(&sha_ctx, 0);
     mbedtls_sha256_update(&sha_ctx, (uint8_t *)&auth_nonce, sizeof(nonce_t));
+    mbedtls_sha256_update(&sha_ctx,
+                          (uint8_t *)sealed_supernode,
+                          sealed_supernode->header.total_size);
     mbedtls_sha256_update(
-            &sha_ctx, (uint8_t *)_supernode, _supernode->header.total_size);
-    mbedtls_sha256_update(
-            &sha_ctx, (uint8_t *)_volumekey, sizeof(struct volumekey));
+        &sha_ctx, (uint8_t *)_volumekey, sizeof(struct volumekey));
     mbedtls_sha256_finish(&sha_ctx, hash);
-
 
     // 1 - let's make sure our supernode is not tampered
     if (volumekey_unwrap(_volumekey)) {
@@ -155,7 +159,9 @@ nx_authentication_response(struct volumekey * _volumekey,
         goto out;
     }
 
-    if (supernode_decrypt_and_unseal(_supernode, _volumekey)) {
+    ret = supernode_decrypt_and_unseal(
+        sealed_supernode, _volumekey, &_supernode);
+    if (ret != 0) {
         ocall_debug("could not unseal supernode");
         goto out;
     }
@@ -170,7 +176,7 @@ nx_authentication_response(struct volumekey * _volumekey,
 
     // 3 - validate signature
     ret = mbedtls_pk_parse_public_key(
-            &pk, auth_user_pubkey, auth_user_pubkey_len);
+        &pk, auth_user_pubkey, auth_user_pubkey_len);
     if (ret != 0) {
         ocall_debug("parsing public key failed");
         goto out;
@@ -192,21 +198,25 @@ out:
     mbedtls_sha256_free(&sha_ctx);
     mbedtls_pk_free(&pk);
 
+    if (ret) {
+        my_free(_supernode);
+    }
+
     return ret;
 }
 
 // TODO
 int
 ecall_authentication_response(struct volumekey * volumekey_ext,
-                              struct supernode *  supernode_ext,
-                              uint8_t *           signature_ext,
-                              size_t              signature_len)
+                              struct supernode * supernode_ext,
+                              uint8_t *          signature_ext,
+                              size_t             signature_len)
 {
-    int                 ret            = -1;
-    uint8_t *           signature      = NULL;
-    struct supernode *  _supernode     = NULL;
+    int                ret            = -1;
+    uint8_t *          signature      = NULL;
+    struct supernode * _supernode     = NULL;
     struct volumekey * _volumekey     = NULL;
-    size_t              supernode_size = supernode_ext->header.total_size;
+    size_t             supernode_size = supernode_ext->header.total_size;
 
     // in case someone is trying to skip the challenge
     if (auth_user_pubkey == NULL) {
@@ -232,11 +242,8 @@ ecall_authentication_response(struct volumekey * volumekey_ext,
         _volumekey, _supernode, signature, signature_len);
 
 out:
-    if (ret) {
-        my_free(_volumekey);
-        my_free(_supernode);
-    }
-
+    my_free(_volumekey);
+    my_free(_supernode);
     my_free(signature);
 
     // let's cleanup all authentication data

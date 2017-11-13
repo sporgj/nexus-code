@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include <sgx_trts.h>
 #include <sgx_tseal.h>
@@ -7,6 +8,8 @@
 
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/gcm.h>
+#include <mbedtls/aes.h>
 
 #include "nx_enclave_t.h"
 
@@ -24,12 +27,14 @@
 extern sgx_key_128bit_t enclave_sealing_key;
 
 int
-supernode_encrypt_and_seal(struct supernode  * supernode,
-                           struct volumekey * volkey);
+supernode_encrypt_and_seal(struct supernode *  supernode,
+                           struct volumekey *  volumekey,
+                           struct supernode ** p_sealed_supernode);
 
 int
-supernode_decrypt_and_unseal(struct supernode *  supernode,
-                             struct volumekey * volkey);
+supernode_decrypt_and_unseal(struct supernode *  sealed_supernode,
+                             struct volumekey *  volumekey,
+                             struct supernode ** p_supernode);
 
 int
 dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volumekey * volkey);

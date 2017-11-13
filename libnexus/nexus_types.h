@@ -14,6 +14,7 @@ extern "C" {
 // for now, let's stick with GCM
 // clang-format off
 #define CONFIG_EKEY_BYTES   16
+#define CONFIG_EKEY_BITS   (CONFIG_EKEY_BYTES << 3)
 #define CONFIG_IV_BYTES     16
 #define CONFIG_TAG_BYTES    16
 #define CONFIG_HASH_BYTES   32 // sha256
