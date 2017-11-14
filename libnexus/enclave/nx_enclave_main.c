@@ -14,6 +14,21 @@ static struct pubkey_hash auth_user_pubkey_hash = { 0 };
 // the nonce of the authentication challenge
 static nonce_t auth_nonce;
 
+/**
+ * returns the volumekey corresponding to the root uuid.
+ *
+ * TODO: for now, let's just return the owner_supernode_volumekey. In the
+ * future, once multivolume support is added, we shall iterate a list.
+ *
+ * @param root_uuid is the root_uuid to search with
+ * @return NULL if volume key not found.
+ */
+struct volumekey *
+volumekey_from_rootuuid(struct uuid * root_uuid)
+{
+    return owner_supernode_volumekey;
+}
+
 int
 ecall_init_enclave()
 {
@@ -74,12 +89,12 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
     dirnode.header.total_size = sizeof(struct dirnode);
 
     // seal the structures
-    if (supernode_encrypt_and_seal(&supernode, &volkey, &sealed_supernode)) {
+    if (supernode_encryption1(&supernode, &volkey, &sealed_supernode)) {
         ocall_debug("supernode sealage FAILED");
         goto out;
     }
 
-    if (dirnode_encrypt_and_seal(&dirnode, &volkey)) {
+    if (dirnode_encryption1(&dirnode, &volkey, &sealed_dirnode)) {
         ocall_debug("dirnode sealing FAILED");
         goto out;
     }
@@ -91,12 +106,13 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
 
     // copy out to untrusted memory
     memcpy(supernode_buffer_ext, sealed_supernode, sizeof(struct supernode));
-    memcpy(dirnode_buffer_ext, &dirnode, sizeof(struct dirnode));
+    memcpy(dirnode_buffer_ext, sealed_dirnode, sizeof(struct dirnode));
     memcpy(volume_volkey_ext, &volkey, sizeof(struct volumekey));
 
     ret = 0;
 out:
     my_free(sealed_supernode);
+    my_free(sealed_dirnode);
 
     return ret;
 }
@@ -159,7 +175,7 @@ nx_authentication_response(struct volumekey * _volumekey,
         goto out;
     }
 
-    ret = supernode_decrypt_and_unseal(
+    ret = supernode_decryption1(
         sealed_supernode, _volumekey, &_supernode);
     if (ret != 0) {
         ocall_debug("could not unseal supernode");

@@ -3,7 +3,7 @@ include ../build.mk
 CC=gcc
 
 APP_PATH = ..
-OBJS = nx_enclave_main.o nx_enclave_crypto.o
+OBJS = nx_enclave_main.o nx_enclave_crypto.o nx_enclave_dirnode.o
 
 CRYPTO_LIB := mbedtls/library/libmbedcrypto.a
 CRYPTO_CONFIG := mbedtls/include/mbedtls/config.h

@@ -69,9 +69,9 @@ struct volume_user_table {
 };
 
 struct supernode_header {
-    uint32_t                 total_size;
     struct uuid              uuid;
     struct uuid              root_uuid;
+    uint32_t                 total_size;
     struct pubkey_hash       owner;
 } __attribute__((packed));
 
@@ -83,10 +83,10 @@ struct supernode {
 
 // -- dirnode stuff. Manages directories
 struct dirnode_header {
-    uint32_t    total_size;
-    uint32_t    dir_count; // number of directories
     struct uuid uuid;
     struct uuid root_uuid;
+    uint32_t    total_size;
+    uint32_t    dir_count; // number of files and subdirectories
 } __attribute__((packed));
 
 struct dirnode_entry {
@@ -100,7 +100,7 @@ struct dirnode_entry {
 struct dirnode {
     struct crypto_context crypto_context;
     struct dirnode_header header;
-    struct dirnode_entry  entries;
+    struct dirnode_entry  entries[0];
 } __attribute__((packed));
 
 // TODO

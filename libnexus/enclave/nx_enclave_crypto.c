@@ -72,9 +72,9 @@ instantiate_gcm_context(mbedtls_gcm_context *   gcm_context,
 }
 
 int
-supernode_encrypt_and_seal(struct supernode *  supernode,
-                           struct volumekey *  volumekey,
-                           struct supernode ** p_sealed_supernode)
+supernode_encryption1(struct supernode *  supernode,
+                      struct volumekey *  volumekey,
+                      struct supernode ** p_sealed_supernode)
 {
     int                       ret                 = -1;
     size_t                    size                = 0;
@@ -144,9 +144,9 @@ out:
 }
 
 int
-supernode_decrypt_and_unseal(struct supernode *  sealed_supernode,
-                             struct volumekey *  volumekey,
-                             struct supernode ** p_supernode)
+supernode_decryption1(struct supernode *  sealed_supernode,
+                      struct volumekey *  volumekey,
+                      struct supernode ** p_supernode)
 {
     int                       ret                   = -1;
     size_t                    size                  = 0;
@@ -221,17 +221,46 @@ out:
 
 // TODO
 int
-dirnode_encrypt_and_seal(struct dirnode * dirnode, struct volumekey * volkey)
+dirnode_encryption1(struct dirnode *   dirnode,
+                    struct volumekey * volkey,
+                    struct dirnode **  p_sealed_dirnode)
 {
+    struct dirnode * sealed_dirnode = NULL;
+
+    sealed_dirnode = (struct dirnode *)calloc(1, dirnode->header.total_size);
+    if (sealed_dirnode == NULL) {
+        ocall_debug("allocation error");
+        return -1;
+    }
+
+    memcpy(sealed_dirnode, dirnode, dirnode->header.total_size);
+    *p_sealed_dirnode = sealed_dirnode;
+
     return 0;
 }
 
 int
-dirnode_decrypt_and_unseal(struct dirnode * dirnode, struct volumekey * volkey)
+dirnode_encryption(struct dirnode * dirnode, struct dirnode ** p_sealed_dirnode)
+{
+    struct volumekey * volumekey = NULL;
+
+    volumekey = volumekey_from_rootuuid(&dirnode->header.root_uuid);
+    if (volumekey == NULL) {
+        ocall_debug("could not find dirnode volumekey");
+        return -1;
+    }
+
+    return dirnode_encryption1(dirnode, volumekey, p_sealed_dirnode);
+}
+
+// TODO
+int
+dirnode_decryption(struct dirnode * sealed_dirnode, struct dirnode ** p_dirnode)
 {
     return 0;
 }
 
+// TODO
 int
 volumekey_wrap(struct volumekey * volkey)
 {

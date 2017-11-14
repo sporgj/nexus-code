@@ -6,6 +6,7 @@ enclave {
 
         public int ecall_init_enclave();
 
+        // supernode stuff
         /**
          * Creates a new nexus volume
          * @param supernode_uuid_in is the uuid of the supernode
@@ -51,6 +52,35 @@ enclave {
             size_t signature_len
         );
 
+        // dirnode stuff
+
+        /**
+         * Creates a new dirnode 
+         * @param uuid_ext the dirnode's uuid
+         * @param parent_dirnode_ext the dirnode of the parent directory
+         * @param dirnode_out_ext destination pointer for the new dirnode.
+         * @return 0 on success
+         */
+        public int ecall_dirnode_new(
+            [user_check] struct uuid * uuid_ext,
+            [user_check] struct dirnode * parent_dirnode_ext,
+            [user_check] struct dirnode * dirnode_out_ext
+        );
+
+        /**
+         * Add a new file/dir into the dirnode
+         * @param dirnode_ext
+         * @param 
+         * @param dirnode_out_ext destination pointer for the new dirnode.
+         * @return 0 on success
+         */
+        public int ecall_dirnode_add(
+            [user_check] struct dirnode * dirnode_ext,
+            [user_check] struct uuid * uuid,
+            [in, string] const char * fname_str_in,
+            size_t fname_str_len,
+            nexus_fs_obj_type_t type
+        );
     };
 
     untrusted {
