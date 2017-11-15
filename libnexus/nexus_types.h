@@ -29,6 +29,8 @@ typedef enum {
     NEXUS_LINK = 3
 } nexus_fs_obj_type_t;
 
+typedef uint32_t version_t;
+
 typedef uint8_t nonce_t[CONFIG_NONCE_BYTES];
 
 typedef struct crypto_ekey {
@@ -69,10 +71,11 @@ struct volume_user_table {
 };
 
 struct supernode_header {
-    struct uuid              uuid;
-    struct uuid              root_uuid;
-    uint32_t                 total_size;
-    struct pubkey_hash       owner;
+    struct uuid        uuid;
+    struct uuid        root_uuid;
+    version_t          version;
+    uint32_t           total_size;
+    struct pubkey_hash owner;
 } __attribute__((packed));
 
 struct supernode {
@@ -85,22 +88,23 @@ struct supernode {
 struct dirnode_header {
     struct uuid uuid;
     struct uuid root_uuid;
+    version_t   version;
     uint32_t    total_size;
     uint32_t    dir_count; // number of files and subdirectories
 } __attribute__((packed));
 
-struct dirnode_entry {
-    nexus_fs_obj_type_t type;
-    struct uuid         random_name;
+struct dirnode_direntry {
     uint16_t            entry_len;
+    nexus_fs_obj_type_t type;
+    struct uuid         uuid;
     uint16_t            name_len;
-    char                real_name[0];
+    char                name[0];
 };
 
 struct dirnode {
-    struct crypto_context crypto_context;
-    struct dirnode_header header;
-    struct dirnode_entry  entries[0];
+    struct crypto_context   crypto_context;
+    struct dirnode_header   header;
+    struct dirnode_direntry entries[0];
 } __attribute__((packed));
 
 // TODO

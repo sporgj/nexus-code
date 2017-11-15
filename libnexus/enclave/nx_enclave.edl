@@ -1,6 +1,6 @@
 enclave {
 
-    include "nexus_types.h"
+    include "nexus.h"
 
     trusted {
 
@@ -78,13 +78,36 @@ enclave {
             [user_check] struct dirnode * dirnode_ext,
             [user_check] struct uuid * uuid,
             [in, string] const char * fname_str_in,
-            size_t fname_str_len,
             nexus_fs_obj_type_t type
+        );
+
+        public int ecall_dirnode_find_by_uuid(
+            [user_check] struct dirnode *      sealed_dirnode_ext,
+            [user_check] struct uuid *         uuid_ext,
+            [user_check] char **               fname_str_out_ext,
+            [user_check] nexus_fs_obj_type_t * type_out_ext
+        );
+
+        public int ecall_dirnode_find_by_name(
+            [user_check] struct dirnode *      sealed_dirnode_ext,
+            [user_check] char *                fname_str_ext,
+            [user_check] struct uuid *         uuid_out_ext,
+            [user_check] nexus_fs_obj_type_t * type_out_ext
+        );
+
+        public int ecall_dirnode_remove(
+            [user_check] struct dirnode *      sealed_dirnode_ext,
+            [user_check] char *                fname_str_ext,
+            [user_check] struct uuid *         uuid_out_ext,
+            [user_check] nexus_fs_obj_type_t * type_out_ext
         );
     };
 
     untrusted {
         void ocall_print([in, string] const char * str);
+
+        // performs an allocation in untrusted space
+        void * ocall_calloc(size_t size);
     };
 
 };

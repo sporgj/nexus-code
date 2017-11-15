@@ -27,7 +27,7 @@ build = \
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
-test_dirnode: nx_test_dirnode.o libnexus.a
+test_dirnode: nx_test_dirnode.o unity/unity.o libnexus.a
 	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
 
 .PHONY: clean

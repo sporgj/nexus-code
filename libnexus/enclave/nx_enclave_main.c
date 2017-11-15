@@ -14,6 +14,9 @@ static struct pubkey_hash auth_user_pubkey_hash = { 0 };
 // the nonce of the authentication challenge
 static nonce_t auth_nonce;
 
+size_t                        dirnode_cache_size = 0;
+struct dirnode_wrapper_list * dirnode_cache      = NULL;
+
 /**
  * returns the volumekey corresponding to the root uuid.
  *
@@ -45,6 +48,17 @@ ecall_init_enclave()
     if (status != SGX_SUCCESS) {
         return -1;
     }
+
+    // allocate our enclave variables
+    dirnode_cache = (struct dirnode_wrapper_list *)calloc(
+        1, sizeof(struct dirnode_wrapper_list));
+
+    if (dirnode_cache == NULL) {
+        ocall_debug("allocation error");
+        return -1;
+    }
+
+    TAILQ_INIT(dirnode_cache);
 
     return 0;
 }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -28,17 +30,22 @@
 
 extern sgx_key_128bit_t enclave_sealing_key;
 
-struct dirnode_list_entry {
-    TAILQ_ENTRY(dirnode_list_entry) next_entry;
-    struct dirnode_entry * data_ptr;
+struct dirnode_direntry_item {
+    bool                      freeable; // if the direntry can be freed
+    struct dirnode_direntry * direntry;
+    TAILQ_ENTRY(dirnode_direntry_item) next_item;
 };
 
 struct dirnode_wrapper {
-    size_t current_tsize;
-    size_t current_dircount;
+    bool             modified;
     struct dirnode * dirnode;
-    TAILQ_HEAD(dirnode_list_entry_head, dirnode_list_entry) entries_list;
+    TAILQ_HEAD(dirnode_direntry_list, dirnode_direntry_item) direntry_head;
+    TAILQ_ENTRY(dirnode_wrapper) next_item;
 };
+
+// cache of all stored dirnode wrapper items
+extern size_t dirnode_cache_size;
+extern TAILQ_HEAD(dirnode_wrapper_list, dirnode_wrapper) * dirnode_cache;
 
 int
 supernode_encryption1(struct supernode *  supernode,
@@ -89,10 +96,5 @@ volumekey_from_rootuuid(struct uuid * root_uuid);
 struct dirnode *
 dirnode_new(struct uuid * uuid, struct uuid * root_uuid);
 
-/**
- * Creates/Loads a new dirnode wrapper from a dirnode object.
- * @param dirnode
- * @return NULL
- */
-struct dirnode_wrapper *
-dirnode_load(struct dirnode * dirnode);
+struct dirnode *
+dirnode_copy(struct dirnode * dirnode);

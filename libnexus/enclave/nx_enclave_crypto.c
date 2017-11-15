@@ -225,18 +225,8 @@ dirnode_encryption1(struct dirnode *   dirnode,
                     struct volumekey * volkey,
                     struct dirnode **  p_sealed_dirnode)
 {
-    struct dirnode * sealed_dirnode = NULL;
-
-    sealed_dirnode = (struct dirnode *)calloc(1, dirnode->header.total_size);
-    if (sealed_dirnode == NULL) {
-        ocall_debug("allocation error");
-        return -1;
-    }
-
-    memcpy(sealed_dirnode, dirnode, dirnode->header.total_size);
-    *p_sealed_dirnode = sealed_dirnode;
-
-    return 0;
+    *p_sealed_dirnode = dirnode_copy(dirnode);
+    return (*p_sealed_dirnode == NULL) ? -1 : 0;
 }
 
 int
@@ -257,7 +247,8 @@ dirnode_encryption(struct dirnode * dirnode, struct dirnode ** p_sealed_dirnode)
 int
 dirnode_decryption(struct dirnode * sealed_dirnode, struct dirnode ** p_dirnode)
 {
-    return 0;
+    *p_dirnode = dirnode_copy(sealed_dirnode);
+    return (*p_dirnode == NULL) ? -1 : 0;
 }
 
 // TODO

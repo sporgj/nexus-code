@@ -16,6 +16,13 @@ ocall_print(const char * str)
     fflush(stdout);
 }
 
+
+void *
+ocall_calloc(size_t size)
+{
+    return calloc(1, size);
+}
+
 static char *
 fread_public_or_private_key(const char * key_fpath, size_t * p_klen)
 {

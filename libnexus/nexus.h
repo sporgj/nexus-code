@@ -19,6 +19,9 @@ extern "C" {
 #define NEXUS_FILENAME_PREFIX       "f"
 #define NEXUS_PREFIX_SIZE(s)        (sizeof(s) - 1)
 
+#define NEXUS_MAX_FILENAME_LEN	    256
+#define NEXUS_MAX_PATH_LEN	    1024
+
 
 // global operations
 int
