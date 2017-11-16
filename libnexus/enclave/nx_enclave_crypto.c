@@ -268,13 +268,14 @@ _instantiate_dirnode_crypto(struct dirnode *        dirnode,
     struct dirnode *        sealed_dirnode      = NULL;
 
     // create the dirnode and instantiate its crypto context
+    header         = &dirnode->header;
+
     sealed_dirnode = (struct dirnode *)calloc(1, header->total_size);
     if (sealed_dirnode == NULL) {
         ocall_print("allocation error");
         return NULL;
     }
 
-    header        = &dirnode->header;
     sealed_header = &sealed_dirnode->header;
     memcpy(sealed_header, header, sizeof(struct dirnode_header));
 

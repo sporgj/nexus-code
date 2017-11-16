@@ -159,7 +159,7 @@ ecall_authentication_request(const char * publickey_str_in,
 }
 
 int
-nx_authentication_response(struct volumekey * _volumekey,
+nx_authentication_response(struct volumekey * sealed_volumekey,
                            struct supernode * sealed_supernode,
                            uint8_t *          signature,
                            size_t             signature_len)
@@ -167,6 +167,7 @@ nx_authentication_response(struct volumekey * _volumekey,
     int                    ret                     = -1;
     uint8_t                hash[CONFIG_HASH_BYTES] = { 0 };
     struct supernode *     _supernode              = NULL;
+    struct volumekey *     _volumekey              = NULL;
     mbedtls_sha256_context sha_ctx;
     mbedtls_pk_context     pk;
 
@@ -180,10 +181,19 @@ nx_authentication_response(struct volumekey * _volumekey,
                           (uint8_t *)sealed_supernode,
                           sealed_supernode->header.total_size);
     mbedtls_sha256_update(
-        &sha_ctx, (uint8_t *)_volumekey, sizeof(struct volumekey));
+        &sha_ctx, (uint8_t *)sealed_volumekey, sizeof(struct volumekey));
     mbedtls_sha256_finish(&sha_ctx, hash);
+    mbedtls_sha256_free(&sha_ctx);
 
     // 1 - let's make sure our supernode is not tampered
+    _volumekey = (struct volumekey *)calloc(1, sizeof(struct volumekey));
+    if (_volumekey == NULL) {
+        ocall_debug("allocation error");
+        return -1;
+    }
+
+    memcpy(_volumekey, sealed_volumekey, sizeof(struct volumekey));
+
     if (volumekey_unwrap(_volumekey)) {
         ocall_debug("unwrapping volume key failed");
         goto out;
@@ -225,11 +235,11 @@ nx_authentication_response(struct volumekey * _volumekey,
 
     ret = 0;
 out:
-    mbedtls_sha256_free(&sha_ctx);
     mbedtls_pk_free(&pk);
 
     if (ret) {
         my_free(_supernode);
+        my_free(_volumekey);
     }
 
     return ret;
@@ -243,10 +253,10 @@ ecall_authentication_response(struct volumekey * volumekey_ext,
                               size_t             signature_len)
 {
     int                ret            = -1;
+    size_t             supernode_size = 0;
     uint8_t *          signature      = NULL;
-    struct supernode * _supernode     = NULL;
-    struct volumekey * _volumekey     = NULL;
-    size_t             supernode_size = supernode_ext->header.total_size;
+    struct supernode * supernode      = NULL;
+    struct volumekey   volumekey      = { 0 };
 
     // in case someone is trying to skip the challenge
     if (auth_user_pubkey == NULL) {
@@ -254,26 +264,26 @@ ecall_authentication_response(struct volumekey * volumekey_ext,
         return -1;
     }
 
-    _volumekey = (struct volumekey *)calloc(1, sizeof(struct volumekey));
-    _supernode = (struct supernode *)calloc(1, supernode_size);
+    supernode_size = supernode_ext->header.total_size;
+
+    supernode = (struct supernode *)calloc(1, supernode_size);
     signature  = (uint8_t *)calloc(1, signature_len);
 
-    if (_volumekey == NULL || _supernode == NULL || signature == NULL) {
+    if (supernode == NULL || signature == NULL) {
         ocall_debug("allocation failed");
         goto out;
     }
 
     // copy in the data structures and call nx_authentication_response()
-    memcpy(_volumekey, volumekey_ext, sizeof(struct volumekey));
-    memcpy(_supernode, supernode_ext, supernode_size);
+    memcpy(&volumekey, volumekey_ext, sizeof(struct volumekey));
+    memcpy(supernode, supernode_ext, supernode_size);
     memcpy(signature, signature_ext, signature_len);
 
     ret = nx_authentication_response(
-        _volumekey, _supernode, signature, signature_len);
+        &volumekey, supernode, signature, signature_len);
 
 out:
-    my_free(_volumekey);
-    my_free(_supernode);
+    my_free(supernode);
     my_free(signature);
 
     // let's cleanup all authentication data

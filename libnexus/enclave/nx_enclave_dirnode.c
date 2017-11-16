@@ -111,6 +111,7 @@ dirnode_get_wrapper_from_ext(struct dirnode * sealed_dirnode_ext)
  * Drops reference on a dirnode_wrapper
  * @param dirnode_wrapper
  */
+// TODO
 void
 dirnode_put_wrapper(struct dirnode_wrapper * dirnode_wrapper)
 {
@@ -434,10 +435,11 @@ out:
 }
 
 int
-ecall_dirnode_find_by_name(struct dirnode *      sealed_dirnode_ext,
-                           char *                fname_str_in,
-                           struct uuid *         uuid_out_ext,
-                           nexus_fs_obj_type_t * type_out_ext)
+ecall_dirnode_find_or_remove(struct dirnode *      sealed_dirnode_ext,
+                             char *                fname_str_in,
+                             struct uuid *         uuid_out_ext,
+                             nexus_fs_obj_type_t * type_out_ext,
+                             bool                  remove)
 {
     int                      ret             = -1;
     char *                   fname           = NULL;
@@ -451,7 +453,12 @@ ecall_dirnode_find_by_name(struct dirnode *      sealed_dirnode_ext,
         return -1;
     }
 
-    ret = dirnode_find_by_name(dirnode_wrapper, fname_str_in, &type, &uuid);
+    if (remove) {
+        ret = dirnode_remove(dirnode_wrapper, fname_str_in, &type, &uuid);
+    } else {
+        ret = dirnode_find_by_name(dirnode_wrapper, fname_str_in, &type, &uuid);
+    }
+
     if (ret != 0) {
         ocall_debug("could not find the name entry");
         goto out;
@@ -468,38 +475,22 @@ out:
     return ret;
 }
 
-// TODO refactor this function. similar to ecall_dirnode_find_by_name()
+int
+ecall_dirnode_find_by_name(struct dirnode *      sealed_dirnode_ext,
+                           char *                fname_str_in,
+                           struct uuid *         uuid_out_ext,
+                           nexus_fs_obj_type_t * type_out_ext)
+{
+    return ecall_dirnode_find_or_remove(
+        sealed_dirnode_ext, fname_str_in, uuid_out_ext, type_out_ext, false);
+}
+
 int
 ecall_dirnode_remove(struct dirnode *      sealed_dirnode_ext,
                      char *                fname_str_in,
                      struct uuid *         uuid_out_ext,
                      nexus_fs_obj_type_t * type_out_ext)
 {
-    int                      ret             = -1;
-    char *                   fname           = NULL;
-    nexus_fs_obj_type_t      type            = NEXUS_ANY;
-    struct dirnode_wrapper * dirnode_wrapper = NULL;
-    struct uuid              uuid;
-
-    dirnode_wrapper = dirnode_get_wrapper_from_ext(sealed_dirnode_ext);
-    if (dirnode_wrapper == NULL) {
-        ocall_debug("dirnode_get_wrapper_from_ext() FAILED");
-        return -1;
-    }
-
-    ret = dirnode_remove(dirnode_wrapper, fname_str_in, &type, &uuid);
-    if (ret != 0) {
-        ocall_debug("could not find the name entry");
-        goto out;
-    }
-
-    // write out the data
-    memcpy(uuid_out_ext, &uuid, sizeof(struct uuid));
-    *type_out_ext = type;
-
-    ret = 0;
-out:
-    dirnode_put_wrapper(dirnode_wrapper);
-
-    return ret;
+    return ecall_dirnode_find_or_remove(
+        sealed_dirnode_ext, fname_str_in, uuid_out_ext, type_out_ext, true);
 }
