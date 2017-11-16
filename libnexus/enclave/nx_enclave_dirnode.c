@@ -44,9 +44,10 @@ dirnode_find_wrapper(struct dirnode * sealed_dirnode)
 struct dirnode_wrapper *
 dirnode_get_wrapper(struct dirnode * sealed_dirnode)
 {
-    int                      ret     = -1;
-    struct dirnode_wrapper * wrapper = NULL;
-    struct dirnode *         dirnode = NULL;
+    int                      ret       = -1;
+    struct dirnode_wrapper * wrapper   = NULL;
+    struct dirnode *         dirnode   = NULL;
+    struct volumekey *       volumekey = NULL;
 
     // let's first find it in our cache
     wrapper = dirnode_find_wrapper(sealed_dirnode);
@@ -54,7 +55,13 @@ dirnode_get_wrapper(struct dirnode * sealed_dirnode)
         return wrapper;
     }
 
-    ret = dirnode_decryption(sealed_dirnode, &dirnode);
+    volumekey = volumekey_from_rootuuid(&sealed_dirnode->header.root_uuid);
+    if (volumekey == NULL) {
+        ocall_debug("could not find dirnode volumekey");
+        return NULL;
+    }
+
+    ret = dirnode_decryption(sealed_dirnode, volumekey, &dirnode);
     if (ret != 0) {
         ocall_debug("dirnode_decryption() FAILED");
         return NULL;
@@ -68,7 +75,8 @@ dirnode_get_wrapper(struct dirnode * sealed_dirnode)
     }
 
     // initialize the wrapper and return it all
-    wrapper->dirnode = dirnode;
+    wrapper->volumekey = volumekey;
+    wrapper->dirnode   = dirnode;
     TAILQ_INIT(&wrapper->direntry_head);
 
     // add it to the dirnode cache
@@ -189,6 +197,7 @@ dirnode_add(struct dirnode_wrapper * dirnode_wrapper,
     TAILQ_INSERT_TAIL(head, entryitem, next_item);
 
     dirnode->header.total_size += size;
+    dirnode->header.dir_size += size;
     dirnode->header.dir_count += 1;
 
     dirnode_wrapper->modified = true;
@@ -255,10 +264,18 @@ dirnode_remove(struct dirnode_wrapper * dirnode_wrapper,
                nexus_fs_obj_type_t *    p_type,
                struct uuid *            uuid)
 {
-    struct dirnode_direntry_item * direntry_item
-        = _dirnode_find_or_remove(dirnode_wrapper, fname_str, p_type, uuid);
+    size_t                         size          = 0;
+    struct dirnode *               dirnode       = dirnode_wrapper->dirnode;
+    struct dirnode_direntry_item * direntry_item = NULL;
 
+    direntry_item
+        = _dirnode_find_or_remove(dirnode_wrapper, fname_str, p_type, uuid);
     if (direntry_item) {
+        // adjust the size of the dir
+        size = direntry_item->direntry->entry_len;
+        dirnode->header.total_size -= size;
+        dirnode->header.dir_size -= size;
+
         TAILQ_REMOVE(&dirnode_wrapper->direntry_head, direntry_item, next_item);
         if (direntry_item->freeable) {
             free(direntry_item->direntry);
@@ -305,15 +322,22 @@ ecall_dirnode_new(struct uuid *    uuid_ext,
                   struct dirnode * parent_dirnode_ext,
                   struct dirnode * dirnode_out_ext)
 {
-    int              ret            = -1;
-    struct dirnode * dirnode        = NULL;
-    struct dirnode * sealed_dirnode = NULL;
-    struct uuid      uuid;
-    struct uuid      root_uuid;
+    int                ret            = -1;
+    struct dirnode *   dirnode        = NULL;
+    struct dirnode *   sealed_dirnode = NULL;
+    struct volumekey * volumekey      = NULL;
+    struct uuid        uuid;
+    struct uuid        root_uuid;
 
     memcpy(&uuid, uuid_ext, sizeof(struct uuid));
     memcpy(
         &root_uuid, &parent_dirnode_ext->header.root_uuid, sizeof(struct uuid));
+
+    volumekey = volumekey_from_rootuuid(&sealed_dirnode->header.root_uuid);
+    if (volumekey == NULL) {
+        ocall_debug("could not find dirnode volumekey");
+        return -1;
+    }
 
     // create the new dirnode and send to the exterior
     dirnode = dirnode_new(&uuid, &root_uuid);
@@ -321,7 +345,7 @@ ecall_dirnode_new(struct uuid *    uuid_ext,
         return -1;
     }
 
-    ret = dirnode_encryption(dirnode, &sealed_dirnode);
+    ret = dirnode_encryption1(NULL, dirnode, volumekey, &sealed_dirnode);
     if (ret != 0) {
         ocall_debug("dirnode_encrypt_and_seal2() FAILED");
         goto out;

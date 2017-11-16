@@ -108,7 +108,7 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
         goto out;
     }
 
-    if (dirnode_encryption1(&dirnode, &volkey, &sealed_dirnode)) {
+    if (dirnode_encryption1(NULL, &dirnode, &volkey, &sealed_dirnode)) {
         ocall_debug("dirnode sealing FAILED");
         goto out;
     }

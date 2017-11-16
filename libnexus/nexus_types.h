@@ -90,7 +90,8 @@ struct dirnode_header {
     struct uuid root_uuid;
     version_t   version;
     uint32_t    total_size;
-    uint32_t    dir_count; // number of files and subdirectories
+    uint32_t    dir_size; // size of directory entries
+    uint32_t    dir_count;
 } __attribute__((packed));
 
 struct dirnode_direntry {

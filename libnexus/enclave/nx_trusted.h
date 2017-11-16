@@ -37,8 +37,9 @@ struct dirnode_direntry_item {
 };
 
 struct dirnode_wrapper {
-    bool             modified;
-    struct dirnode * dirnode;
+    bool              modified;
+    struct dirnode *  dirnode;
+    struct volumekey * volumekey;
     TAILQ_HEAD(dirnode_direntry_list, dirnode_direntry_item) direntry_head;
     TAILQ_ENTRY(dirnode_wrapper) next_item;
 };
@@ -58,19 +59,18 @@ supernode_decryption1(struct supernode *  sealed_supernode,
                       struct supernode ** p_supernode);
 
 int
-dirnode_encryption1(struct dirnode *   dirnode,
-                    struct volumekey * volkey,
-                    struct dirnode **  sealed_dirnode);
-/**
- * Calls dirnode_encrypt_and_seal() after using the dirnode uuid to find
- * the volume key.  */
+dirnode_encryption1(struct dirnode_wrapper * dirnode_wrapper,
+                    struct dirnode *         dirnode,
+                    struct volumekey *       volkey,
+                    struct dirnode **        sealed_dirnode);
 int
-dirnode_encryption(struct dirnode *  dirnode,
-                   struct dirnode ** p_sealed_dirnode);
+dirnode_encryption(struct dirnode_wrapper * dirnode_wrapper,
+                   struct dirnode **        p_sealed_dirnode);
 
 int
-dirnode_decryption(struct dirnode *  sealed_dirnode,
-                   struct dirnode ** p_dirnode);
+dirnode_decryption(struct dirnode *   sealed_dirnode,
+                   struct volumekey * volumekey,
+                   struct dirnode **  p_dirnode);
 
 /**
  * Protects the volkey with the enclave sealing key before it is sent to
