@@ -97,6 +97,8 @@ supernode_encryption1(struct supernode *  supernode,
     sealed_header = &sealed_supernode->header;
     memcpy(sealed_header, header, sizeof(struct supernode_header));
 
+    sealed_header->version += 1;
+
     // initialize the crypto context
     crypto_context = &sealed_supernode->crypto_context;
     sgx_read_rand((uint8_t *)crypto_context, sizeof(struct crypto_context));
@@ -276,6 +278,9 @@ _instantiate_dirnode_crypto(struct dirnode *        dirnode,
         return NULL;
     }
 
+    // increment the version of header
+    header->version += 1;
+
     sealed_header = &sealed_dirnode->header;
     memcpy(sealed_header, header, sizeof(struct dirnode_header));
 
@@ -351,7 +356,6 @@ dirnode_encryption(struct dirnode_wrapper * dirnode_wrapper,
     return dirnode_encryption1(dirnode_wrapper, dirnode, volumekey, p_sealed_dirnode);
 }
 
-// TODO
 int
 dirnode_decryption(struct dirnode *   sealed_dirnode,
                    struct volumekey * volumekey,

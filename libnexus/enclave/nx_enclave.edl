@@ -101,6 +101,11 @@ enclave {
             [user_check] struct uuid *         uuid_out_ext,
             [user_check] nexus_fs_obj_type_t * type_out_ext
         );
+
+        public int ecall_dirnode_serialize(
+            [user_check] struct dirnode * dirnode,
+            [user_check] struct dirnode ** p_sealed_dirnode_out_ext
+        );
     };
 
     untrusted {

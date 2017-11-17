@@ -15,6 +15,14 @@ dirnode_copy(struct dirnode * dirnode)
     return copy;
 }
 
+// TODO
+static void
+dirnode_wrapper_free(struct dirnode_wrapper * wrapper)
+{
+    // iterate the dirnode from the back
+    dirnode_free(wrapper->dirnode);
+}
+
 static struct dirnode_wrapper *
 dirnode_find_wrapper(struct dirnode * sealed_dirnode)
 {
@@ -26,12 +34,69 @@ dirnode_find_wrapper(struct dirnode * sealed_dirnode)
     {
         header = &dirnode_wrapper->dirnode->header;
         if (memcmp(&header->uuid, uuid, sizeof(struct uuid)) == 0) {
-            // TODO check for versions here
+            // JBD; the sealed_dirnode is not checked for integrity
+            // before comparing for versions. It doesn't really change much
+            // because it will be checked for unsealing.
+
+            if (header->version < sealed_dirnode->header.version) {
+                dirnode_wrapper_free(dirnode_wrapper);
+                return NULL;
+            }
+
             return dirnode_wrapper;
         }
     }
 
     return NULL;
+}
+
+static int
+dirnode_wrapper_initialize(struct dirnode_wrapper * wrapper)
+{
+    int                            ret        = -1;
+    int                            count      = 0;
+    int                            bytes_left = 0;
+    int                            size       = 0;
+    struct dirnode *               dirnode    = wrapper->dirnode;
+    struct dirnode_direntry_list * head       = &wrapper->direntry_head;
+    struct dirnode_direntry_item * entryitem  = NULL;
+    struct dirnode_direntry_item * item0      = NULL;
+    struct dirnode_direntry *      direntry   = NULL;
+
+    // let's allocate the list in advance
+    count = dirnode->header.dir_count;
+    size  = count * sizeof(struct dirnode_direntry_item);
+
+    item0 = (struct dirnode_direntry_item *)calloc(1, size);
+    if (item0 == NULL) {
+        ocall_debug("allocation error for entryitems");
+        return -1;
+    }
+
+    entryitem = item0;
+
+    TAILQ_INIT(head);
+
+    direntry   = dirnode->entries;
+    bytes_left = dirnode->header.dir_size;
+    while (bytes_left > 0) {
+        size = direntry->entry_len;
+
+        // set the entryitem to point to the direntry
+        entryitem->freeable = false;
+        entryitem->direntry = direntry;
+        TAILQ_INSERT_TAIL(head, entryitem, next_item);
+
+        bytes_left -= size;
+        entryitem++;
+    }
+
+    // the first element is freeable
+    item0->freeable = true;
+
+    ret = 0;
+out:
+    return ret;
 }
 
 /**
@@ -77,7 +142,8 @@ dirnode_get_wrapper(struct dirnode * sealed_dirnode)
     // initialize the wrapper and return it all
     wrapper->volumekey = volumekey;
     wrapper->dirnode   = dirnode;
-    TAILQ_INIT(&wrapper->direntry_head);
+
+    ret = dirnode_wrapper_initialize(wrapper);
 
     // add it to the dirnode cache
     TAILQ_INSERT_TAIL(dirnode_cache, wrapper, next_item);
@@ -137,6 +203,12 @@ dirnode_new(struct uuid * uuid, struct uuid * root_uuid)
     dirnode->header.total_size = sizeof(struct dirnode);
 
     return dirnode;
+}
+
+void
+dirnode_free(struct dirnode * dirnode)
+{
+    free(dirnode);
 }
 
 static int
@@ -276,6 +348,7 @@ dirnode_remove(struct dirnode_wrapper * dirnode_wrapper,
         size = direntry_item->direntry->entry_len;
         dirnode->header.total_size -= size;
         dirnode->header.dir_size -= size;
+        dirnode->header.dir_count -= 1;
 
         TAILQ_REMOVE(&dirnode_wrapper->direntry_head, direntry_item, next_item);
         if (direntry_item->freeable) {
@@ -493,4 +566,49 @@ ecall_dirnode_remove(struct dirnode *      sealed_dirnode_ext,
 {
     return ecall_dirnode_find_or_remove(
         sealed_dirnode_ext, fname_str_in, uuid_out_ext, type_out_ext, true);
+}
+
+int
+ecall_dirnode_serialize(struct dirnode *  dirnode,
+                        struct dirnode ** p_sealed_dirnode_out_ext)
+{
+    int                      ret                = -1;
+    size_t                   size               = 0;
+    struct dirnode_wrapper * dirnode_wrapper    = NULL;
+    struct dirnode *         sealed_dirnode     = NULL;
+    struct dirnode *         sealed_dirnode_ext = NULL;
+
+    // get the wrapper and encrypt the dirnode
+    dirnode_wrapper = dirnode_get_wrapper(dirnode);
+    if (dirnode_wrapper == NULL) {
+        ocall_debug("dirnode_get_wrapper FAILED");
+        return -1;
+    }
+
+    ret = dirnode_encryption(dirnode_wrapper, &sealed_dirnode);
+    if (ret != 0) {
+        ocall_debug("dirnode_encryption FAILED");
+        goto out;
+    }
+
+    // allocate an external buffer and copy out the sealed dirnode
+    size = sealed_dirnode->header.total_size;
+    ret  = ocall_calloc((void **)&sealed_dirnode_ext, size);
+    if (ret != 0) {
+        ocall_debug("ocall_calloc for sealed_dirnode FAILED");
+        goto out;
+    }
+
+    memcpy(sealed_dirnode_ext, sealed_dirnode, size);
+    *p_sealed_dirnode_out_ext = sealed_dirnode_ext;
+
+    ret = 0;
+out:
+    if (sealed_dirnode) {
+        my_free(sealed_dirnode);
+    }
+
+    dirnode_put_wrapper(dirnode_wrapper);
+
+    return ret;
 }

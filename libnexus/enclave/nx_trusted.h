@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <sgx_trts.h>
 #include <sgx_tseal.h>
@@ -98,3 +99,6 @@ dirnode_new(struct uuid * uuid, struct uuid * root_uuid);
 
 struct dirnode *
 dirnode_copy(struct dirnode * dirnode);
+
+void
+dirnode_free(struct dirnode * dirnode);
