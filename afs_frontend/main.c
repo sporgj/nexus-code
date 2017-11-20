@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include <sys/ioctl.h>
 #include <sys/epoll.h>
@@ -16,7 +17,11 @@
 #include "handler.h"
 
 
-
+char * metadata_path = NULL;
+char * datadir_path = NULL;
+char * volkey_fpath  = NULL;
+char * pubkey_fpath  = NULL;
+char * privkey_fpath = NULL;
 
 
 static int
@@ -172,18 +177,117 @@ handle_afs_cmds(int volume_fd)
     return 0;
 }
 
+static int NUMBER_OF_ARGS = 4;
+
+static struct option long_options[]
+    = { { "privatekey", required_argument, 0, 's' },
+        { "publickey", required_argument, 0, 'p' },
+        { "metadata", required_argument, 0, 'm' },
+        { "datadir", required_argument, 0, 'd' },
+        { "volumekey", required_argument, 0, 'v' },
+        { 0, 0, 0, 0 } };
+
+static int
+parse_args(int argc, char ** argv)
+{
+    int ret          = -1;
+    int c            = 0;
+    int found        = 0;
+    int option_index = 0;
+
+    do {
+        option_index = 0;
+
+        c = getopt_long(argc, argv, "d:m:p:s:v:", long_options, &option_index);
+        if (c == -1) {
+            break;
+        }
+
+        switch (c) {
+        case 's':
+	    privkey_fpath = strndup(optarg, PATH_MAX);
+	    if (privkey_fpath == NULL) {
+		log_error("allocation error :(");
+		goto out;
+	    }
+
+            found++;
+            break;
+
+        case 'p':
+	    pubkey_fpath = strndup(optarg, PATH_MAX);
+	    if (pubkey_fpath == NULL) {
+		log_error("allocation error :(");
+		goto out;
+	    }
+
+            found++;
+            log_debug("private_key %s", optarg);
+            break;
+
+        case 'm':
+	    metadata_path = strndup(optarg, PATH_MAX);
+	    if (metadata_path == NULL) {
+		log_error("allocation error :(");
+		goto out;
+	    }
+
+            found++;
+            log_debug("private_key %s", optarg);
+            break;
+
+        case 'd':
+	    datadir_path = strndup(optarg, PATH_MAX);
+	    if (datadir_path == NULL) {
+		log_error("allocation error :(");
+		goto out;
+	    }
+
+            found++;
+            break;
+
+        case 'v':
+	    volkey_fpath = strndup(optarg, PATH_MAX);
+	    if (volkey_fpath == NULL) {
+		log_error("allocation error :(");
+		goto out;
+	    }
+
+            found++;
+            break;
+        }
+    } while (1);
+
+    if (found < NUMBER_OF_ARGS) {
+        log_error("Set all the flags: (%d/%d)", found, NUMBER_OF_ARGS);
+	goto out;
+    }
+
+    ret = 0;
+out:
+    if (ret) {
+	nexus_free2(metadata_path);
+	nexus_free2(datadir_path);
+	nexus_free2(volkey_fpath);
+	nexus_free2(pubkey_fpath);
+	nexus_free2(privkey_fpath);
+    }
+
+    return ret;
+}
+
 int
 main(int argc, char ** argv)
 {
     char * volume_path = NULL;
     int    volume_fd   = 0;
-    
-    if (argc < 2) {
-	printf("./nexus-afs <volume-path>\n");
+
+    if (parse_args(argc, argv)) {
+	log_error("parsing arguments failed");
 	exit(-1);
     }
 
-    volume_path = argv[1];
+    volume_path = datadir_path;
     
     printf("Launching Nexus-AFS on Volume %s\n", volume_path);
 
