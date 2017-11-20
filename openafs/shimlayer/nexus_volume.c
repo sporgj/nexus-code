@@ -118,6 +118,9 @@ volume_last_put(struct kref * kref)
     /* Abort any pending commands */
     
     deregister_volume(vol);
+
+    // remove from list
+    list_del(&(vol->node));
     
     kfree(vol->path);
     kfree(vol);

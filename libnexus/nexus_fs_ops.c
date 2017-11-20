@@ -27,7 +27,7 @@ nexus_lookup(char                 * dir_path,
 
     printf("Nexus Lookup for %s/%s\n", dir_path, file_name);
     
-    return 0;
+    return -1;
 }
 
 // TODO
