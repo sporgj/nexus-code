@@ -173,6 +173,7 @@ nexus_send_cmd(struct nexus_volume * vol,
     // ...Eh fuck it, lets just burn the cpu
     while (vol->cmd_queue.complete == 0) {
 	if (!vol->is_online) {
+	    NEXUS_ERROR("daemon is offline\n");
 	    ret = -1;
 	    goto out1;
 	}
@@ -354,7 +355,12 @@ create_nexus_volume(char * path)
 
 
     // Check for path conflicts
-
+    vol = nexus_get_volume(path);
+    if (vol != NULL) {
+	NEXUS_DEBUG("Volume '%s' exists\n", path);
+	nexus_put_volume(vol);
+	goto create_volume;
+    }
     
     vol = nexus_kmalloc(sizeof(struct nexus_volume), GFP_KERNEL);
 
@@ -385,7 +391,8 @@ create_nexus_volume(char * path)
 	goto err3;
     }
 
-    
+
+create_volume:
     vol_fd = anon_inode_getfd("nexus-volume", &vol_fops, vol, O_RDWR);
     
     if (vol_fd < 0) {
