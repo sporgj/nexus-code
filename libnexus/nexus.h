@@ -56,9 +56,9 @@ nexus_symlink(char  * target_path,
 /* JRL: What is a raw filename ? */
 int
 nexus_filldir(char                 * dir_path,
-	      char                 * encoded_name,
+	      char                 * nexus_name,
 	      nexus_fs_obj_type_t    type,
-	      char                ** raw_name_dest);
+	      char                ** file_name);
 
 
 

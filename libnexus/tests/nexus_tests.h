@@ -5,8 +5,11 @@
 #define UNITY_OUTPUT_COLOR
 #include "unity/unity.h"
 
-#define TEST_PUBLIC_KEY "profile/public_key"
-#define TEST_PRIVATE_KEY "profile/private_key"
+#define TEST_PUBLIC_KEY         "profile/public_key"
+#define TEST_PRIVATE_KEY        "profile/private_key"
+#define TEST_METADATA_PATH      "dummy-volume"
+#define TEST_DATADIR_PATH       "dummy-volume"
+#define TEST_VOLUMEKEY_PATH     "profile/volumekey"
 
 #define TEST_ENCLAVE_PATH "../enclave/nx_enclave.signed.so"
 

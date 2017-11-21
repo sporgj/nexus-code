@@ -8,7 +8,7 @@ nexus_uuid(struct uuid * uuid)
     uuid_generate((uint8_t *)uuid);
 }
 
-static int
+int
 read_file(const char * fpath, uint8_t ** p_buffer, size_t * p_size)
 {
     int       ret    = -1;
@@ -57,8 +57,8 @@ out:
     return ret;
 }
 
-static int
-write_file(const char * fpath, uint8_t * buffer, size_t size)
+int
+write_file(const char * fpath, void * buffer, size_t size)
 {
     int    ret    = -1;
     size_t nbytes = 0;
@@ -206,6 +206,29 @@ char *
 pathjoin(char * directory, const char * filename)
 {
     return my_strnjoin(directory, "/", filename, PATH_MAX);
+}
+
+// XXX check for allocations
+char *
+uuid_path(const char * dir_path, struct uuid * uuid)
+{
+    char * fname    = NULL;
+    char * fullpath = NULL;
+
+    fname = metaname_bin2str(uuid);
+    if (fname == NULL) {
+        log_error("allocation error");
+        return NULL;
+    }
+
+    fullpath = strndup(dir_path, PATH_MAX);
+    fullpath = pathjoin(fullpath, fname);
+    if (fullpath == NULL) {
+        log_error("allocation error");
+        return NULL;
+    }
+
+    return fullpath;
 }
 
 int

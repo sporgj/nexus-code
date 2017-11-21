@@ -39,35 +39,6 @@ fread_public_or_private_key(const char * key_fpath, size_t * p_klen)
 }
 
 int
-nexus_init_enclave(const char * enclave_fpath)
-{
-    int ret     = -1;
-    int updated = 0;
-    int err     = 0;
-
-    /* initialize the enclave */
-    sgx_launch_token_t token;
-    ret = sgx_create_enclave(enclave_fpath,
-                             SGX_DEBUG_FLAG,
-                             &token,
-                             &updated,
-                             &global_enclave_id,
-                             NULL);
-    if (ret != SGX_SUCCESS) {
-        log_error("Could not open enclave: ret=%#x", ret);
-        return -1;
-    }
-
-    ecall_init_enclave(global_enclave_id, &err);
-    if (err != 0) {
-        log_error("Initializing enclave failed");
-        return -1;
-    }
-
-    return 0;
-}
-
-int
 nexus_create_volume(char *               publickey_fpath,
                     struct supernode **  p_supernode,
                     struct dirnode **    p_root_dirnode,
@@ -259,6 +230,7 @@ nexus_login_volume(const char *       publickey_fpath,
         goto out;
     }
 
+
     ret = 0;
 out:
     nexus_free2(publickey);
@@ -267,14 +239,28 @@ out:
     return ret;
 }
 
+// TODO
 int
-nexus_mount_volume(const char * supernode_fpath)
+nexus_mount_volume(struct supernode * supernode,
+                   struct volumekey * volumekey,
+                   const char *       metadata_dir,
+                   const char *       datafile_dir)
 {
+    int ret = -1;
+
     /* 1 -- if not logged in, exit */
 
     /* 2 -- Read the supernode */
 
     /* 3 -- Call the enclave */
 
-    return 0;
+    // add it to the vfs and call it a day
+    ret = nexus_vfs_add_volume(&supernode->header, metadata_dir,
+            datafile_dir);
+    if (ret != 0) {
+        log_error("nexus_vfs_add_volume ERROR");
+        goto out;
+    }
+out:
+    return ret;
 }

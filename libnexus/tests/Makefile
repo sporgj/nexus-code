@@ -4,7 +4,7 @@ CFLAGS += -I../ $(App_C_Flags)
 
 LIBS := -lmbedcrypto $(App_Link_Flags) -luuid
 
-tests := test_dirnode
+tests := test_dirnode test_dirops
 
 all: $(tests)
 
@@ -28,6 +28,9 @@ build = \
 	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
 test_dirnode: nx_test_dirnode.o unity/unity.o libnexus.a
+	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
+
+test_dirops: nx_test_dirops.o unity/unity.o libnexus.a
 	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
 
 .PHONY: clean

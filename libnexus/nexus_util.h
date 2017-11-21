@@ -21,6 +21,12 @@ extern "C" {
 void
 nexus_uuid(struct uuid * uuid);
 
+int
+read_file(const char * fpath, uint8_t ** p_buffer, size_t * p_size);
+
+int
+write_file(const char * fpath, void * buffer, size_t size);
+
 /**
  * Reads the volume key and supernode
  * @param metadata_path
@@ -87,6 +93,9 @@ pathjoin(char * directory, const char * filename);
 
 char *
 my_strncat(char * dest, const char * src, size_t max);
+
+char *
+uuid_path(const char * dir_path, struct uuid * uuid);
 
 #ifdef __cplusplus
 }
