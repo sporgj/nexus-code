@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +26,13 @@ extern "C" {
 
 // global operations
 int
+nexus_init(const char * enclave_path);
+
+int
 nexus_init_enclave(const char * enclave_fpath);
+
+int
+nexus_exit();
 
 // directory operations
 

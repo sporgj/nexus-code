@@ -167,14 +167,14 @@ out:
     return;
 }
 
-static size_t encoded_str_size = 0;
+size_t global_encoded_str_size = 0;
 
-static inline void
+void
 compute_encoded_str_size()
 {
     struct uuid code;
     ecryptfs_encode_for_filename(
-        NULL, &encoded_str_size, (uint8_t *)&code, sizeof(struct uuid));
+        NULL, &global_encoded_str_size, (uint8_t *)&code, sizeof(struct uuid));
 }
 
 static char *
@@ -183,11 +183,7 @@ encode_bin2str(const struct uuid * code, char * prefix, size_t prefix_len)
     char * result = NULL;
     size_t sz;
 
-    if (encoded_str_size == 0) {
-        compute_encoded_str_size();
-    }
-
-    result = (char *)calloc(1, prefix_len + encoded_str_size + 1);
+    result = (char *)calloc(1, prefix_len + global_encoded_str_size + 1);
     if (result == NULL) {
         return NULL;
     }

@@ -37,7 +37,11 @@ test_dirnode_new()
     struct uuid    uuid;
     struct dirnode dirnode = { 0 };
 
-    ecall_dirnode_new(global_enclave_id, &ret, &uuid, gbl_root_dirnode, &dirnode);
+    ecall_dirnode_new(global_enclave_id,
+                      &ret,
+                      &uuid,
+                      &gbl_root_dirnode->header.root_uuid,
+                      &dirnode);
     TEST_ASSERT_MESSAGE(ret == 0, "ecall_dirnode_new FAILED");
 
     TEST_ASSERT_MESSAGE(sizeof(struct dirnode) == dirnode.header.total_size,

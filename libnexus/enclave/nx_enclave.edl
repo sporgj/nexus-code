@@ -57,13 +57,13 @@ enclave {
         /**
          * Creates a new dirnode 
          * @param uuid_ext the dirnode's uuid
-         * @param parent_dirnode_ext the dirnode of the parent directory
+         * @param root_uuid_ext the dirnode of the parent directory
          * @param dirnode_out_ext destination pointer for the new dirnode.
          * @return 0 on success
          */
         public int ecall_dirnode_new(
             [user_check] struct uuid * uuid_ext,
-            [user_check] struct dirnode * parent_dirnode_ext,
+            [user_check] struct uuid * root_uuid_ext,
             [user_check] struct dirnode * dirnode_out_ext
         );
 

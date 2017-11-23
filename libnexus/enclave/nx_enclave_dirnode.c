@@ -393,7 +393,7 @@ dirnode_find_by_uuid(struct dirnode_wrapper * dirnode_wrapper,
 
 int
 ecall_dirnode_new(struct uuid *    uuid_ext,
-                  struct dirnode * parent_dirnode_ext,
+                  struct uuid *    root_uuid_ext,
                   struct dirnode * dirnode_out_ext)
 {
     int                ret            = -1;
@@ -404,10 +404,9 @@ ecall_dirnode_new(struct uuid *    uuid_ext,
     struct uuid        root_uuid;
 
     memcpy(&uuid, uuid_ext, sizeof(struct uuid));
-    memcpy(
-        &root_uuid, &parent_dirnode_ext->header.root_uuid, sizeof(struct uuid));
+    memcpy(&root_uuid, root_uuid_ext, sizeof(struct uuid));
 
-    volumekey = volumekey_from_rootuuid(&sealed_dirnode->header.root_uuid);
+    volumekey = volumekey_from_rootuuid(&root_uuid);
     if (volumekey == NULL) {
         ocall_debug("could not find dirnode volumekey");
         return -1;

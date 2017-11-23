@@ -9,7 +9,7 @@ setUp()
 {
     int ret = -1;
 
-    ret = nexus_init_enclave(TEST_ENCLAVE_PATH);
+    ret = nexus_init(TEST_ENCLAVE_PATH);
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_init_enclave() FAILED");
 
     ret = nexus_create_volume(
@@ -26,9 +26,6 @@ setUp()
                                       TEST_METADATA_PATH,
                                       TEST_VOLUMEKEY_PATH);
     TEST_ASSERT_MESSAGE(ret == 0, "write_volume_metadata_files() FAILED");
-
-    ret = nexus_vfs_init();
-    TEST_ASSERT_MESSAGE(ret == 0, "nexus_vfs_init() FAILED");
 
     ret = nexus_mount_volume(
         gbl_supernode, gbl_volumekey, TEST_METADATA_PATH, TEST_DATADIR_PATH);

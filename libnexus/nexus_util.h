@@ -14,6 +14,8 @@ extern "C" {
 
 #include "nexus.h"
 
+#include "enclave/queue.h"
+
 /**
  * Generates a UUID in-place
  * @param uuid is the uuid object
@@ -85,6 +87,7 @@ util_generate_signature(mbedtls_pk_context * pk,
         }                                                                      \
     } while (0)
 
+
 char *
 my_strnjoin(char * dest, const char * join, const char * src, size_t max);
 
@@ -96,6 +99,33 @@ my_strncat(char * dest, const char * src, size_t max);
 
 char *
 uuid_path(const char * dir_path, struct uuid * uuid);
+
+
+/* used by the VFS to manage traversed paths */
+struct path_element {
+    struct uuid uuid;
+    TAILQ_ENTRY(path_element) next_item;
+};
+
+struct path_builder {
+    size_t count;  // count[path_elements]
+    TAILQ_HEAD(path_list, path_element) path_head;
+};
+
+struct path_builder *
+path_alloc();
+
+int
+path_push(struct path_builder * builder, struct uuid * uuid);
+
+int
+path_pop(struct path_builder * builder);
+
+void
+path_free(struct path_builder * builder);
+
+char *
+path_string(struct path_builder * builder, const char * metadata_dirpath);
 
 #ifdef __cplusplus
 }

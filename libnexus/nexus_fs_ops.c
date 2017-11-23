@@ -20,7 +20,7 @@ nexus_new(char *              dir_path,
     struct dirnode *  dirnode2 = NULL;
     struct uuid       uuid;
 
-    inode = nexus_get_inode(dir_path);
+    inode = vfs_get_inode(dir_path);
     if (inode == NULL) {
         log_error("could not find inode");
         return -1;
@@ -43,10 +43,19 @@ nexus_new(char *              dir_path,
         goto out;
     }
 
-    ret = nexus_flush_dirnode(inode, dirnode2);
+    ret = vfs_flush_dirnode(inode, dirnode2);
     if (ret != 0) {
         log_error("nexus_flush_dirnode FAILED");
         goto out;
+    }
+
+    if (type == NEXUS_FILE || type == NEXUS_DIR) {
+        ret = vfs_create_inode(
+            inode, &uuid, (type == NEXUS_FILE ? NEXUS_FILEBOX : NEXUS_DIRNODE));
+        if (ret != 0) {
+            log_error("vfs_create_inode FAILED");
+            goto out;
+        }
     }
 
     *nexus_name = filename_bin2str(&uuid);
@@ -55,7 +64,7 @@ nexus_new(char *              dir_path,
 out:
     ret |= err;
 
-    nexus_put_inode(inode);
+    vfs_put_inode(inode);
 
     return ret;
 }
@@ -75,7 +84,7 @@ nexus_remove(char *              dir_path,
     struct dirnode *    dirnode2 = NULL;
     struct uuid         uuid;
 
-    inode = nexus_get_inode(dir_path);
+    inode = vfs_get_inode(dir_path);
     if (inode == NULL) {
         log_error("could not find inode");
         return -1;
@@ -96,7 +105,7 @@ nexus_remove(char *              dir_path,
         goto out;
     }
 
-    ret = nexus_flush_dirnode(inode, dirnode2);
+    ret = vfs_flush_dirnode(inode, dirnode2);
     if (ret != 0) {
         log_error("nexus_flush_dirnode FAILED");
         goto out;
@@ -112,7 +121,7 @@ nexus_remove(char *              dir_path,
 out:
     ret |= err;
 
-    nexus_put_inode(inode);
+    vfs_put_inode(inode);
 
     return ret;
 }
@@ -130,7 +139,7 @@ nexus_lookup(char *              dir_path,
     struct dirnode *    dirnode1 = NULL;
     struct uuid         uuid;
 
-    inode = nexus_get_inode(dir_path);
+    inode = vfs_get_inode(dir_path);
     if (inode == NULL) {
         log_error("could not find inode");
         return -1;
@@ -161,7 +170,7 @@ nexus_lookup(char *              dir_path,
 out:
     ret |= err;
 
-    nexus_put_inode(inode);
+    vfs_put_inode(inode);
 
     return ret;
 }
@@ -186,7 +195,7 @@ nexus_filldir(char *              dir_path,
         return -1;
     }
 
-    inode = nexus_get_inode(dir_path);
+    inode = vfs_get_inode(dir_path);
     if (inode == NULL) {
         nexus_free(uuid);
         log_error("could not find inode");
@@ -207,7 +216,7 @@ out:
     ret |= err;
 
     nexus_free(uuid);
-    nexus_put_inode(inode);
+    vfs_put_inode(inode);
 
     return ret;
 }

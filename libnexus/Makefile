@@ -16,6 +16,7 @@ objs :=	nx_enclave_u.o \
 	nexus_encode.o \
 	nexus_main.o \
 	nexus_vfs.o \
+	nexus_dentry.o \
 	jsmn.o \
 	nexus_util.o 
 build = \

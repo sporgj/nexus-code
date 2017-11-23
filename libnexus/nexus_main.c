@@ -14,7 +14,7 @@ nexus_init_enclave(const char * enclave_fpath)
     int err     = 0;
 
     /* initialize the enclave */
-    sgx_launch_token_t token;
+    sgx_launch_token_t token = {0};
     ret = sgx_create_enclave(enclave_fpath,
                              SGX_DEBUG_FLAG,
                              &token,
@@ -39,8 +39,24 @@ nexus_init_enclave(const char * enclave_fpath)
  * Initializes the nexus subsystem
  */
 int
-nexus_init()
+nexus_init(const char * enclave_path)
 {
+    if (nexus_init_enclave(enclave_path)) {
+        log_error("nexus_init_enclave() FAILED");
+        return -1;
+    }
 
+    if (nexus_vfs_init()) {
+        log_error("nexus_vfs_init() FAILED");
+        return -1;
+    }
+
+    return 0;
+}
+
+// TODO
+int
+nexus_exit()
+{
     return 0;
 }
