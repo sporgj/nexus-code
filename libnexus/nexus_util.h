@@ -79,13 +79,6 @@ util_generate_signature(mbedtls_pk_context * pk,
         ptr = NULL;                                                            \
     } while (0)
 
-// checks pointer and then frees
-#define nexus_free2(ptr)                                                       \
-    do {                                                                       \
-        if (ptr != NULL) {                                                     \
-            nexus_free(ptr);                                                   \
-        }                                                                      \
-    } while (0)
 
 
 char *
