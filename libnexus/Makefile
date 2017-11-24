@@ -1,24 +1,23 @@
-include build.mk
-
-MBEDTLS_PATH ?= /usr/local/include/mbedtls/include
-
-INCLUDES += -I$(MBEDTLS_PATH)
-CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11\
-	 $(INCLUDES) $(App_C_Flags)
-
-LIBS = -lmbedcrypto $(App_Link_Flags) -luuid
 
 
-objs :=	nx_enclave_u.o \
-	nexus_fs_ops.o \
-	nexus_json.o \
+INCLUDES =
+
+CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11
+
+
+LIBS = -luuid
+
+
+objs :=	nexus_fs_ops.o \
 	nexus_volume.o \
 	nexus_encode.o \
 	nexus_main.o \
 	nexus_vfs.o \
-	nexus_dentry.o \
 	jsmn.o \
+	nexus_json.o \
 	nexus_util.o 
+
+
 build = \
         @if [ -z "$V" ]; then \
                 echo '    [$1]  $@'; \
@@ -29,7 +28,7 @@ build = \
         fi
 
 
-all: libnexus.a nexus-admin
+all: libnexus.a
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -40,15 +39,9 @@ all: libnexus.a nexus-admin
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
-nx_enclave_u.c: enclave/nx_enclave.edl
-	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
-	@echo "GEN =>  $@"
-
 libnexus.a: $(objs)
 	$(call build,AR,$(AR) rcs $@ $^)
 
-nexus-admin: nx_admin.o libnexus.a
-	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -65,4 +58,4 @@ cscope:
 
 .PHONY: clean
 clean:
-	rm -f $(wildcard *.o *.a) nexus-admin nx_enclave_u.*
+	rm -f $(wildcard *.o *.a)

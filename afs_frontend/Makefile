@@ -26,7 +26,7 @@ build = \
         fi
 
 
-all: nexus-afs nexus-test nexus-admin
+all: nexus-afs nexus-test
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -37,9 +37,6 @@ all: nexus-afs nexus-test nexus-admin
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
-
-nexus-admin: ../libnexus/nexus-admin
-	cp $^ $@
 
 
 nexus-afs: $(exec_objs)

@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <wordexp.h>
+
 #include <nexus_log.h>
 #include <nexus_util.h>
 
@@ -17,11 +19,59 @@
 #include "handler.h"
 
 
-char * metadata_path = NULL;
-char * datadir_path = NULL;
-char * volkey_fpath  = NULL;
-char * pubkey_fpath  = NULL;
-char * privkey_fpath = NULL;
+
+#define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"
+
+#define DEFAULT_VOL_KEY_FILENAME  "$HOME/.nexus/volume_key"
+#define DEFAULT_PUB_KEY_FILENAME  "$HOME/.nexus/public_key"
+#define DEFAULT_PRV_KEY_FILENAME  "$HOME/.nexus/private_key"
+
+
+static char * volume_path       = NULL;
+
+static char * vol_key_filename  = NULL;
+static char * pub_key_filemame  = NULL;
+static char * prv_key_filename  = NULL;
+
+
+
+static int cmd_line_volume   = 0;
+static int cmd_line_prv_key  = 0;
+static int cmd_line_pub_key  = 0;
+static int cmd_line_vol_key  = 0;
+
+
+
+
+static int 
+set_defaults()
+{
+    wordexp_t volume_path_exp;
+    wordexp_t vol_key_filename_exp;
+    wordexp_t pub_key_filename_exp;
+    wordexp_t prv_key_filename_exp;
+    
+    wordexp(DEFAULT_VOLUME_PATH,      &volume_path_exp,      0);
+    wordexp(DEFAULT_VOL_KEY_FILENAME, &vol_key_filename_exp, 0);
+    wordexp(DEFAULT_PUB_KEY_FILENAME, &pub_key_filename_exp, 0);
+    wordexp(DEFAULT_PRV_KEY_FILENAME, &prv_key_filename_exp, 0);
+
+    volume_path      = strndup(volume_path_exp.we_wordv[0],      PATH_MAX);
+    vol_key_filename = strndup(vol_key_filename_exp.we_wordv[0], PATH_MAX);
+    pub_key_filename = strndup(pub_key_filename_exp.we_wordv[0], PATH_MAX);
+    prv_key_filename = strndup(prv_key_filename_exp.we_wordv[0], PATH_MAX);
+
+    wordfree(&volume_path_exp);
+    wordfree(&vol_key_filename_exp);
+    wordfree(&pub_key_filename_exp);
+    wordfree(&prv_key_filename_exp);
+
+    return 0;
+}
+
+
+
+
 
 
 static int
@@ -36,7 +86,6 @@ create_nexus_volume(char * path)
 	log_error("could not open Nexus Device file (%s)\n", NEXUS_DEVICE);
 	return -1;
     }
-
 
     volume_fd = ioctl(nexus_fd, NEXUS_IOCTL_CREATE_VOLUME, path);
 
@@ -177,129 +226,95 @@ handle_afs_cmds(int volume_fd)
     return 0;
 }
 
-static int NUMBER_OF_ARGS = 4;
 
-static struct option long_options[]
-    = { { "privatekey", required_argument, 0, 's' },
-        { "publickey", required_argument, 0, 'p' },
-        { "metadata", required_argument, 0, 'm' },
-        { "datadir", required_argument, 0, 'd' },
-        { "volumekey", required_argument, 0, 'v' },
-        { 0, 0, 0, 0 } };
 
-static int
-parse_args(int argc, char ** argv)
+
+void
+usage(void)
 {
-    int ret          = -1;
-    int c            = 0;
-    int found        = 0;
-    int option_index = 0;
-
-    do {
-        option_index = 0;
-
-        c = getopt_long(argc, argv, "d:m:p:s:v:", long_options, &option_index);
-        if (c == -1) {
-            break;
-        }
-
-        switch (c) {
-        case 's':
-	    privkey_fpath = strndup(optarg, PATH_MAX);
-	    if (privkey_fpath == NULL) {
-		log_error("allocation error :(");
-		goto out;
-	    }
-
-            found++;
-            break;
-
-        case 'p':
-	    pubkey_fpath = strndup(optarg, PATH_MAX);
-	    if (pubkey_fpath == NULL) {
-		log_error("allocation error :(");
-		goto out;
-	    }
-
-            found++;
-            log_debug("private_key %s", optarg);
-            break;
-
-        case 'm':
-	    metadata_path = strndup(optarg, PATH_MAX);
-	    if (metadata_path == NULL) {
-		log_error("allocation error :(");
-		goto out;
-	    }
-
-            found++;
-            log_debug("private_key %s", optarg);
-            break;
-
-        case 'd':
-	    datadir_path = strndup(optarg, PATH_MAX);
-	    if (datadir_path == NULL) {
-		log_error("allocation error :(");
-		goto out;
-	    }
-
-            found++;
-            break;
-
-        case 'v':
-	    volkey_fpath = strndup(optarg, PATH_MAX);
-	    if (volkey_fpath == NULL) {
-		log_error("allocation error :(");
-		goto out;
-	    }
-
-            found++;
-            break;
-        }
-    } while (1);
-
-    if (found < NUMBER_OF_ARGS) {
-        log_error("Set all the flags: (%d/%d)", found, NUMBER_OF_ARGS);
-	goto out;
-    }
-
-    ret = 0;
-out:
-    if (ret) {
-	nexus_free2(metadata_path);
-	nexus_free2(datadir_path);
-	nexus_free2(volkey_fpath);
-	nexus_free2(pubkey_fpath);
-	nexus_free2(privkey_fpath);
-    }
-
-    return ret;
+    printf("Usage: \n");
+    return;
 }
+
+    
+
+
+static struct option long_options[] =
+    {
+	{ "volume"  , required_argument , cmd_line_volume  ,  1  }, /* 0 */
+	{ "prv_key" , required_argument , cmd_line_prv_key ,  1  }, /* 1 */
+	{ "pub_key" , required_argument , cmd_line_pub_key ,  1  }, /* 2 */
+	{ "vol_key" , required_argument , cmd_line_vol_key ,  1  }, /* 3 */
+	{ "help"    , no_argument       , 0                , 'h' },
+	{ 0, 0, 0, 0 }
+    };
 
 int
 main(int argc, char ** argv)
 {
-    char * volume_path = NULL;
-    int    volume_fd   = 0;
 
-    if (parse_args(argc, argv)) {
-	log_error("parsing arguments failed");
-	exit(-1);
+    /* Setup default path strings with ENV expansions */
+    set_defaults();
+
+    
+    /* Override defaults with command line arguments */
+    {
+ 	int  opt_index = 0;
+	char c = 0;
+	
+	
+	while ((c = getopt_long(argc, argv, "h", long_options, &opt_index)) != -1) {
+	    
+	    switch (c) {
+		case 0:
+		    switch (opt_index) {
+			case 0:
+			    nexus_free(volume_path);
+			    volume_path = optarg;
+			    break;
+
+			case 1:
+			    nexus_free(prv_key_filename);
+			    prv_key_filename = optarg;
+			    break;
+
+			case 2:
+			    nexus_free(pub_key_filename);
+			    pub_key_filename = optarg;
+			    break;
+
+			case 3:
+			    nexus_free(vol_key_filename);
+			    vol_key_filename = optarg;
+			    break;
+			default:
+			    break;
+		    }
+		    break;
+
+		case 'h':
+		default:
+		    usage();
+		    return -1;
+	    }
+	}
     }
-
-    volume_path = datadir_path;
+    
     
     printf("Launching Nexus-AFS on Volume %s\n", volume_path);
 
-
-    volume_fd = create_nexus_volume(volume_path);
-    
-    if (volume_fd == -1) {
-	log_error("could not create volume\n");
-	return -1;
+    {
+	int volume_fd   = 0;
+	
+	volume_fd = create_nexus_volume(volume_path);
+	
+	if (volume_fd == -1) {
+	    log_error("could not create volume\n");
+	    return -1;
+	}
+	
+	handle_afs_cmds(volume_fd);
     }
-
-    handle_afs_cmds(volume_fd);
     
     return 0;
 }

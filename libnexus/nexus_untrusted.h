@@ -1,5 +1,10 @@
 #pragma once
 
+
+
+#if 0
+
+
 /**
  * defines all the functions used by the untrusted code
  */
@@ -139,3 +144,6 @@ nexus_mount_volume(struct supernode * supernode,
                    struct volumekey * volumekey,
                    const char *       metadata_dir,
                    const char *       data_dir);
+
+
+#endif
