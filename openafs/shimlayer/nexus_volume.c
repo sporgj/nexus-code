@@ -95,7 +95,10 @@ register_volume(struct nexus_volume * vol)
  out:
     spin_unlock_irqrestore(&volume_list_lock, flags);
     
-    
+    if (ret == -1) {
+	NEXUS_DEBUG("Volume '%s' exists\n", vol->path);
+    }
+
     return ret;
 }
 
@@ -103,10 +106,15 @@ register_volume(struct nexus_volume * vol)
 static int
 deregister_volume(struct nexus_volume * vol)
 {
+    unsigned long flags = 0;
     
-    module_put(THIS_MODULE);
+    spin_lock_irqsave(&volume_list_lock, flags);
+    {
+	list_del(&(vol->node));
+    }
+    spin_unlock_irqrestore(&volume_list_lock, flags);
     
-    return -1;
+    return 0;
 }
 
 
@@ -118,12 +126,11 @@ volume_last_put(struct kref * kref)
     /* Abort any pending commands */
     
     deregister_volume(vol);
-
-    // remove from list
-    list_del(&(vol->node));
     
     kfree(vol->path);
     kfree(vol);
+
+    module_put(THIS_MODULE);
 }
 
 
@@ -172,7 +179,8 @@ nexus_send_cmd(struct nexus_volume * vol,
     // wait on kernel waitq until cmd is complete
     // ...Eh fuck it, lets just burn the cpu
     while (vol->cmd_queue.complete == 0) {
-	if (!vol->is_online) {
+
+	if (vol->is_online == 0) {
 	    NEXUS_ERROR("daemon is offline\n");
 	    ret = -1;
 	    goto out1;
@@ -252,7 +260,13 @@ volume_write(struct file       * filp,
     int       ret  = 0;
 
     nexus_printk("Write of Size %lu\n", count);
-    
+
+    if ((vol->cmd_queue.active   == 0) ||
+	(vol->cmd_queue.complete == 1)) {
+	return 0;
+    }
+     
+
     // check size of resp
     // too large: set error flag in cmd_queue, mark cmd_queue complete, and return -EINVAL
     if (count > MAX_CMD_RESP_SIZE) {
@@ -354,14 +368,6 @@ create_nexus_volume(char * path)
     int ret    = 0;
 
 
-    // Check for path conflicts
-    vol = nexus_get_volume(path);
-    if (vol != NULL) {
-	NEXUS_DEBUG("Volume '%s' exists\n", path);
-	nexus_put_volume(vol);
-	goto create_volume;
-    }
-    
     vol = nexus_kmalloc(sizeof(struct nexus_volume), GFP_KERNEL);
 
     if (vol == NULL) {
@@ -392,7 +398,6 @@ create_nexus_volume(char * path)
     }
 
 
-create_volume:
     vol_fd = anon_inode_getfd("nexus-volume", &vol_fops, vol, O_RDWR);
     
     if (vol_fd < 0) {
