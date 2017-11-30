@@ -18,7 +18,7 @@ extern "C" {
 
 // global operations
 int
-nexus_init(const char * enclave_path);
+nexus_init();
 
 int
 nexus_exit();
@@ -29,10 +29,10 @@ nexus_create_volume(char               * publickey_fpath,
                     struct dirnode    ** p_root_dirnode,
                     struct volumekey ** p_sealed_volumekey);
 int
-nexus_login_volume(const char *       publickey_fpath,
-                   const char *       privatekey_fpath,
-                   struct supernode * supernode,
-                   struct volumekey * volumekey);
+nexus_login_volume(struct supernode * supernode,
+                   struct volumekey * volumekey,
+                   const char *       publickey_fpath,
+                   const char *       privatekey_fpath);
 
 int
 nexus_mount_volume(struct supernode * supernode,

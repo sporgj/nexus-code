@@ -12,10 +12,8 @@ nexus_exit_backend();
 extern int
 nexus_auth_backend(struct supernode * supernode,
                    struct volumekey * volumekey,
-                   const char *       publickey,
-                   const char *       privatekey,
-                   size_t             publickey_len,
-                   size_t             privatekey_len);
+                   const char *       publickey_fpath,
+                   const char *       privatekey_fpath);
 
 // volume management
 extern int

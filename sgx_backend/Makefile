@@ -3,9 +3,9 @@ include build.mk
 INCLUDES = -I../libnexus $(App_Include_Paths)
 
 CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull\
-	 -Wno-unused-parameter -std=gnu11 
+	 -Wno-unused-parameter -std=gnu11 -fPIC
 
-LIBS = -luuid $(App_Link_Flags) -Lmbedcrypto
+LIBS = -luuid $(App_Link_Flags) -L/usr/local/lib -lmbedcrypto
 
 
 objs := nx_enclave_u.o \
@@ -43,7 +43,7 @@ nx_enclave_u.c: enclave/nx_enclave.edl
 	@echo "GEN =>  $@"
 
 libsgx_backend.so: $(objs)
-	$(call build,CC,$(CC) -shared $(LIBS) -o $@)
+	$(call build,CC,$(CC) $^ -shared $(LIBS) -o $@)
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -61,4 +61,7 @@ cscope:
 .PHONY: clean
 clean:
 	rm -f $(wildcard *.o *.a *.so) cscope.* nx_enclave_u.*
+
+.PHONY: distclean
+distclean: clean
 	make -C enclave distclean

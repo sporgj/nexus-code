@@ -93,6 +93,37 @@ out:
     return ret;
 }
 
+int
+nexus_login_volume(struct supernode * supernode,
+                   struct volumekey * volumekey,
+                   const char *       publickey_fpath,
+                   const char *       privatekey_fpath)
+{
+    int ret = nexus_auth_backend(
+        supernode, volumekey, publickey_fpath, privatekey_fpath);
+
+    if (ret != 0) {
+        log_error("backend authentication FAILED");
+    }
+
+    return ret;
+}
+
+int
+nexus_init() {
+    if (nexus_init_backend()) {
+        log_error("initializing the backend failed");
+        return -1;
+    }
+
+    if (nexus_vfs_init()) {
+        log_error("could not initialize NeXUS-VFS");
+        return -1;
+    }
+
+    return 0;
+}
+
 // TODO
 int
 nexus_exit()

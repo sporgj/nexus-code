@@ -40,7 +40,6 @@ walk_path(struct nx_dentry *    root_dentry,
           struct path_builder * builder,
           char *                relpath)
 {
-    int                 err     = -1;
     int                 ret     = -1;
     nexus_fs_obj_type_t atype   = NEXUS_ANY;
     char *              nch     = NULL;
@@ -97,7 +96,7 @@ walk_path(struct nx_dentry *    root_dentry,
         ret = backend_dirnode_find_by_name(dirnode, nch, &uuid, &atype);
         if (ret != 0) {
             log_error("backend_dirnode_find_by_name() FAILED");
-            goto out;
+            return NULL;
         }
 
 	// if the entry is not found, let's leave

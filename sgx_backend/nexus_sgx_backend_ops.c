@@ -70,15 +70,34 @@ out:
 int
 nexus_auth_backend(struct supernode * supernode,
                    struct volumekey * volumekey,
-                   const char *       publickey,
-                   const char *       privatekey,
-                   size_t             publickey_len,
-                   size_t             privatekey_len)
+                   const char *       publickey_fpath,
+                   const char *       privatekey_fpath)
 {
-    int     ret                             = -1;
-    uint8_t signature[MBEDTLS_MPI_MAX_SIZE] = { 0 };
-    size_t  signature_len                   = 0;
-    nonce_t auth_nonce                      = { 0 };
+    int          ret                             = -1;
+    uint8_t      signature[MBEDTLS_MPI_MAX_SIZE] = { 0 };
+    size_t       signature_len                   = 0;
+    size_t       publickey_len                   = 0;
+    size_t       privatekey_len                  = 0;
+    char *       publickey                       = NULL;
+    char *       privatekey                      = NULL;
+    nonce_t      auth_nonce                      = { 0 };
+
+    ret = mbedtls_pk_load_file(
+        publickey_fpath, (uint8_t **)&publickey, &publickey_len);
+
+    if (ret != 0) {
+        log_error("Could not load key: %s", publickey_fpath);
+        return -1;
+    }
+
+    ret = mbedtls_pk_load_file(
+        privatekey_fpath, (uint8_t **)&privatekey, &privatekey_len);
+
+    if (ret != 0) {
+        free(publickey);
+        log_error("Could not load key: %s", privatekey_fpath);
+        return -1;
+    }
 
     // call the enclave to receive a challenge
     ecall_authentication_request(
@@ -115,6 +134,9 @@ nexus_auth_backend(struct supernode * supernode,
 
     ret = 0;
 out:
+    free(publickey);
+    free(privatekey);
+
     return ret;
 }
 

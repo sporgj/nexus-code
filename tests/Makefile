@@ -1,19 +1,24 @@
-include ../build.mk
+LIBNEXUS_PATH := ../libnexus
+LIBNEXUS_LIB := -lnexus
 
-CFLAGS += -I../ $(App_C_Flags)
+SGX_BACKEND_PATH := ../sgx_backend
+LIBSGX_BACKEND := -lsgx_backend
 
-LIBS := -lmbedcrypto $(App_Link_Flags) -luuid
+CFLAGS += -I$(LIBNEXUS_PATH)
 
-tests := test_dirnode test_dirops test_misc
+LIBS := -L$(LIBNEXUS_PATH) $(LIBNEXUS_LIB)\
+			-L$(SGX_BACKEND_PATH) $(LIBSGX_BACKEND)
 
-all: $(tests)
+tests := test_dirops
+
+all: $(tests) $(LIBNEXUS_LIB)
 
 .PHONY: nexuslib
 nexuslib:
 	make -C ../
 
-libnexus.a: ../libnexus.a
-	cp $^ $@
+$(LIBNEXUS_LIB): $(wildcard $(LIBNEXUS_PATH)/*.c)
+	make -C $(LIBNEXUS_PATH)
 
 build = \
 	@if [ -z "$V" ]; then \
@@ -27,13 +32,7 @@ build = \
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
-test_dirnode: nx_test_dirnode.o unity/unity.o libnexus.a
-	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
-
-test_dirops: nx_test_dirops.o unity/unity.o libnexus.a
-	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
-
-test_misc: nx_test_misc.o unity/unity.o libnexus.a
+test_dirops: nx_test_dirops.o unity/unity.o $(LIBNEXUS_LIB)
 	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
 
 .PHONY: clean

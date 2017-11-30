@@ -17,15 +17,8 @@ setUp()
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_create_volume() FAILED");
 
     ret = nexus_login_volume(
-        TEST_PUBLIC_KEY, TEST_PRIVATE_KEY, gbl_supernode, gbl_volumekey);
+        gbl_supernode, gbl_volumekey, TEST_PUBLIC_KEY, TEST_PRIVATE_KEY);
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_login_volume() FAILED");
-
-    ret = write_volume_metadata_files(gbl_supernode,
-                                      gbl_root_dirnode,
-                                      gbl_volumekey,
-                                      TEST_METADATA_PATH,
-                                      TEST_VOLUMEKEY_PATH);
-    TEST_ASSERT_MESSAGE(ret == 0, "write_volume_metadata_files() FAILED");
 
     ret = nexus_mount_volume(
         gbl_supernode, gbl_volumekey, TEST_METADATA_PATH, TEST_DATADIR_PATH);
@@ -38,7 +31,6 @@ tearDown()
     nexus_free(gbl_supernode);
     nexus_free(gbl_volumekey);
     nexus_free(gbl_root_dirnode);
-    sgx_destroy_enclave(global_enclave_id);
 }
 
 void
