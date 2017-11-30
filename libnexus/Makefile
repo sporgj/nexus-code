@@ -9,9 +9,9 @@ LIBS = -luuid
 
 
 objs :=	nexus_fs_ops.o \
-	nexus_volume.o \
 	nexus_encode.o \
 	nexus_main.o \
+	nexus_path.o \
 	nexus_vfs.o \
 	jsmn.o \
 	nexus_json.o \
@@ -42,7 +42,6 @@ all: libnexus.a
 libnexus.a: $(objs)
 	$(call build,AR,$(AR) rcs $@ $^)
 
-
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
 		\( -name '*.[chS]' -o -name '*.cc' \) -print; \
@@ -58,4 +57,4 @@ cscope:
 
 .PHONY: clean
 clean:
-	rm -f $(wildcard *.o *.a)
+	rm -f $(wildcard *.o *.a) cscope.*

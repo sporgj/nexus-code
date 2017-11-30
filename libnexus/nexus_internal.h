@@ -1,33 +1,42 @@
 #pragma once
 
-
-
-#if 0
-
-
 /**
  * defines all the functions used by the untrusted code
  */
 #include <stdlib.h>
-
-#include <sgx_urts.h>
 
 #include "nexus.h"
 #include "nexus_log.h"
 
 #include "nexus_types.h"
 #include "nexus_util.h"
+#include "nexus_path.h"
+#include "nexus_backend.h"
 
-#include "enclave/queue.h"
+/* nx_encode.c */
+#define NEXUS_METANAME_PREFIX       "m"
+#define NEXUS_FILENAME_PREFIX       "f"
+#define NEXUS_PREFIX_SIZE(s)        (sizeof(s) - 1)
 
-#include "nx_enclave_u.h"
-
-// nexus_encode.c
+// TODO: remove this from the header
 extern size_t global_encoded_str_size;
 
 void
 compute_encoded_str_size();
 
+char *
+metaname_bin2str(const struct uuid * uuid);
+
+struct uuid *
+metaname_str2bin(const char * str);
+
+char *
+filename_bin2str(const struct uuid * uuid);
+
+struct uuid *
+filename_str2bin(const char * str);
+
+// nexus_vfs.c
 struct nx_dentry;
 
 struct nx_volume_item {
@@ -72,21 +81,6 @@ struct nx_dentry {
     TAILQ_HEAD(nx_dentry_list, nx_dentry) children;
 };
 
-extern sgx_enclave_id_t global_enclave_id;
-
-/* nx_encode.c */
-char *
-metaname_bin2str(const struct uuid * uuid);
-
-struct uuid *
-metaname_str2bin(const char * str);
-
-char *
-filename_bin2str(const struct uuid * uuid);
-
-struct uuid *
-filename_str2bin(const char * str);
-
 
 /* nexus_vfs.c */
 int
@@ -126,24 +120,3 @@ nexus_vfs_add_volume(struct supernode_header * supernode_header,
 /* nexus_dentry.c */
 struct nx_dentry *
 nexus_dentry_lookup(struct nx_dentry * root_dentry, char * relpath);
-
-/* nexus_volume.c */
-int
-nexus_create_volume(char               * publickey_fpath,
-                    struct supernode  ** p_supernode,
-                    struct dirnode    ** p_root_dirnode,
-                    struct volumekey ** p_sealed_volumekey);
-int
-nexus_login_volume(const char *       publickey_fpath,
-                   const char *       privatekey_fpath,
-                   struct supernode * supernode,
-                   struct volumekey * volumekey);
-
-int
-nexus_mount_volume(struct supernode * supernode,
-                   struct volumekey * volumekey,
-                   const char *       metadata_dir,
-                   const char *       data_dir);
-
-
-#endif

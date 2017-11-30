@@ -30,7 +30,7 @@
 static char * volume_path       = NULL;
 
 static char * vol_key_filename  = NULL;
-static char * pub_key_filemame  = NULL;
+static char * pub_key_filename  = NULL;
 static char * prv_key_filename  = NULL;
 
 
@@ -241,10 +241,10 @@ usage(void)
 
 static struct option long_options[] =
     {
-	{ "volume"  , required_argument , cmd_line_volume  ,  1  }, /* 0 */
-	{ "prv_key" , required_argument , cmd_line_prv_key ,  1  }, /* 1 */
-	{ "pub_key" , required_argument , cmd_line_pub_key ,  1  }, /* 2 */
-	{ "vol_key" , required_argument , cmd_line_vol_key ,  1  }, /* 3 */
+	{ "volume"  , required_argument , &cmd_line_volume  ,  1  }, /* 0 */
+	{ "prv_key" , required_argument , &cmd_line_prv_key ,  1  }, /* 1 */
+	{ "pub_key" , required_argument , &cmd_line_pub_key ,  1  }, /* 2 */
+	{ "vol_key" , required_argument , &cmd_line_vol_key ,  1  }, /* 3 */
 	{ "help"    , no_argument       , 0                , 'h' },
 	{ 0, 0, 0, 0 }
     };

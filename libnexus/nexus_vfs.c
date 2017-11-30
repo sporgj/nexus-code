@@ -1,6 +1,7 @@
-#include "nexus_untrusted.h"
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include "nexus_internal.h"
 
 struct nx_volume_list * nx_volume_head = NULL;
 
@@ -78,7 +79,7 @@ nexus_vfs_add_volume(struct supernode_header * supernode_header,
 
     // assign the path to the root dirnode
     volume_item->root_dirnode_fpath
-        = uuid_path(metadata_dir, &supernode_header->root_uuid);
+        = filepath_from_uuid(metadata_dir, &supernode_header->root_uuid);
 
     memcpy(&volume_item->supernode_header,
            supernode_header,
@@ -90,12 +91,25 @@ nexus_vfs_add_volume(struct supernode_header * supernode_header,
 out:
     if (ret) {
         // TODO move this to a "free volume" function
-        nexus_free2(root_dirnode_fpath);
-        nexus_free2(root_dentry);
+        if (root_dirnode_fpath) {
+            nexus_free(root_dirnode_fpath);
+        }
 
-        nexus_free2(volume_item->metadata_dir);
-        nexus_free2(volume_item->datafile_dir);
-        nexus_free2(volume_item);
+        if (root_dentry) {
+            nexus_free(root_dentry);
+        }
+
+        if (volume_item->metadata_dir) {
+            nexus_free(volume_item->metadata_dir);
+        }
+
+        if (volume_item->datafile_dir) {
+            nexus_free(volume_item->datafile_dir);
+        }
+
+        if (volume_item) {
+            nexus_free(volume_item);
+        }
     }
 
     return ret;
@@ -163,9 +177,17 @@ nexus_load_inode(struct nx_dentry * dentry, struct path_builder * builder)
 int
 vfs_put_inode(struct nx_inode * inode)
 {
-    nexus_free2(inode->fpath);
-    nexus_free2(inode->dirnode);
-    nexus_free2(inode);
+    if (inode->fpath) {
+        nexus_free(inode->fpath);
+    }
+
+    if (inode->dirnode) {
+        nexus_free(inode->dirnode);
+    }
+
+    if (inode) {
+        nexus_free(inode);
+    }
 
     return 0;
 }
@@ -182,7 +204,10 @@ vfs_flush_dirnode(struct nx_inode * inode, struct dirnode * dirnode)
     }
 
     // free the current inode dirnode and cache the new
-    nexus_free2(inode->dirnode);
+    if (inode->dirnode) {
+        nexus_free(inode->dirnode);
+    }
+
     inode->dirnode = dirnode;
 out:
     return ret;
@@ -207,7 +232,7 @@ vfs_create_inode(struct nx_inode * parent_inode,
     // if it's a root dirnode, the metadata file is in the metadata_dir
     if (parent_inode->is_root_dirnode) {
         fullpath = strndup(parent_inode->volume->metadata_dir, PATH_MAX);
-        fullpath = pathjoin(fullpath, metadata_name);
+        fullpath = filepath_from_name(fullpath, metadata_name);
     } else {
         fullpath = strndup(parent_inode->fpath, PATH_MAX);
         fullpath = my_strnjoin(fullpath, "_/", metadata_name, PATH_MAX);
@@ -239,8 +264,13 @@ vfs_create_inode(struct nx_inode * parent_inode,
 
     ret = 0;
 out:
-    nexus_free2(metadata_name);
-    nexus_free2(fullpath);
+    if (metadata_name) {
+        nexus_free(metadata_name);
+    }
+
+    if (fullpath) {
+        nexus_free(fullpath);
+    }
 
     if (fd) {
         fclose(fd);
@@ -252,7 +282,6 @@ out:
 struct nx_inode *
 vfs_read_inode(struct nx_dentry * dentry, struct path_builder * builder)
 {
-    int               err       = -1;
     int               ret       = -1;
     size_t            size      = 0;
     uint8_t *         buffer    = NULL;
@@ -267,8 +296,8 @@ vfs_read_inode(struct nx_dentry * dentry, struct path_builder * builder)
     fullpath = path_string(builder, dentry->volume->metadata_dir);
     path_pop(builder);
 
-    err = read_file(fullpath, &buffer, &size);
-    if (err != 0) {
+    ret = read_file(fullpath, &buffer, &size);
+    if (ret != 0) {
         log_error("read_file FAILED");
         goto out;
     }
@@ -281,18 +310,13 @@ vfs_read_inode(struct nx_dentry * dentry, struct path_builder * builder)
 
     // if the file is empty, then we've to instantiate a new inode
     if (size == 0) {
-        nexus_free2(buffer);
-
-        dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode *));
-        if (dirnode == NULL) {
-            log_error("allocation error");
-            goto out;
+        if (buffer) {
+            nexus_free(buffer);
         }
 
-        err = ecall_dirnode_new(global_enclave_id, &ret, uuid, root_uuid, dirnode);
-        if (err || ret) {
-            err |= ret;
-            log_error("ecall_dirnode_new() FAILED");
+        ret = backend_dirnode_new(uuid, root_uuid, &dirnode);
+        if (ret != 0) {
+            log_error("backend_dirnode_new() FAILED");
             goto out;
         }
     } else {
@@ -300,20 +324,29 @@ vfs_read_inode(struct nx_dentry * dentry, struct path_builder * builder)
     }
 
     // TODO add code for filebox
-    inode->type    = NEXUS_DIRNODE;
-    inode->dirnode = dirnode;
-    inode->fpath   = fullpath;
-    inode->volume  = dentry->volume;
+    inode->type            = NEXUS_DIRNODE;
+    inode->dirnode         = dirnode;
+    inode->fpath           = fullpath;
+    inode->volume          = dentry->volume;
     inode->is_root_dirnode = (dentry->parent == NULL);
 
     dentry->inode = inode;
 
-    err = 0;
+    ret = 0;
 out:
-    if (err) {
-        nexus_free2(fullpath);
-        nexus_free2(dirnode);
-        nexus_free2(inode);
+    if (ret != 0) {
+        if (fullpath) {
+            nexus_free(fullpath);
+        }
+
+        if (dirnode) {
+            nexus_free(dirnode);
+        }
+
+        if (inode) {
+            nexus_free(inode);
+        }
+
         return NULL;
     }
 
@@ -341,7 +374,9 @@ nexus_vfs_lookup(const char * path)
 
     dentry = nexus_dentry_lookup(volume->root_dentry, relpath);
 
-    nexus_free2(relpath);
+    if (relpath) {
+        nexus_free(relpath);
+    }
 
     return dentry;
 }

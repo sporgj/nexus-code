@@ -1,6 +1,6 @@
 include ../build.mk
 
-CC=gcc
+CC ?= gcc
 
 APP_PATH = ..
 OBJS = nx_enclave_main.o nx_enclave_crypto.o nx_enclave_dirnode.o
@@ -14,7 +14,7 @@ FLAGS := $(Enclave_C_Flags)
 .PHONY: all
 all: nx_enclave.signed.so
 
-Enclave_C_Flags += -DNEXUS_ENCLAVE -Imbedtls/include  -I../ \
+Enclave_C_Flags += -DNEXUS_ENCLAVE -Imbedtls/include  -I../../libnexus \
 
 %.o: %.cc
 	@$(CXX) $(Enclave_Cpp_Flags) -c $< -o $@
@@ -24,10 +24,6 @@ Enclave_C_Flags += -DNEXUS_ENCLAVE -Imbedtls/include  -I../ \
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC => $@"
 
-%.o: siv/%.c
-	@$(CC) $(FLAGS) -I/usr/lib/gcc/x86_64-linux-gnu/4.9/include/ -c $< -o $@
-	@echo "CC => $@"
-
 private_key.pem:
 	openssl genrsa -out $@ -3 3072
 
@@ -35,7 +31,7 @@ nx_enclave_t.c: nx_enclave.edl
 	@$(SGX_EDGER8R) --trusted --trusted-dir . $^
 	@echo "GEN +> $@"
 
-nx_enclave_t.o: nx_enclave_t.c
+nx_enclave_t.o: nx_enclave_t.c $(CRYPTO_LIB)
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC => $@"
 
@@ -50,7 +46,6 @@ libmbedcrypto.a: $(CRYPTO_LIB)
 	@echo "cp $^ => $@"
 
 nx_enclave.so: nx_enclave_t.o $(OBJS) $(CRYPTO_LIB)
-	@echo $(SIV_OBJS)
 	@$(CC) $^ -o $@ $(Enclave_Link_Flags) $(FLAGS)
 	@echo "LINK => $@"
 

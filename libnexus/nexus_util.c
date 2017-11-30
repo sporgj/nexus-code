@@ -1,6 +1,6 @@
 #include <uuid/uuid.h>
 
-#include "nexus_untrusted.h"
+#include "nexus_internal.h"
 
 void
 nexus_uuid(struct uuid * uuid)
@@ -51,7 +51,9 @@ out:
     fclose(fd);
 
     if (ret) {
-        nexus_free2(buffer);
+        if (buffer) {
+            nexus_free(buffer);
+        }
     }
 
     return ret;
@@ -79,91 +81,6 @@ write_file(const char * fpath, void * buffer, size_t size)
     ret = 0;
 out:
     fclose(fd);
-    return ret;
-}
-
-int
-write_volume_metadata_files(struct supernode * supernode,
-                            struct dirnode *   root_dirnode,
-                            struct volumekey * volkey,
-                            const char *       metadata_path,
-                            const char *       volumekey_fpath)
-{
-    int    ret             = -1;
-    size_t size            = 0;
-    char * dirnode_fname   = metaname_bin2str(&root_dirnode->header.uuid);
-    char * supernode_fpath = strndup(metadata_path, PATH_MAX);
-    char * dirnode_fpath   = strndup(metadata_path, PATH_MAX);
-
-    supernode_fpath = pathjoin(supernode_fpath, NEXUS_FS_SUPERNODE_NAME);
-    dirnode_fpath = pathjoin(dirnode_fpath, dirnode_fname);
-
-    // write out the files now
-    size = supernode->header.total_size;
-    log_debug("Writing supernode [%zu bytes]: %s", size, supernode_fpath);
-    if (write_file(supernode_fpath, (uint8_t *)supernode, size)) {
-        goto out;
-    }
-
-    size = root_dirnode->header.total_size;
-    log_debug("Writing dirnode [%zu bytes]: %s", size, dirnode_fpath);
-    if (write_file(dirnode_fpath, (uint8_t *)root_dirnode, size)) {
-        goto out;
-    }
-
-    size = sizeof(struct volumekey);
-    log_debug("Writing volumekey [%zu bytes]: %s", size, volumekey_fpath);
-    if (write_file(volumekey_fpath, (uint8_t *)volkey, size)) {
-        goto out;
-    }
-
-    ret = 0;
-out:
-    nexus_free2(dirnode_fname);
-    nexus_free2(dirnode_fpath);
-    nexus_free2(supernode_fpath);
-
-    return ret;
-}
-
-int
-read_volume_metadata_files(const char *        metadata_path,
-                           const char *        volumekey_fpath,
-                           struct supernode ** p_supernode,
-                           struct volumekey ** p_volumekey)
-{
-    int                ret       = -1;
-    size_t             size      = 0;
-    struct supernode * supernode = NULL;
-    struct volumekey * volumekey = NULL;
-
-    char * supernode_fpath = strndup(metadata_path, PATH_MAX);
-    supernode_fpath = pathjoin(supernode_fpath, NEXUS_FS_SUPERNODE_NAME);
-
-    ret = read_file(supernode_fpath, (uint8_t **)&supernode, &size);
-    if (ret != 0) {
-        log_error("reading supernode(%s) FAILED", supernode_fpath);
-        goto out;
-    }
-
-    ret = read_file(volumekey_fpath, (uint8_t **)&volumekey, &size);
-    if (ret != 0) {
-        log_error("reading volumekey(%s) FAILED", volumekey_fpath);
-        goto out;
-    }
-
-    *p_supernode = supernode;
-    *p_volumekey = volumekey;
-
-    ret = 0;
-out:
-    nexus_free2(supernode_fpath);
-
-    if (ret) {
-        nexus_free2(supernode);
-        nexus_free2(volumekey);
-    }
-
     return ret;
 }
 
@@ -203,14 +120,14 @@ my_strncat(char * dest, const char * src, size_t max)
 }
 
 char *
-pathjoin(char * directory, const char * filename)
+filepath_from_name(char * directory, const char * filename)
 {
     return my_strnjoin(directory, "/", filename, PATH_MAX);
 }
 
 // XXX check for allocations
 char *
-uuid_path(const char * dir_path, struct uuid * uuid)
+filepath_from_uuid(const char * dir_path, struct uuid * uuid)
 {
     char * fname    = NULL;
     char * fullpath = NULL;
@@ -222,152 +139,11 @@ uuid_path(const char * dir_path, struct uuid * uuid)
     }
 
     fullpath = strndup(dir_path, PATH_MAX);
-    fullpath = pathjoin(fullpath, fname);
+    fullpath = filepath_from_name(fullpath, fname);
     if (fullpath == NULL) {
         log_error("allocation error");
         return NULL;
     }
 
     return fullpath;
-}
-
-int
-util_generate_signature(mbedtls_pk_context * pk,
-                        uint8_t *            data,
-                        size_t               len,
-                        uint8_t **           signature,
-                        size_t *             signature_len)
-{
-    int                      ret = -1;
-    int                      err = -1;
-    uint8_t                  hash[CONFIG_HASH_BYTES];
-    uint8_t *                buf = NULL;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context  entropy;
-
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    err = mbedtls_ctr_drbg_seed(
-        &ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
-    if (err) {
-        log_error("mbedtls_ctr_drbg_seed failed ret=%#x", err);
-        goto out;
-    }
-
-    buf = (uint8_t *) calloc(1, MBEDTLS_MPI_MAX_SIZE);
-    if (buf == NULL) {
-	log_error("allocation error");
-    }
-
-    mbedtls_sha256(data, len, hash, 0);
-
-    err = mbedtls_pk_sign(pk,
-                          MBEDTLS_MD_SHA256,
-                          hash,
-                          0,
-                          buf,
-                          signature_len,
-                          mbedtls_ctr_drbg_random,
-                          &ctr_drbg);
-    if (err) {
-        log_error("mbedtls_pk_sign ret = %d", err);
-        goto out;
-    }
-
-    *signature = buf;
-
-    ret = 0;
-out:
-    if (ret && buf) {
-	nexus_free(buf);
-    }
-
-    return ret;
-}
-
-struct path_builder *
-path_alloc()
-{
-    struct path_builder * builder = NULL;
-    builder = (struct path_builder *)calloc(1, sizeof(struct path_builder));
-    if (builder == NULL) {
-        log_error("allocation error");
-        return NULL;
-    }
-
-    TAILQ_INIT(&builder->path_head);
-
-    return builder;
-}
-
-int
-path_push(struct path_builder * builder, struct uuid * uuid)
-{
-    struct path_element * element = NULL;
-
-    element = (struct path_element *)calloc(1, sizeof(struct path_element));
-    if (element == NULL) {
-        log_error("allocation error");
-        return -1;
-    }
-
-    memcpy(&element->uuid, uuid, sizeof(struct uuid));
-
-    builder->count += 1;
-    TAILQ_INSERT_TAIL(&builder->path_head, element, next_item);
-
-    return 0;
-}
-
-int
-path_pop(struct path_builder * builder)
-{
-    struct path_element * element = NULL;
-    // XXX: does this ever return NULL?
-    element = TAILQ_LAST(&builder->path_head, path_list);
-    TAILQ_REMOVE(&builder->path_head, element, next_item);
-    free(element);
-
-    return 0;
-}
-
-void
-path_free(struct path_builder * builder)
-{
-    struct path_element * curr   = NULL;
-    struct path_element * next   = NULL;
-
-    TAILQ_FOREACH_SAFE(curr, &builder->path_head, next_item, next) {
-        free(curr);
-    }
-
-    free(builder);
-}
-
-
-// TODO: there is clearly a more efficient way of doing this,
-// probably keeping this short for now
-char *
-path_string(struct path_builder * builder, const char * metadata_dirpath)
-{
-    char *                nexus_name = NULL;
-    char *                result = NULL;
-    struct path_element * curr   = NULL;
-    struct path_element * next   = NULL;
-
-    result = strndup(metadata_dirpath, PATH_MAX);
-    result = my_strnjoin(result, NULL, "/", PATH_MAX);
-
-    TAILQ_FOREACH_SAFE(curr, &builder->path_head, next_item, next) {
-        nexus_name = metaname_bin2str(&curr->uuid);
-        if (next == NULL) {
-            result = my_strnjoin(result, NULL, nexus_name, PATH_MAX);
-        } else {
-            result = my_strnjoin(result, nexus_name, "_/", PATH_MAX);
-        }
-
-        free(nexus_name);
-    }
-
-    return result;
 }

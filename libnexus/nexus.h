@@ -16,23 +16,29 @@ extern "C" {
 #define NEXUS_FS_DATA_FOLDER        "nexus"
 #define NEXUS_FS_SUPERNODE_NAME	    "supernode"
 
-#define NEXUS_METANAME_PREFIX       "m"
-#define NEXUS_FILENAME_PREFIX       "f"
-#define NEXUS_PREFIX_SIZE(s)        (sizeof(s) - 1)
-
-#define NEXUS_MAX_FILENAME_LEN	    256
-#define NEXUS_MAX_PATH_LEN	    1024
-
-
 // global operations
 int
 nexus_init(const char * enclave_path);
 
 int
-nexus_init_enclave(const char * enclave_fpath);
+nexus_exit();
 
 int
-nexus_exit();
+nexus_create_volume(char               * publickey_fpath,
+                    struct supernode  ** p_supernode,
+                    struct dirnode    ** p_root_dirnode,
+                    struct volumekey ** p_sealed_volumekey);
+int
+nexus_login_volume(const char *       publickey_fpath,
+                   const char *       privatekey_fpath,
+                   struct supernode * supernode,
+                   struct volumekey * volumekey);
+
+int
+nexus_mount_volume(struct supernode * supernode,
+                   struct volumekey * volumekey,
+                   const char *       metadata_dir,
+                   const char *       data_dir);
 
 // directory operations
 

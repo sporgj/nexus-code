@@ -1,6 +1,6 @@
 enclave {
 
-    include "nexus.h"
+    include "nexus_types.h"
 
     trusted {
 

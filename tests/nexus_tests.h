@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nexus_untrusted.h>
+#include <nexus_internal.h>
 
 #define UNITY_OUTPUT_COLOR
 #include "unity/unity.h"

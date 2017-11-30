@@ -1,4 +1,4 @@
-#include "nexus_untrusted.h"
+#include "nexus_internal.h"
 
 static struct nx_dentry *
 d_alloc(struct nx_dentry * parent, struct uuid * uuid, const char * name)
@@ -94,13 +94,10 @@ walk_path(struct nx_dentry *    root_dentry,
 
         dirnode = inode->dirnode;
 
-        err = ecall_dirnode_find_by_name(
-            global_enclave_id, &ret, dirnode, nch, &uuid, &atype);
-
-        if (err) {
-            log_error(
-                "ecall_dirnode_find_by_name FAILED (err=%d, ret=%d)", err, ret);
-            return NULL;
+        ret = backend_dirnode_find_by_name(dirnode, nch, &uuid, &atype);
+        if (ret != 0) {
+            log_error("backend_dirnode_find_by_name() FAILED");
+            goto out;
         }
 
 	// if the entry is not found, let's leave

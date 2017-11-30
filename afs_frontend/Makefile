@@ -13,6 +13,8 @@ exec_objs :=	main.o \
 test_objs :=	test.o \
 		handler.o
 
+execs := nexus-afs nexus-test
+
 
 libs := ../libnexus/libnexus.a
 
@@ -26,7 +28,7 @@ build = \
         fi
 
 
-all: nexus-afs nexus-test
+all: frontend
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -37,7 +39,11 @@ all: nexus-afs nexus-test
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
+.PHONY: frontend
+frontend: afs_frontend.a
 
+afs_frontend.a: $(exec_objs)
+	$(call build,AR,$(AR) rcs $@ $^)
 
 nexus-afs: $(exec_objs)
 	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
@@ -63,4 +69,4 @@ cscope:
 .PHONY: clean
 
 clean:
-	rm -f $(wildcard  $(exec_objs) $(execs) *.o *.a)
+	rm -f $(wildcard  $(exec_objs) cscope.* $(execs) *.o *.a)

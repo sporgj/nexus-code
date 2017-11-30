@@ -1,57 +1,96 @@
-#include "nexus_untrusted.h"
-
-void
-nexus_print_dirnode(struct dirnode * dirnode)
-{
-
-}
-
-int
-nexus_init_enclave(const char * enclave_fpath)
-{
-    int ret     = -1;
-    int updated = 0;
-    int err     = 0;
-
-    /* initialize the enclave */
-    sgx_launch_token_t token = {0};
-    ret = sgx_create_enclave(enclave_fpath,
-                             SGX_DEBUG_FLAG,
-                             &token,
-                             &updated,
-                             &global_enclave_id,
-                             NULL);
-    if (ret != SGX_SUCCESS) {
-        log_error("Could not open enclave: ret=%#x", ret);
-        return -1;
-    }
-
-    ecall_init_enclave(global_enclave_id, &err);
-    if (err != 0) {
-        log_error("Initializing enclave failed");
-        return -1;
-    }
-
-    return 0;
-}
-
 /**
- * Initializes the nexus subsystem
+ * File contains functions that manage Nexus volumes
+ *
+ * @author Judicael Djoko <jdb@djoko.me>
  */
+#include <sys/stat.h>
+
+#include "nexus_internal.h"
+
 int
-nexus_init(const char * enclave_path)
+nexus_create_volume(char *              publickey_fpath,
+                    struct supernode ** p_supernode,
+                    struct dirnode **   p_root_dirnode,
+                    struct volumekey ** p_sealed_volumekey)
 {
-    if (nexus_init_enclave(enclave_path)) {
-        log_error("nexus_init_enclave() FAILED");
-        return -1;
+    int                ret          = -1;
+    struct supernode * supernode    = NULL;
+    struct dirnode *   root_dirnode = NULL;
+    struct volumekey * volkey       = NULL;
+    struct uuid        supernode_uuid;
+    struct uuid        root_uuid;
+
+    /* 2 -- allocate our structs and call the enclave */
+    supernode    = (struct supernode *)calloc(1, sizeof(struct supernode));
+    root_dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode));
+    volkey       = (struct volumekey *)calloc(1, sizeof(struct volumekey));
+    if (supernode == NULL || root_dirnode == NULL || volkey == NULL) {
+        log_error("allocation error");
+        goto out;
     }
 
-    if (nexus_vfs_init()) {
-        log_error("nexus_vfs_init() FAILED");
-        return -1;
+    nexus_uuid(&supernode_uuid);
+    nexus_uuid(&root_uuid);
+
+    ret = backend_volume_create(&supernode_uuid,
+                                &root_uuid,
+                                publickey_fpath,
+                                supernode,
+                                root_dirnode,
+                                volkey);
+
+    if (ret != 0) {
+        log_error("backend_volume_create FAILED ret=%d", ret);
+        goto out;
     }
 
-    return 0;
+    *p_supernode         = supernode;
+    *p_root_dirnode      = root_dirnode;
+    *p_sealed_volumekey  = volkey;
+
+    ret = 0;
+out:
+    if (ret) {
+        if (supernode) {
+            nexus_free(supernode);
+        }
+
+        if (root_dirnode) {
+            nexus_free(root_dirnode);
+        }
+
+        if (volkey) {
+            nexus_free(volkey);
+        }
+    }
+
+    return ret;
+}
+
+// TODO
+int
+nexus_mount_volume(struct supernode * supernode,
+                   struct volumekey * volumekey,
+                   const char *       metadata_dir,
+                   const char *       datafile_dir)
+{
+    int ret = -1;
+
+    /* 1 -- if not logged in, exit */
+
+    /* 2 -- Read the supernode */
+
+    /* 3 -- Call the enclave */
+
+    // add it to the vfs and call it a day
+    ret = nexus_vfs_add_volume(&supernode->header, metadata_dir,
+            datafile_dir);
+    if (ret != 0) {
+        log_error("nexus_vfs_add_volume ERROR");
+        goto out;
+    }
+out:
+    return ret;
 }
 
 // TODO

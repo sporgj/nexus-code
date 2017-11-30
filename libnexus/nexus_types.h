@@ -5,6 +5,12 @@
 extern "C" {
 #endif
 
+#define NEXUS_MAX_FILENAME_LEN	    256
+#define NEXUS_MAX_PATH_LEN	    1024
+
+#ifndef PATH_MAX
+#define PATH_MAX NEXUS_MAX_PATH_LEN
+#endif
 
 #define CONFIG_UUID_BYTES 16
 
