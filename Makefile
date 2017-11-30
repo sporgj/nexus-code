@@ -9,22 +9,28 @@ nexus_backends  :=	backend_sgx \
 
 
 
-invoke = \
-	@if [ true ]; then \
-                echo ' [Building $1]' ; \
-                make -C $(nexus_home)/$1; \
-	fi
+
+build = \
+        @if [ -z "$V" ]; then \
+                echo '   [$1]     $@'; \
+                $2; \
+        else \
+                echo '$2'; \
+                $2; \
+        fi
 
 all: libnexus frontends backends
+# link release version (AFS + SGX)
 
+dev: libnexus frontends backends
+# link the debug versions
 
-.PHONY: libnexus frontends $(nexus_frontends) backends $(nexus_backends)
 
 
 frontends: $(nexus_frontends)
 
 $(nexus_frontends):
-	$(call invoke,$@)
+	$(call build,BUILDING, make -C $@)
 
 
 
@@ -32,16 +38,21 @@ $(nexus_frontends):
 backends: $(nexus_backends)
 
 $(nexus_backends):
-	$(call invoke,$@)
+	$(call build,BUILDING, make -C $@)
 
 
 
 libnexus:
-	make -C $(nexus_home)/libnexus
+	$(call build,BUILDING, make -C $@)
 
 
-.PHONY: clean
+
+
+
 clean:
 	make -C $(nexus_home)/libnexus clean
 	@$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean)
 	@$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean)
+
+
+.PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) clean
