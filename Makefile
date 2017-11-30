@@ -10,20 +10,29 @@ nexus_backends  :=	backend_sgx \
 
 
 invoke = \
+	@if [ true ]; then \
                 echo ' [Building $1]' ; \
-                cd $(nexus_home)/$1 && make || exit
-
+                make -C $(nexus_home)/$1; \
+	fi
 
 all: libnexus frontends backends
 
 
+.PHONY: libnexus frontends $(nexus_frontends) backends $(nexus_backends)
 
-frontends:
-	@$(foreach frontend,$(nexus_frontends), $(call invoke,$(frontend)))
 
-backends:
-	@$(foreach backend,$(nexus_backends), $(call invoke,$(backend)))
+frontends: $(nexus_frontends)
 
+$(nexus_frontends):
+	$(call invoke,$@)
+
+
+
+
+backends: $(nexus_backends)
+
+$(nexus_backends):
+	$(call invoke,$@)
 
 
 
