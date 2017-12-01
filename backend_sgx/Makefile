@@ -1,5 +1,7 @@
 include build.mk
 
+buildpath = ../build
+
 INCLUDES = -I../libnexus $(App_Include_Paths)
 
 CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull\
@@ -23,7 +25,7 @@ build = \
         fi
 
 
-all: enclave libsgx_backend.so
+all: enclave $(buildpath)/backend_sgx.so
 
 .PHONY: enclave
 enclave:
@@ -41,6 +43,10 @@ enclave:
 nx_enclave_u.c: enclave/nx_enclave.edl
 	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
 	@echo "GEN =>  $@"
+
+$(buildpath)/backend_sgx.so: libsgx_backend.so
+	@cp $^ $@
+	@echo "CP $^ => $@"
 
 libsgx_backend.so: $(objs)
 	$(call build,CC,$(CC) $^ -shared $(LIBS) -o $@)

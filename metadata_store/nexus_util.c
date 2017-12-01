@@ -1,12 +1,7 @@
 #include <uuid/uuid.h>
 
-#include "nexus_internal.h"
-
-void
-nexus_uuid(struct uuid * uuid)
-{
-    uuid_generate((uint8_t *)uuid);
-}
+#include "nexus_mstore_internal.h"
+#include "base58.h"
 
 int
 read_file(const char * fpath, uint8_t ** p_buffer, size_t * p_size)
@@ -87,9 +82,9 @@ out:
 char *
 my_strnjoin(char * dest, const char * join, const char * src, size_t max)
 {
-    size_t len1 = strnlen(dest, max);
-    size_t len2 = (join == NULL) ? 0 : strnlen(join, max);
-    size_t len3 = strnlen(src, max);
+    size_t len1  = strnlen(dest, max);
+    size_t len2  = (join == NULL) ? 0 : strnlen(join, max);
+    size_t len3  = strnlen(src, max);
     size_t total = len1 + len2 + len3;
 
     if (total > max) {
@@ -120,6 +115,23 @@ my_strncat(char * dest, const char * src, size_t max)
 }
 
 char *
+uuid_to_string(struct uuid * uuid)
+{
+    char * buffer = NULL;
+    size_t size   = base58_encoded_size(sizeof(struct uuid));
+
+    buffer = (char *)calloc(1, size);
+    if (buffer == NULL) {
+        log_error("allocation error");
+        return NULL;
+    }
+
+    base58_encode((uint8_t *)buffer, (uint8_t *)uuid, sizeof(struct uuid));
+
+    return buffer;
+}
+
+char *
 filepath_from_name(char * directory, const char * filename)
 {
     return my_strnjoin(directory, "/", filename, PATH_MAX);
@@ -132,7 +144,7 @@ filepath_from_uuid(const char * dir_path, struct uuid * uuid)
     char * fname    = NULL;
     char * fullpath = NULL;
 
-    fname = metaname_bin2str(uuid);
+    fname = uuid_to_string(uuid);
     if (fname == NULL) {
         log_error("allocation error");
         return NULL;
@@ -140,6 +152,8 @@ filepath_from_uuid(const char * dir_path, struct uuid * uuid)
 
     fullpath = strndup(dir_path, PATH_MAX);
     fullpath = filepath_from_name(fullpath, fname);
+    free(fname);
+
     if (fullpath == NULL) {
         log_error("allocation error");
         return NULL;

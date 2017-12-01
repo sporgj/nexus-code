@@ -1,4 +1,5 @@
 
+buildpath = ../build
 
 INCLUDES =
 
@@ -11,12 +12,8 @@ LIBS = -luuid
 objs :=	nexus_fs_ops.o \
 	nexus_encode.o \
 	nexus_main.o \
-	nexus_path.o \
-	nexus_vfs.o \
-	nexus_dentry.o \
 	jsmn.o \
-	nexus_json.o \
-	nexus_util.o 
+	nexus_json.o
 
 
 build = \
@@ -29,7 +26,7 @@ build = \
         fi
 
 
-all: libnexus.so
+all: $(buildpath)/libnexus.so
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -39,6 +36,10 @@ all: libnexus.so
 
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
+
+$(buildpath)/libnexus.so: libnexus.so
+	@cp $^ $@
+	@echo "CP $^ => $@"
 
 libnexus.so: $(objs)
 	$(call build,CC,$(CC) $^ -shared $(LIBS) -o $@)

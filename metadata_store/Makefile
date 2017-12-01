@@ -1,23 +1,23 @@
-
 buildpath = ../build
 
-INCLUDES := -I../libnexus
-CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
+INCLUDES = -I../libnexus
 
-CC = gcc
-AR = ar
-
-
-exec_objs :=	main.o \
-		handler.o
-
-test_objs :=	test.o \
-		handler.o
-
-execs := nexus-afs nexus-test
+CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
+		 $(INCLUDES)
 
 
-libs := ../libnexus/libnexus.a
+LIBS = 
+
+
+objs :=	nexus_metadata_store.o \
+	nexus_util.o \
+	nexus_path.o \
+	nexus_vfs.o \
+	nexus_dentry.o \
+	nexus_volume.o \
+	nexus_mstore_flat_directory.o \
+	base58.o
+
 
 build = \
         @if [ -z "$V" ]; then \
@@ -29,7 +29,7 @@ build = \
         fi
 
 
-all: $(buildpath)/frontend_afs.a
+all: $(buildpath)/metadata_store.so
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -40,20 +40,12 @@ all: $(buildpath)/frontend_afs.a
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
-$(buildpath)/frontend_afs.a: frontend_afs.a
+metadata_store.so: $(objs)
+	$(call build,CC,$(CC) $^ -shared $(LIBS) -o $@)
+
+$(buildpath)/metadata_store.so: metadata_store.so
 	@cp $^ $@
 	@echo "CP $^ => $@"
-
-frontend_afs.a: $(exec_objs)
-	$(call build,AR,$(AR) rcs $@ $^)
-
-nexus-afs: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
-
-nexus-test: $(test_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
-
-
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -69,6 +61,5 @@ cscope:
 
 
 .PHONY: clean
-
 clean:
-	rm -f $(wildcard  $(exec_objs) cscope.* $(execs) *.o *.a)
+	rm -f $(wildcard *.o *.so *.a) cscope.*

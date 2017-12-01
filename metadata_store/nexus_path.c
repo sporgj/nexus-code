@@ -1,4 +1,4 @@
-#include "nexus_internal.h"
+#include "nexus_mstore_internal.h"
 
 struct path_builder *
 path_alloc()
@@ -57,32 +57,4 @@ path_free(struct path_builder * builder)
     }
 
     free(builder);
-}
-
-
-// TODO: there is clearly a more efficient way of doing this,
-// probably keeping this short for now
-char *
-path_string(struct path_builder * builder, const char * metadata_dirpath)
-{
-    char *                nexus_name = NULL;
-    char *                result = NULL;
-    struct path_element * curr   = NULL;
-    struct path_element * next   = NULL;
-
-    result = strndup(metadata_dirpath, PATH_MAX);
-    result = my_strnjoin(result, NULL, "/", PATH_MAX);
-
-    TAILQ_FOREACH_SAFE(curr, &builder->path_head, next_item, next) {
-        nexus_name = metaname_bin2str(&curr->uuid);
-        if (next == NULL) {
-            result = my_strnjoin(result, NULL, nexus_name, PATH_MAX);
-        } else {
-            result = my_strnjoin(result, nexus_name, "_/", PATH_MAX);
-        }
-
-        free(nexus_name);
-    }
-
-    return result;
 }

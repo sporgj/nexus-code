@@ -37,4 +37,4 @@ test_dirops: nx_test_dirops.o unity/unity.o $(LIBNEXUS_LIB)
 
 .PHONY: clean
 clean:
-	rm *.o $(tests) libnexus.a
+	rm *.o $(tests) 

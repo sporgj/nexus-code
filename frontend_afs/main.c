@@ -13,11 +13,16 @@
 #include <wordexp.h>
 
 #include <nexus_log.h>
-#include <nexus_util.h>
 
 #include "afs.h"
 #include "handler.h"
 
+
+#define nexus_free(ptr)                                                        \
+    do {                                                                       \
+        free(ptr);                                                             \
+        ptr = NULL;                                                            \
+    } while (0)
 
 
 #define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"

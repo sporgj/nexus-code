@@ -10,35 +10,25 @@ extern "C" {
 
 #include "nexus_types.h"
 
-/* volume information */
-/* JRL: What is this doing in here? */
-#define NEXUS_FS_METADATA_FOLDER    ".nxs"
-#define NEXUS_FS_DATA_FOLDER        "nexus"
-#define NEXUS_FS_SUPERNODE_NAME	    "supernode"
-
-// global operations
 int
 nexus_init();
 
 int
 nexus_exit();
 
+
+// volume management
 int
-nexus_create_volume(char               * publickey_fpath,
-                    struct supernode  ** p_supernode,
-                    struct dirnode    ** p_root_dirnode,
-                    struct volumekey ** p_sealed_volumekey);
-int
-nexus_login_volume(struct supernode * supernode,
-                   struct volumekey * volumekey,
-                   const char *       publickey_fpath,
-                   const char *       privatekey_fpath);
+nexus_create_volume(const char * metadata_dirpath,
+                    const char * publickey_fpath,
+                    const char * volumekey_fpath);
 
 int
-nexus_mount_volume(struct supernode * supernode,
-                   struct volumekey * volumekey,
-                   const char *       metadata_dir,
-                   const char *       data_dir);
+nexus_mount_volume(const char * metadata_dirpath,
+                   const char * datafolder_dirpath,
+                   const char * volumekey_fpath,
+                   const char * publickey_fpath,
+                   const char * privatekey_fpath);
 
 // directory operations
 
