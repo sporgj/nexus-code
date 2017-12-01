@@ -19,6 +19,7 @@ objs :=	nexus_fs_ops.o \
 	nexus_util.o 
 
 
+
 build = \
         @if [ -z "$V" ]; then \
                 echo '    [$1]  $@'; \
@@ -29,7 +30,7 @@ build = \
         fi
 
 
-all: libnexus.so
+all: libnexus.a
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -37,11 +38,10 @@ all: libnexus.so
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
-%.a : %.o
-	$(call build,AR,$(AR) rcs $@ $^)
 
-libnexus.so: $(objs)
-	$(call build,CC,$(CC) $^ -shared $(LIBS) -o $@)
+libnexus.a: $(objs)
+	$(call build,AR,$(AR) rcs $@ $^)
+	@cp $@ ../build
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \

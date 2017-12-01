@@ -28,7 +28,7 @@ build = \
         fi
 
 
-all: frontend
+all: frontend_afs.a
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -39,11 +39,10 @@ all: frontend
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
-.PHONY: frontend
-frontend: afs_frontend.a
 
-afs_frontend.a: $(exec_objs)
+frontend_afs.a: $(exec_objs)
 	$(call build,AR,$(AR) rcs $@ $^)
+	@cp $@ ../build
 
 nexus-afs: $(exec_objs)
 	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)

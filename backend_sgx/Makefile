@@ -1,17 +1,58 @@
-include build.mk
-
-INCLUDES = -I../libnexus $(App_Include_Paths)
-
-CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull\
-	 -Wno-unused-parameter -std=gnu11 -fPIC
-
-LIBS = -luuid $(App_Link_Flags) -L/usr/local/lib -lmbedcrypto
+include ../build.mk
 
 
-objs := nx_enclave_u.o \
+
+
+ifeq ($(DEBUG), 1)
+LDFLAGS := -O0 -g
+else
+LDFLAGS := -O2
+endif
+
+
+ifeq ($(SGX_MODE), SIM)
+	sgx_urts_lib    := sgx_urts_sim
+	sgx_uae_lib     := sgx_uae_service_sim
+else ifeq ($(SGX_MODE), HW)
+	sgx_urts_lib    := sgx_urts
+	sgx_uae_lib     := sgx_uae_service
+else
+        $(error Invalid SGX MODE)
+endif
+
+
+
+
+INCLUDES := -I../libnexus \
+	    -I$(SGX_SDK)/include \
+	    -I../mbedtls-2.6.0/include
+
+CFLAGS   := -W -Wall -Werror \
+	    -Wno-nonnull -Wno-unused-parameter -Wno-attributes \
+	    -D_GNU_SOURCE \
+	    -std=gnu11 -fPIC 
+
+
+LDFLAGS  := -L$(SGX_SDK)/lib64  \
+	    -L../mbedtls-2.6.0/library
+
+libs     :=   -l$(sgx_urts_lib) \
+	     -l$(sgx_uae_lib) \
+	     -lpthread \
+	     -luuid
+
+#  -lmbedcrypto \
+
+
+
+EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
+
+objs := nexus_enclave_u.o \
 	nexus_sgx_backend_ops.o\
 	nexus_sgx_backend_main.o
 
+
+edl_src := nexus_enclave.edl
 
 build = \
         @if [ -z "$V" ]; then \
@@ -23,11 +64,10 @@ build = \
         fi
 
 
-all: enclave libsgx_backend.so
-
-.PHONY: enclave
-enclave:
-	make -C enclave
+all: stubs backend_sgx.so
+	make -C enclave/
+	@cp backend_sgx.so ../build
+	@cp enclave/nexus_enclave.signed.so ..
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -35,15 +75,15 @@ enclave:
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
 
-%.a : %.o
-	$(call build,AR,$(AR) rcs $@ $^)
+stubs: $(edl_src)
+	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --trusted --trusted-dir ./enclave --untrusted --untrusted-dir ./ $(edl_src)
 
-nx_enclave_u.c: enclave/nx_enclave.edl
-	@$(SGX_EDGER8R) --untrusted --untrusted-dir ./ $^
-	@echo "GEN =>  $@"
 
-libsgx_backend.so: $(objs)
-	$(call build,CC,$(CC) $^ -shared $(LIBS) -o $@)
+
+backend_sgx.so:  $(objs) 
+	$(call build,LD,$(CC) $(LDFLAGS) $(objs) $(libs) -shared -o $@)
+
+
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -58,10 +98,9 @@ cscope:
 
 
 
-.PHONY: clean
 clean:
 	rm -f $(wildcard *.o *.a *.so) cscope.* nx_enclave_u.*
+	make -C enclave clean
 
-.PHONY: distclean
-distclean: clean
-	make -C enclave distclean
+
+.PHONY: stubs clean backend_sgx.mri

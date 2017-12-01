@@ -1,62 +1,96 @@
-include ../build.mk
+include ../../build.mk
 
-CC ?= gcc
 
-APP_PATH = ..
-OBJS = nx_enclave_main.o nx_enclave_crypto.o nx_enclave_dirnode.o
 
-CRYPTO_LIB := mbedtls/library/libmbedcrypto.a
-CRYPTO_CONFIG := mbedtls/include/mbedtls/config.h
-CRYPTO_PATCH_FILE := force-aesni-mbedtls.patch
+ifeq ($(DEBUG), 1)
+LDFLAGS := -O0 -g
+else
+LDFLAGS := -O2
+endif
 
-FLAGS := $(Enclave_C_Flags)
 
-.PHONY: all
-all: nx_enclave.signed.so
+ifeq ($(SGX_MODE), SIM)
+	sgx_trts_lib    := sgx_trts_sim
+	sgx_svc_lib     := sgx_tservice_sim
+else ifeq ($(SGX_MODE), HW)
+	sgx_trts_lib    := sgx_trts
+	sgx_svc_lib     := sgx_tservice
+else
+        $(error Invalid SGX MODE)
+endif
 
-Enclave_C_Flags += -DNEXUS_ENCLAVE -Imbedtls/include  -I../../libnexus \
 
-%.o: %.cc
-	@$(CXX) $(Enclave_Cpp_Flags) -c $< -o $@
-	@echo "CXX => $@"
+INCLUDE := -I$(SGX_SDK)/include \
+	   -I$(SGX_SDK)/include/tlibc \
+	   -I$(SGX_SDK)/include/stlport \
+	   -Imbedtls/include \
+	   -I../../libnexus 
+
+CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector \
+	   -DNEXUS_ENCLAVE   # WTF is this used for?
+
+
+
+
+LDFLAGS += -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_SDK)/lib64 \
+	   -Wl,--whole-archive -l$(sgx_trts_lib) -Wl,--no-whole-archive \
+	   -Wl,--start-group -lsgx_tstdc -lsgx_tstdcxx -lsgx_tcrypto -l$(sgx_svc_lib) -Wl,--end-group \
+	   -Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
+	   -Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
+	   -Wl,--defsym,__ImageBase=0 \
+	   -Wl,--version-script=enclave.lds
+
+
+CC := gcc # SGX requires GCC (?)
+
+SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
+
+
+crypto_lib := mbedtls/library/libmbedcrypto.a
+
+objs :=  nx_enclave_main.o \
+	 nx_enclave_crypto.o \
+	 nx_enclave_dirnode.o \
+	 nexus_enclave_t.o
+
+
+build = \
+        @if [ -z "$V" ]; then \
+                echo '   [$1]     $@'; \
+                $2; \
+        else \
+                echo '$2'; \
+                $2; \
+        fi
+
+
+
+private_key := prviate_key.pem
+
+
+all: nexus_enclave.signed.so
+
 
 %.o: %.c
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
-	@echo "CC => $@"
+	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDE) -c $<  -o $@)
 
-private_key.pem:
+
+signing_key: $(private_key)
 	openssl genrsa -out $@ -3 3072
 
-nx_enclave_t.c: nx_enclave.edl
-	@$(SGX_EDGER8R) --trusted --trusted-dir . $^
-	@echo "GEN +> $@"
+libmbedcrypto.a:
+	make -C mbedtls/library && cp $(crypto_lib) .
 
-nx_enclave_t.o: nx_enclave_t.c $(CRYPTO_LIB)
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
-	@echo "CC => $@"
+nexus_enclave.so: $(objs) libmbedcrypto.a
+	$(call build,LD,$(CC) $^  $(LDFLAGS) -o $@)
 
-$(CRYPTO_CONFIG): mbedtls-config.h
-	cp $^ $@
+nexus_enclave.signed.so: nexus_enclave.so
+	$(call build,SIGN,$(SGX_ENCLAVE_SIGNER) sign -key private_key.pem -enclave $< -out $@ -config config.xml)
 
-$(CRYPTO_LIB): $(CRYPTO_CONFIG)
-	make -C mbedtls/library
 
-libmbedcrypto.a: $(CRYPTO_LIB)
-	@make -C mbedtls/library && cp $^ .
-	@echo "cp $^ => $@"
-
-nx_enclave.so: nx_enclave_t.o $(OBJS) $(CRYPTO_LIB)
-	@$(CC) $^ -o $@ $(Enclave_Link_Flags) $(FLAGS)
-	@echo "LINK => $@"
-
-nx_enclave.signed.so: nx_enclave.so private_key.pem
-	@$(SGX_ENCLAVE_SIGNER) sign -key private_key.pem -enclave $< -out $@ -config config.xml
-	@echo "SIGN => $@"
-
-.PHONY: clean
 clean:
-	rm -rf *.so *.o nx_enclave_t.*
+	rm -rf *.a *.o *.so
+	make -C mbedtls/library clean
 
-.PHONY: distclean
-distclean: clean
-	make clean -C mbedtls/library
+
+.PHONY: all clean

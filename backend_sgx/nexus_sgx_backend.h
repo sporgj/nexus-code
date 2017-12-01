@@ -2,7 +2,7 @@
 
 #include "nexus_log.h"
 
-#include "nx_enclave_u.h"
+#include "nexus_enclave_u.h"
 
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>

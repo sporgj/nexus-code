@@ -4,7 +4,7 @@
 
 #include <nexus_backend.h>
 #include "nexus_log.h"
-#include "nx_enclave_u.h"
+#include "nexus_enclave_u.h"
 
 #define ENCLAVE_PATH "enclave/nx_enclave.signed.so"
 
