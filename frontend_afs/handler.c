@@ -6,7 +6,6 @@
 
 #include <nexus.h>
 #include <nexus_log.h>
-#include <nexus_util.h>
 #include <nexus_json.h>
 
 

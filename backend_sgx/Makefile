@@ -1,8 +1,6 @@
 include ../build.mk
 
 
-
-
 ifeq ($(DEBUG), 1)
 LDFLAGS := -O0 -g
 else

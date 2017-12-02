@@ -1,4 +1,5 @@
 
+buildpath = ../build
 
 INCLUDES =
 
@@ -11,12 +12,8 @@ LIBS = -luuid
 objs :=	nexus_fs_ops.o \
 	nexus_encode.o \
 	nexus_main.o \
-	nexus_path.o \
-	nexus_vfs.o \
-	nexus_dentry.o \
 	jsmn.o \
-	nexus_json.o \
-	nexus_util.o 
+	nexus_json.o
 
 
 
@@ -56,6 +53,8 @@ cscope:
 
 
 
-.PHONY: clean
 clean:
 	rm -f $(wildcard *.o *.so *.a) cscope.*
+
+
+.PHONY: clean

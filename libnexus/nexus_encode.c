@@ -167,14 +167,16 @@ out:
     return;
 }
 
-size_t global_encoded_str_size = 0;
+size_t computed_encoded_str_size = 0;
 
 void
-compute_encoded_str_size()
+compute_encoded_size()
 {
     struct uuid code;
-    ecryptfs_encode_for_filename(
-        NULL, &global_encoded_str_size, (uint8_t *)&code, sizeof(struct uuid));
+    ecryptfs_encode_for_filename(NULL,
+                                 &computed_encoded_str_size,
+                                 (uint8_t *)&code,
+                                 sizeof(struct uuid));
 }
 
 static char *
@@ -183,14 +185,20 @@ encode_bin2str(const struct uuid * code, char * prefix, size_t prefix_len)
     char * result = NULL;
     size_t sz;
 
-    result = (char *)calloc(1, prefix_len + global_encoded_str_size + 1);
+    if (computed_encoded_str_size == 0) {
+        compute_encoded_size();
+    }
+
+    result = (char *)calloc(1, prefix_len + computed_encoded_str_size + 1);
     if (result == NULL) {
         return NULL;
     }
 
     memcpy(result, prefix, prefix_len);
-    ecryptfs_encode_for_filename(
-        (uint8_t *)result + prefix_len, &sz, (uint8_t *)code, sizeof(struct uuid));
+    ecryptfs_encode_for_filename((uint8_t *)result + prefix_len,
+                                 &sz,
+                                 (uint8_t *)code,
+                                 sizeof(struct uuid));
 
     result[sz] = '\0';
     return result;
@@ -199,9 +207,9 @@ encode_bin2str(const struct uuid * code, char * prefix, size_t prefix_len)
 static struct uuid *
 encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
 {
-    size_t       src_sz = strlen(encoded_filename);
+    const char * _encoded_fname = NULL;
     size_t       i, dst_sz;
-    const char * _encoded_fname;
+    size_t       src_sz = strlen(encoded_filename);
 
     if (src_sz > prefix_len) {
         for (i = 0; i < prefix_len; i++) {
@@ -232,20 +240,6 @@ encode_str2bin(const char * encoded_filename, char * prefix, size_t prefix_len)
         (uint8_t *)code, &dst_sz, (uint8_t *)_encoded_fname, src_sz);
 
     return code;
-}
-
-char *
-metaname_bin2str(const struct uuid * bin)
-{
-    return encode_bin2str(
-        bin, NEXUS_METANAME_PREFIX, NEXUS_PREFIX_SIZE(NEXUS_METANAME_PREFIX));
-}
-
-struct uuid *
-metaname_str2bin(const char * str)
-{
-    return encode_str2bin(
-        str, NEXUS_METANAME_PREFIX, NEXUS_PREFIX_SIZE(NEXUS_METANAME_PREFIX));
 }
 
 char *

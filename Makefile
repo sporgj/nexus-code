@@ -9,11 +9,13 @@ nexus_frontends := 	frontend_afs \
 nexus_backends  :=	backend_sgx \
 #		     	backend_stub
 
+nexus_metadata_store := metadata_store
 
 release_components :=   libnexus.a \
 			backend_sgx.so \
 			frontend_afs.a \
-			libmbedcrypto.a
+			libmbedcrypto.a \
+			metadata_store.a
 
 LDFLAGS := -L$(nexus_home)/mbedtls-2.6.0/library \
 	   -L$(SGX_SDK)/lib64
@@ -31,8 +33,6 @@ endif
 
 
 
-
-
 build = \
         @if [ -z "$V" ]; then \
                 echo '   [$1]     $@'; \
@@ -45,13 +45,13 @@ build = \
 
 
 
-all: mbedtls frontends backends libnexus
+all: mbedtls frontends backends metadata_store libnexus 
 	$(CC) $(addprefix $(build_path),$(release_components) $(release_components)) $(LDFLAGS) $(libs) -o nexus
 
-dev: frontends backends libnexus
+dev: frontends backends metadata_store libnexus
 # link the debug versions
-	$(CC) $(addprefix $(build_path), libnexus.a backend_stub.a frontend_afs.a libnexus.a)  -luuid -o nexus-afs-test
-	$(CC) $(addprefix $(build_path), libnexus.a backend_sgx.a  frontend_stub.a libnexus.a) -luuid -o nexus-sgx-test
+	$(CC) $(addprefix $(build_path), libnexus.a metadata_store.a backend_stub.a frontend_afs.a libnexus.a)  -luuid -o nexus-afs-test
+	$(CC) $(addprefix $(build_path), libnexus.a metadata_store.a backend_sgx.a  frontend_stub.a libnexus.a) -luuid -o nexus-sgx-test
 
 
 
@@ -69,8 +69,13 @@ $(nexus_backends):
 	$(call build,BUILDING, make -C $@)
 
 
+metadata_store:
+	$(call build,BUILDING, make -C $@)
+
+
 libnexus:
 	$(call build,BUILDING, make -C $@)
+
 
 
 mbedtls:
@@ -83,7 +88,8 @@ clean:
 	make -C $(nexus_home)/libnexus clean
 	make -C $(nexus_home)/mbedtls-2.6.0/library clean
 	@$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean)
+	@make -C $(nexus_home)/$(nexus_metadata_store) clean
 	@$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean)
 
 
-.PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) clean mbedtls
+.PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) metadata_store clean mbedtls

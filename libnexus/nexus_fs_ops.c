@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <linux/limits.h>
-
-#include "nexus_internal.h"
+#include "nexus.h"
 
 // TODO need to create the on-disk structures
 int
@@ -13,6 +11,7 @@ nexus_new(char *              dir_path,
           nexus_fs_obj_type_t type,
           char **             nexus_name)
 {
+#if 0
     int               ret      = -1;
     struct nx_inode * inode    = NULL;
     struct dirnode *  dirnode1 = NULL;
@@ -66,6 +65,9 @@ out:
     vfs_put_inode(inode);
 
     return ret;
+#endif
+
+    return 0;
 }
 
 // TODO need to remove the on-disk structures
@@ -75,6 +77,7 @@ nexus_remove(char *              dir_path,
              nexus_fs_obj_type_t type,
              char **             nexus_name)
 {
+#if 0
     int                 ret      = -1;
     nexus_fs_obj_type_t atype    = NEXUS_ANY;
     struct nx_inode *   inode    = NULL;
@@ -119,6 +122,9 @@ out:
     vfs_put_inode(inode);
 
     return ret;
+#endif
+
+    return 0;
 }
 
 int
@@ -127,6 +133,7 @@ nexus_lookup(char *              dir_path,
              nexus_fs_obj_type_t type,
              char **             nexus_name)
 {
+#if 0
     int                 ret      = -1;
     nexus_fs_obj_type_t atype    = NEXUS_ANY;
     struct nx_inode *   inode    = NULL;
@@ -159,6 +166,9 @@ out:
     vfs_put_inode(inode);
 
     return ret;
+#endif
+
+    return 0;
 }
 
 int
@@ -167,6 +177,7 @@ nexus_filldir(char *              dir_path,
               nexus_fs_obj_type_t type,
               char **             file_name)
 {
+#if 0
     int                 ret      = -1;
     nexus_fs_obj_type_t atype    = NEXUS_ANY;
     struct nx_inode *   inode    = NULL;
@@ -201,6 +212,9 @@ out:
     vfs_put_inode(inode);
 
     return ret;
+#endif
+
+    return 0;
 }
 
 // TODO

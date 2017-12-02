@@ -1,23 +1,22 @@
 
-buildpath = ../build
+INCLUDES = -I../libnexus
 
-INCLUDES := -I../libnexus
-CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
-
-CC = gcc
-AR = ar
+CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
+		 $(INCLUDES)
 
 
-exec_objs :=	main.o \
-		handler.o
-
-test_objs :=	test.o \
-		handler.o
-
-execs := nexus-afs nexus-test
+LIBS = 
 
 
-libs := ../libnexus/libnexus.a
+objs :=	nexus_metadata_store.o \
+	nexus_util.o \
+	nexus_path.o \
+	nexus_vfs.o \
+	nexus_dentry.o \
+	nexus_volume.o \
+	nexus_mstore_flat_directory.o \
+	base58.o
+
 
 build = \
         @if [ -z "$V" ]; then \
@@ -29,7 +28,7 @@ build = \
         fi
 
 
-all: frontend_afs.a
+all: metadata_store.a
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -37,20 +36,9 @@ all: frontend_afs.a
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
-%.a : %.o
-	$(call build,AR,$(AR) rcs $@ $^)
-
-frontend_afs.a: $(exec_objs)
+metadata_store.a: $(objs)
 	$(call build,AR,$(AR) rcs $@ $^)
 	@cp $@ ../build
-
-nexus-afs: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
-
-nexus-test: $(test_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
-
-
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -65,9 +53,8 @@ cscope:
 
 
 
-
 clean:
-	rm -f $(wildcard  $(exec_objs) cscope.* $(execs) *.o *.a)
+	rm -f $(wildcard *.o *.so *.a) cscope.*
 
 
 .PHONY: clean
