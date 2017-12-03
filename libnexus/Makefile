@@ -27,7 +27,8 @@ build = \
         fi
 
 
-all: libnexus.a
+all: libnexus.a nexus_create_volume.o
+	@cp $^ $(buildpath)
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -38,7 +39,6 @@ all: libnexus.a
 
 libnexus.a: $(objs)
 	$(call build,AR,$(AR) rcs $@ $^)
-	@cp $@ ../build
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -54,7 +54,7 @@ cscope:
 
 
 clean:
-	rm -f $(wildcard *.o *.so *.a) cscope.*
+	rm -f $(wildcard *.o *.so *.a) cscope.*a
 
 
 .PHONY: clean

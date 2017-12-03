@@ -97,7 +97,7 @@ cscope:
 
 
 clean:
-	rm -f $(wildcard *.o *.a *.so) cscope.* nx_enclave_u.*
+	rm -f $(wildcard *.o *.a *.so) cscope.* nexus_enclave_u.*
 	make -C enclave clean
 
 

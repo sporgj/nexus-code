@@ -89,7 +89,7 @@ nexus_enclave.signed.so: nexus_enclave.so
 
 
 clean:
-	rm -rf *.a *.o *.so
+	rm -rf *.a *.o *.so nexus_enclave_t.*
 	make -C mbedtls/library clean
 
 

@@ -6,7 +6,7 @@
 #include "nexus_log.h"
 #include "nexus_enclave_u.h"
 
-#define ENCLAVE_PATH "enclave/nx_enclave.signed.so"
+#define ENCLAVE_PATH "nexus_enclave.signed.so"
 
 sgx_enclave_id_t global_enclave_id = 0;
 

@@ -17,6 +17,14 @@ release_components :=   libnexus.a \
 			libmbedcrypto.a \
 			metadata_store.a
 
+create_volume_components := \
+	nexus_create_volume.o \
+	libnexus.a \
+	backend_sgx.so \
+	libmbedcrypto.a \
+	metadata_store.a
+
+
 LDFLAGS := -L$(nexus_home)/mbedtls-2.6.0/library \
 	   -L$(SGX_SDK)/lib64
 
@@ -45,8 +53,9 @@ build = \
 
 
 
-all: mbedtls frontends backends metadata_store libnexus 
-	$(CC) $(addprefix $(build_path),$(release_components) $(release_components)) $(LDFLAGS) $(libs) -o nexus
+all: mbedtls frontends backends metadata_store libnexus nx-create-volume
+	@$(CC) $(addprefix $(build_path),$(release_components) $(release_components)) $(LDFLAGS) $(libs) -o nexus
+	@echo "GEN => $@"
 
 dev: frontends backends metadata_store libnexus
 # link the debug versions
@@ -76,6 +85,9 @@ metadata_store:
 libnexus:
 	$(call build,BUILDING, make -C $@)
 
+nx-create-volume: libnexus
+	@$(CC) $(addprefix $(build_path),$(create_volume_components)) $(LDFLAGS) $(libs) -luuid -o $@
+	@echo "GEN => $@"
 
 
 mbedtls:
@@ -90,6 +102,7 @@ clean:
 	@$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean)
 	@make -C $(nexus_home)/$(nexus_metadata_store) clean
 	@$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean)
+	rm nx-create-volume
 
 
 .PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) metadata_store clean mbedtls
