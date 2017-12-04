@@ -17,3 +17,4 @@ afs_frontend/nexus-afs
 *.orig
 nexus-afs
 nexus
+nx-create-volume

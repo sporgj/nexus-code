@@ -53,6 +53,9 @@ struct metadata_operations {
     int (*create)(struct nexus_metadata * parent_metadata,
                   struct uuid *           uuid,
                   nexus_fs_obj_type_t     type);
+
+    int (*delete)(struct nexus_metadata * parent_metadata,
+                  struct uuid *           uuid);
 };
 
 

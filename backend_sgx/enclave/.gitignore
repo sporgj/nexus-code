@@ -1,2 +1,3 @@
 mbedtls/include/mbedtls/config.h
+nexus_enclave_t.*
 nx_enclave_t.*

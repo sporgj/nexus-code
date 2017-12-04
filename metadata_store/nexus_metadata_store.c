@@ -187,3 +187,13 @@ metadata_create_metadata(struct nexus_metadata * parent_metadata,
 
     return ops->create(parent_metadata, uuid, type);
 }
+
+int
+metadata_delete_metadata(struct nexus_metadata * parent_metadata,
+                         struct uuid *           uuid)
+{
+    struct metadata_operations * ops
+        = (struct metadata_operations *)parent_metadata->private_data;
+
+    return ops->delete(parent_metadata, uuid);
+}
