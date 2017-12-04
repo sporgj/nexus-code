@@ -49,7 +49,12 @@ struct metadata_operations {
                                     struct path_builder * path);
 
     int (*write)(struct nexus_metadata * metadata, size_t size);
+
+    int (*create)(struct nexus_metadata * parent_metadata,
+                  struct uuid *           uuid,
+                  nexus_fs_obj_type_t     type);
 };
+
 
 // nexus_volume.c
 struct nexus_volume *
@@ -67,4 +72,10 @@ vfs_read_metadata(struct nexus_dentry * dentry, struct path_builder * builder);
 // checks for the metadata cache state on disk
 int
 vfs_revalidate(struct nexus_dentry * dentry);
+
+struct nexus_volume *
+vfs_get_volume(const char * path, char ** p_relpath);
+
+struct nexus_dentry *
+nexus_dentry_lookup(struct nexus_dentry * root_dentry, char * relpath);
 

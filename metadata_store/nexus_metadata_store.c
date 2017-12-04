@@ -120,3 +120,70 @@ void
 metadata_umount_volume(struct nexus_volume * volume)
 {
 }
+
+struct nexus_metadata *
+metadata_get_metadata(const char * dirpath)
+{
+    struct nexus_metadata * metadata = NULL;
+    struct nexus_dentry * root_dentry = NULL;
+    struct nexus_dentry * dentry = NULL;
+
+    struct nexus_volume * volume = NULL;
+
+    char * relative_path = NULL;
+
+    volume = vfs_get_volume(dirpath, &relative_path);
+    if (!volume) {
+        log_error("vfs_get_volume() FAILED");
+        return NULL;
+    }
+
+    dentry = nexus_dentry_lookup(root_dentry, relative_path);
+    nexus_free(relative_path);
+
+    if (!dentry) {
+        log_error("nexus_dentry_lookup() FAILED");
+        return NULL;
+    }
+
+    return metadata;
+}
+
+void
+metadata_put_metadata(struct nexus_metadata * metadata)
+{
+    // TODO
+}
+
+int 
+metadata_write_dirnode(struct nexus_metadata * metadata,
+                       struct dirnode *        dirnode)
+{
+    struct dirnode *             old_dirnode = metadata->dirnode;
+    struct metadata_operations * ops
+        = (struct metadata_operations *)metadata->private_data;
+
+    metadata->dirnode = dirnode;
+    if (ops->write(metadata, dirnode->header.total_size)) {
+        // restore the original dirnode
+        metadata->dirnode = old_dirnode;
+        log_error("could not write metadata (%s)", metadata->fpath);
+        return -1;
+    }
+
+    // otherwise, deallocate the old
+    free(old_dirnode);
+
+    return 0;
+}
+
+int
+metadata_create_metadata(struct nexus_metadata * parent_metadata,
+                         struct uuid *           uuid,
+                         nexus_fs_obj_type_t     type)
+{
+    struct metadata_operations * ops
+        = (struct metadata_operations *)parent_metadata->private_data;
+
+    return ops->create(parent_metadata, uuid, type);
+}

@@ -13,6 +13,8 @@ struct nexus_volume {
 
     struct supernode *    supernode;
     struct nexus_dentry * root_dentry;
+
+    void * private_data;
 };
 
 typedef enum { DIRNODE, FILENODE } nexus_metadata_type_t;
@@ -33,6 +35,8 @@ struct nexus_metadata {
         struct dirnode * dirnode;
         struct filebox * filebox;
     };
+
+    void * private_data;
 };
 
 /**
@@ -55,7 +59,7 @@ nexus_dirnode_lookup(struct dirnode *      dirnode,
  * @param root_dirnode
  * @param metadata
  */
-int
+extern int
 metadata_create_volume(struct supernode * supernode,
                        struct dirnode *   root_dirnode,
                        struct volumekey * volumekey,
@@ -70,7 +74,7 @@ metadata_create_volume(struct supernode * supernode,
  * @param filedata_dirpath
  * @return NULL
  */
-struct nexus_volume *
+extern struct nexus_volume *
 metadata_mount_volume(const char * metadata_dirpath,
                       const char * filedata_dirpath,
                       const char * volumekey_fpath);
@@ -79,5 +83,47 @@ metadata_mount_volume(const char * metadata_dirpath,
  * Unmounts the volume from the metadata store
  * @param volume
  */
-void
+extern void
 metadata_umount_volume(struct nexus_volume * volume);
+
+/**
+ * @param dirpath
+ * @return NULL when not found
+ */
+extern struct nexus_metadata *
+metadata_get_metadata(const char * dirpath);
+
+extern void
+metadata_put_metadata(struct nexus_metadata * metadata);
+
+/**
+ * Writes the dirnode in the metadata store
+ * @param metadata
+ * @param dirnode
+ * @return 0 on success
+ */
+extern int
+metadata_write_dirnode(struct nexus_metadata * metadata,
+                       struct dirnode *        dirnode);
+
+/**
+ * Creates a new metadata object
+ * @param parent_metadata
+ * @param uuid
+ * @param type
+ * @return 0 on success
+ */
+extern int
+metadata_create_metadata(struct nexus_metadata * parent_metadata,
+                         struct uuid *           uuid,
+                         nexus_fs_obj_type_t     type);
+
+/**
+ * Deletes the metadata object
+ * @param parent_metadata
+ * @param uuid
+ * @return 0 on success
+ */
+extern int
+metadata_delete_metadata(struct nexus_metadata * parent_metadata,
+                         struct uuid *           uuid);

@@ -8,6 +8,8 @@
 
 #include "nexus_mstore_internal.h"
 
+struct metadata_operations flatdir_metadata_ops;
+
 struct nexus_metadata *
 flatdir_read_metadata(struct nexus_dentry * dentry, struct path_builder * path)
 {
@@ -37,10 +39,13 @@ flatdir_read_metadata(struct nexus_dentry * dentry, struct path_builder * path)
 	goto out;
     }
 
+    metadata->volume = dentry->volume;
     metadata->fpath = fpath;
     metadata->is_root_dirnode = (dentry->parent == NULL);
     metadata->buffer = buffer;
     metadata->timestamp = clock();
+
+    metadata->private_data = &flatdir_metadata_ops; 
 out:
     if (ret) {
 	nexus_free(fpath);
@@ -66,7 +71,32 @@ flatdir_write_metadata(struct nexus_metadata * metadata, size_t size)
     return 0;
 }
 
-struct metadata_operations flatdir_metadata_ops = {
-    .read = flatdir_read_metadata,
-    .write = flatdir_write_metadata
-};
+int
+flatdir_create_metadata(struct nexus_metadata * parent_metadata,
+                        struct uuid *           uuid,
+                        nexus_fs_obj_type_t     type)
+{
+    char * fpath = NULL;
+    FILE * fd    = NULL;
+
+    // create an empty file in the root directory
+    fpath = strndup(parent_metadata->volume->metadata_dirpath, PATH_MAX);
+    fpath = filepath_from_uuid(fpath, uuid);
+
+    fd = fopen(fpath, "wb");
+    nexus_free(fpath);
+
+    if (fd == NULL) {
+	log_error("creating file (%s) FAILED", fpath);
+	return -1;
+    }
+
+    fclose(fd);
+
+    return 0;
+}
+
+struct metadata_operations flatdir_metadata_ops
+    = {.read   = flatdir_read_metadata,
+       .write  = flatdir_write_metadata,
+       .create = flatdir_create_metadata };

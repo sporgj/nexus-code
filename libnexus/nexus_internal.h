@@ -16,6 +16,10 @@
         ptr = NULL;                                                            \
     } while (0)
 
+// generates a uuid in-place
+void
+nexus_uuid(struct uuid * uuid);
+
 #define NEXUS_FILENAME_PREFIX "f"
 #define NEXUS_PREFIX_SIZE(x) (sizeof(x) - 1)
 
