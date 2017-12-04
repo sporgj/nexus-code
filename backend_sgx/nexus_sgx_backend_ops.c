@@ -244,8 +244,8 @@ backend_dirnode_find_by_uuid(struct dirnode *      dirnode,
         global_enclave_id, &ret, dirnode, uuid, p_fname, p_type);
 
     if (err || ret) {
-        log_error(
-            "ecall_dirnode_find_by_uuid FAILED (err=%d, ret=%d)", err, ret);
+        // log_error(
+        //    "ecall_dirnode_find_by_uuid FAILED (err=%d, ret=%d)", err, ret);
         return -1;
     }
 
@@ -265,8 +265,8 @@ backend_dirnode_find_by_name(struct dirnode *      dirnode,
         global_enclave_id, &ret, dirnode, fname, uuid, p_type);
 
     if (err || ret) {
-        log_error(
-            "ecall_dirnode_find_by_name FAILED (err=%d, ret=%d)", err, ret);
+        // log_error(
+        ///    "ecall_dirnode_find_by_name FAILED (err=%d, ret=%d)", err, ret);
         return -1;
     }
 

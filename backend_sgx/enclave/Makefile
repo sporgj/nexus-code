@@ -3,9 +3,9 @@ include ../../build.mk
 
 
 ifeq ($(DEBUG), 1)
-LDFLAGS := -O0 -g
+	CFLAGS += -O0 -g
 else
-LDFLAGS := -O2
+	CFLAGS += -O2
 endif
 
 
@@ -67,12 +67,17 @@ build = \
 
 private_key := prviate_key.pem
 
+EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
+edl_src := ../nexus_enclave.edl
 
 all: nexus_enclave.signed.so
 
 
 %.o: %.c
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDE) -c $<  -o $@)
+
+nexus_enclave_t.c: $(edl_src)
+	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --trusted --trusted-dir . $(edl_src)
 
 
 signing_key: $(private_key)

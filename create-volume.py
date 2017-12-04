@@ -19,22 +19,30 @@ with open(gbl_config, "r") as fp:
 pubkey_path = config['publickey']
 privkey_path = config['privatekey']
 metadata_path = config['metadata_dir']
+datafolder_path = config['data_dir']
 volkey_path = config['volume_key']
 
+print('-------------------------------------------------------------')
+print('\t      volume key:', volkey_path)
 print('\t      public key:', pubkey_path)
 print('\t     private key:', privkey_path)
 print('\t   metadata path:', metadata_path)
-print('\t      volume key:', volkey_path)
+print('\t datafolder path:', datafolder_path)
 
-m_fpath = os.path.abspath(metadata_path)
-
-print('Clearing:', m_fpath)
-subprocess.call("mkdir -p " + m_fpath, shell=True)
-status = subprocess.call("rm -rf " + m_fpath + "/*", shell=True)
-if not status == 0:
-    sys.exit(-1)
+m_path = os.path.abspath(metadata_path)
+d_path = os.path.abspath(datafolder_path)
 
 print('-------------------------------------------------------------')
+print('Clearing:', m_path)
+subprocess.call("mkdir -p " + m_path, shell=True)
+status = subprocess.call("rm -rf " + m_path + "/*", shell=True)
+
+print('Clearing:', d_path)
+subprocess.call("mkdir -p " + d_path, shell=True)
+status = subprocess.call("rm -rf " + d_path + "/*", shell=True)
+print('-------------------------------------------------------------')
+
+
 status = subprocess.call(["./nx-create-volume", pubkey_path, privkey_path,
     metadata_path, volkey_path])
 if not status == 0:

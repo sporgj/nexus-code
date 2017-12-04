@@ -6,7 +6,7 @@ alloc_volume(const char * metadata_dirpath, const char * datafolder_dirpath)
     struct nexus_volume * volume      = NULL;
     struct nexus_dentry * root_dentry = NULL;
 
-    volume = (struct nexus_volume *)calloc(1, sizeof(struct nexus_volume *));
+    volume = (struct nexus_volume *)calloc(1, sizeof(struct nexus_volume));
     if (volume == NULL) {
         log_error("allocation error");
         return NULL;
@@ -22,6 +22,7 @@ alloc_volume(const char * metadata_dirpath, const char * datafolder_dirpath)
     volume->root_dentry        = root_dentry;
     volume->metadata_dirpath   = strndup(metadata_dirpath, PATH_MAX);
     volume->datafolder_dirpath = strndup(datafolder_dirpath, PATH_MAX);
+    volume->private_data       = default_metadata_ops;
 
     root_dentry->volume = volume;
 

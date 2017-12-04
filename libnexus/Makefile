@@ -5,6 +5,9 @@ INCLUDES =
 
 CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
 
+ifeq ($(DEBUG), 1)
+	CFLAGS += -g3
+endif
 
 LIBS = -luuid
 

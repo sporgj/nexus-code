@@ -25,7 +25,7 @@ nexus_vfs_init()
     return 0;
 }
 
-void
+int
 nexus_vfs_exit()
 {
     struct volume_entry * curr = NULL;
@@ -39,6 +39,8 @@ nexus_vfs_exit()
 
         nexus_free(mounted_volumes);
     }
+
+    return 0;
 }
 
 int
@@ -101,11 +103,19 @@ vfs_get_volume(const char * path, char ** p_relpath)
     return NULL;
 }
 
-// TODO
 struct nexus_metadata *
 vfs_read_metadata(struct nexus_dentry * dentry, struct path_builder * builder)
 {
-    return NULL;
+    struct nexus_metadata *      metadata = NULL;
+    struct nexus_volume *        volume   = dentry->volume;
+
+    struct metadata_operations * ops
+        = (struct metadata_operations *)volume->private_data;
+
+    metadata = ops->read(dentry, builder);
+    dentry->metadata = metadata;
+
+    return metadata;
 }
 
 // TODO

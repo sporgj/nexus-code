@@ -53,6 +53,13 @@ nexus_dirnode_lookup(struct dirnode *      dirnode,
                      struct uuid *         uuid_dest,
                      nexus_fs_obj_type_t * p_type);
 
+
+extern int
+nexus_init_metadata_store();
+
+extern int 
+nexus_exit_metadata_store();
+
 /**
  * Creates a new volume of the type
  * @param supernode

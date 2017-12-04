@@ -124,6 +124,11 @@ nexus_init()
         return -1;
     }
 
+    if (nexus_init_metadata_store()) {
+        log_error("initializing metadata store failed");
+        return -1;
+    }
+
     return 0;
 }
 

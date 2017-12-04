@@ -58,6 +58,9 @@ struct metadata_operations {
                   struct uuid *           uuid);
 };
 
+extern struct metadata_operations * default_metadata_ops;
+
+extern struct metadata_operations flatdir_metadata_ops;
 
 // nexus_volume.c
 struct nexus_volume *
@@ -67,6 +70,15 @@ void
 free_volume(struct nexus_volume * volume);
 
 // nexus_vfs.c
+
+int
+nexus_vfs_init();
+
+int
+nexus_vfs_exit();
+
+int
+vfs_add_volume(struct nexus_volume * volume);
 
 // reads the inode from disk
 struct nexus_metadata *

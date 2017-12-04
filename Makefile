@@ -102,7 +102,7 @@ clean:
 	@$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean)
 	@make -C $(nexus_home)/$(nexus_metadata_store) clean
 	@$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean)
-	rm nx-create-volume
+	rm -f nx-create-volume
 
 
 .PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) metadata_store clean mbedtls

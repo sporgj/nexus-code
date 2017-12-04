@@ -2,6 +2,8 @@
 
 #define SUPERNODE_FILENAME "supernode"
 
+struct metadata_operations * default_metadata_ops = NULL;
+
 int
 metadata_create_volume(struct supernode * supernode,
                        struct dirnode *   root_dirnode,
@@ -96,6 +98,11 @@ metadata_mount_volume(const char * metadata_dirpath,
            &volume->supernode->header.root_uuid,
            sizeof(struct uuid));
 
+    if (vfs_add_volume(volume)) {
+        log_error("adding volume FAILED");
+        goto out;
+    }
+
     err = 0;
 out:
     nexus_free(temp_fpath);
@@ -108,6 +115,8 @@ out:
         if (volumekey) {
             nexus_free(volumekey);
         }
+
+        free_volume(volume);
 
         return NULL;
     }
@@ -124,8 +133,6 @@ metadata_umount_volume(struct nexus_volume * volume)
 struct nexus_metadata *
 metadata_get_metadata(const char * dirpath)
 {
-    struct nexus_metadata * metadata = NULL;
-    struct nexus_dentry * root_dentry = NULL;
     struct nexus_dentry * dentry = NULL;
 
     struct nexus_volume * volume = NULL;
@@ -138,7 +145,7 @@ metadata_get_metadata(const char * dirpath)
         return NULL;
     }
 
-    dentry = nexus_dentry_lookup(root_dentry, relative_path);
+    dentry = nexus_dentry_lookup(volume->root_dentry, relative_path);
     nexus_free(relative_path);
 
     if (!dentry) {
@@ -146,7 +153,7 @@ metadata_get_metadata(const char * dirpath)
         return NULL;
     }
 
-    return metadata;
+    return dentry->metadata;
 }
 
 void
@@ -196,4 +203,28 @@ metadata_delete_metadata(struct nexus_metadata * parent_metadata,
         = (struct metadata_operations *)parent_metadata->private_data;
 
     return ops->delete(parent_metadata, uuid);
+}
+
+int
+nexus_init_metadata_store()
+{
+    log_debug("Initializing metadata store");
+
+    if (nexus_vfs_init()) {
+        log_error("Could not initialize the VFS");
+    }
+
+    // for now, let's just statically default to the flatdir implementation
+    default_metadata_ops = &flatdir_metadata_ops;
+    return 0;
+}
+
+int
+nexus_exit_metadata_store()
+{
+    log_debug("Shutting down metadata store...");
+
+    nexus_vfs_exit();
+
+    return 0;
 }

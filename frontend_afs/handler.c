@@ -8,7 +8,98 @@
 #include <nexus_log.h>
 #include <nexus_json.h>
 
+static int
+handle_create(uint8_t *  cmd_buf,
+              uint32_t   cmd_size,
+              uint8_t ** resp_buf,
+              uint32_t * resp_size)
+{
+    struct nexus_json_param create_cmd[4] = { {"op",   NEXUS_JSON_U32,    {0} },
+					      {"name", NEXUS_JSON_STRING, {0} },
+					      {"path", NEXUS_JSON_STRING, {0} },
+					      {"type", NEXUS_JSON_U32,    {0} } };
 
+    char * nexus_name = NULL;
+    
+    int ret = -1;
+
+    
+    ret = nexus_json_parse((char *)cmd_buf, create_cmd, 4);
+
+    if (ret < 0) {
+	log_error("Could not parse lookup command (%s)\n", cmd_buf);
+	goto out;
+    }
+
+
+    /* Handle Lookup */
+    ret = nexus_new(create_cmd[2].ptr, create_cmd[1].ptr, create_cmd[3].val, &nexus_name);
+
+    ret = asprintf((char **)resp_buf, "code : %d, nexus_name : \"%s\"", ret, nexus_name);
+	
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+	goto out;
+    }
+
+    *resp_size = ret + 1;
+    
+    ret = 0;
+	
+ out:
+    
+    nexus_json_release_params(create_cmd, 4);
+    
+    return ret;
+	
+}
+
+static int
+handle_remove(uint8_t *  cmd_buf,
+              uint32_t   cmd_size,
+              uint8_t ** resp_buf,
+              uint32_t * resp_size)
+{
+    struct nexus_json_param remove_cmd[4] = { {"op",   NEXUS_JSON_U32,    {0} },
+					      {"name", NEXUS_JSON_STRING, {0} },
+					      {"path", NEXUS_JSON_STRING, {0} },
+					      {"type", NEXUS_JSON_U32,    {0} } };
+
+    char * nexus_name = NULL;
+    
+    int ret = -1;
+
+    
+    ret = nexus_json_parse((char *)cmd_buf, remove_cmd, 4);
+
+    if (ret < 0) {
+	log_error("Could not parse lookup command (%s)\n", cmd_buf);
+	goto out;
+    }
+
+
+    /* Handle Lookup */
+    ret = nexus_remove(
+        remove_cmd[2].ptr, remove_cmd[1].ptr, remove_cmd[3].val, &nexus_name);
+
+    ret = asprintf((char **)resp_buf, "code : %d, nexus_name : \"%s\"", ret, nexus_name);
+	
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+	goto out;
+    }
+
+    *resp_size = ret + 1;
+    
+    ret = 0;
+	
+ out:
+    
+    nexus_json_release_params(remove_cmd, 4);
+    
+    return ret;
+	
+}
 
 static int
 handle_lookup(uint8_t   * cmd_buf,
@@ -32,14 +123,6 @@ handle_lookup(uint8_t   * cmd_buf,
 	log_error("Could not parse lookup command (%s)\n", cmd_buf);
 	goto out;
     }
-
-
-    log_debug("Parsed Lookup Command:\n");
-    log_debug("Op   = %u\n", (uint32_t)lookup_cmd[0].val);
-    log_debug("name = %s\n", (char *)  lookup_cmd[1].ptr);
-    log_debug("path = %s\n", (char *)  lookup_cmd[2].ptr);
-    log_debug("type = %u\n", (uint32_t)lookup_cmd[3].val);
-
 
     /* Handle Lookup */
     ret = nexus_lookup(lookup_cmd[2].ptr, lookup_cmd[1].ptr, lookup_cmd[3].val, &nexus_name);
@@ -85,16 +168,8 @@ handle_filldir(uint8_t   * cmd_buf,
 	goto out;
     }
 
-
-    log_debug("Parsed Filldir Command:\n");
-    log_debug("Op         = %u\n", (uint32_t)lookup_cmd[0].val);
-    log_debug("path       = %s\n", (char *)  lookup_cmd[1].ptr);
-    log_debug("nexus_name = %s\n", (char *)  lookup_cmd[2].ptr);
-    log_debug("type       = %u\n", (uint32_t)lookup_cmd[3].val);
-
-
     /* Handle Lookup */
-    ret = nexus_lookup(filldir_cmd[1].ptr, filldir_cmd[2].ptr, filldir_cmd[3].val, &real_name);
+    ret = nexus_filldir(filldir_cmd[1].ptr, filldir_cmd[2].ptr, filldir_cmd[3].val, &real_name);
 
     ret = asprintf((char **)resp_buf, "code : %d, real_name : \"%s\"", ret, real_name);
 	
@@ -136,10 +211,14 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
     }
     
 
-    printf("Handling Command %u\n", (uint32_t)op_code.val);
-    
     switch (op_code.val) {
-	case AFS_OP_LOOKUP:
+	case AFS_OP_CREATE:
+	    ret = handle_create(cmd_buf, cmd_size, resp_buf, resp_size);
+            break;
+        case AFS_OP_REMOVE:
+            ret = handle_remove(cmd_buf, cmd_size, resp_buf, resp_size);
+            break;
+        case AFS_OP_LOOKUP:
 	    ret = handle_lookup(cmd_buf, cmd_size, resp_buf, resp_size);
 	    break;
 	case AFS_OP_FILLDIR:
@@ -149,9 +228,6 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
 	    ret = -1;
 	    break;
     }
-
-
-    printf("Command handler returned %d\n", ret);
 
     nexus_json_release_params(&op_code, 1);
     

@@ -9,19 +9,16 @@ setUp()
 {
     int ret = -1;
 
-    ret = nexus_init(TEST_ENCLAVE_PATH);
+    ret = nexus_init();
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_init_enclave() FAILED");
 
     ret = nexus_create_volume(
-        TEST_PUBLIC_KEY, &gbl_supernode, &gbl_root_dirnode, &gbl_volumekey);
+        TEST_METADATA_PATH, TEST_PUBLIC_KEY, TEST_VOLUMEKEY_PATH);
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_create_volume() FAILED");
 
-    ret = nexus_login_volume(
-        gbl_supernode, gbl_volumekey, TEST_PUBLIC_KEY, TEST_PRIVATE_KEY);
-    TEST_ASSERT_MESSAGE(ret == 0, "nexus_login_volume() FAILED");
-
     ret = nexus_mount_volume(
-        gbl_supernode, gbl_volumekey, TEST_METADATA_PATH, TEST_DATADIR_PATH);
+        TEST_METADATA_PATH, TEST_DATADIR_PATH, TEST_VOLUMEKEY_PATH,
+        TEST_PUBLIC_KEY, TEST_PRIVATE_KEY);
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_mount_volume() FAILED");
 }
 

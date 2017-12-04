@@ -10,8 +10,6 @@
 
 #include "nexus_mstore_internal.h"
 
-struct metadata_operations flatdir_metadata_ops;
-
 struct nexus_metadata *
 flatdir_read_metadata(struct nexus_dentry * dentry, struct path_builder * path)
 {

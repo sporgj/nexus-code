@@ -66,7 +66,6 @@ out:
     return ret;
 }
 
-// TODO need to remove the on-disk structures
 int
 nexus_remove(char *              dir_path,
              char *              file_name,

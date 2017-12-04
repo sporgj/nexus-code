@@ -1,24 +1,35 @@
-LIBNEXUS_PATH := ../libnexus
-LIBNEXUS_LIB := -lnexus
+nexus_home := ..
 
-SGX_BACKEND_PATH := ../sgx_backend
-LIBSGX_BACKEND := -lsgx_backend
+LIBNEXUS_PATH := $(nexus_home)/libnexus
+LIBNEXUS_LIB := libnexus.a
+
+SGX_BACKEND_PATH := $(nexus_home)/backend_sgx
+LIBSGX_BACKEND := backend_sgx.so
+
+METADATA_STORE_PATH := $(nexus_home)/metadata_store
+LIBMETADATA_STORE := metadata_store.a
+
+MBEDTLS_PATH := $(nexus_home)/mbedtls-2.6.0/library
+MBEDTLS_LIB := libmbedcrypto.a
 
 CFLAGS += -I$(LIBNEXUS_PATH)
 
-LIBS := -L$(LIBNEXUS_PATH) $(LIBNEXUS_LIB)\
-			-L$(SGX_BACKEND_PATH) $(LIBSGX_BACKEND)
+LIBS := $(LIBNEXUS_PATH)/$(LIBNEXUS_LIB)\
+		$(SGX_BACKEND_PATH)/$(LIBSGX_BACKEND)\
+		$(METADATA_STORE_PATH)/$(LIBMETADATA_STORE)\
+		$(MBEDTLS_PATH)/$(MBEDTLS_LIB) -luuid
 
 tests := test_dirops
 
-all: $(tests) $(LIBNEXUS_LIB)
+all: libs $(tests)
 
-.PHONY: nexuslib
-nexuslib:
-	make -C ../
-
-$(LIBNEXUS_LIB): $(wildcard $(LIBNEXUS_PATH)/*.c)
-	make -C $(LIBNEXUS_PATH)
+.PHONY: libs
+libs:
+	make -C $(LIBNEXUS_PATH) DEBUG=1
+	make -C $(SGX_BACKEND_PATH) DEBUG=1
+	make -C $(METADATA_STORE_PATH) DEBUG=1
+	make -C $(MBEDTLS_PATH) DEBUG=1 SHARED=1
+	cp $(SGX_BACKEND_PATH)/enclave/nexus_enclave.signed.so .
 
 build = \
 	@if [ -z "$V" ]; then \
@@ -32,9 +43,9 @@ build = \
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
-test_dirops: nx_test_dirops.o unity/unity.o $(LIBNEXUS_LIB)
+test_dirops: nx_test_dirops.o unity/unity.o $(LIBS)
 	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
 
 .PHONY: clean
 clean:
-	rm *.o $(tests) 
+	rm -rf *.o $(tests) dummy-volume/*

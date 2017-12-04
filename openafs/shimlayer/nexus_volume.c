@@ -110,6 +110,7 @@ deregister_volume(struct nexus_volume * vol)
     
     spin_lock_irqsave(&volume_list_lock, flags);
     {
+	NEXUS_DEBUG("Deregistering VOLUME '%s'\n", vol->path);
 	list_del(&(vol->node));
     }
     spin_unlock_irqrestore(&volume_list_lock, flags);

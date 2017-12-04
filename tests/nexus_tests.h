@@ -11,8 +11,6 @@
 #define TEST_DATADIR_PATH       "dummy-volume"
 #define TEST_VOLUMEKEY_PATH     "profile/volumekey"
 
-#define TEST_ENCLAVE_PATH "../enclave/nx_enclave.signed.so"
-
 #ifndef RUN_TEST
 #define RUN_TEST(testfunc)                                                     \
     UNITY_NEW_TEST(#testfunc)                                                  \

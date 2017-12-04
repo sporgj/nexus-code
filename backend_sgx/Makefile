@@ -1,13 +1,6 @@
 include ../build.mk
 
 
-ifeq ($(DEBUG), 1)
-LDFLAGS := -O0 -g
-else
-LDFLAGS := -O2
-endif
-
-
 ifeq ($(SGX_MODE), SIM)
 	sgx_urts_lib    := sgx_urts_sim
 	sgx_uae_lib     := sgx_uae_service_sim
@@ -29,6 +22,14 @@ CFLAGS   := -W -Wall -Werror \
 	    -Wno-nonnull -Wno-unused-parameter -Wno-attributes \
 	    -D_GNU_SOURCE \
 	    -std=gnu11 -fPIC 
+
+# setup debug info
+ifeq ($(DEBUG), 1)
+	CFLAGS += -O0 -g3
+else
+	CFLAGS += -O2
+endif
+
 
 
 LDFLAGS  := -L$(SGX_SDK)/lib64  \
@@ -62,8 +63,9 @@ build = \
         fi
 
 
-all: stubs backend_sgx.so
-	make -C enclave/
+all: backend_sgx.so
+	# for now, let's just pass DEBUG as it comes
+	make -C enclave DEBUG=$(DEBUG)
 	@cp backend_sgx.so ../build
 	@cp enclave/nexus_enclave.signed.so ..
 
@@ -73,9 +75,8 @@ all: stubs backend_sgx.so
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
 
-stubs: $(edl_src)
-	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --trusted --trusted-dir ./enclave --untrusted --untrusted-dir ./ $(edl_src)
-
+nexus_enclave_u.c: $(edl_src)
+	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --untrusted --untrusted-dir ./ $(edl_src)
 
 
 backend_sgx.so:  $(objs) 
