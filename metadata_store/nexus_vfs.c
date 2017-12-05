@@ -112,7 +112,21 @@ vfs_read_metadata(struct nexus_dentry * dentry, struct path_builder * builder)
     struct metadata_operations * ops
         = (struct metadata_operations *)volume->private_data;
 
-    metadata = ops->read(dentry, builder);
+    size_t size = 0;
+
+    metadata = ops->read(dentry, builder, &size);
+
+    // this means the data had not been allocated, let's create it
+    if (size == 0) {
+        metadata->buffer
+            = nexus_generate_metadata(volume, &dentry->uuid, dentry->type);
+    }
+
+    // free the old metadata object
+    if (dentry->metadata) {
+        nexus_free(dentry->metadata);
+    }
+
     dentry->metadata = metadata;
 
     return metadata;

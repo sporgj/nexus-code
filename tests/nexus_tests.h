@@ -2,6 +2,8 @@
 
 #include <nexus_internal.h>
 
+#include <nexus_util.h>
+
 #define UNITY_OUTPUT_COLOR
 #include "unity/unity.h"
 

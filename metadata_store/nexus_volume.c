@@ -19,12 +19,14 @@ alloc_volume(const char * metadata_dirpath, const char * datafolder_dirpath)
         return NULL;
     }
 
+    root_dentry->type   = NEXUS_DIR;
+    root_dentry->volume = volume;
+    TAILQ_INIT(&root_dentry->children);
+
     volume->root_dentry        = root_dentry;
     volume->metadata_dirpath   = strndup(metadata_dirpath, PATH_MAX);
     volume->datafolder_dirpath = strndup(datafolder_dirpath, PATH_MAX);
     volume->private_data       = default_metadata_ops;
-
-    root_dentry->volume = volume;
 
     return volume;
 }

@@ -191,7 +191,7 @@ backend_dirnode_new(struct uuid *     dirnode_uuid,
     int              err     = -1;
     struct dirnode * dirnode = NULL;
 
-    dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode *));
+    dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode));
     if (dirnode == NULL) {
         log_error("allocation error");
         return -1;

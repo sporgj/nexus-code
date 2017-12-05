@@ -11,20 +11,21 @@
 #include "nexus_mstore_internal.h"
 
 struct nexus_metadata *
-flatdir_read_metadata(struct nexus_dentry * dentry, struct path_builder * path)
+flatdir_read_metadata(struct nexus_dentry * dentry,
+                      struct path_builder * path,
+                      size_t *              p_size)
 {
     struct nexus_metadata * metadata = NULL;
 
     char *    fpath  = strndup(dentry->volume->metadata_dirpath, PATH_MAX);
     uint8_t * buffer = NULL;
-    size_t    buflen = 0;
 
     int ret = -1;
 
     // since everything is suppose to be in a flat directory, just use the
     // uuid of the dentry to read from the root metadata directory
     fpath = filepath_from_uuid(fpath, &dentry->uuid);
-    ret   = read_file(fpath, &buffer, &buflen);
+    ret   = read_file(fpath, &buffer, p_size);
     if (ret != 0) {
         nexus_free(fpath);
         log_error("reading metadata file FAILED (%s)", fpath);

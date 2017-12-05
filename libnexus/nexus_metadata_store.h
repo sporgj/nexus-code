@@ -53,6 +53,16 @@ nexus_dirnode_lookup(struct dirnode *      dirnode,
                      struct uuid *         uuid_dest,
                      nexus_fs_obj_type_t * p_type);
 
+/**
+ * generates a metadata of a certain type
+ * @param volume
+ * @param uuid
+ * @return NULL on failure
+ */
+void *
+nexus_generate_metadata(struct nexus_volume * volume,
+                        struct uuid *         uuid,
+                        nexus_fs_obj_type_t   type);
 
 extern int
 nexus_init_metadata_store();

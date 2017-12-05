@@ -1,11 +1,15 @@
 #include "nexus_mstore_internal.h"
 
 static struct nexus_dentry *
-d_alloc(struct nexus_dentry * parent, struct uuid * uuid, const char * name)
+d_alloc(struct nexus_dentry * parent,
+        struct uuid *         uuid,
+        const char *          name,
+        nexus_fs_obj_type_t   type)
 {
     struct nexus_dentry * dentry
         = (struct nexus_dentry *)calloc(1, sizeof(struct nexus_dentry));
 
+    dentry->type     = type;
     dentry->parent   = parent;
     dentry->volume   = parent->volume;
     dentry->name_len = strnlen(name, PATH_MAX);
@@ -22,8 +26,9 @@ d_alloc(struct nexus_dentry * parent, struct uuid * uuid, const char * name)
 static struct nexus_dentry *
 d_lookup(struct nexus_dentry * parent, const char * name)
 {
-    size_t                len    = strlen(name);
     struct nexus_dentry * dentry = NULL;
+
+    size_t len = strlen(name);
 
     TAILQ_FOREACH(dentry, &parent->children, next_item)
     {
@@ -40,20 +45,21 @@ walk_path(struct nexus_dentry * root_dentry,
           struct path_builder * builder,
           char *                relpath)
 {
-    int                     ret      = -1;
-    nexus_fs_obj_type_t     atype    = NEXUS_ANY;
-    char *                  nch      = NULL;
-    char *                  pch      = NULL;
-    struct dirnode *        dirnode  = NULL;
-    struct nexus_dentry *   parent   = NULL;
-    struct nexus_dentry *   dentry   = NULL;
+    nexus_fs_obj_type_t atype = NEXUS_ANY;
+
+    char * nch = NULL;
+    char * pch = NULL;
+
+    struct nexus_dentry * parent = root_dentry;
+    struct nexus_dentry * dentry = NULL;
+
     struct nexus_metadata * metadata = NULL;
-    struct uuid             uuid;
+
+    struct uuid uuid;
+
+    int ret = -1;
 
     nch = strtok_r(relpath, "/", &pch);
-
-    parent = root_dentry;
-
     while (nch != NULL) {
         // check for . and ..
         if (nch[0] == '.') {
@@ -88,11 +94,9 @@ walk_path(struct nexus_dentry * root_dentry,
             return NULL;
         }
 
-        dirnode = metadata->dirnode;
-
-        ret = nexus_dirnode_lookup(dirnode, nch, &uuid, &atype);
+        ret = nexus_dirnode_lookup(metadata->dirnode, nch, &uuid, &atype);
         if (ret != 0) {
-            log_error("backend_dirnode_find_by_name() FAILED");
+            log_error("nexus_dirnode_lookup() FAILED");
             return NULL;
         }
 
@@ -103,13 +107,13 @@ walk_path(struct nexus_dentry * root_dentry,
         }
 
         // allocate and add the dentry to the tree
-        dentry = d_alloc(parent, &uuid, nch);
+        dentry = d_alloc(parent, &uuid, nch, atype);
 
     next:
         path_push(builder, &dentry->uuid);
         parent = dentry;
     skip:
-        nch = strtok_r(relpath, "/", &pch);
+        nch = strtok_r(NULL, "/", &pch);
     }
 
     return dentry;
@@ -128,7 +132,7 @@ nexus_dentry_lookup(struct nexus_dentry * root_dentry, char * relpath)
     }
 
     // resolve the dentry and return
-    if (vfs_read_metadata(dentry, builder) == NULL) {
+    if (dentry && vfs_read_metadata(dentry, builder) == NULL) {
         path_free(builder);
         log_error("vfs_read_metadata() FAILED");
         return NULL;
