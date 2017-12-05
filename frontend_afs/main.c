@@ -18,13 +18,6 @@
 #include "handler.h"
 
 
-#define nexus_free(ptr)                                                        \
-    do {                                                                       \
-        free(ptr);                                                             \
-        ptr = NULL;                                                            \
-    } while (0)
-
-
 #define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"
 #define DEFAULT_METADATA_PATH       DEFAULT_VOLUME_PATH"/metadata"
 #define DEFAULT_DATAFOLDER_PATH     DEFAULT_VOLUME_PATH"/datafolder"
