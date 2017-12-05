@@ -1,4 +1,4 @@
-#include "nx_trusted.h"
+#include "nexus_trusted.h"
 
 sgx_key_128bit_t enclave_sealing_key;
 

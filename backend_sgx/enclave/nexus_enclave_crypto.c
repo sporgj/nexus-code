@@ -1,4 +1,4 @@
-#include "nx_trusted.h"
+#include "nexus_trusted.h"
 
 /**
  * Refactored function to apply key wrapping

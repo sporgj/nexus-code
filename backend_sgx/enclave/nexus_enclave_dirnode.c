@@ -1,4 +1,4 @@
-#include "nx_trusted.h"
+#include "nexus_trusted.h"
 
 struct dirnode *
 dirnode_copy(struct dirnode * dirnode)

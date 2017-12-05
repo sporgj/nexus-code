@@ -16,7 +16,7 @@
 
 #include "queue.h"
 
-#include "nx_enclave_t.h"
+#include "nexus_enclave_t.h"
 
 #define ocall_debug(str)                                                       \
     ocall_print("enclave> " str "\n")

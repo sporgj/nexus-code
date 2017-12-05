@@ -48,10 +48,10 @@ SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 
 crypto_lib := mbedtls/library/libmbedcrypto.a
 
-objs :=  nx_enclave_main.o \
-	 nx_enclave_crypto.o \
-	 nx_enclave_dirnode.o \
-	 nexus_enclave_t.o
+objs := nexus_enclave_t.o \
+	nexus_enclave_main.o \
+	nexus_enclave_crypto.o \
+	nexus_enclave_dirnode.o
 
 
 build = \
