@@ -19,19 +19,19 @@
 
 
 #define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"
-#define DEFAULT_METADATA_PATH       DEFAULT_VOLUME_PATH"/metadata"
-#define DEFAULT_DATAFOLDER_PATH     DEFAULT_VOLUME_PATH"/datafolder"
+#define DEFAULT_METADATA_PATH     DEFAULT_VOLUME_PATH "/metadata"
+#define DEFAULT_DATAFOLDER_PATH   DEFAULT_VOLUME_PATH "/datafolder"
 
 #define DEFAULT_VOL_KEY_FILENAME  "$HOME/.nexus/volume_key"
 #define DEFAULT_PUB_KEY_FILENAME  "$HOME/.nexus/public_key"
 #define DEFAULT_PRV_KEY_FILENAME  "$HOME/.nexus/private_key"
 
-static char * metadata_dirpath   = NULL;
-static char * datafolder_dirpath = NULL;
+static char * metadata_dirpath     = NULL;
+static char * datafolder_dirpath   = NULL;
 
-static char * vol_key_filename  = NULL;
-static char * pub_key_filename  = NULL;
-static char * prv_key_filename  = NULL;
+static char * vol_key_filename     = NULL;
+static char * pub_key_filename     = NULL;
+static char * prv_key_filename     = NULL;
 
 static int cmd_line_metadata_dir   = 0;
 static int cmd_line_datafolder_dir = 0;
@@ -48,8 +48,8 @@ set_defaults()
     wordexp_t pub_key_filename_exp;
     wordexp_t prv_key_filename_exp;
 
-    wordexp(DEFAULT_METADATA_PATH, &metadata_path_exp, 0);
-    wordexp(DEFAULT_DATAFOLDER_PATH, &datafolder_path_exp, 0);
+    wordexp(DEFAULT_METADATA_PATH,    &metadata_path_exp, 0);
+    wordexp(DEFAULT_DATAFOLDER_PATH,  &datafolder_path_exp, 0);
     wordexp(DEFAULT_VOL_KEY_FILENAME, &vol_key_filename_exp, 0);
     wordexp(DEFAULT_PUB_KEY_FILENAME, &pub_key_filename_exp, 0);
     wordexp(DEFAULT_PRV_KEY_FILENAME, &prv_key_filename_exp, 0);
@@ -75,7 +75,7 @@ set_defaults()
 
 
 static int
-create_nexus_volume(char * path)
+attach_volume(char * path)
 {
     int  nexus_fd = 0;
     int volume_fd = 0;
@@ -237,12 +237,12 @@ usage(void)
 }
 
 static struct option long_options[] = {
-    { "metadata_dir", required_argument, &cmd_line_metadata_dir, 1 }, /* 0 */
-    { "data_dir", required_argument, &cmd_line_datafolder_dir, 1 },   /* 1 */
-    { "prv_key", required_argument, &cmd_line_prv_key, 1 },           /* 2 */
-    { "pub_key", required_argument, &cmd_line_pub_key, 1 },           /* 3 */
-    { "vol_key", required_argument, &cmd_line_vol_key, 1 },           /* 4 */
-    { "help", no_argument, 0, 'h' },
+    { "metadata_dir" , required_argument , &cmd_line_metadata_dir   ,  1  }, /* 0 */
+    { "data_dir"     , required_argument , &cmd_line_datafolder_dir ,  1  }, /* 1 */
+    { "prv_key"      , required_argument , &cmd_line_prv_key        ,  1  }, /* 2 */
+    { "pub_key"      , required_argument , &cmd_line_pub_key        ,  1  }, /* 3 */
+    { "vol_key"      , required_argument , &cmd_line_vol_key        ,  1  }, /* 4 */
+    { "help"         , no_argument       , 0                        , 'h' },
     { 0, 0, 0, 0 }
 };
 
@@ -333,7 +333,7 @@ main(int argc, char ** argv)
     {
 	int volume_fd   = 0;
 	
-	volume_fd = create_nexus_volume(datafolder_dirpath);
+	volume_fd = attach_volume(datafolder_dirpath);
 	
 	if (volume_fd == -1) {
 	    log_error("could not create volume\n");

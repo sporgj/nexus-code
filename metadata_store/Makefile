@@ -13,8 +13,6 @@ LIBS =
 
 
 objs :=	nexus_metadata_store.o \
-	nexus_util.o \
-	nexus_path.o \
 	nexus_vfs.o \
 	nexus_dentry.o \
 	nexus_volume.o \

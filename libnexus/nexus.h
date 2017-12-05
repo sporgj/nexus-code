@@ -10,12 +10,6 @@ extern "C" {
 
 #include "nexus_types.h"
 
-int
-nexus_init();
-
-int
-nexus_exit();
-
 
 // volume management
 int
@@ -24,11 +18,10 @@ nexus_create_volume(const char * metadata_dirpath,
                     const char * volumekey_fpath);
 
 int
-nexus_mount_volume(const char * metadata_dirpath,
-                   const char * datafolder_dirpath,
-                   const char * volumekey_fpath,
-                   const char * publickey_fpath,
-                   const char * privatekey_fpath);
+nexus_mount_volume(char * volume_path,
+		   char * vol_key_path,
+                   char * pub_key_path,
+                   char * prv_key_path);
 
 // directory operations
 

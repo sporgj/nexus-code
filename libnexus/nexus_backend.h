@@ -1,25 +1,34 @@
 #pragma once
 
-#include "nexus.h"
+#include <nexus.h>
 
 extern int
-nexus_init_backend();
+nexus_backend_init();
 
 extern int
-nexus_exit_backend();
+nexus_backend_exit();
+
+
 
 // authenticates with the backend
+
 extern int
-nexus_auth_backend(struct supernode * supernode,
-                   struct volumekey * volumekey,
-                   const char *       publickey_fpath,
-                   const char *       privatekey_fpath);
+nexus_backend_authenticate(struct nexus_supernode * supernode,
+			   struct nexus_vol_key   * vol_key,
+			   struct nexus_pub_key   * pub_key,
+			   struct nexus_prv_key   * prv_key);
+
+
+
+
+
+
 
 // volume management
 extern int
 backend_volume_create(struct uuid *      supernode_uuid,
                       struct uuid *      root_uuid,
-                      const char *       publickey_fpath,
+		      char *       publickey_fpath,
                       struct supernode * supernode_out,
                       struct dirnode *   dirnode_out,
                       struct volumekey * volume_out);
