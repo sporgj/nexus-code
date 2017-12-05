@@ -334,7 +334,7 @@ volume_release(struct inode * inode,
     NEXUS_DEBUG("Release Volume (%s)\n", vol->path);
     vol->is_online = 0;
     
-    nexus_put_volume(vol);
+    // nexus_put_volume(vol);
     
     return 0;
 }

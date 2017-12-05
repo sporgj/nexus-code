@@ -150,33 +150,40 @@ supernode_decryption1(struct supernode *  sealed_supernode,
                       struct volumekey *  volumekey,
                       struct supernode ** p_supernode)
 {
-    int                       ret                   = -1;
-    size_t                    size                  = 0;
-    uint8_t                   iv[CONFIG_IV_BYTES]   = { 0 };
-    uint8_t                   tag[CONFIG_TAG_BYTES] = { 0 };
-    struct crypto_context *   crypto_context        = NULL;
-    struct supernode_header * header                = NULL;
-    struct supernode_header * sealed_header         = NULL;
-    struct supernode *        supernode             = NULL;
-    mbedtls_gcm_context       gcm_context;
+    struct supernode *        supernode     = NULL;
+    struct supernode_header * header        = NULL;
+    struct supernode_header * sealed_header = NULL;
 
-    size      = sealed_supernode->header.total_size;
-    supernode = (struct supernode *)calloc(1, size);
-    if (supernode == NULL) {
-        ocall_debug("allocation error");
-        return -1;
+    struct crypto_context * crypto_context = NULL;
+
+    uint8_t             iv[CONFIG_IV_BYTES]   = { 0 };
+    uint8_t             tag[CONFIG_TAG_BYTES] = { 0 };
+    mbedtls_gcm_context gcm_context;
+
+    size_t size = 0;
+    int    ret  = -1;
+
+    // instantiate the receiving end of the super
+    {
+        size      = sealed_supernode->header.total_size;
+        supernode = (struct supernode *)calloc(1, size);
+        if (supernode == NULL) {
+            ocall_debug("allocation error");
+            return -1;
+        }
+
+        header        = &supernode->header;
+        sealed_header = &sealed_supernode->header;
+        memcpy(header, sealed_header, sizeof(struct supernode_header));
+        memcpy(&supernode->crypto_context,
+               &sealed_supernode->crypto_context,
+               sizeof(struct crypto_context));
     }
-
-    header        = &supernode->header;
-    sealed_header = &sealed_supernode->header;
-    memcpy(header, sealed_header, sizeof(struct supernode_header));
-    memcpy(&supernode->crypto_context,
-           &sealed_supernode->crypto_context,
-           sizeof(struct crypto_context));
 
     // unwrap the crypto context and start decrypting
     crypto_context = &supernode->crypto_context;
     unwrap_crypto_context(crypto_context, volumekey);
+
     memcpy(iv, &crypto_context->iv, CONFIG_IV_BYTES);
 
     mbedtls_gcm_init(&gcm_context);
@@ -226,15 +233,16 @@ _encrypt_dirnode_direntries(struct dirnode_wrapper * dirnode_wrapper,
                             struct dirnode *         sealed_dirnode,
                             mbedtls_gcm_context *    gcm_context)
 {
-    int                            ret           = -1;
-    size_t                         size          = 0;
-    uint8_t *                      sealed_buffer = NULL;
-    struct dirnode *               dirnode       = dirnode_wrapper->dirnode;
+    uint8_t * sealed_buffer = (uint8_t *)&sealed_dirnode->entries;
+
+    struct dirnode * dirnode = dirnode_wrapper->dirnode;
+
     struct dirnode_direntry_list * head      = &dirnode_wrapper->direntry_head;
     struct dirnode_direntry_item * entryitem = NULL;
     struct dirnode_direntry *      direntry  = NULL;
 
-    sealed_buffer = (uint8_t *)&sealed_dirnode->entries;
+    size_t size = 0;
+    int    ret  = -1;
 
     // iterate direntries and encrypt
     TAILQ_FOREACH(entryitem, head, next_item)
@@ -263,15 +271,15 @@ _instantiate_dirnode_crypto(struct dirnode *        dirnode,
                             mbedtls_gcm_context *   gcm_context,
                             uint8_t * iv)
 {
-    int                     ret                 = -1;
-    struct crypto_context * crypto_context      = NULL;
-    struct dirnode_header * header              = NULL;
-    struct dirnode_header * sealed_header       = NULL;
-    struct dirnode *        sealed_dirnode      = NULL;
+    struct dirnode_header * header         = &dirnode->header;
+    struct dirnode_header * sealed_header  = NULL;
+    struct dirnode *        sealed_dirnode = NULL;
+
+    struct crypto_context * crypto_context = NULL;
+
+    int ret = -1;
 
     // create the dirnode and instantiate its crypto context
-    header         = &dirnode->header;
-
     sealed_dirnode = (struct dirnode *)calloc(1, header->total_size);
     if (sealed_dirnode == NULL) {
         ocall_print("allocation error");
@@ -281,11 +289,13 @@ _instantiate_dirnode_crypto(struct dirnode *        dirnode,
     // increment the version of header
     header->version += 1;
 
+    // copy the updated header
     sealed_header = &sealed_dirnode->header;
     memcpy(sealed_header, header, sizeof(struct dirnode_header));
 
     crypto_context = &sealed_dirnode->crypto_context;
     sgx_read_rand((uint8_t *)crypto_context, sizeof(struct crypto_context));
+
     memcpy(iv, &crypto_context->iv, CONFIG_IV_BYTES);
 
     mbedtls_gcm_init(gcm_context);
@@ -305,11 +315,14 @@ dirnode_encryption1(struct dirnode_wrapper * dirnode_wrapper,
                     struct volumekey *       volumekey,
                     struct dirnode **        p_sealed_dirnode)
 {
-    int                     ret                 = -1;
-    uint8_t                 iv[CONFIG_IV_BYTES] = { 0 };
-    struct crypto_context * crypto_context      = NULL;
-    struct dirnode *        sealed_dirnode      = NULL;
-    mbedtls_gcm_context     gcm_context;
+    struct dirnode * sealed_dirnode = NULL;
+
+    struct crypto_context * crypto_context = NULL;
+
+    uint8_t             iv[CONFIG_IV_BYTES] = { 0 };
+    mbedtls_gcm_context gcm_context;
+
+    int ret = -1;
 
     sealed_dirnode = _instantiate_dirnode_crypto(dirnode, &gcm_context, iv);
     if (sealed_dirnode == NULL) {
@@ -320,6 +333,7 @@ dirnode_encryption1(struct dirnode_wrapper * dirnode_wrapper,
     if (dirnode_wrapper != NULL && sealed_dirnode->header.dir_size > 0) {
         ret = _encrypt_dirnode_direntries(
             dirnode_wrapper, sealed_dirnode, &gcm_context);
+
         if (ret != 0) {
             ocall_debug("_encrypt_dirnode_direntries() FAILED");
             goto out;
@@ -339,6 +353,9 @@ dirnode_encryption1(struct dirnode_wrapper * dirnode_wrapper,
 out:
     if (ret != 0) {
         my_free(sealed_dirnode);
+
+        // restore the dirnode version
+        dirnode->header.version -= 1;
     }
 
     mbedtls_gcm_free(&gcm_context);
@@ -350,10 +367,10 @@ int
 dirnode_encryption(struct dirnode_wrapper * dirnode_wrapper,
                    struct dirnode **        p_sealed_dirnode)
 {
-    struct dirnode *   dirnode   = dirnode_wrapper->dirnode;
-    struct volumekey * volumekey = dirnode_wrapper->volumekey;
-
-    return dirnode_encryption1(dirnode_wrapper, dirnode, volumekey, p_sealed_dirnode);
+    return dirnode_encryption1(dirnode_wrapper,
+                               dirnode_wrapper->dirnode,
+                               dirnode_wrapper->volumekey,
+                               p_sealed_dirnode);
 }
 
 int
@@ -361,52 +378,63 @@ dirnode_decryption(struct dirnode *   sealed_dirnode,
                    struct volumekey * volumekey,
                    struct dirnode **  p_dirnode)
 {
-    int                       ret                   = -1;
-    size_t                    size                  = 0;
-    uint8_t                   iv[CONFIG_IV_BYTES]   = { 0 };
-    uint8_t                   tag[CONFIG_TAG_BYTES] = { 0 };
-    struct crypto_context *   crypto_context        = NULL;
-    struct dirnode_header *   header                = NULL;
-    struct dirnode_header *   sealed_header         = NULL;
-    struct dirnode *          dirnode               = NULL;
-    mbedtls_gcm_context       gcm_context;
+    struct dirnode *        dirnode        = NULL;
+    struct dirnode_header * header         = NULL;
+    struct dirnode_header * sealed_header  = NULL;
+
+    struct crypto_context * crypto_context        = NULL;
+
+    uint8_t             iv[CONFIG_IV_BYTES]   = { 0 };
+    uint8_t             tag[CONFIG_TAG_BYTES] = { 0 };
+    mbedtls_gcm_context gcm_context;
+
+    size_t size = 0;
+
+    int ret = -1;
 
     // allocate the necessary memory and start copying header information
-    sealed_header = &sealed_dirnode->header;
-    size          = sealed_header->total_size;
+    {
+        sealed_header = &sealed_dirnode->header;
+        size          = sealed_header->total_size;
 
-    dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode));
-    if (dirnode == NULL) {
-        ocall_print("allocation error");
-        return -1;
+        dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode));
+        if (dirnode == NULL) {
+            ocall_print("allocation error");
+            return -1;
+        }
+
+        header = &dirnode->header;
+        memcpy(header, sealed_header, sizeof(struct dirnode_header));
+        memcpy(&dirnode->crypto_context,
+               &sealed_dirnode->crypto_context,
+               sizeof(struct crypto_context));
     }
 
-    header = &dirnode->header;
-    memcpy(header, sealed_header, sizeof(struct dirnode_header));
-    memcpy(&dirnode->crypto_context,
-           &sealed_dirnode->crypto_context,
-           sizeof(struct crypto_context));
+    // initilize the decryption context and decrypt the direntry contents
+    {
+        crypto_context = &dirnode->crypto_context;
+        unwrap_crypto_context(crypto_context, volumekey);
 
-    crypto_context = &dirnode->crypto_context;
-    unwrap_crypto_context(crypto_context, volumekey);
-    memcpy(iv, &crypto_context->iv, CONFIG_IV_BYTES);
+        memcpy(iv, &crypto_context->iv, CONFIG_IV_BYTES);
 
-    mbedtls_gcm_init(&gcm_context);
-    instantiate_gcm_context(&gcm_context,
-            crypto_context,
-            iv,
-            (uint8_t *)header,
-            sizeof(struct dirnode_header),
-            MBEDTLS_GCM_DECRYPT);
+        mbedtls_gcm_init(&gcm_context);
+        instantiate_gcm_context(&gcm_context,
+                                crypto_context,
+                                iv,
+                                (uint8_t *)header,
+                                sizeof(struct dirnode_header),
+                                MBEDTLS_GCM_DECRYPT);
 
-    size = sealed_dirnode->header.dir_size;
-    mbedtls_gcm_update(&gcm_context,
-                       size,
-                       (uint8_t *)&sealed_dirnode->entries,
-                       (uint8_t *)&dirnode->entries);
+        size = sealed_dirnode->header.dir_size;
+        mbedtls_gcm_update(&gcm_context,
+                           size,
+                           (uint8_t *)&sealed_dirnode->entries,
+                           (uint8_t *)&dirnode->entries);
 
-    mbedtls_gcm_finish(&gcm_context, (uint8_t *)&tag, CONFIG_TAG_BYTES);
+        mbedtls_gcm_finish(&gcm_context, (uint8_t *)&tag, CONFIG_TAG_BYTES);
+    }
 
+    // compare the resulting integrity tags 
     ret = memcmp(&tag, &sealed_dirnode->crypto_context.tag, CONFIG_TAG_BYTES);
     if (ret != 0) {
         ocall_debug("integrity check failed");

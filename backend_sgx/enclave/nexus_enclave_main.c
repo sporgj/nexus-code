@@ -72,13 +72,16 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
                     struct dirnode *   dirnode_buffer_ext,
                     struct volumekey * volume_volkey_ext)
 {
-    int                ret              = -1;
     struct supernode * sealed_supernode = NULL;
     struct dirnode *   sealed_dirnode   = NULL;
-    struct volumekey   volkey           = { 0 };
-    struct supernode   supernode        = { 0 };
-    struct dirnode     dirnode          = { 0 };
+
+    struct volumekey volumekey = { 0 };
+    struct supernode supernode = { 0 };
+    struct dirnode   dirnode   = { 0 };
+
     mbedtls_pk_context pk;
+
+    int ret = -1;
 
     // 1 -- Parse the public key string and initialize out structures
     mbedtls_pk_init(&pk);
@@ -88,7 +91,7 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
         goto out;
     }
 
-    sgx_read_rand((uint8_t *)&volkey, sizeof(crypto_ekey_t));
+    sgx_read_rand((uint8_t *)&volumekey, sizeof(crypto_ekey_t));
 
     memcpy(&supernode.header.uuid, supernode_uuid_ext, sizeof(struct uuid));
     memcpy(&supernode.header.root_uuid, root_uuid_ext, sizeof(struct uuid));
@@ -103,17 +106,17 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
     dirnode.header.total_size = sizeof(struct dirnode);
 
     // seal the structures
-    if (supernode_encryption1(&supernode, &volkey, &sealed_supernode)) {
+    if (supernode_encryption1(&supernode, &volumekey, &sealed_supernode)) {
         ocall_debug("supernode sealage FAILED");
         goto out;
     }
 
-    if (dirnode_encryption1(NULL, &dirnode, &volkey, &sealed_dirnode)) {
+    if (dirnode_encryption1(NULL, &dirnode, &volumekey, &sealed_dirnode)) {
         ocall_debug("dirnode sealing FAILED");
         goto out;
     }
 
-    if (volumekey_wrap(&volkey)) {
+    if (volumekey_wrap(&volumekey)) {
         ocall_debug("volkey sealing FAILED");
         goto out;
     }
@@ -121,7 +124,7 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
     // copy out to untrusted memory
     memcpy(supernode_buffer_ext, sealed_supernode, sizeof(struct supernode));
     memcpy(dirnode_buffer_ext, sealed_dirnode, sizeof(struct dirnode));
-    memcpy(volume_volkey_ext, &volkey, sizeof(struct volumekey));
+    memcpy(volume_volkey_ext, &volumekey, sizeof(struct volumekey));
 
     ret = 0;
 out:
@@ -131,7 +134,6 @@ out:
     return ret;
 }
 
-// TODO
 int
 ecall_authentication_request(const char * publickey_str_in,
                              size_t       publickey_str_len,
@@ -164,69 +166,85 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
                            uint8_t *          signature,
                            size_t             signature_len)
 {
-    int                    ret                     = -1;
-    uint8_t                hash[CONFIG_HASH_BYTES] = { 0 };
-    struct supernode *     _supernode              = NULL;
-    struct volumekey *     _volumekey              = NULL;
-    mbedtls_sha256_context sha_ctx;
-    mbedtls_pk_context     pk;
+    struct supernode * _supernode = NULL;
+    struct volumekey * _volumekey = NULL;
 
-    mbedtls_sha256_init(&sha_ctx);
+    mbedtls_pk_context     pk;
+    mbedtls_sha256_context sha_context;
+
+    uint8_t hash[CONFIG_HASH_BYTES] = { 0 };
+
+    int ret = -1;
+
     mbedtls_pk_init(&pk);
+    mbedtls_sha256_init(&sha_context);
 
     // sha256(nonce | supernode | volkey)
-    mbedtls_sha256_starts(&sha_ctx, 0);
-    mbedtls_sha256_update(&sha_ctx, (uint8_t *)&auth_nonce, sizeof(nonce_t));
-    mbedtls_sha256_update(&sha_ctx,
-                          (uint8_t *)sealed_supernode,
-                          sealed_supernode->header.total_size);
-    mbedtls_sha256_update(
-        &sha_ctx, (uint8_t *)sealed_volumekey, sizeof(struct volumekey));
-    mbedtls_sha256_finish(&sha_ctx, hash);
-    mbedtls_sha256_free(&sha_ctx);
+    {
+        mbedtls_sha256_starts(&sha_context, 0); // sha256
+        mbedtls_sha256_update(
+            &sha_context, (uint8_t *)&auth_nonce, sizeof(nonce_t));
+        mbedtls_sha256_update(&sha_context,
+                              (uint8_t *)sealed_supernode,
+                              sealed_supernode->header.total_size);
+        mbedtls_sha256_update(&sha_context,
+                              (uint8_t *)sealed_volumekey,
+                              sizeof(struct volumekey));
+        mbedtls_sha256_finish(&sha_context, hash);
+        mbedtls_sha256_free(&sha_context);
+    }
 
     // 1 - let's make sure our supernode is not tampered
-    _volumekey = (struct volumekey *)calloc(1, sizeof(struct volumekey));
-    if (_volumekey == NULL) {
-        ocall_debug("allocation error");
-        return -1;
-    }
+    {
+        _volumekey = (struct volumekey *)calloc(1, sizeof(struct volumekey));
+        if (_volumekey == NULL) {
+            ocall_debug("allocation error");
+            return -1;
+        }
 
-    memcpy(_volumekey, sealed_volumekey, sizeof(struct volumekey));
+        memcpy(_volumekey, sealed_volumekey, sizeof(struct volumekey));
 
-    if (volumekey_unwrap(_volumekey)) {
-        ocall_debug("unwrapping volume key failed");
-        goto out;
-    }
+        if (volumekey_unwrap(_volumekey)) {
+            ocall_debug("unwrapping volume key failed");
+            goto out;
+        }
 
-    ret = supernode_decryption1(
-        sealed_supernode, _volumekey, &_supernode);
-    if (ret != 0) {
-        ocall_debug("could not unseal supernode");
-        goto out;
+        ret = supernode_decryption1(sealed_supernode, _volumekey, &_supernode);
+        if (ret != 0) {
+            ocall_debug("could not unseal supernode");
+            goto out;
+        }
     }
 
     // 2 - make sure hash(auth_user_pubkey) == supernode.owner
-    if (memcmp(&auth_user_pubkey_hash,
-               &_supernode->header.owner,
-               sizeof(struct pubkey_hash))) {
-        ocall_debug("public key not matching owner's");
-        goto out;
+    {
+        ret = memcmp(&auth_user_pubkey_hash,
+                     &_supernode->header.owner,
+                     sizeof(struct pubkey_hash));
+
+        if (ret != 0) {
+            ocall_debug("public key not matching owner's");
+            goto out;
+        }
     }
 
     // 3 - validate signature
-    ret = mbedtls_pk_parse_public_key(
-        &pk, auth_user_pubkey, auth_user_pubkey_len);
-    if (ret != 0) {
-        ocall_debug("parsing public key failed");
-        goto out;
-    }
+    {
+        ret = mbedtls_pk_parse_public_key(
+            &pk, auth_user_pubkey, auth_user_pubkey_len);
 
-    ret = mbedtls_pk_verify(
-        &pk, MBEDTLS_MD_SHA256, hash, 0, signature, signature_len);
-    if (ret != 0) {
-        ocall_debug("verifying signature failed");
-        goto out;
+        if (ret != 0) {
+            ocall_debug("parsing public key failed");
+            goto out;
+        }
+
+        ret = mbedtls_pk_verify(
+            &pk, MBEDTLS_MD_SHA256, hash, 0, signature, signature_len);
+
+        if (ret != 0) {
+            ocall_debug("verifying signature failed");
+            goto out;
+        }
     }
 
     // update our login data structures
@@ -245,18 +263,19 @@ out:
     return ret;
 }
 
-// TODO
 int
 ecall_authentication_response(struct volumekey * volumekey_ext,
                               struct supernode * supernode_ext,
                               uint8_t *          signature_ext,
                               size_t             signature_len)
 {
-    int                ret            = -1;
-    size_t             supernode_size = 0;
-    uint8_t *          signature      = NULL;
-    struct supernode * supernode      = NULL;
-    struct volumekey   volumekey      = { 0 };
+    uint8_t * signature = NULL;
+
+    struct supernode * supernode = NULL;
+    struct volumekey   volumekey = { 0 };
+
+    size_t supernode_size = 0;
+    int    ret            = -1;
 
     // in case someone is trying to skip the challenge
     if (auth_user_pubkey == NULL) {
@@ -267,7 +286,7 @@ ecall_authentication_response(struct volumekey * volumekey_ext,
     supernode_size = supernode_ext->header.total_size;
 
     supernode = (struct supernode *)calloc(1, supernode_size);
-    signature  = (uint8_t *)calloc(1, signature_len);
+    signature = (uint8_t *)calloc(1, signature_len);
 
     if (supernode == NULL || signature == NULL) {
         ocall_debug("allocation failed");
