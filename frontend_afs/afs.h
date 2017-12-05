@@ -9,10 +9,10 @@
 #include <nexus.h>
 
 
-#define NEXUS_IOC_MAGIC 'W'
+#define NEXUS_IOC_MAGIC            'W'
 #define NEXUS_IOCTL_CREATE_VOLUME  _IOW(NEXUS_IOC_MAGIC, 1, char *)
-#define IOCTL_MMAP_SIZE _IOR(NEXUS_IOC_MAGIC, 2, int *)
-#define NEXUS_IOC_MAXNR 2
+#define IOCTL_MMAP_SIZE            _IOR(NEXUS_IOC_MAGIC, 2, int *)
+#define NEXUS_IOC_MAXNR             2
 
 
 #define NEXUS_DEVICE "/dev/nexus"
