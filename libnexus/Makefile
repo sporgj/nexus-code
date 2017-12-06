@@ -32,7 +32,7 @@ build = \
         fi
 
 
-all: libnexus.a nexus_create_volume.o
+all: libnexus.a 
 	@cp $^ $(buildpath)
 
 % : %.c

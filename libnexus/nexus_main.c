@@ -48,6 +48,57 @@ nexus_generate_metadata(struct nexus_volume * volume,
     return NULL;
 }
 
+
+
+int
+nexus_mount_volume(char * volume_path,
+                   char * vol_key_path,
+                   char * pub_key_path,
+                   char * prv_key_path)
+{
+    struct nexus_volume * volume = NULL;
+
+    int    ret  = -1;
+
+
+
+
+    
+    // mount it
+   
+    volume = metadata_mount_volume(metadata_dirpath,
+				   datafolder_dirpath,
+				   volumekey_fpath);
+
+    if (volume == NULL) {
+        log_error("mouting the volume failed");
+        goto out;
+    }
+
+    // authenticate with the backend
+    ret = nexus_auth_backend(volume->supernode,
+                             volume->volumekey,
+                             publickey_fpath,
+                             privatekey_fpath);
+
+    if (ret != 0) {
+        log_error("backend authentication FAILED");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (ret) {
+        metadata_umount_volume(volume);
+    }
+
+    return ret;
+}
+
+
+
+
+
 int
 nexus_create_volume(const char * metadata_dirpath,
                     const char * publickey_fpath,
@@ -94,80 +145,6 @@ nexus_create_volume(const char * metadata_dirpath,
 out:
     if (fd) {
         fclose(fd);
-    }
-
-    return ret;
-}
-
-int
-nexus_mount_volume(const char * metadata_dirpath,
-                   const char * datafolder_dirpath,
-                   const char * volumekey_fpath,
-                   const char * publickey_fpath,
-                   const char * privatekey_fpath)
-{
-    struct nexus_volume * volume = NULL;
-
-    int ret = -1;
-
-    // mount it
-    volume = metadata_mount_volume(
-        metadata_dirpath, datafolder_dirpath, volumekey_fpath);
-
-    if (volume == NULL) {
-        log_error("mouting the volume failed");
-        goto out;
-    }
-
-    // authenticate with the backend
-    ret = nexus_auth_backend(volume->supernode,
-                             volume->volumekey,
-                             publickey_fpath,
-                             privatekey_fpath);
-
-    if (ret != 0) {
-        log_error("backend authentication FAILED");
-        goto out;
-    }
-
-    ret = 0;
-out:
-    if (ret) {
-        metadata_umount_volume(volume);
-    }
-
-    return ret;
-}
-
-int
-nexus_init()
-{
-    if (nexus_init_backend()) {
-        log_error("initializing the backend failed");
-        return -1;
-    }
-
-    if (nexus_init_metadata_store()) {
-        log_error("initializing metadata store failed");
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-nexus_exit()
-{
-    int ret = 0;
-
-    if (nexus_exit_backend()) {
-        ret = -1;
-        log_error("deininitalizing backend failed");
-    }
-
-    if (nexus_exit_metadata_store()) {
-        ret = -1;
-        log_error("exiting metadata store FAILED");
     }
 
     return ret;

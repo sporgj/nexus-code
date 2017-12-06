@@ -4,7 +4,6 @@
 #include "nexus_mstore_internal.h"
 
 static TAILQ_HEAD(volume_head, volume_entry) * mounted_volumes = NULL;
-
 static int mounted_volumes_count = 0;
 
 int
@@ -12,8 +11,7 @@ nexus_vfs_init()
 {
     log_debug("Initializing the NeXUS virtual filesystem");
 
-    mounted_volumes
-        = (struct volume_head *)calloc(1, sizeof(struct volume_head));
+    mounted_volumes = (struct volume_head *)calloc(1, sizeof(struct volume_head));
 
     if (mounted_volumes == NULL) {
         log_error("allocation error");

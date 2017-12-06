@@ -6,7 +6,7 @@ struct metadata_operations * default_metadata_ops = NULL;
 
 int
 metadata_create_volume(struct supernode * supernode,
-                       struct dirnode *   root_dirnode,
+                       struct dirnode   * root_dirnode,
                        struct volumekey * volumekey,
                        const char *       metadata_dirpath,
                        const char *       volumekey_fpath)
