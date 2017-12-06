@@ -142,13 +142,9 @@ twolevel_delete_metadata(struct nexus_metadata * parent_metadata,
     return 0;
 }
 
-// clang-format off
-
 struct metadata_operations twolevel_metadata_ops = {
     .read   = twolevel_read_metadata,
     .write  = twolevel_write_metadata,
     .create = twolevel_create_metadata,
     .delete = twolevel_delete_metadata
 };
-
-// clang-format on

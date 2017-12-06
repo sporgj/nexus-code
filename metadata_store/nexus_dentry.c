@@ -57,8 +57,8 @@ walk_path(struct nexus_dentry * root_dentry,
 {
     nexus_fs_obj_type_t atype = NEXUS_ANY;
 
-    char * nch = NULL;
-    char * pch = NULL;
+    char * token = NULL;
+    char * saveptr = NULL;
 
     struct nexus_dentry * parent = root_dentry;
     struct nexus_dentry * dentry = NULL;
@@ -69,14 +69,14 @@ walk_path(struct nexus_dentry * root_dentry,
 
     int ret = -1;
 
-    nch = strtok_r(relpath, "/", &pch);
-    while (nch != NULL) {
+    token = strtok_r(relpath, "/", &saveptr);
+    while (token != NULL) {
         // check for . and ..
-        if (nch[0] == '.') {
-            if (nch[1] == '\0') {
+        if (token[0] == '.') {
+            if (token[1] == '\0') {
                 // skip this term
                 goto skip;
-            } else if (nch[1] == '.') {
+            } else if (token[1] == '.') {
                 // move back to the parent
                 parent = parent->parent;
                 if (parent == NULL) {
@@ -89,7 +89,7 @@ walk_path(struct nexus_dentry * root_dentry,
         }
 
         // check the dentry cache if it entry exists
-        dentry = d_lookup(parent, nch);
+        dentry = d_lookup(parent, token);
 
         if (dentry != NULL) {
             // if found, check that the underlying nexus_metadata is fresh
@@ -106,7 +106,7 @@ walk_path(struct nexus_dentry * root_dentry,
             return NULL;
         }
 
-        ret = nexus_dirnode_lookup(metadata->dirnode, nch, &uuid, &atype);
+        ret = nexus_dirnode_lookup(metadata->dirnode, token, &uuid, &atype);
         if (ret != 0) {
             log_error("nexus_dirnode_lookup() FAILED");
             return NULL;
@@ -114,17 +114,17 @@ walk_path(struct nexus_dentry * root_dentry,
 
         // if the entry is not found, let's leave
         if (atype != NEXUS_DIR) {
-            log_error("path entry (%s) is not a directory/symlink", nch);
+            log_error("path entry (%s) is not a directory/symlink", token);
             return NULL;
         }
 
         // allocate and add the dentry to the tree
-        dentry = create_dentry(parent, &uuid, nch, atype);
+        dentry = create_dentry(parent, &uuid, token, atype);
 
     next:
         parent = dentry;
     skip:
-        nch = strtok_r(NULL, "/", &pch);
+        token = strtok_r(NULL, "/", &saveptr);
     }
 
     return dentry;
