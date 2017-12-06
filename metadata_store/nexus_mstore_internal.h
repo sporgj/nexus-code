@@ -9,11 +9,11 @@
 
 #include <nexus.h>
 #include <nexus_metadata_store.h>
+#include <nexus_util.h>
 
 #include "nexus_log.h"
 #include "nexus_path.h"
 #include "nexus_types.h"
-#include "nexus_util.h"
 
 #include "queue.h"
 

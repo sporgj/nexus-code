@@ -15,14 +15,16 @@ release_components :=   libnexus.a \
 			backend_sgx.so \
 			frontend_afs.a \
 			libmbedcrypto.a \
-			metadata_store.a
+			metadata_store.a \
+			libnexus.a
 
 create_volume_components := \
 	nexus_create_volume.o \
 	libnexus.a \
 	backend_sgx.so \
 	libmbedcrypto.a \
-	metadata_store.a
+	metadata_store.a \
+	libnexus.a
 
 
 LDFLAGS := -L$(nexus_home)/mbedtls-2.6.0/library \
