@@ -1,26 +1,21 @@
 
 buildpath = ../build
 
-INCLUDES = -I. -I../mbedtls-2.6.0/include
+INCLUDES := -I../libnexus
+CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
 
-CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
-
-
-ifeq ($(DEBUG), 1)
-	CFLAGS += -g3 -DDEBUG
-endif
+CC = gcc
+AR = ar
 
 
-objs :=	nexus_main.o \
-	nexus_volume.o \
-	nexus_util.o \
-	nexus_key.o \
-	nexus_uuid.o \
-	nexus_raw_file.o \
-	jsmn.o \
-	nexus_json.o
+exec_objs :=	main.o \
+#		handler.o
+
+execs := nexus_shell
 
 
+libs := ../build/libnexus.a \
+	../build/libmbedcrypto.a
 
 build = \
         @if [ -z "$V" ]; then \
@@ -32,18 +27,20 @@ build = \
         fi
 
 
-all: libnexus.a 
-	@cp $^ $(buildpath)
+all: nexus_shell
 
 % : %.c
-	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) $< -o $@)
+	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
 
 %.o : %.c
-	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
+	$(call build,CC,$(CC) $(CFLAGS) -c $<  -o $@)
 
-
-libnexus.a: $(objs)
+%.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
+
+nexus_shell: $(exec_objs)
+	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
+
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -58,8 +55,9 @@ cscope:
 
 
 
+
 clean:
-	rm -f $(wildcard *.o *.so *.a) cscope.*a
+	rm -f $(wildcard  $(exec_objs) cscope.* $(execs) *.o *.a)
 
 
 .PHONY: clean

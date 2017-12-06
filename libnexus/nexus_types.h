@@ -5,6 +5,55 @@
 extern "C" {
 #endif
 
+
+
+
+#define NEXUS_HASH_SIZE  32
+#define NEXUS_NONCE_SIZE 64
+
+struct nexus_nonce {
+    uint8_t raw[NEXUS_NONCE_SIZE];
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #define NEXUS_MAX_FILENAME_LEN	    256
 #define NEXUS_MAX_PATH_LEN	    1024
 
@@ -39,14 +88,20 @@ typedef uint32_t version_t;
 
 typedef uint8_t nonce_t[CONFIG_NONCE_BYTES];
 
+
+
+
 typedef struct crypto_ekey {
     uint8_t bytes[CONFIG_EKEY_BYTES];
 } crypto_ekey_t;
+
 
 // TODO for now sealing is just ECB(rootkey). Investigate SGX sealing
 struct volumekey {
     uint8_t bytes[CONFIG_EKEY_BYTES];
 };
+
+
 
 struct uuid {
     uint8_t bytes[CONFIG_UUID_BYTES];
@@ -58,6 +113,10 @@ struct crypto_context {
     uint8_t       tag[CONFIG_TAG_BYTES];
     uint8_t       ekey_mac[CONFIG_EKEY_BYTES];
 };
+
+
+
+
 
 // supernode structures. Manages the NeXUS volume
 struct pubkey_hash {

@@ -57,7 +57,6 @@ build = \
 
 all: mbedtls frontends backends metadata_store libnexus nx-create-volume
 	@$(CC) $(addprefix $(build_path),$(release_components) $(release_components)) $(LDFLAGS) $(libs) -o nexus
-	@echo "GEN => $@"
 
 dev: frontends backends metadata_store libnexus
 # link the debug versions
@@ -89,7 +88,6 @@ libnexus:
 
 nx-create-volume: libnexus
 	@$(CC) $(addprefix $(build_path),$(create_volume_components)) $(LDFLAGS) $(libs) -luuid -o $@
-	@echo "GEN => $@"
 
 
 mbedtls:

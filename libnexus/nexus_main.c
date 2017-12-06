@@ -1,20 +1,15 @@
-/**
- * File contains functions that manage Nexus volumes
- *
- * @author Judicael Djoko <jdb@djoko.me>
- */
 #include <sys/stat.h>
 
-#include <uuid/uuid.h>
+#include <nexus_volume.h>
+#include <nexus_key.h>
+
+#include <nexus_util.h>
+#include <nexus_log.h>
 
 #include "nexus_internal.h"
 
-void
-nexus_uuid(struct uuid * uuid)
-{
-    uuid_generate((uint8_t *)uuid);
-}
 
+#if 0
 int
 nexus_dirnode_lookup(struct dirnode *      dirnode,
                      char *                fname,
@@ -47,6 +42,8 @@ nexus_generate_metadata(struct nexus_volume * volume,
 
     return NULL;
 }
+#endif
+
 
 
 
@@ -56,14 +53,53 @@ nexus_mount_volume(char * volume_path,
                    char * pub_key_path,
                    char * prv_key_path)
 {
-    struct nexus_volume * volume = NULL;
+    struct nexus_volume * volume  = NULL;
 
+    struct nexus_key    * vol_key = NULL;
+    struct nexus_key    * pub_key = NULL;
+    struct nexus_key    * prv_key = NULL;
+    
     int    ret  = -1;
 
+
+    /* Grab the keys */
+    vol_key = nexus_load_key_from_file(vol_key_path);
+    pub_key = nexus_load_key_from_file(pub_key_path);
+    prv_key = nexus_load_key_from_file(prv_key_path);
+
+
+    if (vol_key == NULL) {
+	log_error("Could not load volume key (%s)\n", vol_key_path);
+	goto err;
+    }
+	
+    if (pub_key == NULL) {
+	log_error("Could not load public key (%s)\n", pub_key_path);
+	goto err;
+    }
+    
+    if (prv_key == NULL) {
+	log_error("Could not load private_key (%s)\n", prv_key_path);
+	goto err;
+    }
+
+           
+    /* Read in volume information */
+    volume = nexus_load_volume(volume_path);
+
+    if (volume == NULL) {
+	log_error("Could not load volume (%s)\n", volume_path);
+    }
+    
+    /* Activate the backend and metadata components */
+    
+    
+    /* Return handle to volume */
 
 
 
     
+ #if 0
     // mount it
    
     volume = metadata_mount_volume(metadata_dirpath,
@@ -86,18 +122,32 @@ nexus_mount_volume(char * volume_path,
         goto out;
     }
 
+
+    
     ret = 0;
 out:
     if (ret) {
         metadata_umount_volume(volume);
     }
 
+#endif
+   
+
     return ret;
+err:
+    if (vol_key) nexus_free(vol_key);
+    if (pub_key) nexus_free(pub_key);
+    if (prv_key) nexus_free(prv_key);
+
+    if (volume) nexus_close_volume(volume);    
+
+
+    return -1;
 }
 
 
 
-
+#if 0
 
 int
 nexus_create_volume(const char * metadata_dirpath,
@@ -149,3 +199,6 @@ out:
 
     return ret;
 }
+
+
+#endif

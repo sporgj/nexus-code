@@ -3,10 +3,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "jsmn.h"
-#include "nexus_json.h"
+#include <jsmn.h>
+#include <nexus_json.h>
 
-#include "nexus_internal.h"
+#include <nexus_internal.h>
+#include <nexus_util.h>
+#include <nexus_log.h>
 
 static int
 safe_strtou8(char    * str,
