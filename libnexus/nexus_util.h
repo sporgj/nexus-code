@@ -7,9 +7,7 @@ extern "C" {
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "nexus.h"
-
-#include "queue.h"
+#include "nexus_internal.h"
 
 #define nexus_free(ptr)                                                        \
     do {                                                                       \
@@ -24,28 +22,28 @@ extern "C" {
  * @param p_size
  * @return 0 on success
  */
-int
+extern int
 read_file(const char * fpath, uint8_t ** p_buffer, size_t * p_size);
 
-int
+extern int
 write_file(const char * fpath, void * buffer, size_t size);
 
 
-char *
+extern char *
 my_strnjoin(char * dest, const char * join, const char * src, size_t max);
 
-char *
+extern char *
 my_strncat(char * dest, const char * src, size_t max);
 
 
-char *
+extern char *
 uuid_to_string(struct uuid * uuid);
 
 
-char *
+extern char *
 filepath_from_name(char * directory, const char * filename);
 
-char *
+extern char *
 filepath_from_uuid(const char * dir_path, struct uuid * uuid);
 
 #ifdef __cplusplus

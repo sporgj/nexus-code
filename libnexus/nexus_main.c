@@ -15,14 +15,37 @@ nexus_uuid(struct uuid * uuid)
     uuid_generate((uint8_t *)uuid);
 }
 
-// TODO
 int
 nexus_dirnode_lookup(struct dirnode *      dirnode,
                      char *                fname,
                      struct uuid *         uuid_dest,
                      nexus_fs_obj_type_t * p_type)
 {
-    return -1;
+    return backend_dirnode_find_by_name(dirnode, fname, uuid_dest, p_type);
+}
+
+void *
+nexus_generate_metadata(struct nexus_volume * volume,
+                        struct uuid *         uuid,
+                        nexus_fs_obj_type_t   type)
+{
+    struct dirnode * dirnode = NULL;
+
+    struct uuid * root_uuid = &volume->supernode->header.root_uuid;
+
+    int ret = -1;
+
+    if (type == NEXUS_DIR) {
+        ret = backend_dirnode_new(uuid, root_uuid, &dirnode);
+        if (ret != 0) {
+            log_error("backend_dirnode_new() FAILED");
+            return NULL;
+        }
+
+        return dirnode;
+    }
+
+    return NULL;
 }
 
 

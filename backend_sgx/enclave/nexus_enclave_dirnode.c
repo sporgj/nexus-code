@@ -562,7 +562,7 @@ ecall_dirnode_find_or_remove(struct dirnode *      sealed_dirnode_ext,
     }
 
     if (ret != 0) {
-        ocall_debug("could not find the name entry");
+        // ocall_debug("could not find the name entry");
         goto out;
     }
 

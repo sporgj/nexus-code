@@ -1,7 +1,0 @@
-{
-    "_comment": "this is the default fstab file",
-    "root_ucafs": "/afs/xyz.vm/user/djoko/",
-    "pubkey": "profile/public_key",
-    "privkey": "profile/private_key",
-    mounts: [],
-}

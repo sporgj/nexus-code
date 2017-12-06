@@ -9,11 +9,14 @@
 
 #include <nexus.h>
 #include <nexus_metadata_store.h>
+#include <nexus_util.h>
 
-#include <nnexus_log.h>
+
+#include <nexus_log.h>
 #include <nexus_path.h>
 #include <nexus_types.h>
 #include <nexus_util.h>
+
 
 #include "queue.h"
 
@@ -22,6 +25,8 @@ typedef enum { NEXUS_DIRNODE, NEXUS_FILEBOX } nx_metadata_type_t;
 
 // internally used by the VFS as an in-memory directory cache structure
 struct nexus_dentry {
+    nexus_fs_obj_type_t type;
+
     char *      name;
     size_t      name_len;
     struct uuid uuid;
@@ -46,7 +51,8 @@ struct volume_entry {
 // operations on metadata files
 struct metadata_operations {
     struct nexus_metadata * (*read)(struct nexus_dentry * dentry,
-                                    struct path_builder * path);
+                                    struct path_builder * path,
+                                    size_t *              p_size);
 
     int (*write)(struct nexus_metadata * metadata, size_t size);
 

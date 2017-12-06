@@ -64,7 +64,6 @@ build = \
 
 
 all: backend_sgx.so
-	# for now, let's just pass DEBUG as it comes
 	make -C enclave DEBUG=$(DEBUG)
 	@cp backend_sgx.so ../build
 	@cp enclave/nexus_enclave.signed.so ..

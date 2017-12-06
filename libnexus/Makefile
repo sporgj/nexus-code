@@ -6,7 +6,7 @@ INCLUDES =
 CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
 
 ifeq ($(DEBUG), 1)
-	CFLAGS += -g3
+	CFLAGS += -g3 -DDEBUG
 endif
 
 LIBS = -luuid
@@ -15,7 +15,9 @@ LIBS = -luuid
 objs :=	nexus_fs_ops.o \
 	nexus_encode.o \
 	nexus_main.o \
+	nexus_util.o \
 	jsmn.o \
+	base58.o \
 	nexus_json.o
 
 

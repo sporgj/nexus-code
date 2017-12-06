@@ -209,9 +209,6 @@ handle_afs_cmds(int volume_fd)
 	    return -1;
 	}
 
-	printf("Response: %s\n", resp_buf);
-	
-	
 	ret = write(volume_fd, resp_buf, resp_size);
 
 	if (ret != resp_size) {

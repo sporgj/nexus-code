@@ -12,7 +12,7 @@ LIBMETADATA_STORE := metadata_store.a
 MBEDTLS_PATH := $(nexus_home)/mbedtls-2.6.0/library
 MBEDTLS_LIB := libmbedcrypto.a
 
-CFLAGS += -I$(LIBNEXUS_PATH)
+CFLAGS += -I$(LIBNEXUS_PATH) -I$(METADATA_STORE_PATH)
 
 LIBS := $(LIBNEXUS_PATH)/$(LIBNEXUS_LIB)\
 		$(SGX_BACKEND_PATH)/$(LIBSGX_BACKEND)\
@@ -46,6 +46,10 @@ build = \
 test_dirops: nx_test_dirops.o unity/unity.o $(LIBS)
 	$(call build,CC,$(CC) $^ $(LIBS) -o $@)
 
-.PHONY: clean
-clean:
-	rm -rf *.o $(tests) dummy-volume/*
+.PHONY: clean clearvolume
+
+clearvolume: 
+	rm -rf dummy-volume/*
+
+clean: clearvolume
+	rm -rf *.o $(tests)

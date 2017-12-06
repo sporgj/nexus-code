@@ -1,9 +1,5 @@
 #include "nexus_tests.h"
 
-struct supernode * gbl_supernode    = NULL;
-struct volumekey * gbl_volumekey    = NULL;
-struct dirnode *   gbl_root_dirnode = NULL;
-
 void
 setUp()
 {
@@ -25,37 +21,46 @@ setUp()
 void
 tearDown()
 {
-    nexus_free(gbl_supernode);
-    nexus_free(gbl_volumekey);
-    nexus_free(gbl_root_dirnode);
+    nexus_exit();
 }
 
 void
 test_dirops_basic1()
 {
-    int         ret         = -1;
-    char *      fname_test1 = "test.txt";
-    char *      fname_test2 = NULL;
-    char *      nexus_name1 = NULL;
-    char *      nexus_name2 = NULL;
-    char *      nexus_name3 = NULL;
+    char * fname_test1 = "test1.txt";
+    char * fname_test2 = "test2.txt";
+
+    char * temp_fname1 = NULL;
+
+    char * nexus_name1 = NULL;
+    char * nexus_name2 = NULL;
+    char * nexus_name3 = NULL;
+
     struct uuid uuid1;
     struct uuid uuid2;
 
+    int ret = -1;
+
     nexus_uuid(&uuid1);
 
+    // insert two files
     ret = nexus_new(TEST_DATADIR_PATH, fname_test1, NEXUS_FILE, &nexus_name1);
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_new() FAILED");
 
+    ret = nexus_new(TEST_DATADIR_PATH, fname_test2, NEXUS_FILE, &nexus_name2);
+    TEST_ASSERT_MESSAGE(ret == 0, "nexus_lookup() FAILED");
+    nexus_free(nexus_name2);
+
+    // lookup the first
     ret = nexus_lookup(
         TEST_DATADIR_PATH, fname_test1, NEXUS_FILE, &nexus_name2);
+    
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_lookup() FAILED");
-
-    // check that the string messages match
     TEST_ASSERT_EQUAL_STRING_MESSAGE(nexus_name1, nexus_name2, "lookup failed");
 
+    // try to filldir
     ret = nexus_filldir(
-        TEST_DATADIR_PATH, nexus_name1, NEXUS_FILE, &fname_test2);
+        TEST_DATADIR_PATH, nexus_name1, NEXUS_FILE, &temp_fname1);
     TEST_ASSERT_MESSAGE(ret == 0, "nexus_filldir() FAILED");
 
     ret = nexus_remove(
@@ -71,9 +76,43 @@ test_dirops_basic1()
     TEST_ASSERT_MESSAGE(ret != 0, "nexus_lookup returned file illegally");
 
     nexus_free(nexus_name1);
-    nexus_free(nexus_name2);
     nexus_free(nexus_name3);
-    nexus_free(fname_test2);
+}
+
+void
+test_dirops_basic2()
+{
+    char * foodir      = "foo";
+    char * dirpath_foo = filepath_from_name(strdup(TEST_DATADIR_PATH), foodir);
+
+    char * test_fname1 = "test1.txt";
+    char * test_fname2 = "test2.txt";
+
+    char * temp_fname1 = NULL;
+
+    char * nexus_name1 = NULL;
+    char * nexus_name2 = NULL;
+    char * nexus_name3 = NULL;
+
+    struct uuid uuid1;
+
+    int ret = -1;
+
+    nexus_uuid(&uuid1);
+
+    ret = nexus_new(TEST_DATADIR_PATH, foodir, NEXUS_DIR, &nexus_name1);
+    TEST_ASSERT_MESSAGE(ret == 0, "nexus_new FAILED");
+
+    ret = nexus_new(dirpath_foo, test_fname1, NEXUS_FILE, &nexus_name2);
+    TEST_ASSERT_MESSAGE(ret == 0, "nexus_new FAILED");
+
+    ret = nexus_new(dirpath_foo, test_fname2, NEXUS_FILE, &nexus_name3);
+    TEST_ASSERT_MESSAGE(ret == 0, "nexus_new FAILED");
+
+    ret = nexus_lookup(dirpath_foo, test_fname1, NEXUS_FILE, &temp_fname1);
+    TEST_ASSERT_MESSAGE(ret == 0, "nexus_lookup FAILED");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(nexus_name2, temp_fname1, "lookup failed");
 }
 
 int
@@ -81,6 +120,7 @@ main()
 {
     UNITY_BEGIN();
     RUN_TEST(test_dirops_basic1);
+    RUN_TEST(test_dirops_basic2);
 
     return UNITY_END();
 }

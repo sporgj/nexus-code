@@ -59,6 +59,12 @@ nexus_new(char *              dir_path,
 
     *nexus_name = filename_bin2str(&uuid);
 
+    log_debug("[%s] %s/%s -> %s",
+              ((type == NEXUS_FILE) ? "create" : "mkdir"),
+              dir_path,
+              file_name,
+              *nexus_name);
+
     ret = 0;
 out:
     metadata_put_metadata(metadata);
@@ -120,6 +126,8 @@ nexus_remove(char *              dir_path,
         goto out;
     }
 
+    log_debug("[remove] %s/%s -> %s", dir_path, file_name, *nexus_name);
+
     ret = 0;
 out:
     metadata_put_metadata(metadata);
@@ -152,7 +160,7 @@ nexus_lookup(char *              dir_path,
     // if the file was not found, let's return
     ret = backend_dirnode_find_by_name(dirnode, file_name, &uuid, &atype);
     if (ret != 0) {
-        log_error("backend_dirnode_find_by_name() FAILED");
+        // log_debug("backend_dirnode_find_by_name() FAILED");
         goto out;
     }
 
@@ -161,6 +169,8 @@ nexus_lookup(char *              dir_path,
         log_error("filename_bin2str returned NULL");
         goto out;
     }
+
+    log_debug("[lookup] %s/%s -> %s", dir_path, file_name, *nexus_name);
 
     ret = 0;
 out:
@@ -201,9 +211,11 @@ nexus_filldir(char *              dir_path,
 
     ret = backend_dirnode_find_by_uuid(dirnode, uuid, file_name, &atype);
     if (ret != 0) {
-        log_error("backend_dirnode_find_by_uuid() FAILED");
+        // log_debug("backend_dirnode_find_by_uuid() FAILED");
         goto out;
     }
+
+    log_debug("[filldir] %s/%s -> %s", dir_path, nexus_name, *file_name);
 
     ret = 0;
 out:

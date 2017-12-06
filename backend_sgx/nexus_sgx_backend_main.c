@@ -53,9 +53,30 @@ nexus_init_enclave(const char * enclave_fpath)
     return 0;
 }
 
+static int
+nexus_exit_enclave()
+{
+    int ret = 0;
+
+    if (global_enclave_id) {
+        log_debug("Destroying enclave (eid=%zu)", global_enclave_id);
+        ret = sgx_destroy_enclave(global_enclave_id);
+    }
+
+    global_enclave_id = 0;
+
+    return ret;
+}
+
 // TODO temporary, add this at config
 int
 nexus_init_backend()
 {
     return nexus_init_enclave(ENCLAVE_PATH);
+}
+
+int
+nexus_exit_backend()
+{
+    return nexus_exit_enclave(global_enclave_id);
 }

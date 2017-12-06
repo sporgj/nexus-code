@@ -4,9 +4,8 @@
 
 #include <linux/ioctl.h>
 
-//#include <uuid/uuid.h>
-
 #include <nexus.h>
+#include <nexus_util.h>
 
 
 #define NEXUS_IOC_MAGIC            'W'
