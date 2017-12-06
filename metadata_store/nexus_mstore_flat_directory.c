@@ -17,7 +17,8 @@ flatdir_read_metadata(struct nexus_dentry * dentry,
 {
     struct nexus_metadata * metadata = NULL;
 
-    char *    fpath  = strndup(dentry->volume->metadata_dirpath, PATH_MAX);
+    char * fpath = strndup(dentry->volume->metadata_dirpath, PATH_MAX);
+
     uint8_t * buffer = NULL;
 
     int ret = -1;
@@ -32,19 +33,11 @@ flatdir_read_metadata(struct nexus_dentry * dentry,
         return NULL;
     }
 
-    metadata
-        = (struct nexus_metadata *)calloc(1, sizeof(struct nexus_metadata));
-
-    if (!metadata) {
-	log_error("allocation error");
-	goto out;
+    metadata = alloc_metadata(dentry, fpath, buffer);
+    if (metadata == NULL) {
+        log_error("alloc_metadata failed");
+        goto out;
     }
-
-    metadata->volume = dentry->volume;
-    metadata->fpath = fpath;
-    metadata->is_root_dirnode = (dentry->parent == NULL);
-    metadata->buffer = buffer;
-    metadata->timestamp = clock();
 
     metadata->private_data = &flatdir_metadata_ops; 
 out:
@@ -66,8 +59,6 @@ flatdir_write_metadata(struct nexus_metadata * metadata, size_t size)
         log_error("writing metadata file FAILED (%s)", metadata->fpath);
         return -1;
     }
-
-    metadata->timestamp = clock();
 
     return 0;
 }

@@ -64,15 +64,18 @@ struct metadata_operations {
 extern struct metadata_operations * default_metadata_ops;
 
 extern struct metadata_operations flatdir_metadata_ops;
+extern struct metadata_operations twolevel_metadata_ops;
 
-// nexus_volume.c
+// nexus_vfs.c
 struct nexus_volume *
 alloc_volume(const char * metadata_dirpath, const char * datafolder_dirpath);
 
 void
 free_volume(struct nexus_volume * volume);
 
-// nexus_vfs.c
+struct nexus_metadata *
+alloc_metadata(struct nexus_dentry * dentry, char * fpath, uint8_t * buffer);
+
 
 int
 nexus_vfs_init();

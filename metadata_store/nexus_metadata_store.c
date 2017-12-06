@@ -181,6 +181,8 @@ metadata_write_dirnode(struct nexus_metadata * metadata,
     // otherwise, deallocate the old
     free(old_dirnode);
 
+    metadata->timestamp = clock();
+
     return 0;
 }
 
@@ -214,8 +216,8 @@ nexus_init_metadata_store()
         log_error("Could not initialize the VFS");
     }
 
-    // for now, let's just statically default to the flatdir implementation
-    default_metadata_ops = &flatdir_metadata_ops;
+    // for now, let's just statically default to the twolevel implementation
+    default_metadata_ops = &twolevel_metadata_ops;
     return 0;
 }
 

@@ -115,12 +115,18 @@ vfs_read_metadata(struct nexus_dentry * dentry, struct path_builder * builder)
     size_t size = 0;
 
     metadata = ops->read(dentry, builder, &size);
+    if (metadata == NULL) {
+        log_error("reading metadata failed");
+        return NULL;
+    }
 
     // this means the data had not been allocated, let's create it
     if (size == 0) {
         metadata->buffer
             = nexus_generate_metadata(volume, &dentry->uuid, dentry->type);
     }
+
+    metadata->timestamp = clock();
 
     // free the old metadata object
     if (dentry->metadata) {
@@ -139,3 +145,79 @@ vfs_revalidate(struct nexus_dentry * dentry)
     return -1;
 }
 
+// volume management
+
+struct nexus_volume *
+alloc_volume(const char * metadata_dirpath, const char * datafolder_dirpath)
+{
+    struct nexus_volume * volume      = NULL;
+    struct nexus_dentry * root_dentry = NULL;
+
+    volume = (struct nexus_volume *)calloc(1, sizeof(struct nexus_volume));
+    if (volume == NULL) {
+        log_error("allocation error");
+        return NULL;
+    }
+
+    root_dentry = (struct nexus_dentry *)calloc(1, sizeof(struct nexus_dentry));
+    if (root_dentry == NULL) {
+        nexus_free(volume);
+        log_error("allocation error");
+        return NULL;
+    }
+
+    root_dentry->type   = NEXUS_DIR;
+    root_dentry->volume = volume;
+    TAILQ_INIT(&root_dentry->children);
+
+    volume->root_dentry        = root_dentry;
+    volume->metadata_dirpath   = strndup(metadata_dirpath, PATH_MAX);
+    volume->datafolder_dirpath = strndup(datafolder_dirpath, PATH_MAX);
+    volume->private_data       = default_metadata_ops;
+
+    return volume;
+}
+
+void
+free_volume(struct nexus_volume * volume)
+{
+    if (volume) {
+        if (volume->metadata_dirpath) {
+            nexus_free(volume->metadata_dirpath);
+        }
+
+        if (volume->datafolder_dirpath) {
+            nexus_free(volume->datafolder_dirpath);
+        }
+
+	if (volume->supernode) {
+	    nexus_free(volume->supernode);
+	}
+
+	if (volume->volumekey) {
+	    nexus_free(volume->volumekey);
+	}
+
+        nexus_free(volume);
+    }
+}
+
+struct nexus_metadata *
+alloc_metadata(struct nexus_dentry * dentry, char * fpath, uint8_t * buffer)
+{
+    struct nexus_metadata * metadata
+        = (struct nexus_metadata *)calloc(1, sizeof(struct nexus_metadata));
+
+    if (!metadata) {
+	log_error("allocation error");
+        return NULL;
+    }
+
+    metadata->volume = dentry->volume;
+    metadata->fpath = fpath;
+    metadata->is_root_dirnode = (dentry->parent == NULL);
+    metadata->buffer = buffer;
+    metadata->timestamp = clock();
+
+    return metadata;
+}
