@@ -1,5 +1,11 @@
 #pragma once
 
+
+
+#define NEXUS_JSON_INVALID_OBJ (NULL)
+
+typedef void * nexus_json_obj_t;
+
 typedef enum {
     NEXUS_JSON_U8,
     NEXUS_JSON_S8,
@@ -9,7 +15,8 @@ typedef enum {
     NEXUS_JSON_S32,
     NEXUS_JSON_U64,
     NEXUS_JSON_S64,
-    NEXUS_JSON_STRING
+    NEXUS_JSON_STRING,
+    NEXUS_JSON_OBJECT
 } nexus_json_type_t;
 
 
@@ -26,20 +33,35 @@ struct nexus_json_param {
 
 
 
-/* A simple parser with basic validation but limited JSON support
- * Currently only handles basic 'key : value' pairs. 
- *  
- * Does not handle objects. i.e. the use of '{}'s in the string. 
- * Does not handle arrays
- * 
- * Extending it is possible, but for now it does what we need.
- */
 
 int
-nexus_json_parse(char                    * str,
-		 struct nexus_json_param * params,
-		 uint32_t                  num_params);
+nexus_json_get_params(nexus_json_obj_t          obj,
+		      struct nexus_json_param * params,
+		      uint32_t                  num_params);
 
-int
-nexus_json_release_params(struct nexus_json_param * params,
-			  uint32_t                  num_params);
+
+nexus_json_obj_t
+nexus_json_parse_str(char * str);
+
+nexus_json_obj_t
+nexus_json_parse_file(char * file_name);
+
+
+nexus_json_obj_t
+nexus_json_parse_file(char * str);
+
+void
+nexus_json_free_object(nexus_json_obj_t object);
+
+
+
+
+
+nexus_json_obj_t 
+nexus_json_get_object(nexus_json_obj_t   obj,
+		      char             * key);
+
+char *
+nexus_json_get_string(nexus_json_obj_t   obj,
+		      char             * key);
+

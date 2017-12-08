@@ -12,9 +12,9 @@
 
 
 int
-nexus_read_raw_file(char    * path,
-		    void   ** buf,
-		    size_t  * size)
+nexus_read_raw_file(char     * path,
+		    uint8_t ** buf,
+		    size_t   * size)
 {
     FILE        * file_ptr = NULL;
     struct stat   file_stats;

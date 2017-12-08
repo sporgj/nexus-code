@@ -42,9 +42,6 @@ typedef struct {
 	int start;
 	int end;
 	int size;
-#ifdef JSMN_PARENT_LINKS
-	int parent;
-#endif
 } jsmntok_t;
 
 /**

@@ -3,308 +3,111 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <jsmn.h>
+
 #include <nexus_json.h>
 
-#include <nexus_internal.h>
+#include <nexus_raw_file.h>
 #include <nexus_util.h>
 #include <nexus_log.h>
 
-static int
-safe_strtou8(char    * str,
-	     uint8_t * value)
+
+/* Internalize nxjson functions */
+#include <nxjson.h>
+#include <nxjson.c>
+
+
+
+
+nexus_json_obj_t
+nexus_json_parse_str(char * str)
 {
-    unsigned long tmp = 0;
+    nexus_json_obj_t new_obj = NEXUS_JSON_INVALID_OBJ;
 
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
+    new_obj = nx_json_parse(str);
+
+    if (new_obj == NULL) {
+	log_error("Could not parse JSON string (%s)\n", str);
+	return NEXUS_JSON_INVALID_OBJ;
     }
 
-    tmp = strtoul(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
-    }
-
-    if (tmp > UCHAR_MAX) {
-	/* value exceeded requested size */
-	return -1;
-    }
-	   
-    *value = (uint8_t)tmp;    
-    return 0;
+    return new_obj;
 }
 
-static int
-safe_strtoi8(char    * str,
-	     int8_t * value)
+nexus_json_obj_t
+nexus_json_parse_file(char * file_name)
 {
-    long tmp = 0;
+    nexus_json_obj_t obj      = NEXUS_JSON_INVALID_OBJ;
 
-    char * end  = NULL;
-    int    base = 0;
+    char           * json_str = NULL;
+    size_t           json_len = 0;
+
+    int ret = 0;
+
     
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
+    ret = nexus_read_raw_file(file_name, (uint8_t **)&json_str, &json_len);
+
+    if (ret == -1) {
+	log_error("Could not read JSON file (%s)\n", file_name);
+	return NEXUS_JSON_INVALID_OBJ;
     }
 
-    tmp = strtol(str, &end, base);
+    obj = nexus_json_parse_str(json_str);
 
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
-    }
+    nexus_free(json_str);
 
-    if ((tmp > SCHAR_MAX) ||
-	(tmp < SCHAR_MIN)) {
-	/* value exceeded requested size */
-	return -1;
-    }
-	   	
-    *value = (int8_t)tmp;    
-    return 0;
+    return obj;
 }
 
 
-
-static int
-safe_strtou16(char     * str,
-	      uint16_t * value)
+void
+nexus_json_free_object(nexus_json_obj_t object)
 {
-    unsigned long tmp = 0;
+    assert(object != NULL);
 
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
-    }
+    nx_json_free(object);
 
-    tmp = strtoul(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
-    }
-
-    if (tmp > USHRT_MAX) {
-	/* value exceeded requested size */
-	return -1;
-    }
-	   
-    *value = (uint16_t)tmp;    
-    return 0;
-}
-
-static int
-safe_strtoi16(char     * str,
-	      int16_t * value)
-{
-    long tmp = 0;
-
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
-    }
-
-    tmp = strtol(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
-    }
-
-    if ((tmp > SHRT_MAX) ||
-	(tmp < SHRT_MIN)) {
-	/* value exceeded requested size */
-	return -1;
-    }
-	   	
-    *value = (int16_t)tmp;    
-    return 0;
-}
-
-static int
-safe_strtou32(char     * str,
-	      uint32_t * value)
-{
-    unsigned long tmp = 0;
-
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
-    }
-
-    tmp = strtoul(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
-    }
-	   
-    *value = (uint32_t)tmp;    
-    return 0;
-}
-
-static int
-safe_strtoi32(char     * str,
-	      int32_t * value)
-{
-    long tmp = 0;
-
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
-    }
-
-    tmp = strtol(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
-    }
-	   	
-    *value = (int32_t)tmp;    
-    return 0;
+    return;
 }
 
 
-static int
-safe_strtou64(char     * str,
-	      uint64_t * value)
+nexus_json_obj_t
+nexus_json_get_object(nexus_json_obj_t   obj,
+		      char             * key)
 {
-    unsigned long long tmp = 0;
+    struct nx_json * tgt_obj = NULL;
 
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return NEXUS_JSON_INVALID_OBJ;
     }
 
-    tmp = strtoull(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
+    if (tgt_obj->type != NX_JSON_OBJECT) {
+	return NEXUS_JSON_INVALID_OBJ;
     }
-	   
-    *value = (uint64_t)tmp;    
-    return 0;
+    
+    
+    return tgt_obj;
 }
 
-static int
-safe_strtoi64(char     * str,
-	      int64_t * value)
+
+char *
+nexus_json_get_string(nexus_json_obj_t   obj,
+		      char             * key)
 {
-    long long tmp = 0;
+    struct nx_json * tgt_obj = NULL;
 
-    char * end  = NULL;
-    int    base = 0;
-    
-    
-    if ((str == NULL) || (*str == '\0')) {
-	/*  String was either NULL or empty */
-	log_error("Invalid string\n");
-	return -1;
-    }
-    
-    if (strlen(str) > 2) {
-	if ((*(str + 1) == 'x') ||
-	    (*(str + 1) == 'X')) {
-	    base = 16;
-	}
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return NEXUS_JSON_INVALID_OBJ;
     }
 
-    tmp = strtoll(str, &end, base);
-
-    if (end == str) {
-	/* String contained non-numerics */
-	return -1;
+    if (tgt_obj->type != NX_JSON_STRING) {
+	return NEXUS_JSON_INVALID_OBJ;
     }
-	   	
-    *value = (int64_t)tmp;    
-    return 0;
+
+    return tgt_obj->text_value;
 }
 
 
@@ -317,196 +120,158 @@ safe_strtoi64(char     * str,
  */
 
 int
-nexus_json_parse(char                    * str,
-		 struct nexus_json_param * params,
-		 uint32_t                  num_params)
+nexus_json_get_params(nexus_json_obj_t          obj,
+		      struct nexus_json_param * params,
+		      uint32_t                  num_params)
 {
-    jsmn_parser   parser;
-    jsmntok_t   * tokens     = NULL;
-
-    uint32_t num_tokens = (2 * num_params);
-    
-    uint32_t i        = 0;
-    int      ret      = -1;
-
-    int param_overflow = 0;
-    
-
-    log_debug("Parsing JSON String:\n%s\n", str);
-    
-    /* Initialize JSMN parser */
-    jsmn_init(&parser);
-
-    /* Allocate tokens */
-    tokens = calloc(sizeof(jsmntok_t), num_tokens);
-
-    if (tokens == NULL) {
-	log_error("Could not allocate JSMN tokens\n");
-	goto out;
-    }
-
-    memset(tokens, 0, sizeof(jsmntok_t) * num_tokens);
-    
-
-    /* Parse JSON */
-    ret = jsmn_parse(&parser, str, strlen(str), tokens, num_tokens);
-
-    if (ret == JSMN_ERROR_NOMEM) {
-	param_overflow = 1;
-    } else if (ret < 0) {
-	log_error("JSON Parse error (ret=%d)\n", ret);
-	goto out;
-    }
-
-#if 0
-    /* Null terminate all tokens */
-    for (i = 0; i < num_tokens; i++) {
-	str[tokens[i].end] = '\0';
-    }
-#endif
+    uint32_t i   = 0;
+    int      ret = 0;
     
     /* Check Params and grab values */
     for (i = 0; i < num_params; i++) {
+	struct nx_json * tgt_obj = NULL;
 
-	jsmntok_t * name_tok = &(tokens[(i * 2)]);
-	jsmntok_t *  val_tok = &(tokens[(i * 2) + 1]);
-	
-	char * name  = str + name_tok->start;
-	char * value = str +  val_tok->start;
-	
-	if (strncmp(params[i].name, name, strlen(params[i].name)) != 0) {
-	    log_error("Error matching JSON format (param.name = %s) (toke.name=%s)\n", params[i].name, name);
-	    goto out;
+	tgt_obj = nx_json_get(obj, params[i].name);
+
+	if (tgt_obj == NULL) {
+	    log_error("Invalid JSON for given parameters\n");
+	    return -1;
 	}
 
-
+	
 	switch (params[i].type) {
 	    case NEXUS_JSON_U8:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 		
-		ret = safe_strtou8(value, (uint8_t *)&(params[i].val));
-
-		if (ret == -1) {
+		if (tgt_obj->int_value > UCHAR_MAX) {
+		    ret = -1;		    
 		    log_error("NEXUS_JSON_U8 Conversion error\n");
 		    goto out;
 		}
+
+		params[i].val = tgt_obj->int_value;
 		
 		break;
 	    case NEXUS_JSON_S8:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 
-		ret = safe_strtoi8(value, (int8_t *)&(params[i].val));
 
-		if (ret == -1) {
+		if ((tgt_obj->int_value > SCHAR_MAX) ||
+		    (tgt_obj->int_value < SCHAR_MIN)) {
+		    ret = -1;		    
 		    log_error("NEXUS_JSON_S8 Conversion error\n");
 		    goto out;
 		}
-		
+
+		params[i].val = tgt_obj->int_value;
+
+
+
 		break;
 	    case NEXUS_JSON_U16:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 
-		ret = safe_strtou16(value, (uint16_t *)&(params[i].val));
-
-		if (ret == -1) {
+		if (tgt_obj->int_value > USHRT_MAX) {
+		    ret = -1;		    
 		    log_error("NEXUS_JSON_U16 Conversion error\n");
 		    goto out;
 		}
+
+		params[i].val = tgt_obj->int_value;
+
 		
+
 		break;
 	    case NEXUS_JSON_S16:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 
-		ret = safe_strtoi16(value, (int16_t *)&(params[i].val));
-
-		if (ret == -1) {
+		if ((tgt_obj->int_value > SHRT_MAX) ||
+		    (tgt_obj->int_value < SHRT_MIN)) {
+		    ret = -1;		    
 		    log_error("NEXUS_JSON_S16 Conversion error\n");
 		    goto out;
 		}
 
+		params[i].val = tgt_obj->int_value;
+
 		break;
 	    case NEXUS_JSON_U32:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 
-		ret = safe_strtou32(value, (uint32_t *)&(params[i].val));
-
-		if (ret == -1) {
+		if (tgt_obj->int_value > UINT_MAX) {
+		    ret = -1;		    
 		    log_error("NEXUS_JSON_U32 Conversion error\n");
 		    goto out;
 		}
-		
+
+		params[i].val = tgt_obj->int_value;
+	
 		break;
 	    case NEXUS_JSON_S32:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 
 		}
-		
-		ret = safe_strtoi32(value, (int32_t *)&(params[i].val));
 
-		if (ret == -1) {
+		if ((tgt_obj->int_value > INT_MAX) ||
+		    (tgt_obj->int_value < INT_MIN)) {
+		    ret = -1;		    
 		    log_error("NEXUS_JSON_S32 Conversion error\n");
 		    goto out;
 		}
 
+		params[i].val = tgt_obj->int_value;
+
 		break;
 	    case NEXUS_JSON_U64:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 
-		ret = safe_strtou64(value, (uint64_t *)&(params[i].val));
-
-		if (ret == -1) {
-		    log_error("NEXUS_JSON_U64 Conversion error\n");
-		    goto out;
-		}
+		params[i].val = tgt_obj->int_value;
 
 		break;
 	    case NEXUS_JSON_S64:
-		if (val_tok->type != JSMN_PRIMITIVE) {
+		if (tgt_obj->type != NX_JSON_INTEGER) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
 
-		ret = safe_strtoi64(value, (int64_t *)&(params[i].val));
-
-		if (ret == -1) {
-		    log_error("NEXUS_JSON_S64 Conversion error\n");
-		    goto out;
-		}
+		params[i].val = tgt_obj->int_value;
 
 		break;
+	   
 	    case NEXUS_JSON_STRING: {
-		int tmp_len = val_tok->end - val_tok->start;
 		
-		if (val_tok->type != JSMN_STRING) {
+		if (tgt_obj->type != NX_JSON_STRING) {
 		    log_error("JSON Error: type mismatch\n");
 		    goto out;
 		}
-		
-		params[i].ptr = calloc(tmp_len + 1, 1);
-		strncpy(params[i].ptr, value, tmp_len);
+
+		params[i].ptr = tgt_obj->text_value;
 		
 		break;
 	    }
+	    case NEXUS_JSON_OBJECT:
+		log_error("NEXUS_JSON_OBJECT not currently supported\n");
+		goto out;
 	    default:
 		log_error("Error Invalid Parameter Type (%d)\n", params[i].type);
 		goto out;
@@ -515,38 +280,13 @@ nexus_json_parse(char                    * str,
 	
     }
 
-    if (param_overflow) {
-	ret = 1;
-    } else {
-	ret = 0;
-    }
-    
- out:
-    
+
+ out:   
     if (ret < 0) {
 	log_error("Error Parsing JSON value\n");
     }
     
-    if (tokens) nexus_free(tokens);
-
-    
+  
     return ret;
     
-}
-
-/* For now just free temporary strings allocated in the params */
-int
-nexus_json_release_params(struct nexus_json_param * params,
-			  uint32_t                  num_params)
-{
-    uint32_t i = 0;
-
-    for (i = 0; i < num_params; i++) {
-	if ( (params[i].type == NEXUS_JSON_STRING) &&
-	     (params[i].val  != (uintptr_t)NULL) ){
-	    nexus_free(params[i].ptr);
-	}
-    }
-    
-    return 0;
 }

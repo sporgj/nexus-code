@@ -12,54 +12,40 @@
 struct nexus_volume *
 nexus_load_volume(char * volume_path)
 {
-    struct nexus_volume * volume = NULL;
+
+    struct nexus_volume * volume       = NULL;
+    nexus_json_obj_t      nexus_config = NEXUS_JSON_INVALID_OBJ;
 
     char   * conf_path = NULL;	
-    char   * conf_data = NULL;
-    size_t   conf_size = 0;
-
-    struct nexus_json_param vol_config[4] = { {"backend",      NEXUS_JSON_STRING, {0} },
-					      {"metadata_url", NEXUS_JSON_STRING, {0} },
-					      {"supernode",    NEXUS_JSON_STRING, {0} } };
+    char   * supernode = NULL;
     
     int ret = 0;
 
     ret = asprintf(&conf_path, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
-
+    
     if (ret == -1) {
 	log_error("Could not create config path\n");
 	return NULL;
     }
-    
-    ret = nexus_read_raw_file(conf_path, (uint8_t **)&conf_data, &conf_size);
+
+    // Load JSON config params
+    nexus_config = nexus_json_parse_file(conf_path);
 
     nexus_free(conf_path);
     
     if (ret == -1) {
 	log_error("Failed to load Nexus Volume (%s)\n", volume_path);
-	return NULL;
-    }
-    
-    
-    ret = nexus_json_parse((char *)conf_data, vol_config, 3);
-
-    if (ret < 0) {
-	log_error("Could not parse volume config file\n");
 	goto err;
     }
-
-
     
+    supernode = nexus_json_get_string(nexus_config, "supernode");
     
-    nexus_free(conf_data);
-    nexus_json_release_params(vol_config, 3);
+
+    log_error("Supernode=%s\n", supernode);
     
     return volume;
 
  err:
-    if (conf_data) nexus_free(conf_data);
-
-    nexus_json_release_params(vol_config, 3);
 
     if (volume) nexus_free(volume);
 

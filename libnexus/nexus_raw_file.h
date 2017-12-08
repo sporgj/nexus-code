@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 int nexus_read_raw_file(char    * path,
-			void   ** buf,
+			uint8_t ** buf,
 			size_t  * size);
 
 
