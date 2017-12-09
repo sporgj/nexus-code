@@ -20,7 +20,7 @@ static struct nexus_hashtable * backend_table = NULL;
  * This is a place holder to ensure that the _nexus_backends section gets created by gcc
  */
 static struct {} null_backend  __attribute__((__used__))                    \
-__attribute__((unused, __section__ ("_v3_backends"),                  \
+__attribute__((used, __section__ ("_nexus_backends"),                  \
                    aligned(sizeof(uintptr_t))));
 
 
@@ -54,6 +54,8 @@ nexus_backend_init()
 
     int i = 0;
 
+    log_debug("Initializing Nexus Backends\n");
+    
     backend_table = nexus_create_htable(0, backend_hash_fn, backend_eq_fn);
 
 

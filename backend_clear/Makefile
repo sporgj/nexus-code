@@ -1,27 +1,31 @@
-
 include ../build.mk
 
-buildpath = ../build
 
-INCLUDES = -I. -I../mbedtls-2.6.0/include
+INCLUDES := -I../libnexus \
+	    -I../mbedtls-2.6.0/include
 
-CFLAGS = -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
+CFLAGS   := -W -Wall -Werror \
+	    -Wno-nonnull -Wno-unused-parameter -Wno-attributes \
+	    -D_GNU_SOURCE \
 
-
+# setup debug info
 ifeq ($(DEBUG), 1)
-	CFLAGS += -g3 -DDEBUG
+	CFLAGS += -O0 -g3
+else
+	CFLAGS += -O2
 endif
 
 
-objs :=	nexus_main.o \
-	nexus_volume.o \
-	nexus_backend.o \
-	nexus_hashtable.o \
-	nexus_util.o \
-	nexus_key.o \
-	nexus_uuid.o \
-	nexus_raw_file.o \
-	nexus_json.o
+
+LDFLAGS  := -L../mbedtls-2.6.0/library
+
+libs     := -luuid
+
+#  -lmbedcrypto \
+
+
+
+objs := main.o \
 
 
 
@@ -35,18 +39,20 @@ build = \
         fi
 
 
-all: libnexus.a 
-	@cp $^ $(buildpath)
+all: backend_clear.a
+	@cp backend_clear.a ../build
 
 % : %.c
-	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) $< -o $@)
+	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
 
 %.o : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
 
 
-libnexus.a: $(objs)
+backend_clear.a:  $(objs) 
 	$(call build,AR,$(AR) rcs $@ $^)
+
+
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -62,7 +68,7 @@ cscope:
 
 
 clean:
-	rm -f $(wildcard *.o *.so *.a) cscope.*a
+	rm -f $(wildcard *.o *.a *.so) cscope.* nexus_enclave_u.*
 
 
-.PHONY: clean
+.PHONY: clean 

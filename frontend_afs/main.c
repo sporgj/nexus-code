@@ -19,22 +19,19 @@
 
 
 #define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"
-#define DEFAULT_METADATA_PATH     DEFAULT_VOLUME_PATH "/metadata"
-#define DEFAULT_DATAFOLDER_PATH   DEFAULT_VOLUME_PATH "/datafolder"
 
 #define DEFAULT_VOL_KEY_FILENAME  "$HOME/.nexus/volume_key"
 #define DEFAULT_PUB_KEY_FILENAME  "$HOME/.nexus/public_key"
 #define DEFAULT_PRV_KEY_FILENAME  "$HOME/.nexus/private_key"
 
-static char * metadata_dirpath     = NULL;
-static char * datafolder_dirpath   = NULL;
+
+static char * volume_path          = NULL;
 
 static char * vol_key_filename     = NULL;
 static char * pub_key_filename     = NULL;
 static char * prv_key_filename     = NULL;
 
-static int cmd_line_metadata_dir   = 0;
-static int cmd_line_datafolder_dir = 0;
+static int cmd_line_vol_path       = 0;
 static int cmd_line_prv_key        = 0;
 static int cmd_line_pub_key        = 0;
 static int cmd_line_vol_key        = 0;
@@ -42,26 +39,23 @@ static int cmd_line_vol_key        = 0;
 static int 
 set_defaults()
 {
-    wordexp_t metadata_path_exp;
-    wordexp_t datafolder_path_exp;
+    wordexp_t volume_path_exp;
     wordexp_t vol_key_filename_exp;
     wordexp_t pub_key_filename_exp;
     wordexp_t prv_key_filename_exp;
 
-    wordexp(DEFAULT_METADATA_PATH,    &metadata_path_exp, 0);
-    wordexp(DEFAULT_DATAFOLDER_PATH,  &datafolder_path_exp, 0);
+    wordexp(DEFAULT_VOLUME_PATH,      &volume_path_exp,      0);
     wordexp(DEFAULT_VOL_KEY_FILENAME, &vol_key_filename_exp, 0);
     wordexp(DEFAULT_PUB_KEY_FILENAME, &pub_key_filename_exp, 0);
     wordexp(DEFAULT_PRV_KEY_FILENAME, &prv_key_filename_exp, 0);
 
-    metadata_dirpath   = strndup(metadata_path_exp.we_wordv[0], PATH_MAX);
-    datafolder_dirpath = strndup(datafolder_path_exp.we_wordv[0], PATH_MAX);
+    
+    volume_path        = strndup(volume_path_exp.we_wordv[0],      PATH_MAX);
     vol_key_filename   = strndup(vol_key_filename_exp.we_wordv[0], PATH_MAX);
     pub_key_filename   = strndup(pub_key_filename_exp.we_wordv[0], PATH_MAX);
     prv_key_filename   = strndup(prv_key_filename_exp.we_wordv[0], PATH_MAX);
 
-    wordfree(&metadata_path_exp);
-    wordfree(&datafolder_path_exp);
+    wordfree(&volume_path_exp);
     wordfree(&vol_key_filename_exp);
     wordfree(&pub_key_filename_exp);
     wordfree(&prv_key_filename_exp);
@@ -233,9 +227,10 @@ usage(void)
     return;
 }
 
+
+
 static struct option long_options[] = {
-    { "metadata_dir" , required_argument , &cmd_line_metadata_dir   ,  1  }, /* 0 */
-    { "data_dir"     , required_argument , &cmd_line_datafolder_dir ,  1  }, /* 1 */
+    { "volume"       , required_argument , &cmd_line_vol_path       ,  1  }, /* 1 */
     { "prv_key"      , required_argument , &cmd_line_prv_key        ,  1  }, /* 2 */
     { "pub_key"      , required_argument , &cmd_line_pub_key        ,  1  }, /* 3 */
     { "vol_key"      , required_argument , &cmd_line_vol_key        ,  1  }, /* 4 */
@@ -250,8 +245,9 @@ main(int argc, char ** argv)
     /* Setup default path strings with ENV expansions */
     set_defaults();
 
-    
-    /* Override defaults with command line arguments */
+
+
+  /* Override defaults with command line arguments */
     {
  	int  opt_index = 0;
 	char c = 0;
@@ -263,26 +259,21 @@ main(int argc, char ** argv)
 		case 0:
 		    switch (opt_index) {
 			case 0:
-			    nexus_free(metadata_dirpath);
-			    metadata_dirpath = optarg;
+			    nexus_free(volume_path);
+			    volume_path = optarg;
 			    break;
 
 			case 1:
-			    nexus_free(datafolder_dirpath);
-			    datafolder_dirpath = optarg;
-			    break;
-
-			case 2:
 			    nexus_free(prv_key_filename);
 			    prv_key_filename = optarg;
 			    break;
 
-			case 3:
+			case 2:
 			    nexus_free(pub_key_filename);
 			    pub_key_filename = optarg;
 			    break;
 
-			case 4:
+			case 3:
 			    nexus_free(vol_key_filename);
 			    vol_key_filename = optarg;
 			    break;
@@ -301,9 +292,6 @@ main(int argc, char ** argv)
     
     
     printf("Launching Nexus-AFS.\n");
-    printf("\t data folder: %s\n", datafolder_dirpath);
-    printf("\t    metadata: %s\n", metadata_dirpath);
-    fflush(stdout);
 
     // initialize libnexus and mount the volume
     {
@@ -314,14 +302,12 @@ main(int argc, char ** argv)
 	    return -1;
 	}
 
-        ret = nexus_mount_volume(metadata_dirpath,
-                                 datafolder_dirpath,
-                                 vol_key_filename,
+        ret = nexus_mount_volume(volume_path,
+				 vol_key_filename,
                                  pub_key_filename,
                                  prv_key_filename);
 	if (ret != 0) {
 	    log_error("could not mount volume :(");
-	    nexus_exit();
 	    return -1;
 	}
     }
@@ -330,7 +316,7 @@ main(int argc, char ** argv)
     {
 	int volume_fd   = 0;
 	
-	volume_fd = attach_volume(datafolder_dirpath);
+	volume_fd = attach_volume(volume_path);
 	
 	if (volume_fd == -1) {
 	    log_error("could not create volume\n");

@@ -1,0 +1,7 @@
+create libnexus.a
+addlib ./build/libnexus.a
+addlib ./build/libmbedcrypto.a
+addlib ./build/backend_clear.a
+save
+end
+

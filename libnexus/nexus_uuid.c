@@ -16,6 +16,7 @@ nexus_generate_uuid(struct nexus_uuid * uuid)
 }
 
 
+#if 0
 char *
 nexus_uuid_to_string(struct nexus_uuid * uuid)
 {
@@ -33,3 +34,4 @@ nexus_uuid_to_string(struct nexus_uuid * uuid)
 
     return uuid_str;
 }
+#endif

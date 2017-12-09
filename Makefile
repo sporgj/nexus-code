@@ -4,28 +4,16 @@ nexus_home := $(PWD)
 build_path := $(nexus_home)/build/
 
 nexus_frontends := 	frontend_afs \
-#			frontend_stub
+			frontend_shell
 
-nexus_backends  :=	backend_sgx \
-#		     	backend_stub
+nexus_backends  :=     	backend_clear \
+#			backend_sgx
 
-nexus_metadata_store := metadata_store
+nexus_metadata_store := 
+#metadata_store
 
-release_components :=   libnexus.a \
-			backend_sgx.so \
-			frontend_afs.a \
-			libmbedcrypto.a \
-			metadata_store.a \
-			libnexus.a
 
-create_volume_components := \
-	nexus_create_volume.o \
-	libnexus.a \
-	backend_sgx.so \
-	libmbedcrypto.a \
-	metadata_store.a \
-	libnexus.a
-
+components := libmbedcypto.a libnexus.a $(addsuffix .a, $(nexus_backends) $(nexus_metadata_store))
 
 LDFLAGS := -L$(nexus_home)/mbedtls-2.6.0/library \
 	   -L$(SGX_SDK)/lib64
@@ -55,13 +43,7 @@ build = \
 
 
 
-all: mbedtls frontends backends metadata_store libnexus nx-create-volume
-	@$(CC) $(addprefix $(build_path),$(release_components) $(release_components)) $(LDFLAGS) $(libs) -o nexus
-
-dev: frontends backends metadata_store libnexus
-# link the debug versions
-	$(CC) $(addprefix $(build_path), libnexus.a metadata_store.a backend_stub.a frontend_afs.a libnexus.a)  -luuid -o nexus-afs-test
-	$(CC) $(addprefix $(build_path), libnexus.a metadata_store.a backend_sgx.a  frontend_stub.a libnexus.a) -luuid -o nexus-sgx-test
+all: mbedtls backends metadata_store libnexus frontends
 
 
 
@@ -71,23 +53,19 @@ $(nexus_frontends):
 	$(call build,BUILDING, make -C $@)
 
 
-
-
 backends: $(nexus_backends)
 
 $(nexus_backends):
 	$(call build,BUILDING, make -C $@)
 
 
-metadata_store:
+$(metadata_store):
 	$(call build,BUILDING, make -C $@)
 
 
 libnexus:
 	$(call build,BUILDING, make -C $@)
-
-nx-create-volume: libnexus
-	@$(CC) $(addprefix $(build_path),$(create_volume_components)) $(LDFLAGS) $(libs) -luuid -o $@
+	$(call build,AR,$(AR) -M < libnexus.mri)
 
 
 mbedtls:
@@ -99,10 +77,9 @@ mbedtls:
 clean:
 	make -C $(nexus_home)/libnexus clean
 	make -C $(nexus_home)/mbedtls-2.6.0/library clean
-	@$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean)
-	@make -C $(nexus_home)/$(nexus_metadata_store) clean
-	@$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean)
-	rm -f nx-create-volume nexus nexus_enclave.signed.so
+#	@make -C $(nexus_home)/$(nexus_metadata_store) clean
+	$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean;)
+	$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean;)
 
 
 .PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) metadata_store clean mbedtls

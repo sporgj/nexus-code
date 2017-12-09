@@ -2,7 +2,8 @@
 buildpath = ../build
 
 INCLUDES := -I../libnexus
-CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
+CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter  -std=gnu11 $(INCLUDES)
+LDFLAGS =  -Wl,--whole-archive
 
 CC = gcc
 AR = ar
@@ -14,8 +15,7 @@ exec_objs :=	main.o \
 execs := nexus_shell
 
 
-libs := ../build/libnexus.a \
-	../build/libmbedcrypto.a
+libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid
 
 build = \
         @if [ -z "$V" ]; then \
@@ -39,7 +39,7 @@ all: nexus_shell
 	$(call build,AR,$(AR) rcs $@ $^)
 
 nexus_shell: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
+	$(call build,CC,$(CC) $(CFLAGS)  $^  $(libs) -o $@)
 
 
 define cscope-all-sources
@@ -57,7 +57,7 @@ cscope:
 
 
 clean:
-	rm -f $(wildcard  $(exec_objs) cscope.* $(execs) *.o *.a)
+	rm -f  cscope.* $(execs) *.o *.a
 
 
 .PHONY: clean

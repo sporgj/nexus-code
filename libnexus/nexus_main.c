@@ -50,6 +50,9 @@ nexus_generate_metadata(struct nexus_volume * volume,
 int
 nexus_init()
 {
+
+    printf("Initializing Nexus\n");
+    
     nexus_backend_init();
 
     return 0;

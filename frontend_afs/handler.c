@@ -24,7 +24,7 @@ handle_create(uint8_t *  cmd_buf,
     int ret = -1;
 
     
-    ret = nexus_json_parse((char *)cmd_buf, create_cmd, 4);
+    ret = nexus_json_get_params((char *)cmd_buf, create_cmd, 4);
 
     if (ret < 0) {
 	log_error("Could not parse lookup command (%s)\n", cmd_buf);
@@ -48,8 +48,6 @@ handle_create(uint8_t *  cmd_buf,
 	
  out:
     
-    nexus_json_release_params(create_cmd, 4);
-    
     return ret;
 	
 }
@@ -70,7 +68,7 @@ handle_remove(uint8_t *  cmd_buf,
     int ret = -1;
 
     
-    ret = nexus_json_parse((char *)cmd_buf, remove_cmd, 4);
+    ret = nexus_json_get_params((char *)cmd_buf, remove_cmd, 4);
 
     if (ret < 0) {
 	log_error("Could not parse lookup command (%s)\n", cmd_buf);
@@ -95,8 +93,6 @@ handle_remove(uint8_t *  cmd_buf,
 	
  out:
     
-    nexus_json_release_params(remove_cmd, 4);
-    
     return ret;
 	
 }
@@ -117,7 +113,7 @@ handle_lookup(uint8_t   * cmd_buf,
     int ret = -1;
 
     
-    ret = nexus_json_parse((char *)cmd_buf, lookup_cmd, 4);
+    ret = nexus_json_get_params((char *)cmd_buf, lookup_cmd, 4);
 
     if (ret < 0) {
 	log_error("Could not parse lookup command (%s)\n", cmd_buf);
@@ -140,8 +136,6 @@ handle_lookup(uint8_t   * cmd_buf,
 	
  out:
     
-    nexus_json_release_params(lookup_cmd, 4);
-    
     return ret;
 	
 }
@@ -161,7 +155,7 @@ handle_filldir(uint8_t   * cmd_buf,
 
     int ret = -1;
 
-    ret = nexus_json_parse((char *)cmd_buf, filldir_cmd, 4);
+    ret = nexus_json_get_params((char *)cmd_buf, filldir_cmd, 4);
 
     if (ret < 0) {
 	log_error("Could not parse filldir command (%s)\n", cmd_buf);
@@ -184,8 +178,6 @@ handle_filldir(uint8_t   * cmd_buf,
 	
  out:
     
-    nexus_json_release_params(filldir_cmd, 4);
-    
     return ret;
 
 
@@ -203,7 +195,7 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
 
     int    ret      = 0;
 
-    ret = nexus_json_parse((char *)cmd_buf, &op_code, 1);
+    ret = nexus_json_get_params((char *)cmd_buf, &op_code, 1);
 
     if (ret < 0) {
 	log_error("Error parsing nexus command\n");
@@ -228,8 +220,6 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
 	    ret = -1;
 	    break;
     }
-
-    nexus_json_release_params(&op_code, 1);
     
     
     

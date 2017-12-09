@@ -11,7 +11,7 @@ extern "C" {
 #include "nexus_types.h"
 
 
-int nexus_init();
+int nexus_init(void);
 
 
 // volume management

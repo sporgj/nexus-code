@@ -81,7 +81,7 @@ struct nexus_backend_impl {
     __attribute__((used))								\
 	 __attribute__((unused, __section__("_nexus_backends"),				\
 			aligned(sizeof(void *))))					\
-	 = backend;
+	 = &backend;
 
 
 
