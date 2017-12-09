@@ -1,6 +1,8 @@
 #include <sys/stat.h>
 
 #include <nexus_volume.h>
+#include <nexus_backend.h>
+
 #include <nexus_key.h>
 
 #include <nexus_util.h>
@@ -44,6 +46,14 @@ nexus_generate_metadata(struct nexus_volume * volume,
 }
 #endif
 
+
+int
+nexus_init()
+{
+    nexus_backend_init();
+
+    return 0;
+}
 
 
 

@@ -137,6 +137,8 @@ main(int argc, char ** argv)
 	}
     }
     
+
+    nexus_init();
     
     printf("Launching Nexus-AFS.\n");
     printf("Volume : %s\n", volume_path);

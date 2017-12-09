@@ -13,6 +13,7 @@ endif
 
 objs :=	nexus_main.o \
 	nexus_volume.o \
+	nexus_backend.o \
 	nexus_util.o \
 	nexus_key.o \
 	nexus_uuid.o \
