@@ -17,6 +17,7 @@ nexus_create_volume(char * volume_path)
 
     // Write config file
 
+    return NULL;
 }
 
 

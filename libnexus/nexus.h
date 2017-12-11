@@ -15,17 +15,6 @@ int nexus_init(void);
 
 
 // volume management
-int
-nexus_create_volume(const char * metadata_dirpath,
-                    const char * publickey_fpath,
-                    const char * volumekey_fpath);
-
-int
-nexus_mount_volume(char * volume_path,
-		   char * vol_key_path,
-                   char * pub_key_path,
-                   char * prv_key_path);
-
 
 
 

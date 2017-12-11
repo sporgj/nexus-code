@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <nexus_uuid.h>
 
 int nexus_datastores_init();
 int nexus_datastores_exit();
@@ -11,6 +12,8 @@ int nexus_datastores_exit();
 struct nexus_datastore_impl {
     char * name;
 
+    int (*init)();
+
     int (*get_uuid)(struct nexus_uuid  * uuid,
 		    char               * path,
 		    uint8_t           ** buf,
@@ -18,7 +21,7 @@ struct nexus_datastore_impl {
 
     int (*put_uuid)(struct nexus_uuid * uuid,
 		    char              * path,
-		    uin8_t            * buf,
+		    uint8_t           * buf,
 		    uint32_t            size);
 
 
@@ -27,6 +30,11 @@ struct nexus_datastore_impl {
     
 };
 
+
+
+struct nexus_datastore {
+    struct nexus_datastore_impl * impl;
+};
 
 
 #define nexus_register_datastore(datastore)				\
