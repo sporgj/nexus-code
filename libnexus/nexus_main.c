@@ -68,28 +68,15 @@ nexus_mount_volume(char * volume_path,
 {
     struct nexus_volume * volume  = NULL;
 
-    struct nexus_key    * vol_key = NULL;
-    struct nexus_key    * pub_key = NULL;
     struct nexus_key    * prv_key = NULL;
     
     int    ret  = -1;
 
 
     /* Grab the keys */
-    vol_key = nexus_load_key_from_file(vol_key_path);
-    pub_key = nexus_load_key_from_file(pub_key_path);
     prv_key = nexus_load_key_from_file(prv_key_path);
 
 
-    if (vol_key == NULL) {
-	log_error("Could not load volume key (%s)\n", vol_key_path);
-	goto err;
-    }
-	
-    if (pub_key == NULL) {
-	log_error("Could not load public key (%s)\n", pub_key_path);
-	goto err;
-    }
     
     if (prv_key == NULL) {
 	log_error("Could not load private_key (%s)\n", prv_key_path);
@@ -148,8 +135,6 @@ out:
 
     return ret;
 err:
-    if (vol_key) nexus_free(vol_key);
-    if (pub_key) nexus_free(pub_key);
     if (prv_key) nexus_free(prv_key);
 
     if (volume) nexus_close_volume(volume);    

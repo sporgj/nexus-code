@@ -6,10 +6,8 @@
 struct nexus_volume {
     char * volume_path;
 
-    char * metadata_path;
-    char * data_path;
 
-    struct nexus_key    * volume_key;
+    struct nexus_backend * backend;
 
     // struct supernode    * supernode;
     //struct nexus_dentry * root_dentry;

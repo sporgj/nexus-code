@@ -86,3 +86,53 @@ nexus_backend_init()
     
     return 0;
 }
+
+
+
+
+struct nexus_backend *
+nexus_backend_launch(char * name)
+{
+    struct nexus_backend      * backend = NULL;
+    struct nexus_backend_impl * impl    = NULL;
+
+    int ret = 0;
+    
+    impl = nexus_htable_search(backend_table, (uintptr_t)name);
+
+    if (impl == NULL) {
+	log_error("Could not find backend implementation for (%s)\n", name);
+	return NULL;
+    }
+
+    backend = calloc(sizeof(struct nexus_backend), 1);
+
+    if (backend == NULL) {
+	log_error("Could not allocate nexus_backend\n");
+	return NULL;
+    }
+
+
+    log_debug("initializing backend (%s)\n", name);
+    
+    ret = impl->init();
+
+    if (ret != 0) {
+	log_error("Error initializing backend (%s)\n", name);
+	nexus_free(backend);
+	return NULL;
+    }
+
+    backend->impl = impl;
+
+    return backend;
+}
+
+
+void
+nexus_backend_shutdown(struct nexus_backend * backend)
+{
+    log_debug("Shutting down nexus backend (%s)\n", backend->impl->name);
+
+
+}

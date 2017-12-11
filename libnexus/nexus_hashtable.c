@@ -424,7 +424,7 @@ nexus_htable_dec(struct nexus_hashtable * htable,
 
 
 /* returns value associated with key */
-uintptr_t
+void *
 nexus_htable_search(struct nexus_hashtable * htable, 
 		    uintptr_t                key) 
 {
@@ -441,13 +441,13 @@ nexus_htable_search(struct nexus_hashtable * htable,
 	if ( (hash_value == cursor->hash) && 
 	     (htable->eq_fn(key, cursor->key)) ) {
 
-	    return cursor->value;
+	    return (void *)cursor->value;
 	}
     
 	cursor = cursor->next;
     }
   
-    return (uintptr_t)NULL;
+    return NULL;
 }
 
 

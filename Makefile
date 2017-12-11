@@ -4,7 +4,7 @@ nexus_home := $(PWD)
 build_path := $(nexus_home)/build/
 
 nexus_frontends := 	frontend_afs \
-			frontend_shell
+			shell
 
 nexus_backends  :=     	backend_clear \
 #			backend_sgx

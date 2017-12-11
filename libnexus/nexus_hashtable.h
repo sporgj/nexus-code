@@ -106,7 +106,7 @@ int nexus_htable_change(struct nexus_hashtable * htable, uintptr_t key, uintptr_
 
 
 // returns the value associated with the key, or NULL if none found
-uintptr_t nexus_htable_search(struct nexus_hashtable * htable, uintptr_t key);
+void * nexus_htable_search(struct nexus_hashtable * htable, uintptr_t key);
 
 // returns the value associated with the key, or NULL if none found
 uintptr_t nexus_htable_remove(struct nexus_hashtable * htable, uintptr_t key, int free_key);

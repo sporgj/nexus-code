@@ -14,11 +14,29 @@
 #include <nexus_key.h>
 #include <nexus_uuid.h>
 
-int
-nexus_backend_init();
 
-int
-nexus_backend_exit();
+
+
+
+
+struct nexus_backend {
+
+    struct nexus_backend_impl * impl;
+
+};
+
+
+
+struct nexus_backend * nexus_backend_launch(char * name);
+
+void nexus_backend_shutdown(struct nexus_backend * backend);
+
+
+
+
+
+
+
 
 
 
@@ -66,22 +84,24 @@ struct nexus_backend_impl {
 };
 
 
-
-
-
-
-
-
-
-
-
-
 #define nexus_register_backend(backend)							\
     static struct nexus_backend_impl * _nexus_backend					\
     __attribute__((used))								\
 	 __attribute__((unused, __section__("_nexus_backends"),				\
 			aligned(sizeof(void *))))					\
 	 = &backend;
+
+
+
+
+int
+nexus_backend_init();
+
+int
+nexus_backend_exit();
+
+
+
 
 
 
