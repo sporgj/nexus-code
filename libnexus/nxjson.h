@@ -63,17 +63,14 @@ static char * nx_json_serialize(struct nx_json * json);
 static void nx_json_free(struct nx_json * js);
 
 static struct nx_json * nx_json_get(struct nx_json * json, char * key); // get object's property by key
-//static int              nx_json_set(struct nx_json * json, char * key, struct nx_json * val);
+static int              nx_json_set(struct nx_json * json, char * key, struct nx_json * val);
 static int              nx_json_add(struct nx_json * json, char * key, struct nx_json * new_val);
-//static int              nx_json_del(struct nx_json * json, char * key);
+static int              nx_json_del(struct nx_json * json, char * key);
 
-#if 0
-// Disabled for now so we don't have compile errors
 static struct nx_json * nx_json_get_item(struct nx_json * json, int idx); // get array element by index
 static int              nx_json_set_item(struct nx_json * json, int idx, struct nx_json * val);
 static int              nx_json_add_item(struct nx_json * json, struct nx_json * new_item);
 static int              nx_json_del_item(struct nx_json * json, int idx);
-#endif
 
 #ifdef  __cplusplus
 }

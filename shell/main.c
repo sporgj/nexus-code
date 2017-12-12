@@ -158,8 +158,28 @@ main(int argc, char ** argv)
 
 	
 	out_str = nexus_json_serialize(obj);
-
 	printf("Serialized: (%s)\n", out_str);
+	free(out_str);
+
+	nexus_json_obj_t tmp_obj = nexus_json_get_object(obj, "web-app");	
+
+	if (tmp_obj == NULL) {
+	    printf("ERROR Could not find servlet-mapping\n");
+	    return -1;
+	}
+	      
+
+	tmp_obj = nexus_json_get_object(tmp_obj, "servlet-mapping");
+	
+	nexus_json_set_string(tmp_obj, "cofaxAdmin", "jarusl");
+	nexus_json_add_u16(tmp_obj, "test short", 9991);
+	
+	
+	out_str = nexus_json_serialize(obj);
+	printf("Serialized: (%s)\n", out_str);
+	free(out_str);
+
+	
 	
     }
     

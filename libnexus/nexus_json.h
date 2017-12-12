@@ -32,12 +32,12 @@ struct nexus_json_param {
 };
 
 
-
-
+/* Batch query for a set of parameters */
 int
 nexus_json_get_params(nexus_json_obj_t          obj,
 		      struct nexus_json_param * params,
 		      uint32_t                  num_params);
+
 
 
 nexus_json_obj_t
@@ -47,23 +47,23 @@ nexus_json_obj_t
 nexus_json_parse_file(char * file_name);
 
 
-nexus_json_obj_t
-nexus_json_parse_file(char * str);
-
-void
-nexus_json_free_object(nexus_json_obj_t object);
+/* Free a parsed JSON structure */
+void nexus_json_free(nexus_json_obj_t object);
 
 
 
 
-
+/* 
+ * Object Accessors 
+ */
 nexus_json_obj_t nexus_json_get_object(nexus_json_obj_t obj, char * key);
 int              nexus_json_add_object(nexus_json_obj_t obj, char * key);
 int              nexus_json_del_object(nexus_json_obj_t obj);
 
 
-int nexus_json_del(nexus_json_obj_t obj, char * key);
-
+/* 
+ * Object Member Accessors 
+ */
 
 /* Return a parameter from the JSON tree */
 int nexus_json_get_string(nexus_json_obj_t obj, char * key, char    ** val);
@@ -117,7 +117,75 @@ int nexus_json_add_u16   (nexus_json_obj_t obj, char * key, uint16_t val);
 int nexus_json_add_u32   (nexus_json_obj_t obj, char * key, uint32_t val);
 int nexus_json_add_u64   (nexus_json_obj_t obj, char * key, uint64_t val);
 
+/* Delete a parameter */
+int nexus_json_del_by_key(nexus_json_obj_t obj, char * key);
 
+
+/* 
+ * Array Accessors 
+ */
+nexus_json_obj_t nexus_json_get_array(nexus_json_obj_t obj, char * key);
+int              nexus_json_add_array(nexus_json_obj_t obj, char * key);
+int              nexus_json_del_array(nexus_json_obj_t obj);
+
+
+/* 
+ * Array Item Accessors
+ */
+
+/* Get an array item  */
+int nexus_json_array_get_string(nexus_json_obj_t obj, int idx, char    ** val);
+
+int nexus_json_array_get_bool  (nexus_json_obj_t obj, int idx, int      * val);
+int nexus_json_array_get_int   (nexus_json_obj_t obj, int idx, int      * val);
+int nexus_json_array_get_double(nexus_json_obj_t obj, int idx, double   * val);
+
+int nexus_json_array_get_s8    (nexus_json_obj_t obj, int idx, int8_t   * val);
+int nexus_json_array_get_s16   (nexus_json_obj_t obj, int idx, int16_t  * val);
+int nexus_json_array_get_s32   (nexus_json_obj_t obj, int idx, int32_t  * val);
+int nexus_json_array_get_s64   (nexus_json_obj_t obj, int idx, int64_t  * val);
+
+int nexus_json_array_get_u8    (nexus_json_obj_t obj, int idx, uint8_t  * val);
+int nexus_json_array_get_u16   (nexus_json_obj_t obj, int idx, uint16_t * val);
+int nexus_json_array_get_u32   (nexus_json_obj_t obj, int idx, uint32_t * val);
+int nexus_json_array_get_u64   (nexus_json_obj_t obj, int idx, uint64_t * val);
+
+/* Set the value of an existing array item */
+int nexus_json_array_set_string(nexus_json_obj_t obj, int idx, char     * val);
+
+int nexus_json_array_set_bool  (nexus_json_obj_t obj, int idx, int        val);
+int nexus_json_array_set_int   (nexus_json_obj_t obj, int idx, int        val);
+int nexus_json_array_set_double(nexus_json_obj_t obj, int idx, double     val);
+
+int nexus_json_array_set_s8    (nexus_json_obj_t obj, int idx, int8_t     val);
+int nexus_json_array_set_s16   (nexus_json_obj_t obj, int idx, int16_t    val);
+int nexus_json_array_set_s32   (nexus_json_obj_t obj, int idx, int32_t    val);
+int nexus_json_array_set_s64   (nexus_json_obj_t obj, int idx, int64_t    val);
+
+int nexus_json_array_set_u8    (nexus_json_obj_t obj, int idx, uint8_t    val);
+int nexus_json_array_set_u16   (nexus_json_obj_t obj, int idx, uint16_t   val);
+int nexus_json_array_set_u32   (nexus_json_obj_t obj, int idx, uint32_t   val);
+int nexus_json_array_set_u64   (nexus_json_obj_t obj, int idx, uint64_t   val);
+
+/* Add a new array item */
+int nexus_json_array_add_string(nexus_json_obj_t obj, char     * val);
+
+int nexus_json_array_add_bool  (nexus_json_obj_t obj, int        val);
+int nexus_json_array_add_int   (nexus_json_obj_t obj, int        val);
+int nexus_json_array_add_double(nexus_json_obj_t obj, double     val);
+
+int nexus_json_array_add_s8    (nexus_json_obj_t obj, int8_t     val);
+int nexus_json_array_add_s16   (nexus_json_obj_t obj, int16_t    val);
+int nexus_json_array_add_s32   (nexus_json_obj_t obj, int32_t    val);
+int nexus_json_array_add_s64   (nexus_json_obj_t obj, int64_t    val);
+
+int nexus_json_array_add_u8    (nexus_json_obj_t obj, uint8_t    val);
+int nexus_json_array_add_u16   (nexus_json_obj_t obj, uint16_t   val);
+int nexus_json_array_add_u32   (nexus_json_obj_t obj, uint32_t   val);
+int nexus_json_array_add_u64   (nexus_json_obj_t obj, uint64_t   val);
+
+/* Delete an array item */
+int nexus_json_array_del_item  (nexus_json_obj_t obj, int idx);
 
 
 

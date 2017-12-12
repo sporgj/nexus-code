@@ -95,14 +95,14 @@ nx_json_free(struct nx_json * js)
 		break;
 	    }
 
-	    iter     = iter->next;
 	    tmp_iter = iter;
+	    iter     = iter->next;
 	}
 	
 	assert(iter != NULL);
 	
 	if (tmp_iter == NULL) {
-	    parent->child = iter->next;
+	    parent->child  = iter->next;
 	} else {
 	    tmp_iter->next = iter->next;
 	}
@@ -116,17 +116,8 @@ nx_json_free(struct nx_json * js)
 
     
     /* Free everything contained in this object */
-    {
-	struct nx_json * p  = js->child;
-	struct nx_json * p1 = NULL;
-	
-	while (p) {
-	    p1 = p->next;
-	    
-	    nx_json_free(p);
-	    
-	    p  = p1;
-	}
+    while (js->child) {	    
+	nx_json_free(js->child);
     }
 
     
@@ -246,7 +237,10 @@ __nx_json_serialize(struct nx_json            * json,
 	    srlzer->lvl++;
 
 	    while (iter) {
-		__nx_json_serialize(iter, srlzer);
+		if (__nx_json_serialize(iter, srlzer) == -1) {
+		    return -1;
+		}
+		
 		iter = iter->next;
 
 		if (iter) {
@@ -273,7 +267,11 @@ __nx_json_serialize(struct nx_json            * json,
 
 
 	    while (iter) {
-		__nx_json_serialize(iter, srlzer);
+		if (__nx_json_serialize(iter, srlzer) == -1) {
+		    return -1;
+		}
+
+		
 		iter = iter->next;
 
 		if (iter) {
@@ -329,6 +327,7 @@ nx_json_serialize(struct nx_json * json)
     ret = __nx_json_serialize(json, &srlzer);
 
     if (ret != 0) {
+	log_error("Error serializing JSON\n");
 	NX_JSON_FREE(srlzer.str);
 	return NULL;
     }
@@ -374,6 +373,23 @@ nx_json_add(struct nx_json * json,
 	    break;
     }
     
+    return 0;
+}
+
+static int
+nx_json_del(struct nx_json * json,
+	    char           * key)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(json, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    nx_json_free(tgt_obj);
+
     return 0;
 }
 
@@ -835,10 +851,9 @@ nx_json_get(struct nx_json * json,
 
 
 
-#if 0
 static struct nx_json *
-nx_json_item(struct nx_json * json,
-	     int              idx)
+nx_json_get_item(struct nx_json * json,
+		 int              idx)
 {
     struct nx_json * js = NULL;
     
@@ -851,9 +866,106 @@ nx_json_item(struct nx_json * json,
 	}
     }
 
-    return NULL; // never return null
+    return NULL; 
 }
-#endif
+
+
+static int
+nx_json_set_item(struct nx_json * json,
+		 int              idx,
+		 struct nx_json * new_val)
+{
+    struct nx_json * tgt_item = NULL;
+
+    assert(json->type == NX_JSON_ARRAY);
+
+    tgt_item = nx_json_get_item(json, idx);
+    
+    if (tgt_item->type != new_val->type) {
+	log_error("Type mismatch\n");
+	return -1;
+    }
+
+    switch (new_val->type) {
+	case NX_JSON_STRING:
+	    tgt_item->raw_string = strdup(new_val->text_value);
+	    tgt_item->text_value = tgt_item->raw_string;
+	    break;
+	    
+	case NX_JSON_INTEGER:
+	case NX_JSON_BOOL:
+	    tgt_item->int_value = new_val->int_value;
+	    break;
+	    
+	case NX_JSON_DOUBLE:
+	    tgt_item->dbl_value = new_val->dbl_value;
+	    break;
+	    
+	case NX_JSON_ARRAY:
+	case NX_JSON_OBJECT:
+	case NX_JSON_NULL:
+	default:
+	    // Do nothing ?
+	    break;
+    }	
+
+    return 0;
+}
+
+static int
+nx_json_add_item(struct nx_json * json,
+		 struct nx_json * item)
+{
+    struct nx_json * new_item = NULL;
+
+    assert(json->type == NX_JSON_ARRAY);
+
+    new_item = create_json(item->type, NULL, json);
+
+    switch (item->type) {
+	case NX_JSON_STRING:
+	    new_item->raw_string = strdup(item->text_value);
+	    new_item->text_value = new_item->raw_string;
+	    break;
+	    
+	case NX_JSON_INTEGER:
+	case NX_JSON_BOOL:
+	    new_item->int_value = item->int_value;
+	    break;
+	    
+	case NX_JSON_DOUBLE:
+	    new_item->dbl_value = item->dbl_value;
+	    break;
+	    
+	case NX_JSON_ARRAY:
+	case NX_JSON_OBJECT:
+	case NX_JSON_NULL:
+	default:
+	    // Do nothing ?
+	    break;
+    }
+
+    return 0;
+}
+
+
+static int
+nx_json_del_item(struct nx_json * json,
+		 int              idx)
+{
+    struct nx_json * tgt_item = NULL;
+
+    assert(json->type == NX_JSON_ARRAY);
+
+    tgt_item = nx_json_get_item(json, idx);
+
+    nx_json_free(tgt_item);
+    
+    return 0;
+}
+
+
+
 
 #ifdef  __cplusplus
 }

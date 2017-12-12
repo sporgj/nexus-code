@@ -70,9 +70,9 @@ nexus_load_volume(char * volume_path)
     /* 
      * Initialize the backend 
      */
-    backend_str = nexus_json_get_string(volume_config, "backend");
+    ret = nexus_json_get_string(volume_config, "backend", &backend_str);
 
-    if (backend_str == NULL) {
+    if (ret  == -1) {
 	log_error("Invalid volume configuration. Missing backend\n");
 	goto err;
     }
@@ -88,7 +88,7 @@ nexus_load_volume(char * volume_path)
     /* 
      * parse volume UUID
      */
-    volume_id_str = nexus_json_get_string(volume_config, "volume_id");
+    ret = nexus_json_get_string(volume_config, "volume_id", &volume_id_str);
 
     log_debug("Volume_ID = %s\n", volume_id_str);
 
@@ -98,7 +98,7 @@ nexus_load_volume(char * volume_path)
     /* 
      * parse Supernode UUID
      */
-    supernode_str = nexus_json_get_string(volume_config, "supernode_id");
+    ret = nexus_json_get_string(volume_config, "supernode_id", &supernode_str);
     
     log_debug("Supernode_ID=%s\n", supernode_str);
 
