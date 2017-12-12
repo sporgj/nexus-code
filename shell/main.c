@@ -16,8 +16,10 @@
 #include <nexus.h>
 #include <nexus_log.h>
 #include <nexus_util.h>
+#include <nexus_json.h>
 
 #include "handler.h"
+
 
 
 #define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"
@@ -140,10 +142,30 @@ main(int argc, char ** argv)
 
     nexus_init();
     
-    printf("Launching Nexus-AFS.\n");
+    printf("Launching Nexus Shell.\n");
+
     printf("Volume : %s\n", volume_path);
+
+
+    {	
+	char * json_file = NULL;
+	char * out_str   = NULL;
+	nexus_json_obj_t obj = NEXUS_JSON_INVALID_OBJ;
+	
+	asprintf(&json_file, "%s/config.json", volume_path);
+
+	obj = nexus_json_parse_file(json_file);
+
+	
+	out_str = nexus_json_serialize(obj);
+
+	printf("Serialized: (%s)\n", out_str);
+	
+    }
     
-    // initialize libnexus and mount the volume
+#if 0
+
+       // initialize libnexus and mount the volume
     {
 	int ret = -1;
 
@@ -156,7 +178,7 @@ main(int argc, char ** argv)
 	    return -1;
 	}
     }
-
+#endif
 
 
     

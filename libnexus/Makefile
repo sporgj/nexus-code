@@ -46,8 +46,8 @@ all: libnexus.a
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
 
 
-libnexus.a: $(objs)
-	$(call build,AR,$(AR) rcs $@ $^)
+libnexus.a: $(objs) nxjson.c nxjson.h
+	$(call build,AR,$(AR) rcs $@ $(objs))
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \

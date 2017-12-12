@@ -57,11 +57,69 @@ nexus_json_free_object(nexus_json_obj_t object);
 
 
 
-nexus_json_obj_t 
-nexus_json_get_object(nexus_json_obj_t   obj,
-		      char             * key);
+nexus_json_obj_t nexus_json_get_object(nexus_json_obj_t obj, char * key);
+int              nexus_json_add_object(nexus_json_obj_t obj, char * key);
+int              nexus_json_del_object(nexus_json_obj_t obj);
+
+
+int nexus_json_del(nexus_json_obj_t obj, char * key);
+
+
+/* Return a parameter from the JSON tree */
+int nexus_json_get_string(nexus_json_obj_t obj, char * key, char    ** val);
+
+int nexus_json_get_bool  (nexus_json_obj_t obj, char * key, int      * val);
+int nexus_json_get_int   (nexus_json_obj_t obj, char * key, int      * val);
+int nexus_json_get_double(nexus_json_obj_t obj, char * key, double   * val);
+
+int nexus_json_get_s8    (nexus_json_obj_t obj, char * key, int8_t   * val);
+int nexus_json_get_s16   (nexus_json_obj_t obj, char * key, int16_t  * val);
+int nexus_json_get_s32   (nexus_json_obj_t obj, char * key, int32_t  * val);
+int nexus_json_get_s64   (nexus_json_obj_t obj, char * key, int64_t  * val);
+
+int nexus_json_get_u8    (nexus_json_obj_t obj, char * key, uint8_t  * val);
+int nexus_json_get_u16   (nexus_json_obj_t obj, char * key, uint16_t * val);
+int nexus_json_get_u32   (nexus_json_obj_t obj, char * key, uint32_t * val);
+int nexus_json_get_u64   (nexus_json_obj_t obj, char * key, uint64_t * val);
+
+/* Set the values of currently existing parameters */
+int nexus_json_set_string(nexus_json_obj_t obj, char * key, char * str);  
+							                  
+int nexus_json_set_bool  (nexus_json_obj_t obj, char * key, int      val);
+int nexus_json_set_int   (nexus_json_obj_t obj, char * key, int      val);
+int nexus_json_set_double(nexus_json_obj_t obj, char * key, double   val);
+							                  
+int nexus_json_set_s8    (nexus_json_obj_t obj, char * key, int8_t   val);
+int nexus_json_set_s16   (nexus_json_obj_t obj, char * key, int16_t  val);
+int nexus_json_set_s32   (nexus_json_obj_t obj, char * key, int32_t  val);
+int nexus_json_set_s64   (nexus_json_obj_t obj, char * key, int64_t  val);
+							                  
+int nexus_json_set_u8    (nexus_json_obj_t obj, char * key, uint8_t  val);
+int nexus_json_set_u16   (nexus_json_obj_t obj, char * key, uint16_t val);
+int nexus_json_set_u32   (nexus_json_obj_t obj, char * key, uint32_t val);
+int nexus_json_set_u64   (nexus_json_obj_t obj, char * key, uint64_t val);
+
+
+/* Add new parameters to the JSON tree */
+int nexus_json_add_string(nexus_json_obj_t obj, char * key, char * str);  
+							                  
+int nexus_json_add_bool  (nexus_json_obj_t obj, char * key, int      val);
+int nexus_json_add_int   (nexus_json_obj_t obj, char * key, int      val);
+int nexus_json_add_double(nexus_json_obj_t obj, char * key, double   val);
+							                  
+int nexus_json_add_s8    (nexus_json_obj_t obj, char * key, int8_t   val);
+int nexus_json_add_s16   (nexus_json_obj_t obj, char * key, int16_t  val);
+int nexus_json_add_s32   (nexus_json_obj_t obj, char * key, int32_t  val);
+int nexus_json_add_s64   (nexus_json_obj_t obj, char * key, int64_t  val);
+							                  
+int nexus_json_add_u8    (nexus_json_obj_t obj, char * key, uint8_t  val);
+int nexus_json_add_u16   (nexus_json_obj_t obj, char * key, uint16_t val);
+int nexus_json_add_u32   (nexus_json_obj_t obj, char * key, uint32_t val);
+int nexus_json_add_u64   (nexus_json_obj_t obj, char * key, uint64_t val);
+
+
+
+
 
 char *
-nexus_json_get_string(nexus_json_obj_t   obj,
-		      char             * key);
-
+nexus_json_serialize(nexus_json_obj_t obj);

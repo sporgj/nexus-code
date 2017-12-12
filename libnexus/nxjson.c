@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2013 Yaroslav Stavnichiy <yarosla@gmail.com>
+ * 
+ * Modifications (c) 2017 Jack Lange <jacklange@cs.pitt.edu>
  *
  * This file is part of NXJSON.
  *
@@ -31,13 +33,14 @@ extern "C" {
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdarg.h>
 
 #include "nxjson.h"
 
 // redefine NX_JSON_CALLOC & NX_JSON_FREE to use custom allocator
 #ifndef NX_JSON_CALLOC
 #define NX_JSON_CALLOC() calloc(1, sizeof(struct nx_json))
-#define NX_JSON_FREE(json) free((void*)(json))
+#define NX_JSON_FREE(json) free((void *)(json))
 #endif
 
 // redefine NX_JSON_REPORT_ERROR to use custom error reporting
@@ -57,18 +60,22 @@ create_json(nx_json_type     type,
     
     assert(js);
 
-    js->type = type;
-    js->key  = key;
-    
-    if (!parent->last_child) {
-	parent->child            = js;
-	parent->last_child       = js;
-    } else {
-	parent->last_child->next = js;
-	parent->last_child       = js;
+    js->type   = type;
+    js->key    = key;
+    js->parent = parent;
+
+    if (parent != NULL) {
+	if (!parent->last_child) {
+	    parent->child            = js;
+	    parent->last_child       = js;
+	} else {
+	    parent->last_child->next = js;
+	    parent->last_child       = js;
+	}
+	
+	parent->length++;
     }
-    
-    parent->length++;
+
     
     return js;
 }
@@ -76,22 +83,346 @@ create_json(nx_json_type     type,
 static void
 nx_json_free(struct nx_json * js)
 {
-    struct nx_json * p  = js->child;
-    struct nx_json * p1 = NULL;
+    /* Unlink from parent */
+    if (js->parent) {
+	struct nx_json * parent   = js->parent;
+	struct nx_json * iter     = js->parent->child;
+	struct nx_json * tmp_iter = NULL;
 
-    assert(js->raw_string != NULL);
-    
-    while (p) {
-	p1 = p->next;
+	while (iter != NULL) {
 
-	nx_json_free(p);
+	    if (iter == js) {
+		break;
+	    }
 
-	p  = p1;
+	    iter     = iter->next;
+	    tmp_iter = iter;
+	}
+	
+	assert(iter != NULL);
+	
+	if (tmp_iter == NULL) {
+	    parent->child = iter->next;
+	} else {
+	    tmp_iter->next = iter->next;
+	}
+
+	if (parent->last_child == iter) {
+	    parent->last_child = tmp_iter;
+	}
+
+	parent->length--;
     }
+
     
-    NX_JSON_FREE(js->raw_string);
+    /* Free everything contained in this object */
+    {
+	struct nx_json * p  = js->child;
+	struct nx_json * p1 = NULL;
+	
+	while (p) {
+	    p1 = p->next;
+	    
+	    nx_json_free(p);
+	    
+	    p  = p1;
+	}
+    }
+
+    
+    /* Free object itself */
+    if (js->raw_string != NULL) {
+	NX_JSON_FREE(js->raw_string);
+    }
+
+    
     NX_JSON_FREE(js);
 }
+
+struct nx_json_serializer {
+    char     * str;
+    uint32_t   len;
+    uint32_t   off;
+    uint32_t   lvl;
+};
+
+
+static int
+__resize_srlzer(struct nx_json_serializer * srlzer)
+{
+    void * tmp_ptr = NULL;
+    
+    tmp_ptr = realloc(srlzer->str, srlzer->len * 2);
+
+    if (tmp_ptr == NULL) {
+	log_error("Could not resize serializer string (Req Size=%d)\n", srlzer->len * 2);
+	return -1;
+    }
+	
+    srlzer->str  = tmp_ptr;
+    srlzer->len *= 2;
+    
+    memset(srlzer->str + srlzer->off, 0, srlzer->len - srlzer->off);
+    
+    return 0;
+}
+
+
+static int
+__srlzer_append(struct nx_json_serializer * srlzer, char * fmt, ...)
+{
+    va_list  args;
+    uint32_t ret = 0;
+
+#if 0
+    /* For debugging */
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+#endif
+
+    /* Note: The logic order here is inverted, so ret must be zero before entering the loop */
+    do {
+	if (ret >= (srlzer->len - srlzer->off)) {
+	    // printf("Resizing for fmt (%s)\n", fmt);
+	    if (__resize_srlzer(srlzer) == -1) {
+		return -1;
+	    }
+	    
+	}
+	
+	// Reminder: snprintf returns the total # of bytes it was trying to write
+	va_start(args, fmt);
+	ret = vsnprintf(srlzer->str + srlzer->off, srlzer->len - srlzer->off, fmt, args);	
+	va_end(args);
+
+    } while (ret >= (srlzer->len - srlzer->off));
+
+    srlzer->off += ret;
+    
+    
+
+    return 0;
+    
+}
+
+static int
+__srlzer_indent(struct nx_json_serializer * srlzer)
+{
+    uint32_t i   = 0;
+
+    /* Add tabs for indent level */	
+    for (i = 0; i < srlzer->lvl; i++) {	    
+	__srlzer_append(srlzer, "\t");
+    }    
+    
+    return 0;
+}
+
+
+static int
+__nx_json_serialize(struct nx_json            * json,
+		    struct nx_json_serializer * srlzer)
+{
+
+    __srlzer_indent(srlzer);
+    
+    if (json->root == 0) {
+
+	if ( (json->type         != NX_JSON_OBJECT) ||
+	     (json->parent->type != NX_JSON_ARRAY) ) {
+
+	    __srlzer_append(srlzer, "\"%s\": ", json->key);
+	}
+    } 
+
+    switch (json->type) {
+
+	case NX_JSON_OBJECT: {
+	    struct nx_json * iter = json->child;
+
+	    __srlzer_append(srlzer, "{\n");
+
+	    srlzer->lvl++;
+
+	    while (iter) {
+		__nx_json_serialize(iter, srlzer);
+		iter = iter->next;
+
+		if (iter) {
+		    __srlzer_append(srlzer, ",\n");
+		} else {
+		    __srlzer_append(srlzer, "\n");
+		}
+		
+	    }
+	    
+	    srlzer->lvl--;
+
+	    __srlzer_indent(srlzer);
+	    __srlzer_append(srlzer, "}");
+	    
+	    break;
+	}
+	case NX_JSON_ARRAY: {
+	    struct nx_json * iter = json->child;
+
+	    __srlzer_append(srlzer, "[\n");
+
+	    srlzer->lvl++;
+
+
+	    while (iter) {
+		__nx_json_serialize(iter, srlzer);
+		iter = iter->next;
+
+		if (iter) {
+		    __srlzer_append(srlzer, ",\n");
+		} else {
+		    __srlzer_append(srlzer, "\n");
+		}
+
+	    }
+
+	    srlzer->lvl--;
+
+	    __srlzer_indent(srlzer);
+	    __srlzer_append(srlzer, "]");
+	    
+	    break;
+	}
+	case NX_JSON_STRING:
+	    __srlzer_append(srlzer, "\"%s\"", json->text_value);
+	    break;
+	case NX_JSON_INTEGER:
+	    __srlzer_append(srlzer, "%lld", json->int_value);
+	    break;
+	case NX_JSON_DOUBLE:
+	    __srlzer_append(srlzer, "%f", json->dbl_value);
+	    break;
+	case NX_JSON_BOOL:
+	    __srlzer_append(srlzer, "%s", (json->int_value == 1) ? "true" : "false");
+	    break;
+	default:
+	    log_error("Error: Weird json Object type in serialization (%d)\n", json->type);
+	    return -1;
+    }
+	    
+	    
+    return 0;
+}
+
+
+
+static char *
+nx_json_serialize(struct nx_json * json)
+{
+    struct nx_json_serializer srlzer;
+    int ret = 0;
+    
+    srlzer.str = calloc(sizeof(char), 512);
+    srlzer.len = 512;
+    srlzer.off = 0;
+    srlzer.lvl = 0;
+
+
+    ret = __nx_json_serialize(json, &srlzer);
+
+    if (ret != 0) {
+	NX_JSON_FREE(srlzer.str);
+	return NULL;
+    }
+    
+    return srlzer.str;
+}
+
+
+
+
+static int
+nx_json_add(struct nx_json * json,
+	    char           * key,
+	    struct nx_json * val)
+{
+    struct nx_json * new_json = NULL;
+
+    assert(json->type == NX_JSON_OBJECT);
+    
+    new_json = create_json(val->type, key, json);
+
+
+    switch (val->type) {
+	case NX_JSON_STRING:
+	    new_json->raw_string = strdup(val->text_value);
+	    new_json->text_value = new_json->raw_string;
+	    break;
+	    
+	case NX_JSON_INTEGER:
+	case NX_JSON_BOOL:
+	    new_json->int_value = val->int_value;
+	    break;
+	    
+	case NX_JSON_DOUBLE:
+	    new_json->dbl_value = val->dbl_value;
+	    break;
+	    
+	case NX_JSON_ARRAY:
+	case NX_JSON_OBJECT:
+	case NX_JSON_NULL:
+	default:
+	    // Do nothing ?
+	    break;
+    }
+    
+    return 0;
+}
+
+
+static int
+nx_json_set(struct nx_json * json,
+	    char           * key,
+	    struct nx_json * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    assert(json->type == NX_JSON_OBJECT);
+
+    tgt_obj = nx_json_get(json, key);
+
+    if (tgt_obj->type != val->type) {
+	log_error("Type mismatch\n");
+	return -1;
+    }
+    
+
+    switch (val->type) {
+	case NX_JSON_STRING:
+	    tgt_obj->raw_string = strdup(val->text_value);
+	    tgt_obj->text_value = tgt_obj->raw_string;
+	    break;
+	    
+	case NX_JSON_INTEGER:
+	case NX_JSON_BOOL:
+	    tgt_obj->int_value = val->int_value;
+	    break;
+	    
+	case NX_JSON_DOUBLE:
+	    tgt_obj->dbl_value = val->dbl_value;
+	    break;
+	    
+	case NX_JSON_ARRAY:
+	case NX_JSON_OBJECT:
+	case NX_JSON_NULL:
+	default:
+	    // Do nothing ?
+	    break;
+    }
+    
+    return 0;
+}
+
+
+
 
 
 static inline int hex_val(char c) {
@@ -470,10 +801,12 @@ nx_json_parse(char * text)
     }
 
     js.child->raw_string = raw_text;
-    
+    js.child->root       = 1;
+    js.child->parent     = NULL;
     
     return js.child;
 }
+
 
 static struct nx_json *
 nx_json_get(struct nx_json * json,
@@ -496,6 +829,11 @@ nx_json_get(struct nx_json * json,
     
     return NULL;
 }
+
+
+
+
+
 
 #if 0
 static struct nx_json *

@@ -37,7 +37,8 @@ typedef enum nx_json_type {
 
 struct nx_json {
     nx_json_type type;           // type of json node, see above
-
+    int          root;
+    
     char * key;            // key of the property; for object's children only
     
     char * text_value;     // text value of STRING node
@@ -48,7 +49,7 @@ struct nx_json {
     struct nx_json * child;      // points to first child
     struct nx_json * next;       // points to next child
     struct nx_json * last_child; // points to last child
-
+    struct nx_json * parent;
 
     char * raw_string;           // Raw JSON string that is stored by the root
 };
@@ -56,13 +57,22 @@ struct nx_json {
 
 static struct nx_json * nx_json_parse(char * text);
 
+
+static char * nx_json_serialize(struct nx_json * json);
+
 static void nx_json_free(struct nx_json * js);
 
 static struct nx_json * nx_json_get(struct nx_json * json, char * key); // get object's property by key
+//static int              nx_json_set(struct nx_json * json, char * key, struct nx_json * val);
+static int              nx_json_add(struct nx_json * json, char * key, struct nx_json * new_val);
+//static int              nx_json_del(struct nx_json * json, char * key);
 
 #if 0
 // Disabled for now so we don't have compile errors
-static struct nx_json * nx_json_item(struct nx_json * json, int idx); // get array element by index
+static struct nx_json * nx_json_get_item(struct nx_json * json, int idx); // get array element by index
+static int              nx_json_set_item(struct nx_json * json, int idx, struct nx_json * val);
+static int              nx_json_add_item(struct nx_json * json, struct nx_json * new_item);
+static int              nx_json_del_item(struct nx_json * json, int idx);
 #endif
 
 #ifdef  __cplusplus

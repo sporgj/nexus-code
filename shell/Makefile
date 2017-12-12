@@ -38,8 +38,8 @@ all: nexus_shell
 %.a : %.o
 	$(call build,AR,$(AR) rcs $@ $^)
 
-nexus_shell: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS)  $^  $(libs) -o $@)
+nexus_shell: $(exec_objs) ../libnexus.a
+	$(call build,CC,$(CC) $(CFLAGS)  $(exec_objs)  $(libs) -o $@)
 
 
 define cscope-all-sources

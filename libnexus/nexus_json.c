@@ -16,7 +16,11 @@
 #include <nxjson.c>
 
 
-
+nexus_json_obj_t
+nexus_json_new()
+{
+    return create_json(NX_JSON_OBJECT, NULL, NULL);
+}
 
 nexus_json_obj_t
 nexus_json_parse_str(char * str)
@@ -90,25 +94,624 @@ nexus_json_get_object(nexus_json_obj_t   obj,
     return tgt_obj;
 }
 
-
-char *
-nexus_json_get_string(nexus_json_obj_t   obj,
+int
+nexus_json_add_object(nexus_json_obj_t   obj,
 		      char             * key)
+{
+    struct nx_json new_json;
+
+    new_json.type = NX_JSON_OBJECT;
+
+    return nx_json_add(obj, key, &new_json);
+}
+
+
+int
+nexus_json_del_object(nexus_json_obj_t obj)
+{
+    nx_json_free(obj);
+    return 0;
+}
+
+
+int
+nexus_json_del(nexus_json_obj_t   obj,
+	       char             * key)
+{
+    nexus_json_obj_t tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    nx_json_free(tgt_obj);
+
+    return 0;
+}
+
+
+
+
+int
+nexus_json_get_string(nexus_json_obj_t   obj,
+		      char             * key,
+		      char            ** val)
 {
     struct nx_json * tgt_obj = NULL;
 
     tgt_obj = nx_json_get(obj, key);
 
     if (tgt_obj == NULL) {
-	return NEXUS_JSON_INVALID_OBJ;
+	return -1;
     }
 
     if (tgt_obj->type != NX_JSON_STRING) {
-	return NEXUS_JSON_INVALID_OBJ;
+	return -1;
     }
 
-    return tgt_obj->text_value;
+    *val = tgt_obj->text_value;
+    
+    return 0;
 }
+
+
+int
+nexus_json_get_bool(nexus_json_obj_t   obj,
+		    char             * key,
+		    int              * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_BOOL) {
+	return -1;
+    }
+
+    if ((tgt_obj->int_value != 0) ||
+	(tgt_obj->int_value != 1)) {
+	return -1;
+    }
+    
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+
+int
+nexus_json_get_int(nexus_json_obj_t   obj,
+		   char             * key,
+		   int              * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    if ((tgt_obj->int_value > INT_MAX) ||
+	(tgt_obj->int_value < INT_MIN)) {
+	log_error("NEXUS_JSON_INT: Bounds Error\n");
+	return -1;
+    }
+    
+    *val = tgt_obj->int_value;
+
+    return 0;
+}
+
+int
+nexus_json_get_double(nexus_json_obj_t   obj,
+		      char             * key,
+		      double           * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_DOUBLE) {
+	return -1;
+    }
+
+    *val = tgt_obj->dbl_value;
+    
+    return 0;
+}
+
+
+int
+nexus_json_get_s8(nexus_json_obj_t   obj,
+		  char             * key,
+		  int8_t           * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+
+    if ((tgt_obj->int_value > SCHAR_MAX) ||
+	(tgt_obj->int_value < SCHAR_MIN)) {
+	log_error("NEXUS_JSON_S8: Bounds Error\n");
+	return -1;
+    }
+
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+int
+nexus_json_get_s16(nexus_json_obj_t   obj,
+		   char             * key,
+		   int16_t          * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    if ((tgt_obj->int_value > SHRT_MAX) ||
+	(tgt_obj->int_value < SHRT_MIN)) {
+	log_error("NEXUS_JSON_S16: Bounds Error\n");
+	return -1;
+    }
+    
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+int
+nexus_json_get_s32(nexus_json_obj_t   obj,
+		   char             * key,
+		   int32_t          * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    if ((tgt_obj->int_value > INT_MAX) ||
+	(tgt_obj->int_value < INT_MIN)) {
+	log_error("NEXUS_JSON_S32: Bounds Error\n");
+	return -1;
+    }
+    
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+
+int
+nexus_json_get_s64(nexus_json_obj_t   obj,
+		   char             * key,
+		   int64_t          * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+    
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+
+int
+nexus_json_get_u8(nexus_json_obj_t   obj,
+		  char             * key,
+		  uint8_t          * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    if (tgt_obj->int_value > UCHAR_MAX) {
+	log_error("NEXUS_JSON_U8: Bounds Error\n");
+	return -1;
+    }
+	
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+int
+nexus_json_get_u16(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint16_t         * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    if (tgt_obj->int_value > USHRT_MAX) {
+	log_error("NEXUS_JSON_U16: Bounds Error\n");
+	return -1;
+    }
+
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+int
+nexus_json_get_u32(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint32_t         * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    if (tgt_obj->int_value > UINT_MAX) {
+	log_error("NEXUS_JSON_U32: Bounds Error\n");
+	return -1;
+    }
+    
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+int
+nexus_json_get_u64(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint64_t         * val)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get(obj, key);
+
+    if (tgt_obj == NULL) {
+	return -1;
+    }
+
+    if (tgt_obj->type != NX_JSON_INTEGER) {
+	return -1;
+    }
+
+    *val = tgt_obj->int_value;
+    
+    return 0;
+}
+
+
+
+
+
+
+
+int
+nexus_json_add_string(nexus_json_obj_t   obj,
+		      char             * key,
+		      char             * str)
+{
+    struct nx_json new_json;
+
+    new_json.type       = NX_JSON_STRING;
+    new_json.text_value = str;
+
+    return nx_json_add(obj, key, &new_json);
+}
+
+
+int
+nexus_json_add_bool(nexus_json_obj_t   obj,
+		    char             * key,
+		    int                val)
+{
+    struct nx_json new_json;
+
+    new_json.type      = NX_JSON_BOOL;
+    new_json.int_value = val;
+
+    return nx_json_add(obj, key, &new_json);    
+}
+
+int
+nexus_json_add_int(nexus_json_obj_t   obj,
+		   char             * key,
+		   int                val)
+{
+    struct nx_json new_json;
+
+    new_json.type      = NX_JSON_INTEGER;
+    new_json.int_value = val;
+
+    return nx_json_add(obj, key, &new_json);    
+}
+
+int
+nexus_json_add_double(nexus_json_obj_t   obj,
+		      char             * key,
+		      double             val)
+{
+    struct nx_json new_json;
+
+    new_json.type      = NX_JSON_DOUBLE;
+    new_json.dbl_value = val;
+
+    return nx_json_add(obj, key, &new_json);    
+}
+
+int
+nexus_json_add_s64(nexus_json_obj_t   obj,
+		   char             * key,
+		   int64_t            val)
+{
+    struct nx_json new_json;
+
+    new_json.type      = NX_JSON_INTEGER;
+    new_json.int_value = val;
+
+    return nx_json_add(obj, key, &new_json);    
+}
+
+int
+nexus_json_add_u64(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint64_t           val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+int
+nexus_json_add_s8(nexus_json_obj_t   obj,
+		  char             * key,
+		  int8_t             val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+int
+nexus_json_add_s16(nexus_json_obj_t   obj,
+		   char             * key,
+		   int16_t            val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+int
+nexus_json_add_s32(nexus_json_obj_t   obj,
+		   char             * key,
+		   int32_t            val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+							                  
+int
+nexus_json_add_u8(nexus_json_obj_t   obj,
+		  char             * key,
+		  uint8_t            val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+int
+nexus_json_add_u16(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint16_t           val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+int
+nexus_json_add_u32(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint32_t           val)
+{
+    return nexus_json_add_s64(obj, key, val);
+}
+
+
+
+
+int
+nexus_json_set_string(nexus_json_obj_t   obj,
+		      char             * key,
+		      char             * str)
+{
+    struct nx_json new_val;
+
+    new_val.type       = NX_JSON_STRING;
+    new_val.text_value = str;
+
+    return nx_json_set(obj, key, &new_val);
+}
+
+
+int
+nexus_json_set_bool(nexus_json_obj_t   obj,
+		    char             * key,
+		    int                val)
+{
+    struct nx_json new_val;
+
+    new_val.type      = NX_JSON_BOOL;
+    new_val.int_value = val;
+
+    return nx_json_set(obj, key, &new_val);    
+}
+
+int
+nexus_json_set_int(nexus_json_obj_t   obj,
+		   char             * key,
+		   int                val)
+{
+    struct nx_json new_val;
+
+    new_val.type      = NX_JSON_INTEGER;
+    new_val.int_value = val;
+
+    return nx_json_set(obj, key, &new_val);    
+}
+
+int
+nexus_json_set_double(nexus_json_obj_t   obj,
+		      char             * key,
+		      double             val)
+{
+    struct nx_json new_val;
+
+    new_val.type      = NX_JSON_DOUBLE;
+    new_val.dbl_value = val;
+
+    return nx_json_set(obj, key, &new_val);    
+}
+
+int
+nexus_json_set_s64(nexus_json_obj_t   obj,
+		   char             * key,
+		   int64_t            val)
+{
+    struct nx_json new_val;
+
+    new_val.type      = NX_JSON_INTEGER;
+    new_val.int_value = val;
+
+    return nx_json_set(obj, key, &new_val);    
+}
+
+int
+nexus_json_set_u64(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint64_t           val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+int
+nexus_json_set_s8(nexus_json_obj_t   obj,
+		  char             * key,
+		  int8_t             val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+int
+nexus_json_set_s16(nexus_json_obj_t   obj,
+		   char             * key,
+		   int16_t            val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+int
+nexus_json_set_s32(nexus_json_obj_t   obj,
+		   char             * key,
+		   int32_t            val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+							                  
+int
+nexus_json_set_u8(nexus_json_obj_t   obj,
+		  char             * key,
+		  uint8_t            val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+int
+nexus_json_set_u16(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint16_t           val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+int
+nexus_json_set_u32(nexus_json_obj_t   obj,
+		   char             * key,
+		   uint32_t           val)
+{
+    return nexus_json_set_s64(obj, key, val);
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -129,144 +732,34 @@ nexus_json_get_params(nexus_json_obj_t          obj,
     
     /* Check Params and grab values */
     for (i = 0; i < num_params; i++) {
-	struct nx_json * tgt_obj = NULL;
 
-	tgt_obj = nx_json_get(obj, params[i].name);
-
-	if (tgt_obj == NULL) {
-	    log_error("Invalid JSON for given parameters\n");
-	    return -1;
-	}
-
-	
 	switch (params[i].type) {
 	    case NEXUS_JSON_U8:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-		
-		if (tgt_obj->int_value > UCHAR_MAX) {
-		    ret = -1;		    
-		    log_error("NEXUS_JSON_U8 Conversion error\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-		
+		ret = nexus_json_get_u8 (obj, params[i].name, (uint8_t  *)&params[i].val);
 		break;
 	    case NEXUS_JSON_S8:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-
-		if ((tgt_obj->int_value > SCHAR_MAX) ||
-		    (tgt_obj->int_value < SCHAR_MIN)) {
-		    ret = -1;		    
-		    log_error("NEXUS_JSON_S8 Conversion error\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-
-
-
+		ret = nexus_json_get_s8 (obj, params[i].name, (int8_t   *)&params[i].val);
 		break;
 	    case NEXUS_JSON_U16:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-		if (tgt_obj->int_value > USHRT_MAX) {
-		    ret = -1;		    
-		    log_error("NEXUS_JSON_U16 Conversion error\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-
-		
-
+		ret = nexus_json_get_u16(obj, params[i].name, (uint16_t *)&params[i].val);
 		break;
 	    case NEXUS_JSON_S16:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-		if ((tgt_obj->int_value > SHRT_MAX) ||
-		    (tgt_obj->int_value < SHRT_MIN)) {
-		    ret = -1;		    
-		    log_error("NEXUS_JSON_S16 Conversion error\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-
+		ret = nexus_json_get_s16(obj, params[i].name, (int16_t  *)&params[i].val);
 		break;
 	    case NEXUS_JSON_U32:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-		if (tgt_obj->int_value > UINT_MAX) {
-		    ret = -1;		    
-		    log_error("NEXUS_JSON_U32 Conversion error\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-	
+		ret = nexus_json_get_u32(obj, params[i].name, (uint32_t *)&params[i].val);
 		break;
 	    case NEXUS_JSON_S32:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-
-		}
-
-		if ((tgt_obj->int_value > INT_MAX) ||
-		    (tgt_obj->int_value < INT_MIN)) {
-		    ret = -1;		    
-		    log_error("NEXUS_JSON_S32 Conversion error\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-
+		ret = nexus_json_get_s32(obj, params[i].name, (int32_t  *)&params[i].val);
 		break;
 	    case NEXUS_JSON_U64:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-
+		ret = nexus_json_get_u64(obj, params[i].name, (uint64_t *)&params[i].val);
 		break;
 	    case NEXUS_JSON_S64:
-		if (tgt_obj->type != NX_JSON_INTEGER) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-		params[i].val = tgt_obj->int_value;
-
+		ret = nexus_json_get_s64(obj, params[i].name, (int64_t  *)&params[i].val);
 		break;
-	   
-	    case NEXUS_JSON_STRING: {
-		
-		if (tgt_obj->type != NX_JSON_STRING) {
-		    log_error("JSON Error: type mismatch\n");
-		    goto out;
-		}
-
-		params[i].ptr = tgt_obj->text_value;
-		
+	    case NEXUS_JSON_STRING: {	       
+		ret = nexus_json_get_string(obj, params[i].name, (char **)&params[i].ptr);
 		break;
 	    }
 	    case NEXUS_JSON_OBJECT:
@@ -289,4 +782,13 @@ nexus_json_get_params(nexus_json_obj_t          obj,
   
     return ret;
     
+}
+
+
+
+
+char *
+nexus_json_serialize(nexus_json_obj_t obj)
+{
+    return nx_json_serialize(obj);
 }

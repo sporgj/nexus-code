@@ -3,8 +3,8 @@ include build.mk
 nexus_home := $(PWD)
 build_path := $(nexus_home)/build/
 
-nexus_frontends := 	frontend_afs \
-			shell
+nexus_frontends :=	shell
+#			frontend_afs \
 
 nexus_backends  :=     	backend_clear \
 #			backend_sgx
@@ -51,7 +51,6 @@ frontends: $(nexus_frontends)
 
 $(nexus_frontends):
 	$(call build,BUILDING, make -C $@)
-
 
 backends: $(nexus_backends)
 
