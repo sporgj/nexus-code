@@ -8,10 +8,12 @@
 extern "C" {
 #endif
 
-#include "nexus_types.h"
+#include <nexus_types.h>
+#include <nexus_defaults.h>
 
 
 int nexus_init(void);
+int nexus_deinit(void);
 
 
 // volume management

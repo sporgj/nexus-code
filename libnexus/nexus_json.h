@@ -1,3 +1,12 @@
+/* 
+ * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
+ * All rights reserved.
+ *
+ * This is free software.  You are permitted to use,
+ * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
+ */
+
+
 #pragma once
 
 
@@ -40,16 +49,13 @@ nexus_json_get_params(nexus_json_obj_t          obj,
 
 
 
-nexus_json_obj_t
-nexus_json_parse_str(char * str);
-
-nexus_json_obj_t
-nexus_json_parse_file(char * file_name);
+nexus_json_obj_t nexus_json_new_obj();
+nexus_json_obj_t nexus_json_parse_str(char * str);
+nexus_json_obj_t nexus_json_parse_file(char * file_name);
 
 
 /* Free a parsed JSON structure */
 void nexus_json_free(nexus_json_obj_t object);
-
 
 
 

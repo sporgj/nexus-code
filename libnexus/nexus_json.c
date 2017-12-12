@@ -17,7 +17,7 @@
 
 
 nexus_json_obj_t
-nexus_json_new()
+nexus_json_new_obj()
 {
     return create_json(NX_JSON_OBJECT, NULL, NULL);
 }

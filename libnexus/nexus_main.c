@@ -1,3 +1,11 @@
+/* 
+ * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
+ * All rights reserved.
+ *
+ * This is free software.  You are permitted to use,
+ * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
+ */
+
 #include <sys/stat.h>
 
 #include <nexus_volume.h>
@@ -52,12 +60,22 @@ nexus_init()
 {
 
     printf("Initializing Nexus\n");
+
+    nexus_defaults_init();
     
     nexus_backend_init();
+    
 
     return 0;
 }
 
+
+int
+nexus_deinit()
+{
+    printf("Deinitializing Nexus\n");
+    return 0;
+}
 
 
 int
