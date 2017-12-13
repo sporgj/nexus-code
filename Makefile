@@ -9,11 +9,10 @@ nexus_frontends :=	shell
 nexus_backends  :=     	backend_clear \
 #			backend_sgx
 
-nexus_metadata_store := 
-#metadata_store
+nexus_datastores :=     datastore_flat 
 
 
-components := libmbedcypto.a libnexus.a $(addsuffix .a, $(nexus_backends) $(nexus_metadata_store))
+components := libmbedcypto.a libnexus.a $(addsuffix .a, $(nexus_backends) $(nexus_datastores))
 
 LDFLAGS := -L$(nexus_home)/mbedtls-2.6.0/library \
 	   -L$(SGX_SDK)/lib64
@@ -43,7 +42,7 @@ build = \
 
 
 
-all: mbedtls backends metadata_store libnexus frontends
+all: mbedtls backends datastores libnexus frontends
 
 
 
@@ -58,7 +57,10 @@ $(nexus_backends):
 	$(call build,BUILDING, make -C $@)
 
 
-$(metadata_store):
+
+datastores: $(nexus_datastores)
+
+$(nexus_datastores):
 	$(call build,BUILDING, make -C $@)
 
 
@@ -76,9 +78,9 @@ mbedtls:
 clean:
 	make -C $(nexus_home)/libnexus clean
 	make -C $(nexus_home)/mbedtls-2.6.0/library clean
-#	@make -C $(nexus_home)/$(nexus_metadata_store) clean
-	$(foreach frontend,$(nexus_frontends), make -C $(nexus_home)/$(frontend) clean;)
-	$(foreach backend,$(nexus_backends), make -C $(nexus_home)/$(backend) clean;)
+	$(foreach frontend,  $(nexus_frontends), make -C $(nexus_home)/$(frontend)  clean;)
+	$(foreach backend,   $(nexus_backends),  make -C $(nexus_home)/$(backend)   clean;)
+	$(foreach datastore, $(nexus_backends),  make -C $(nexus_home)/$(datastore) clean;)
 
 
-.PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) metadata_store clean mbedtls
+.PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) datastores $(nexus_datastores) clean mbedtls

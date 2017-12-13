@@ -46,7 +46,7 @@ datastore_eq_fn(uintptr_t key_1,
 
 
 int
-nexus_datastore_init()
+nexus_datastores_init()
 {
     extern struct nexus_datastore_impl  * __start__nexus_datastores[];
     extern struct nexus_datastore_impl  * __stop__nexus_datastores[];
@@ -91,13 +91,12 @@ nexus_datastore_init()
 
 
 struct nexus_datastore *
-nexus_datastore_launch(char * name)
+nexus_datastore_open(char             * name,
+		     nexus_json_obj_t   cfg)
 {
     struct nexus_datastore      * datastore = NULL;
     struct nexus_datastore_impl * impl      = NULL;
 
-    int ret = 0;
-    
     impl = nexus_htable_search(datastore_table, (uintptr_t)name);
 
     if (impl == NULL) {
@@ -112,27 +111,26 @@ nexus_datastore_launch(char * name)
 	return NULL;
     }
 
-
+        
     log_debug("initializing datastore (%s)\n", name);
-    
-    ret = impl->init();
 
-    if (ret != 0) {
+    datastore->impl      = impl;
+    datastore->priv_data = datastore->impl->init(cfg);
+
+    if (datastore->priv_data == NULL) {
 	log_error("Error initializing datastore (%s)\n", name);
 	nexus_free(datastore);
 	return NULL;
     }
 
-    datastore->impl = impl;
-
     return datastore;
 }
 
 
-void
-nexus_datastore_shutdown(struct nexus_datastore * datastore)
+int
+nexus_datastore_close(struct nexus_datastore * datastore)
 {
     log_debug("Shutting down nexus datastore (%s)\n", datastore->impl->name);
 
-
+    return -1;
 }

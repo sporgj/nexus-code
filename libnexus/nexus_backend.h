@@ -15,7 +15,7 @@
 #include <nexus_uuid.h>
 
 
-
+struct nexus_backend_impl;
 
 
 

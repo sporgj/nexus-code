@@ -49,24 +49,29 @@ static char *copy_of_range(const char *src,size_t from,size_t to) {
 static char divmod58(char number[],int start,int len) {
 	int i;
 	uint32_t digit256,temp,remainder = 0;
-	for(i=start; i<len; i++) {
-		digit256 = (uint32_t)(number[i]&0xFF);
-		temp = remainder*256+digit256;
-		number[i] = (char)(temp/58);
+	
+	for(i = start; i < len; i++) {
+		digit256  = (uint32_t)(number[i] & 0xFF);
+		temp      = remainder * 256 + digit256;
+		number[i] = (char)(temp / 58);
 		remainder = temp % 58;
 	}
+	
 	return (char)remainder;
 }
 
 static char divmod256(char number58[],int start,int len) {
 	int i;
+
 	uint32_t digit58,temp,remainder = 0;
-	for(i=start; i<len; i++) {
-		digit58 = (uint32_t)(number58[i]&0xFF);
-		temp = remainder*58+digit58;
-		number58[i] = (char)(temp/256);
-		remainder = temp % 256;
+
+	for(i = start; i < len; i++) {
+		digit58     = (uint32_t)(number58[i] & 0xFF);
+		temp        = remainder * 58 + digit58;
+		number58[i] = (char)(temp / 256);
+		remainder   = temp % 256;
 	}
+
 	return (char)remainder;
 }
 
@@ -79,29 +84,48 @@ size_t base58_decoded_size(size_t len) {
 }
 
 void base58_encode(unsigned char *dst,const unsigned char *src,size_t len) {
-	*dst = '\0';
-	if(len>0) {
-		int tlen= len*2,j = tlen,zc = 0,start,mod;
-		char *copy = copy_of_range((char*)src,0,len);
-		char temp[tlen];
+    *dst = '\0';
+    
+    if (len > 0) {
+	int tlen  = len * 2;
+	int j     = tlen;
+	int zc    = 0;
+	int start = 0;
+	int mod   = 0;
 
-		while((size_t)zc<len && copy[zc]=='\0') ++zc;
+	char * copy = copy_of_range((char *)src, 0, len);
+	char   temp[tlen];
 
-		start = zc;
-		while((size_t)start<len) {
-			mod = divmod58(copy,start,len);
-			if(copy[start]==0) ++start;
-			temp[--j] = base58_code[mod];
-		}
-
-		while(j<tlen && temp[j]==base58_code[0]) ++j;
-
-		while(--zc>=0) temp[--j] = base58_code[0];
-
-		free(copy);
-		memcpy(dst,&temp[j],tlen-j);
-		dst[tlen-j] = '\0';
+	while(((size_t)zc <   len) &&
+	      (copy[zc]   == '\0')) {
+	    ++zc;
 	}
+	
+	start = zc;
+
+	while ((size_t)start < len) {
+	    mod = divmod58(copy,start,len);
+
+	    if(copy[start]==0) {
+		++start;
+	    }
+	    
+	    temp[--j] = base58_code[mod];
+	}
+
+	while ((j        < tlen) &&
+	       (temp[j] == base58_code[0])) {
+	    ++j;
+	}
+
+	while (--zc >= 0) {
+	    temp[--j] = base58_code[0];
+	}
+	
+	free(copy);
+	memcpy(dst,&temp[j],tlen-j);
+	dst[tlen-j] = '\0';
+    }
 }
 
 int base58_decode(unsigned char *dst,const unsigned char *src) {

@@ -10,6 +10,7 @@
 
 #include <nexus_volume.h>
 #include <nexus_backend.h>
+#include <nexus_datastore.h>
 
 #include <nexus_key.h>
 
@@ -64,6 +65,7 @@ nexus_init()
     nexus_defaults_init();
     
     nexus_backend_init();
+    nexus_datastores_init();
     
 
     return 0;
