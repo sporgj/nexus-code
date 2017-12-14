@@ -17,7 +17,7 @@
 
 #define __ -1
 
-static const char base58_code[]="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+static const char base58_code[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 static const int base58_index[256] = {
     __,__,__,__, __,__,__,__, __,__,__,__, __,__,__,__,
@@ -39,16 +39,21 @@ static const int base58_index[256] = {
 };
 
 
-static char *copy_of_range(const char *src,size_t from,size_t to) {
-	char *dst = (char *)malloc((to-from)+1);
-	memcpy(dst,&src[from],to-from);
-	dst[to-from] = '\0';
+static char * copy_of_range(const char * src,
+			    size_t       from,
+			    size_t       to)
+{
+	char * dst = (char *)malloc((to - from) + 1);
+	memcpy(dst, &src[from], to - from);
+	dst[to - from] = '\0';
 	return dst;
 }
 
-static char divmod58(char number[],int start,int len) {
+static char divmod58(char number[], int start, int len) {
 	int i;
-	uint32_t digit256,temp,remainder = 0;
+	uint32_t digit256;
+	uint32_t temp;
+	uint32_t remainder = 0;
 	
 	for(i = start; i < len; i++) {
 		digit256  = (uint32_t)(number[i] & 0xFF);
@@ -60,10 +65,12 @@ static char divmod58(char number[],int start,int len) {
 	return (char)remainder;
 }
 
-static char divmod256(char number58[],int start,int len) {
+static char divmod256(char number58[], int start, int len) {
 	int i;
 
-	uint32_t digit58,temp,remainder = 0;
+	uint32_t digit58   = 0;
+	uint32_t temp      = 0;
+	uint32_t remainder = 0;
 
 	for(i = start; i < len; i++) {
 		digit58     = (uint32_t)(number58[i] & 0xFF);
@@ -76,14 +83,14 @@ static char divmod256(char number58[],int start,int len) {
 }
 
 size_t base58_encoded_size(size_t len) {
-	return ((len+4)/5)*7;
+	return ((len + 4) / 5) * 7;
 }
 
 size_t base58_decoded_size(size_t len) {
-	return (len/4)*3;
+	return (len / 4) * 3;
 }
 
-void base58_encode(unsigned char *dst,const unsigned char *src,size_t len) {
+void base58_encode(unsigned char *dst, const unsigned char *src, size_t len) {
     *dst = '\0';
     
     if (len > 0) {
@@ -104,9 +111,9 @@ void base58_encode(unsigned char *dst,const unsigned char *src,size_t len) {
 	start = zc;
 
 	while ((size_t)start < len) {
-	    mod = divmod58(copy,start,len);
+	    mod = divmod58(copy, start, len);
 
-	    if(copy[start]==0) {
+	    if (copy[start] == 0) {
 		++start;
 	    }
 	    
@@ -123,43 +130,75 @@ void base58_encode(unsigned char *dst,const unsigned char *src,size_t len) {
 	}
 	
 	free(copy);
-	memcpy(dst,&temp[j],tlen-j);
-	dst[tlen-j] = '\0';
+	
+	memcpy(dst, &temp[j], tlen - j);
+	dst[tlen - j] = '\0';
     }
 }
 
-int base58_decode(unsigned char *dst,const unsigned char *src) {
-	int len = strlen((char*)src);
-	*dst = '\0';
-	if(len>0) {
-		int i,j = len,c,digit58,zc = 0,start,mod;
-		char input58[len];
-		char temp[len];
+int
+base58_decode(unsigned char       * dst,
+	      const unsigned char * src)
+{
+    int len = strlen((char *)src);
 
-		for(i=0; i<len; ++i) {
-			c = src[i];
-			digit58 = -1;
-			if(c>=0 && c<128) digit58 = base58_index[c];
-			if(digit58<0) {
-				fprintf(stderr,"Illegal character '%c' at %d.\n",(char)c,i);
-				return -1;
-			}
-			input58[i] = (char)digit58;
-		}
+    *dst = '\0';
+    
+    if (len > 0) {
+	int i;
+	int j = len;
+	int c;
+	int digit58;
+	int zc = 0;
+	int start;
+	int mod;
+	
+	char input58[len];
+	char temp[len];
 
-		while(zc<len && input58[zc]==0) ++zc;
-		start = zc;
-		while(start<len) {
-			mod = divmod256(input58,start,len);
-			if(input58[start]==0) ++start;
-			temp[--j] = mod;
-		}
+	for (i = 0; i < len; ++i) {
+	    c       = src[i];
+	    digit58 = -1;
 
-		while(j<len && temp[j]==0) ++j;
+	    if ( (c >= 0) &&
+		 (c <  128) ) {
+		digit58 = base58_index[c];
+	    }
 
-		memcpy(dst,&temp[j-zc],len-(j-zc));
-		dst[len-(j-zc)] = '\0';
-		return len-(j-zc);
+	    if (digit58 < 0) {
+		fprintf(stderr,"Illegal character '%c' at %d.\n",(char)c,i);
+		return -1;
+	    }
+	    
+	    input58[i] = (char)digit58;
 	}
-	return 0;
+
+	while ((zc          <  len) &&
+	       (input58[zc] == 0)) {
+	    ++zc;
+	}
+	
+	start = zc;
+
+	while (start < len) {
+	    mod = divmod256(input58, start, len);
+
+	    if (input58[start] == 0) {
+		++start;
+	    }
+	    
+	    temp[--j] = mod;
+	}
+
+	while ((j       <  len) &&
+	       (temp[j] == 0)) {
+	    ++j;
+	}
+
+	memcpy(dst, &temp[j - zc], len - (j - zc));
+	dst[len - (j - zc)] = '\0';
+
+	return len - (j - zc);
+    }
+    return 0;
 }

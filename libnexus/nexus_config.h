@@ -10,18 +10,16 @@
 
 
 
-
-struct nexus_defaults {
-    char * volume_path;
+struct nexus_config {
+    char * user_data_dir;
     
-    char * volume_key_path;
-
     char * user_prv_key_path;
     char * user_pub_key_path;
 };
 
 
-extern struct nexus_defaults nexus_defaults;
+extern struct nexus_config nexus_config;
+extern char * nexus_default_volume_config;
 
 
-int nexus_defaults_init(void);
+int nexus_config_init(void);

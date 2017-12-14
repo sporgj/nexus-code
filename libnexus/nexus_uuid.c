@@ -8,7 +8,7 @@
 
 
 int
-nexus_generate_uuid(struct nexus_uuid * uuid)
+nexus_uuid_gen(struct nexus_uuid * uuid)
 {    
     uuid_generate(uuid->raw);
 

@@ -15,6 +15,9 @@ struct nexus_datastore {
 
 
 
+struct nexus_datastore * nexus_datastore_create(char             * name,
+					        nexus_json_obj_t   datastore_cfg);
+
 
 struct nexus_datastore * nexus_datastore_open(char             * name,
 					      nexus_json_obj_t   datastore_cfg);
@@ -48,12 +51,6 @@ int nexus_datastore_del_uuid(struct nexus_datastore * datastore,
 
 
 
-
-
-
-
-
-
 int nexus_datastores_init();
 int nexus_datastores_exit();
 
@@ -63,9 +60,12 @@ int nexus_datastores_exit();
 struct nexus_datastore_impl {
     char * name;
 
-    void * (*init)(nexus_json_obj_t datastore_cfg);
+    void * (*create)(nexus_json_obj_t datastore_cfg);
+    int    (*delete)(void * priv_data);
+    
+    void * (*open)(nexus_json_obj_t datastore_cfg);
 
-    int (*deinit)(void * priv_data);
+    int (*close)(void * priv_data);
 
     
     int (*get_uuid)(struct nexus_uuid  * uuid,

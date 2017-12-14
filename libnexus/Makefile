@@ -19,6 +19,8 @@ objs :=	nexus_main.o \
 	nexus_defaults.o \
 	nexus_datastore.o \
 	nexus_hashtable.o \
+	nexus_binaries.o \
+	nexus_encode.o \
 	nexus_util.o \
 	nexus_key.o \
 	nexus_uuid.o \
@@ -44,6 +46,9 @@ all: libnexus.a
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) $< -o $@)
 
 %.o : %.c
+	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
+
+%.o : %.S
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
 
 

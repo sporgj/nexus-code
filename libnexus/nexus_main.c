@@ -62,7 +62,7 @@ nexus_init()
 
     printf("Initializing Nexus\n");
 
-    nexus_defaults_init();
+    nexus_config_init();
     
     nexus_backend_init();
     nexus_datastores_init();

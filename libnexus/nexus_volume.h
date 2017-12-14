@@ -1,17 +1,20 @@
 #pragma once
 
 #include <nexus_key.h>
-
+#include <nexus_uuid.h>
+#include <nexus_datastore.h>
+#include <nexus_backend.h>
 
 struct nexus_volume {
     char * volume_path;
 
-
-    struct nexus_backend * backend;
-
-    // struct supernode    * supernode;
-    //struct nexus_dentry * root_dentry;
-
+    struct nexus_uuid vol_uuid;
+    struct nexus_uuid supernode_uuid;
+    
+    struct nexus_backend   * backend;
+    struct nexus_datastore * data_store;
+    struct nexus_datastore * meta_data_store;
+    
     void * private_data;
 };
 

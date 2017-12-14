@@ -1,23 +1,163 @@
 #include <nexus_volume.h>
 #include <nexus_backend.h>
+#include <nexus_datastore.h>
+#include <nexus_config.h>
 
 #include <nexus_json.h>
 #include <nexus_log.h>
-#include <nexus_raw_file.h>
 #include <nexus_util.h>
 
 #define NEXUS_VOLUME_CONFIG_FILENAME ".nexus_volume.conf"
 
 struct nexus_volume *
-nexus_create_volume(char * volume_path)
+nexus_create_volume(char * volume_path,
+		    char * config_str)
 {
+    struct nexus_volume * vol = NULL;
+    
+    nexus_json_obj_t vol_config;
+
+    int ret = 0;
+    
+    // Check for config file, otherwise use default
+    vol_config = nexus_json_parse_file(config_str);
+
+    if (vol_config == NEXUS_JSON_INVALID_OBJ) {
+	vol_config = nexus_json_parse_str(nexus_default_volume_config);
+    }
+    
+    // Create Volume
+    vol = calloc(sizeof(struct nexus_volume), 1);
+
+    if (vol == NULL) {
+	log_error("Could not allocate nexus volume\n");
+	return NULL;
+    }
+
+    /* Init Volume */
+    {
+	nexus_uuid_gen(&(vol->vol_uuid));
+
+    }
+    
+    
     // Create Volume key
+    {
+	
 
-    // Create supernode from backend
+    }
+    
+    /* Setup Data store */
+    {
+	void             * data_store      = NULL;
+	nexus_json_obj_t   data_store_cfg;
+	char             * data_store_name = NULL;
+	
+	data_store_cfg = nexus_json_get_object(vol_config, "data_store");
 
+	if (data_store_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid Config: Missing datastore config block\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(data_store_cfg, "name", &data_store_name);
+
+	if (ret == -1) {
+	    log_error("Invalid Config: Missing datastore name\n");
+	    goto err;
+	}
+
+	data_store = nexus_datastore_create(data_store_name, data_store_cfg);
+	
+	if (data_store == NULL) {
+	    log_error("Could not create data store\n");
+	}
+
+	vol->data_store = data_store;
+    }
+
+    /* Setup Metadata Store */
+    {
+	void             * meta_data_store      = NULL;
+	nexus_json_obj_t   meta_data_store_cfg;
+	char             * meta_data_store_name = NULL;
+	
+	meta_data_store_cfg = nexus_json_get_object(vol_config, "meta_data_store");
+
+	if (meta_data_store_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid Config: Missing datastore config block\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(meta_data_store_cfg, "name", &meta_data_store_name);
+
+	if (ret == -1) {
+	    log_error("Invalid Config: Missing datastore name\n");
+	    goto err;
+	}
+
+	meta_data_store = nexus_datastore_create(meta_data_store_name, meta_data_store_cfg);
+	
+	if (meta_data_store == NULL) {
+	    log_error("Could not create data store\n");
+	}
+
+	vol->meta_data_store = meta_data_store;
+    }
+
+
+    /* Setup Backend */
+    {
+	void             * backend      = NULL;
+	nexus_json_obj_t   backend_cfg;
+	char             * backend_name = NULL;
+	
+	backend_cfg = nexus_json_get_object(vol_config, "backend");
+
+	if (backend_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid Config: Missing datastore config block\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(backend_cfg, "name", &backend_name);
+	
+	if (ret == -1) {
+	    log_error("Invalid Config: Missing datastore name\n");
+	    goto err;
+	}
+
+	backend = nexus_backend_launch(backend_name, backend_cfg);
+	
+	if (backend == NULL) {
+	    log_error("Could not create data store\n");
+	}
+
+	vol->backend = backend;
+    }
+
+    /* Create supernode from backend */
+    {
+	char * uuid_str = NULL;
+	
+	ret = nexus_backend_create_volume(&(vol->supernode_uuid), vol->backend);
+
+	if (ret == -1) {
+	    log_error("Backend Error: Could not create volume\n");
+	    goto err;
+	}
+	
+	uuid_str = nexus_uuid_to_str(vol->supernode_uuid);
+	nexus_json_add_string(vol_config, "supernode_uuid", uuid_str);
+	nexus_free(uuid_str);
+	
+    }
     // Write config file
 
-    return NULL;
+    return vol;
+
+err:
+nexus_free(vol);
+return NULL;
 }
 
 

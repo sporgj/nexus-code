@@ -15,14 +15,15 @@
 
 
 static void *
-flat_init(nexus_json_obj_t cfg)
+flat_open(nexus_json_obj_t       cfg,
+	  nexus_datastore_mode_t mode)
 {
     return NULL;
 }
 
 
 static int
-flat_deinit(void * priv_data)
+flat_close(void * priv_data)
 {
     return -1;
 }
@@ -38,7 +39,7 @@ flat_get_uuid(struct nexus_uuid  * uuid,
 }
 
 static int
-flat_put_uuid(struct nexus_uuid * uuid,
+flat_set_uuid(struct nexus_uuid * uuid,
 	      char              * path,
 	      uint8_t           * buf,
 	      uint32_t            size,
@@ -47,6 +48,16 @@ flat_put_uuid(struct nexus_uuid * uuid,
     return -1;
 }
 
+static int
+flat_add_uuid(struct nexus_uuid * uuid,
+	      char              * path,
+	      uint8_t           * buf,
+	      uint32_t            size,
+	      void              * priv_data)
+{
+    return -1;
+}
+    
 static int
 flat_del_uuid(struct nexus_uuid * uuid,
 	      char              * path,
@@ -61,10 +72,12 @@ flat_del_uuid(struct nexus_uuid * uuid,
 
 static struct nexus_datastore_impl flat_datastore = {
     .name     = "FLAT",
-    .init     = flat_init,
-    .deinit   = flat_deinit,
+    .open     = flat_open,
+    .close    = flat_close,
+
     .get_uuid = flat_get_uuid,
-    .put_uuid = flat_put_uuid,
+    .set_uuid = flat_set_uuid,
+    .add_uuid = flat_add_uuid
     .del_uuid = flat_del_uuid
 };
 

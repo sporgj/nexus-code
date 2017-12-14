@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 #include <nexus_types.h>
-#include <nexus_defaults.h>
+#include <nexus_config.h>
 
 
 int nexus_init(void);
