@@ -91,7 +91,7 @@ nexus_backend_init()
 
 
 struct nexus_backend *
-nexus_backend_launch(char * name)
+nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
 {
     struct nexus_backend      * backend = NULL;
     struct nexus_backend_impl * impl    = NULL;
@@ -128,6 +128,14 @@ nexus_backend_launch(char * name)
     return backend;
 }
 
+
+// TODO
+int
+nexus_backend_create_volume(struct nexus_uuid *    supernode_uuid,
+                            struct nexus_backend * backend)
+{
+    return -1;
+}
 
 void
 nexus_backend_shutdown(struct nexus_backend * backend)

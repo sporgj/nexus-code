@@ -13,7 +13,7 @@
 
 #include <nexus_key.h>
 #include <nexus_uuid.h>
-
+#include <nexus_json.h>
 
 struct nexus_backend_impl;
 
@@ -27,12 +27,14 @@ struct nexus_backend {
 
 
 
-struct nexus_backend * nexus_backend_launch(char * name);
+struct nexus_backend *
+nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg);
 
 void nexus_backend_shutdown(struct nexus_backend * backend);
 
-
-
+int
+nexus_backend_create_volume(struct nexus_uuid *    supernode_uuid,
+                            struct nexus_backend * backend);
 
 
 

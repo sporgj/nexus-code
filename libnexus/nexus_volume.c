@@ -146,7 +146,7 @@ nexus_create_volume(char * volume_path,
 	    goto err;
 	}
 	
-	uuid_str = nexus_uuid_to_str(vol->supernode_uuid);
+	uuid_str = nexus_uuid_to_string(&vol->supernode_uuid);
 	nexus_json_add_string(vol_config, "supernode_uuid", uuid_str);
 	nexus_free(uuid_str);
 	
@@ -217,7 +217,7 @@ nexus_load_volume(char * volume_path)
 	goto err;
     }
     
-    backend = nexus_backend_launch(backend_str);
+    backend = nexus_backend_launch(backend_str, NULL);
     
     if (backend == NULL) {
 	log_error("Could not initialize backend (%s)\n", backend_str);

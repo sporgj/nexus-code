@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#include "nexus_internal.h"
+#include "nexus_uuid.h"
 
 #include <stdlib.h>
 
@@ -28,6 +28,18 @@ int nexus_strtou32(char * str, uint32_t * value);
 int nexus_strtoi64(char * str, int64_t  * value);
 int nexus_strtou64(char * str, uint64_t * value);
 
+
+char *
+nexus_strncat(char * dest, const char * src, size_t maxlen);
+
+
+// joining paths
+
+char *
+nexus_filepath_from_name(char * directory, const char * filename);
+
+char *
+nexus_filepath_from_uuid(const char * dirpath, struct nexus_uuid * uuid);
 
 
 #if 0
