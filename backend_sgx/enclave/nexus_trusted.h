@@ -84,7 +84,7 @@ int
 volumekey_unwrap(struct volumekey * volkey);
 
 struct volumekey *
-volumekey_from_rootuuid(struct uuid * root_uuid);
+volumekey_from_rootuuid(struct nexus_uuid * root_uuid);
 
 /* dirnode */
 

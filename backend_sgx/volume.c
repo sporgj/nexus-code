@@ -4,8 +4,7 @@ static int
 __sign_response(struct nexus_nonce * auth_nonce,
                 struct supernode   * supernode,
                 struct volumekey   * volumekey,
-                const char         * privatekey,
-                size_t               privatekey_len,
+                struct nexus_key   * owner_privkey,
                 uint8_t           ** p_response_signature,
                 size_t             * p_signature_len)
 {
@@ -24,7 +23,7 @@ __sign_response(struct nexus_nonce * auth_nonce,
         mbedtls_sha256_starts(&sha_context, 0);
 
         mbedtls_sha256_update(
-            &sha_context, (uint8_t *)auth_nonce, sizeof(nonce_t));
+            &sha_context, (uint8_t *)auth_nonce, sizeof(struct nexus_nonce));
         mbedtls_sha256_update(
             &sha_context, (uint8_t *)supernode, supernode->header.total_size);
         mbedtls_sha256_update(
@@ -75,7 +74,7 @@ __sign_response(struct nexus_nonce * auth_nonce,
 
 
         ret = mbedtls_pk_parse_key(
-            &pk, (uint8_t *)privatekey, privatekey_len, NULL, 0);
+            &pk, owner_privkey->data, owner_privkey->key_size, NULL, 0);
 
         if (ret != 0) {
             log_error("mbedtls_pk_parse_key(ret=%#x)", ret);
@@ -119,8 +118,8 @@ out:
 int
 sgx_backend_open_volume(struct supernode * supernode,
                         struct volumekey * volumekey,
-                        struct nexus_key * user_public_key,
-                        struct nexus_key * user_priv_key)
+                        struct nexus_key * user_pubkey,
+                        struct nexus_key * user_privkey)
 {
     struct nexus_nonce nonce_challenge;
 
@@ -131,11 +130,8 @@ sgx_backend_open_volume(struct supernode * supernode,
     int ret = -1;
 
     // call the enclave to receive a challenge
-    err = ecall_authentication_request(global_enclave_id,
-                                       &ret,
-                                       (char *)user_public_key->data,
-                                       user_public_key->key_size,
-                                       &nonce_challenge);
+    err = ecall_authentication_request(
+        global_enclave_id, &ret, user_pubkey, &nonce_challenge);
 
     if (err != 0 || ret != 0) {
         log_error("ecall_authentication_request() FAILED");
@@ -147,24 +143,25 @@ sgx_backend_open_volume(struct supernode * supernode,
     ret = __sign_response(&nonce_challenge,
                           supernode,
                           volumekey,
-                          (char *)user_priv_key->data,
-                          user_priv_key->key_size,
+                          user_privkey,
                           &signature,
                           &signature_len);
 
     if (ret != 0) {
-        log_error("could not create signature response");
+        log_error("signing response failed");
         goto out;
     }
 
 
-    ecall_authentication_response(global_enclave_id,
-                                  &ret,
-                                  volumekey,
-                                  supernode,
-                                  signature,
-                                  signature_len);
-    if (ret != 0) {
+
+    err = ecall_authentication_response(global_enclave_id,
+                                        &ret,
+                                        volumekey,
+                                        supernode,
+                                        signature,
+                                        signature_len);
+
+    if (err != 0 || ret != 0) {
         log_error("ecall_authentication_response() FAILED");
         goto out;
     }
@@ -194,8 +191,8 @@ sgx_backend_create_volume(struct nexus_key  * owner_pubkey,
 
 
 
-    nexus_uuid(&root_uuid);
-    nexus_uuid(&supernode_uuid);
+    nexus_uuid_gen(&root_uuid);
+    nexus_uuid_gen(&supernode_uuid);
 
 
     supernode = (struct supernode *)calloc(1, sizeof(struct supernode));
@@ -211,8 +208,7 @@ sgx_backend_create_volume(struct nexus_key  * owner_pubkey,
                               &ret,
                               &supernode_uuid,
                               &root_uuid,
-                              (char *) owner_pubkey->data,
-                              owner_pubkey->key_size,
+                              owner_pubkey,
                               supernode,
                               NULL, // root_dirnode,
                               volumekey);

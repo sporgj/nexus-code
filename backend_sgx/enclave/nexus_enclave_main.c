@@ -7,12 +7,11 @@ struct supernode * owner_supernode           = NULL;
 struct volumekey * owner_supernode_volumekey = NULL;
 
 // the public key of the authenticating user
-static char *             auth_user_pubkey      = NULL;
-static size_t             auth_user_pubkey_len  = 0;
+static struct nexus_key * auth_user_pubkey      = NULL;
 static struct pubkey_hash auth_user_pubkey_hash = { 0 };
 
 // the nonce of the authentication challenge
-static nonce_t auth_nonce;
+static struct nexus_nonce auth_nonce = { 0 };
 
 size_t                        dirnode_cache_size = 0;
 struct dirnode_wrapper_list * dirnode_cache      = NULL;
@@ -27,9 +26,35 @@ struct dirnode_wrapper_list * dirnode_cache      = NULL;
  * @return NULL if volume key not found.
  */
 struct volumekey *
-volumekey_from_rootuuid(struct uuid * root_uuid)
+volumekey_from_rootuuid(struct nexus_uuid * root_uuid)
 {
     return owner_supernode_volumekey;
+}
+
+static struct nexus_key *
+copy_nexuskey_into_enclave(struct nexus_key * key_ext)
+{
+    struct nexus_key * key_copy = NULL;
+
+    key_copy = (struct nexus_key *)calloc(1, sizeof(struct nexus_key));
+
+    if (key_copy == NULL) {
+        return NULL;
+    }
+
+
+    key_copy->data = (uint8_t *)calloc(1, key_ext->key_size);
+
+    if (key_copy->data == NULL) {
+        free(key_copy);
+        return NULL;
+    }
+
+
+    key_copy->key_size = key_ext->key_size;
+    memcpy(key_copy->data, key_ext->data, key_copy->key_size);
+
+    return key_copy;
 }
 
 int
@@ -64,61 +89,87 @@ ecall_init_enclave()
 }
 
 int
-ecall_create_volume(struct uuid *      supernode_uuid_ext,
-                    struct uuid *      root_uuid_ext,
-                    const char *       publickey_str_in,
-                    size_t             publickey_str_len,
-                    struct supernode * supernode_buffer_ext,
-                    struct dirnode *   dirnode_buffer_ext,
-                    struct volumekey * volume_volkey_ext)
+ecall_create_volume(struct nexus_uuid * supernode_uuid_ext,
+                    struct nexus_uuid * root_uuid_ext,
+                    struct nexus_key  * owner_pubkey_ext,
+                    struct supernode  * supernode_buffer_ext,
+                    struct dirnode    * dirnode_buffer_ext,
+                    struct volumekey  * volume_volkey_ext)
 {
     struct supernode * sealed_supernode = NULL;
     struct dirnode *   sealed_dirnode   = NULL;
+
+    struct nexus_key * owner_pubkey = NULL;
 
     struct volumekey volumekey = { 0 };
     struct supernode supernode = { 0 };
     struct dirnode   dirnode   = { 0 };
 
-    mbedtls_pk_context pk;
-
     int ret = -1;
 
+
+
     // 1 -- Parse the public key string and initialize out structures
-    mbedtls_pk_init(&pk);
-    ret = mbedtls_pk_parse_public_key(&pk, publickey_str_in, publickey_str_len);
-    if (ret != 0) {
-        ocall_debug("mbedtls_pk_parse_public_key FAILED");
-        goto out;
+    owner_pubkey = copy_nexuskey_into_enclave(owner_pubkey_ext);
+
+    if (owner_pubkey == NULL) {
+        ocall_debug("could not copy key into enclave");
+        return -1;
     }
 
-    sgx_read_rand((uint8_t *)&volumekey, sizeof(crypto_ekey_t));
 
-    memcpy(&supernode.header.uuid, supernode_uuid_ext, sizeof(struct uuid));
-    memcpy(&supernode.header.root_uuid, root_uuid_ext, sizeof(struct uuid));
-    mbedtls_sha256(publickey_str_in,
-                   publickey_str_len,
-                   (uint8_t *)&supernode.header.owner,
-                   0);
-    supernode.header.total_size = sizeof(struct supernode);
+    // 2 -- initialize the structures
+    {
+        struct supernode_header * supernode_header = &supernode.header;
+        struct dirnode_header *   dirnode_header   = &dirnode.header;
 
-    memcpy(&dirnode.header.uuid, root_uuid_ext, sizeof(struct uuid));
-    memcpy(&dirnode.header.root_uuid, root_uuid_ext, sizeof(struct uuid));
-    dirnode.header.total_size = sizeof(struct dirnode);
 
-    // seal the structures
-    if (supernode_encryption1(&supernode, &volumekey, &sealed_supernode)) {
-        ocall_debug("supernode sealage FAILED");
-        goto out;
+        memcpy(&supernode_header->uuid,
+               supernode_uuid_ext,
+               sizeof(struct nexus_uuid));
+
+        memcpy(&supernode_header->root_uuid,
+               root_uuid_ext,
+               sizeof(struct nexus_uuid));
+
+        mbedtls_sha256(owner_pubkey->data,
+                       owner_pubkey->key_size,
+                       (uint8_t *)&supernode_header->owner,
+                       0);
+
+        supernode_header->total_size = sizeof(struct supernode);
+
+
+
+
+        memcpy(&dirnode_header->uuid, root_uuid_ext, sizeof(struct nexus_uuid));
+
+        memcpy(&dirnode_header->root_uuid,
+               root_uuid_ext,
+               sizeof(struct nexus_uuid));
+
+        dirnode_header->total_size = sizeof(struct dirnode);
     }
 
-    if (dirnode_encryption1(NULL, &dirnode, &volumekey, &sealed_dirnode)) {
-        ocall_debug("dirnode sealing FAILED");
-        goto out;
-    }
 
-    if (volumekey_wrap(&volumekey)) {
-        ocall_debug("volkey sealing FAILED");
-        goto out;
+    // 3 -- seal the structures
+    {
+        sgx_read_rand((uint8_t *)&volumekey, sizeof(crypto_ekey_t));
+
+        if (supernode_encryption1(&supernode, &volumekey, &sealed_supernode)) {
+            ocall_debug("supernode sealage FAILED");
+            goto out;
+        }
+
+        if (dirnode_encryption1(NULL, &dirnode, &volumekey, &sealed_dirnode)) {
+            ocall_debug("dirnode sealing FAILED");
+            goto out;
+        }
+
+        if (volumekey_wrap(&volumekey)) {
+            ocall_debug("volkey sealing FAILED");
+            goto out;
+        }
     }
 
     // copy out to untrusted memory
@@ -130,37 +181,38 @@ ecall_create_volume(struct uuid *      supernode_uuid_ext,
 out:
     my_free(sealed_supernode);
     my_free(sealed_dirnode);
+    my_free(owner_pubkey);
 
     return ret;
 }
 
 int
-ecall_authentication_request(const char * publickey_str_in,
-                             size_t       publickey_str_len,
-                             nonce_t *    nonce_ext)
+ecall_authentication_request(struct nexus_key   * user_pubkey,
+                             struct nexus_nonce * challenge_nonce_ext)
 {
-    // copy the publickey into the enclave
-    auth_user_pubkey = strndup(publickey_str_in, publickey_str_len);
+    auth_user_pubkey = copy_nexuskey_into_enclave(user_pubkey);
+
     if (auth_user_pubkey == NULL) {
         ocall_debug("allocation error");
         return -1;
     }
 
-    auth_user_pubkey_len = publickey_str_len;
-    mbedtls_sha256(auth_user_pubkey,
-                   auth_user_pubkey_len,
+
+    mbedtls_sha256(auth_user_pubkey->data,
+                   auth_user_pubkey->key_size,
                    (uint8_t *)&auth_user_pubkey_hash,
                    0);
 
-    // generate challenge and copy out
-    sgx_read_rand((uint8_t *)&auth_nonce, sizeof(nonce_t));
 
-    memcpy(nonce_ext, auth_nonce, sizeof(nonce_t));
+    // generate challenge and copy out
+    sgx_read_rand((uint8_t *)&auth_nonce, sizeof(struct nexus_nonce));
+
+    memcpy(challenge_nonce_ext, &auth_nonce, sizeof(struct nexus_nonce));
 
     return 0;
 }
 
-int
+static int
 nx_authentication_response(struct volumekey * sealed_volumekey,
                            struct supernode * sealed_supernode,
                            uint8_t *          signature,
@@ -169,30 +221,40 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
     struct supernode * _supernode = NULL;
     struct volumekey * _volumekey = NULL;
 
-    mbedtls_pk_context     pk;
-    mbedtls_sha256_context sha_context;
+    mbedtls_pk_context pk_context;
 
     uint8_t hash[CONFIG_HASH_BYTES] = { 0 };
 
     int ret = -1;
 
-    mbedtls_pk_init(&pk);
-    mbedtls_sha256_init(&sha_context);
+
+    mbedtls_pk_init(&pk_context);
 
     // sha256(nonce | supernode | volkey)
     {
-        mbedtls_sha256_starts(&sha_context, 0); // sha256
+        mbedtls_sha256_context sha_context;
+
+        mbedtls_sha256_init(&sha_context);
+        mbedtls_sha256_starts(&sha_context, 0);
+
+
         mbedtls_sha256_update(
-            &sha_context, (uint8_t *)&auth_nonce, sizeof(nonce_t));
+            &sha_context, (uint8_t *)&auth_nonce, sizeof(struct nexus_nonce));
+
         mbedtls_sha256_update(&sha_context,
                               (uint8_t *)sealed_supernode,
                               sealed_supernode->header.total_size);
+
         mbedtls_sha256_update(&sha_context,
                               (uint8_t *)sealed_volumekey,
                               sizeof(struct volumekey));
+
+
         mbedtls_sha256_finish(&sha_context, hash);
         mbedtls_sha256_free(&sha_context);
     }
+
+
 
     // 1 - let's make sure our supernode is not tampered
     {
@@ -216,6 +278,8 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
         }
     }
 
+
+
     // 2 - make sure hash(auth_user_pubkey) == supernode.owner
     {
         ret = memcmp(&auth_user_pubkey_hash,
@@ -228,10 +292,12 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
         }
     }
 
+
+
     // 3 - validate signature
     {
         ret = mbedtls_pk_parse_public_key(
-            &pk, auth_user_pubkey, auth_user_pubkey_len);
+            &pk_context, auth_user_pubkey->data, auth_user_pubkey->key_size);
 
         if (ret != 0) {
             ocall_debug("parsing public key failed");
@@ -239,7 +305,7 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
         }
 
         ret = mbedtls_pk_verify(
-            &pk, MBEDTLS_MD_SHA256, hash, 0, signature, signature_len);
+            &pk_context, MBEDTLS_MD_SHA256, hash, 0, signature, signature_len);
 
         if (ret != 0) {
             ocall_debug("verifying signature failed");
@@ -253,7 +319,7 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
 
     ret = 0;
 out:
-    mbedtls_pk_free(&pk);
+    mbedtls_pk_free(&pk_context);
 
     if (ret) {
         my_free(_supernode);
@@ -306,9 +372,9 @@ out:
     my_free(signature);
 
     // let's cleanup all authentication data
-    auth_user_pubkey_len = 0;
     my_free(auth_user_pubkey);
-    memset_s(&auth_nonce, sizeof(nonce_t), 0, sizeof(nonce_t));
+    memset_s(
+        &auth_nonce, sizeof(struct nexus_nonce), 0, sizeof(struct nexus_nonce));
 
     return ret;
 }

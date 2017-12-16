@@ -67,13 +67,11 @@ struct nexus_nonce {
 #define CONFIG_NONCE_BYTES  64
 
 // for now, let's stick with GCM
-// clang-format off
 #define CONFIG_EKEY_BYTES   16
 #define CONFIG_EKEY_BITS   (CONFIG_EKEY_BYTES << 3)
 #define CONFIG_IV_BYTES     16
 #define CONFIG_TAG_BYTES    16
 #define CONFIG_HASH_BYTES   32 // sha256
-// clang-format on
 
 /* filesystem object types */
 /* JRL: What is an ANY object? */
@@ -85,8 +83,6 @@ typedef enum {
 } nexus_fs_obj_type_t;
 
 typedef uint32_t version_t;
-
-typedef uint8_t nonce_t[CONFIG_NONCE_BYTES];
 
 
 

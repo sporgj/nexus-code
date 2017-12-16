@@ -2,56 +2,45 @@ enclave {
 
     include "nexus_types.h"
     include "nexus_uuid.h"
+    include "nexus_key.h"
 
     trusted {
 
         public int ecall_init_enclave();
 
-        // supernode stuff
-        /**
-         * Creates a new nexus volume
-         * @param supernode_uuid_in is the uuid of the supernode
-         * @param root_uuid_in will be the root uuid
-         * @param supernode_buffer_out will be the output buffer of the supernode
-         * @param dirnode_buffer_out will be the output buffer of the dirnode
-         * @param volume_rootkey_out sealed rootkey
-         */
         public int ecall_create_volume(
-            [user_check] struct nexus_uuid * supernode_uuid_ext,
-            [user_check] struct nexus_uuid * root_uuid_ext,
-            [in, string] const char * publickey_str_in,
-            size_t publickey_str_len,
-            [user_check] struct supernode * supernode_buffer_ext,
-            [user_check] struct dirnode * dirnode_buffer_ext,
-            [user_check] struct volumekey * volume_rootkey_ext
-        );
-                                    
-        /**
-         * Initiates a user authentication with the enclave. The enclave responds
-         * with a nonce challenge.
-         * @param publickey_str_in is the user's public key
-         * @param nonce_out will be the attached challenge
-         */
-        public int ecall_authentication_request(
-            [in, string] const char * publickey_str_in,
-            size_t publickey_str_len,
-            [out] struct nexus_nonce * nonce_ext
+            [user_check] struct nexus_uuid * supernode_uuid_in,
+            [user_check] struct nexus_uuid * root_uuid_in,
+            [user_check] struct nexus_key  * user_pubkey_in,
+            [user_check] struct supernode  * sealed_supernode_out,
+            [user_check] struct dirnode    * sealed_dirnode_out,
+            [user_check] struct volumekey  * sealed_volumekey_out
         );
 
-        /**
-         * Responds to the enclave challenge from above.
-         * @param volume_rootkey_in the sealed volume rootkey
-         * @param supernode_in the supernode to authenticate
-         * @param signature_in [nonce | supernode_in] user_privatekey
-         * @param signature_len
-         * @return 0 on success
-         */
-        public int ecall_authentication_response(
-            [in] struct volumekey * volume_key_in,
-            [user_check] struct supernode * supernode_ext,
-            [user_check] uint8_t * signature_ext,
-            size_t signature_len
+        public int ecall_authentication_request(
+            [user_check] struct nexus_key   * owner_pubkey_in,
+            [user_check] struct nexus_nonce * nonce_out
         );
+
+        public int ecall_authentication_response(
+            [user_check] struct volumekey * volumekey_in,
+            [user_check] struct supernode * supernode_in,
+            [user_check] uint8_t          * response_signature_in,
+                         size_t             signature_len
+        );
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         // dirnode stuff
 
