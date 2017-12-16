@@ -108,31 +108,3 @@ nexus_write_raw_file(char   * path,
 }
 
 
-int
-nexus_touch_raw_file(char * path)
-{
-    FILE * file_ptr = NULL;
-
-    file_ptr = fopen(path, "wb");
-
-    if (file_ptr == NULL) {
-        log_error("Failed top open file (%s)\n", path);
-        return -1;
-    }
-
-    fclose(file_ptr);
-
-    return 0;
-}
-
-
-int
-nexus_delete_raw_file(char * path)
-{
-    if (unlink(path)!= 0) {
-	log_error("unlink(%s) %s", path, strerror(errno));
-	return -1;
-    }
-
-    return 0;
-}
