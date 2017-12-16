@@ -13,23 +13,18 @@
 
 #include <nexus.h>
 #include <nexus_log.h>
-#include <nexus_defaults.h>
+#include <nexus_config.h>
 
 static char * volume_path  = NULL;
-static char * vol_key_path = NULL;
 static char * pub_key_path = NULL;
 
 
-static int cmd_line_vol_key = 0;
 static int cmd_line_pub_key = 0;
 
 
 static void
 __set_defaults()
 {
-    volume_path  = nexus_defaults.volume_path;
-    vol_key_path = nexus_defaults.volume_key_path;
-    pub_key_path = nexus_defaults.user_pub_key_path;
 }
 
 static void usage()
@@ -39,9 +34,7 @@ static void usage()
 	   " Options: \n");
 
     printf("\t[--pub_key]   (default: %-*s)       : Location of User's public key\n",
-	   32, nexus_defaults.user_pub_key_path);
-    printf("\t[--vol_key]   (default: %-*s)       : Location of the volume key\n",
-	   32, nexus_defaults.volume_key_path);
+	   32, nexus_config.user_pub_key_path);
 
     return;
 }
@@ -62,8 +55,7 @@ create_volume_main(int argc, char ** argv)
 	char c = 0;
 
 	static struct option long_options[] = {
-	    { "pub_key"      , required_argument , &cmd_line_pub_key ,  1  }, /* 2 */
-	    { "vol_key"      , required_argument , &cmd_line_vol_key ,  1  }, /* 3 */
+	    { "pub_key"      , required_argument , &cmd_line_pub_key ,  1  },  /* 0 */
 	    { 0, 0, 0, 0 }
 	};
 	
@@ -75,14 +67,10 @@ create_volume_main(int argc, char ** argv)
 		case 0:
 		    switch (opt_index) {
 			case 0:
-			    pub_key_path = optarg;
+			    nexus_config.user_pub_key_path = optarg;
 			    used_opts += 2;
 			    break;
 			    
-			case 1:			    
-			    vol_key_path = optarg;
-			    used_opts += 2;
-			    break;
 
 			default:
 			    usage();
@@ -109,7 +97,6 @@ create_volume_main(int argc, char ** argv)
 	volume_path = argv[used_opts + 1];
 
 	printf("public_key: (%s)\n", pub_key_path);
-	printf("volume_key: (%s)\n", vol_key_path);
 	
 	
     }

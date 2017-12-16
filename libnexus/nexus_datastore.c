@@ -115,7 +115,7 @@ nexus_datastore_open(char             * name,
     log_debug("initializing datastore (%s)\n", name);
 
     datastore->impl      = impl;
-    datastore->priv_data = datastore->impl->init(cfg);
+    datastore->priv_data = datastore->impl->open(cfg);
 
     if (datastore->priv_data == NULL) {
 	log_error("Error initializing datastore (%s)\n", name);

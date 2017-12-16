@@ -108,3 +108,16 @@ nexus_write_raw_file(char   * path,
 }
 
 
+int
+nexus_delete_raw_file(char * path)
+{
+    int ret = 0;
+
+    ret = unlink(path);
+
+    if (ret == -1) {
+	log_error("Could not delete file (%s)\n", path);
+    }
+    
+    return ret;
+}

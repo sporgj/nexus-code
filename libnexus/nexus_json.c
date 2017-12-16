@@ -63,6 +63,39 @@ nexus_json_parse_file(char * file_name)
 }
 
 
+char *
+nexus_json_serialize(nexus_json_obj_t obj)
+{
+    return nx_json_serialize(obj);
+}
+
+
+int
+nexus_json_serialize_to_file(nexus_json_obj_t   obj,
+			     char             * file_name)
+{
+    char * json_str = nx_json_serialize(obj);
+
+    int ret = 0;
+    
+    if (json_str == NULL) {
+	log_error("Could not serialize JSON object\n");
+	return -1;
+    }
+
+    ret = nexus_write_raw_file(file_name, (uint8_t *)json_str, strlen(json_str));
+
+    nexus_free(json_str);
+
+    if (ret == -1) {
+	log_error("Could not write JSON file (%s)\n", file_name);
+	return -1;
+    }
+
+    return 0;
+}
+
+			     
 void
 nexus_json_free(nexus_json_obj_t object)
 {
@@ -720,7 +753,7 @@ nexus_json_get_array(nexus_json_obj_t   obj,
 int
 nexus_json_get_array_len(nexus_json_obj_t arr)
 {
-    return arr->length;
+    return ((struct nx_json *)arr)->length;
 }
 
 
@@ -1420,11 +1453,3 @@ nexus_json_get_params(nexus_json_obj_t          obj,
     
 }
 
-
-
-
-char *
-nexus_json_serialize(nexus_json_obj_t obj)
-{
-    return nx_json_serialize(obj);
-}

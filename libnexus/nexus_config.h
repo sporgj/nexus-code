@@ -15,6 +15,8 @@ struct nexus_config {
     
     char * user_prv_key_path;
     char * user_pub_key_path;
+
+    char * volume_config;
 };
 
 

@@ -14,3 +14,5 @@ nexus_write_raw_file(char   * path,
 		     size_t   len);
 
 
+int
+nexus_delete_raw_file(char * path);

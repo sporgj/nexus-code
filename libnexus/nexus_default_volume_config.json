@@ -1,0 +1,22 @@
+{
+    "metadata_store" : {
+        "name" : "FLAT",
+        "config" : {
+            "path" : "./.metadata"
+        }
+    },
+    
+    "data_store" : {
+        "name" : "FLAT",
+        "config" : {
+            "path" : "./.data"
+        }
+    },
+    
+    "backend" : {
+        "name" : "CLEARTEXT"
+        "config" : { }
+    },
+
+}
+

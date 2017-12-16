@@ -2,166 +2,16 @@
 #include <nexus_backend.h>
 #include <nexus_datastore.h>
 #include <nexus_config.h>
+#include <nexus_user_data.h>
 
 #include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_util.h>
 
 #define NEXUS_VOLUME_CONFIG_FILENAME ".nexus_volume.conf"
-#define NEXUS_VOLUME_KEY_FILENAME    "nexus_volume_keys"
 
 
 
-
-static nexus_json_obj_t
-__get_volume_key_list()
-{
-    nexus_json_obj_t key_json = NEXUS_JSON_INVALID_OBJ;
-
-    char * key_file_path  = NULL;
-
-    int ret = 0;
-
-    ret = asprintf(&key_file_path, "%s/%s", nexus_config.user_data_dir, NEXUS_VOLUME_KEY_FILENAME);
-
-    if (ret == -1) {
-	log_error("Could not allocate volume key string\n");
-	return NEXUS_JSON_INVALID_OBJ;
-    }
-	
-    key_json = nexus_json_parse_file(key_file_path);
-    
-    nexus_free(key_file_path);
-
-    if (key_json == NEXUS_JSON_INVALID_OBJ) {
-	log_error("Could not parse volume key file\n");
-	return NEXUS_JSON_INVALID_OBJ;
-    }
-
-  
-    return key_json;
-}
-
-
-static int
-__get_volume_key(struct nexus_uuid * vol_uuid,
-		 struct nexus_key  * key)
-{
-    nexus_json_obj_t key_list = NEXUS_JSON_INVALID_OBJ;
-    nexus_json_obj_t key_json = __get_volume_key_list();
-
-    char * vol_uuid_base64 = NULL;
-    
-    int num_keys = 0;
-    int ret      = 0;
-    int i        = 0;
-    
-    if (key_json == NEXUS_JSON_INVALID_OBJ) {
-	log_error("Could not read volume key file\n");
-	return -1;
-    }
-
-    key_list = nexus_json_get_array(key_json, "keys");
-
-    if (key_list == NEXUS_JSON_INVALID_OBJ) {
-	log_error("Could not find volume key list\n");
-	return -1;
-    }
-
-    num_keys = nexus_json_get_array_len(key_list);
-
-
-    log_debug("Found %d keys in volume key list\n", num_keys);
-    
-    if (num_keys == 0) {
-	goto err;
-    }
-
-    vol_uuid_base64 = nexus_uuid_to_base64(vol_uuid);
-
-    if (vol_uuid_base64 == NULL) {
-	goto err;
-	
-    }
-    
-    for (i = 0; i < num_keys; i++) {
-	char * key_uuid_base64 = NULL;
-	char * key_base64      = NULL;
-	
-	nexus_json_obj_t key   = nexus_json_array_get_object(key_list, i);
-
-	ret = nexus_json_get_string(key, "uuid", &key_uuid_base64);
-
-	if (ret == -1) {
-	    log_error("Malformed key entry in key list. Skipping\n");
-	    continue;
-	}
-
-	if (strncmp(vol_uuid_base64, key_uuid_base64, strlen(vol_uuid_base64)) == 0) {
-	    ret = nexus_json_get_string(key, "key", &key_base64);
-
-	    if (ret == -1) {
-		log_error("Corrupted key entry for Volume (%s): No key entry\n", vol_uuid_base64);
-		goto err;
-	    }
-
-	    /* TODO: Grab the key type to pass to parser */
-	    
-
-	    ret = nexus_key_from_base64(key, key_base64);
-
-	    if (ret == -1) {
-		log_error("Corrupted key entry for Volume (%s): Invalid key format\n", vol_uuid_base64);
-		goto err;		
-	    }
-	    
-	    break;
-	}
-		      
-    }
-    
-
-    nexus_json_free(key_json);
-
-    return 0;
-
- err:
-    nexus_json_free(key_json);
-
-    return -1;    
-}
-
-
-
-static int
-__add_volume_key(struct nexus_uuid * vol_uuid,
-		 struct nexus_key  * key)
-{
-//    nexus_json_obj_t new_key  = NEXUS_JSON_INVALID_OBJ;
-    nexus_json_obj_t key_list = NEXUS_JSON_INVALID_OBJ;
-    nexus_json_obj_t key_json = __get_volume_key_list();
-
-
-    if (key_json == NEXUS_JSON_INVALID_OBJ) {
-	log_error("Could not read volume key file\n");
-	return -1;
-    }
-
-    key_list = nexus_json_get_array(key_json, "keys");
-
-    if (key_list == NEXUS_JSON_INVALID_OBJ) {
-	log_error("Could not find volume key list\n");
-	return -1;
-    }
-
-//    new_key = nexus_json_array_add_object(key_list);
-
-
-
-    return -1;
-    
-
-}
 
 
 struct nexus_volume *
@@ -198,9 +48,18 @@ nexus_create_volume(char * volume_path,
     
     // Create Volume key
     {
-	
+	struct nexus_key vol_key;
 
+	
+	ret = nexus_add_volume_key(&(vol->vol_uuid), &vol_key);
+
+	if (ret == -1) {
+	    log_error("could not add volume key to key list\n");
+	    goto err;
+	}
+	
     }
+
     
     /* Setup Data store */
     {
@@ -301,18 +160,38 @@ nexus_create_volume(char * volume_path,
 	    goto err;
 	}
 	
-	uuid_str = nexus_uuid_to_string(&vol->supernode_uuid);
+	uuid_str = nexus_uuid_to_base64(&vol->supernode_uuid);
 	nexus_json_add_string(vol_config, "supernode_uuid", uuid_str);
 	nexus_free(uuid_str);
 	
     }
-    // Write config file
 
+
+    /* Write config */
+    {
+	char * cfg_filename = NULL;
+
+	ret = asprintf(&cfg_filename, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
+
+	if (ret == -1) {
+	    log_error("Could not allocate cfg_filename\n");
+	    goto err;
+	}
+	
+	ret = nexus_json_serialize_to_file(vol_config, cfg_filename);
+	nexus_free(cfg_filename);
+
+	if (ret == -1) {
+	    log_error("Could not write volume config file\n");
+	    goto err;
+	}
+	
+    }
     return vol;
 
 err:
-nexus_free(vol);
-return NULL;
+    nexus_free(vol);
+    return NULL;
 }
 
 
