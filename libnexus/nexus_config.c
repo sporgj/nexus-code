@@ -59,6 +59,7 @@ nexus_config_init()
 	
 	strncpy(nexus_config.volume_config, (char *)nexus_default_vol_cfg_start, vol_cfg_len);
     }
+    
     return 0;
 }
 

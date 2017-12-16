@@ -912,6 +912,7 @@ nx_json_set_item(struct nx_json * json,
     return 0;
 }
 
+/* Returns the index at which the item was added */
 static int
 nx_json_add_item(struct nx_json * json,
 		 struct nx_json * item)
@@ -945,7 +946,7 @@ nx_json_add_item(struct nx_json * json,
 	    break;
     }
 
-    return 0;
+    return new_item->parent->length - 1;
 }
 
 
