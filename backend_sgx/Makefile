@@ -47,8 +47,8 @@ libs     :=   -l$(sgx_urts_lib) \
 EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
 
 objs := nexus_enclave_u.o \
-	nexus_sgx_backend_ops.o\
-	nexus_sgx_backend_main.o
+	volume.o\
+	main.o
 
 
 edl_src := nexus_enclave.edl

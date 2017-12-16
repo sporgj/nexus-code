@@ -1,12 +1,13 @@
+#include "internal.h"
 
-int
-login_sign_response(nonce_t *          auth_nonce,
-                    struct supernode * supernode,
-                    struct volumekey * volumekey,
-                    const char *       privatekey,
-                    size_t             privatekey_len,
-                    uint8_t *          p_response_signature,
-                    size_t *           p_signature_len)
+static int
+__sign_response(struct nexus_nonce * auth_nonce,
+                struct supernode   * supernode,
+                struct volumekey   * volumekey,
+                const char         * privatekey,
+                size_t               privatekey_len,
+                uint8_t           ** p_response_signature,
+                size_t             * p_signature_len)
 {
     uint8_t   response_hash[CONFIG_HASH_BYTES] = { 0 };
     uint8_t * response_signature               = NULL;
@@ -31,7 +32,7 @@ login_sign_response(nonce_t *          auth_nonce,
 
         mbedtls_sha256_finish(&sha_context, response_hash);
 
-        mbedtls_sha256_free(&sha_ctx);
+        mbedtls_sha256_free(&sha_context);
     }
 
 
@@ -116,12 +117,12 @@ out:
 }
 
 int
-sgx_backend_authenticate(struct supernode * supernode,
-                         struct volumekey * volumekey,
-                         struct nexus_key * user_public_key,
-                         struct nexus_key * user_priv_key)
+sgx_backend_open_volume(struct supernode * supernode,
+                        struct volumekey * volumekey,
+                        struct nexus_key * user_public_key,
+                        struct nexus_key * user_priv_key)
 {
-    nonce_t auth_nonce = { 0 };
+    struct nexus_nonce nonce_challenge;
 
     uint8_t * signature     = NULL;
     size_t    signature_len = 0;
@@ -132,9 +133,9 @@ sgx_backend_authenticate(struct supernode * supernode,
     // call the enclave to receive a challenge
     err = ecall_authentication_request(global_enclave_id,
                                        &ret,
-                                       user_public_key->data,
+                                       (char *)user_public_key->data,
                                        user_public_key->key_size,
-                                       &auth_nonce);
+                                       &nonce_challenge);
 
     if (err != 0 || ret != 0) {
         log_error("ecall_authentication_request() FAILED");
@@ -143,13 +144,13 @@ sgx_backend_authenticate(struct supernode * supernode,
 
 
     // generate a response and send to the enclave
-    ret = login_sign_response(&auth_nonce,
-                              supernode,
-                              volumekey,
-                              user_priv_key->data,
-                              user_priv_key->key_size,
-                              &signature,
-                              &signature_len);
+    ret = __sign_response(&nonce_challenge,
+                          supernode,
+                          volumekey,
+                          (char *)user_priv_key->data,
+                          user_priv_key->key_size,
+                          &signature,
+                          &signature_len);
 
     if (ret != 0) {
         log_error("could not create signature response");
@@ -172,6 +173,70 @@ sgx_backend_authenticate(struct supernode * supernode,
 out:
     if (signature) {
         nexus_free(signature);
+    }
+
+    return ret;
+}
+
+int
+sgx_backend_create_volume(struct nexus_key  * owner_pubkey,
+                          struct supernode ** p_supernode,
+                          struct volumekey ** p_volumekey)
+{
+    struct supernode * supernode = NULL;
+    struct volumekey * volumekey = NULL;
+
+    struct nexus_uuid root_uuid;
+    struct nexus_uuid supernode_uuid;
+
+    int err = -1;
+    int ret = -1;
+
+
+
+    nexus_uuid(&root_uuid);
+    nexus_uuid(&supernode_uuid);
+
+
+    supernode = (struct supernode *)calloc(1, sizeof(struct supernode));
+    volumekey = (struct volumekey *)calloc(1, sizeof(struct volumekey));
+
+    if (supernode == NULL || volumekey == NULL) {
+        log_error("allocation error");
+        goto out;
+    }
+
+
+    err = ecall_create_volume(global_enclave_id,
+                              &ret,
+                              &supernode_uuid,
+                              &root_uuid,
+                              (char *) owner_pubkey->data,
+                              owner_pubkey->key_size,
+                              supernode,
+                              NULL, // root_dirnode,
+                              volumekey);
+
+    if (err || ret) {
+        log_error("ecall_create_volume FAILED (err=%#x, ret=%d)", err, ret);
+        goto out;
+    }
+
+
+
+    *p_supernode = supernode;
+    *p_volumekey = volumekey;
+
+    ret = 0;
+out:
+    if (ret) {
+        if (supernode) {
+            nexus_free(supernode);
+        }
+
+        if (volumekey) {
+            nexus_free(volumekey);
+        }
     }
 
     return ret;

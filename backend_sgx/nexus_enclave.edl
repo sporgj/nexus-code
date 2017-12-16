@@ -1,6 +1,7 @@
 enclave {
 
     include "nexus_types.h"
+    include "nexus_uuid.h"
 
     trusted {
 
@@ -16,8 +17,8 @@ enclave {
          * @param volume_rootkey_out sealed rootkey
          */
         public int ecall_create_volume(
-            [user_check] struct uuid * supernode_uuid_ext,
-            [user_check] struct uuid * root_uuid_ext,
+            [user_check] struct nexus_uuid * supernode_uuid_ext,
+            [user_check] struct nexus_uuid * root_uuid_ext,
             [in, string] const char * publickey_str_in,
             size_t publickey_str_len,
             [user_check] struct supernode * supernode_buffer_ext,
@@ -34,7 +35,7 @@ enclave {
         public int ecall_authentication_request(
             [in, string] const char * publickey_str_in,
             size_t publickey_str_len,
-            [out] nonce_t * nonce_ext
+            [out] struct nexus_nonce * nonce_ext
         );
 
         /**
@@ -62,8 +63,8 @@ enclave {
          * @return 0 on success
          */
         public int ecall_dirnode_new(
-            [user_check] struct uuid * uuid_ext,
-            [user_check] struct uuid * root_uuid_ext,
+            [user_check] struct nexus_uuid * uuid_ext,
+            [user_check] struct nexus_uuid * root_uuid_ext,
             [user_check] struct dirnode * dirnode_out_ext
         );
 
@@ -76,14 +77,14 @@ enclave {
          */
         public int ecall_dirnode_add(
             [user_check] struct dirnode * dirnode_ext,
-            [user_check] struct uuid * uuid,
+            [user_check] struct nexus_uuid * uuid,
             [in, string] const char * fname_str_in,
             nexus_fs_obj_type_t type
         );
 
         public int ecall_dirnode_find_by_uuid(
             [user_check] struct dirnode *      sealed_dirnode_ext,
-            [user_check] struct uuid *         uuid_ext,
+            [user_check] struct nexus_uuid *   uuid_ext,
             [user_check] char **               fname_str_out_ext,
             [user_check] nexus_fs_obj_type_t * type_out_ext
         );
@@ -91,14 +92,14 @@ enclave {
         public int ecall_dirnode_find_by_name(
             [user_check] struct dirnode *      sealed_dirnode_ext,
             [user_check] char *                fname_str_ext,
-            [user_check] struct uuid *         uuid_out_ext,
+            [user_check] struct nexus_uuid *         uuid_out_ext,
             [user_check] nexus_fs_obj_type_t * type_out_ext
         );
 
         public int ecall_dirnode_remove(
             [user_check] struct dirnode *      sealed_dirnode_ext,
             [user_check] char *                fname_str_ext,
-            [user_check] struct uuid *         uuid_out_ext,
+            [user_check] struct nexus_uuid *         uuid_out_ext,
             [user_check] nexus_fs_obj_type_t * type_out_ext
         );
 

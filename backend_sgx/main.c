@@ -27,26 +27,31 @@ ocall_calloc(size_t size)
 static int
 nexus_init_enclave(const char * enclave_fpath)
 {
-    int ret     = -1;
+    sgx_launch_token_t token = {0};
+
     int updated = 0;
-    int err     = 0;
+
+    int err = 0;
+    int ret = -1;
 
     /* initialize the enclave */
-    sgx_launch_token_t token = {0};
     ret = sgx_create_enclave(enclave_fpath,
                              SGX_DEBUG_FLAG,
                              &token,
                              &updated,
                              &global_enclave_id,
                              NULL);
+
     if (ret != SGX_SUCCESS) {
         log_error("Could not open enclave: ret=%#x", ret);
         return -1;
     }
 
-    ecall_init_enclave(global_enclave_id, &err);
+
+    err = ecall_init_enclave(global_enclave_id, &ret);
+
     if (err != 0) {
-        log_error("Initializing enclave failed");
+        log_error("Initializing enclave failed. err=%#x", err);
         return -1;
     }
 

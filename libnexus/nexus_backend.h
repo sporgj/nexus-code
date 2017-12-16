@@ -47,13 +47,15 @@ struct nexus_backend_impl {
 
     int (*init)();
     int (*deinit)();
-   
-    int (*create_volume)(struct nexus_uuid * uuid,            /* Output parameter */
-			 struct nexus_key  * owner_pub_key);  /* Input parameter */
 
+    int (*create_volume)(struct nexus_key *  owner_pubkey,
+                         struct supernode ** supernode,
+                         struct volumekey ** volumekey);
 
-    int (*open_volume)(struct nexus_uuid * uuid,
-		       struct nexus_key  * user_priv_key);    /* Input parameter */
+    int (*open_volume)(struct supernode * supernode,
+                       struct volumekey * volumekey,
+                       struct nexus_key * user_public_key,
+                       struct nexus_key * user_priv_key);
 
     int (*close_volume)(struct nexus_uuid * uuid);
 

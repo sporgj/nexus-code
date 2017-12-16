@@ -1,48 +1,5 @@
 #include "nexus_sgx_backend.h"
 
-
-int
-backend_volume_create(struct uuid *      supernode_uuid,
-                      struct uuid *      root_uuid,
-                      const char *       publickey_fpath,
-                      struct supernode * supernode_out,
-                      struct dirnode *   root_dirnode_out,
-                      struct volumekey * volume_out)
-{
-    int    ret        = -1;
-    int    err        = -1;
-    size_t pubkey_len = 0;
-    char * pubkey_buf = NULL;
-
-    ret = mbedtls_pk_load_file(
-        publickey_fpath, (uint8_t **)&pubkey_buf, &pubkey_len);
-
-    if (ret != 0) {
-        log_error("Could not load key: %s", publickey_fpath);
-        return -1;
-    }
-
-    err = ecall_create_volume(global_enclave_id,
-                              &ret,
-                              supernode_uuid,
-                              root_uuid,
-                              pubkey_buf,
-                              pubkey_len,
-                              supernode_out,
-                              root_dirnode_out,
-                              volume_out);
-
-    free(pubkey_buf);
-
-    if (err || ret) {
-        log_error("ecall_create_volume FAILED ret=%d", ret);
-        return -1;
-    }
-
-    return 0;
-}
-
-
 int
 backend_dirnode_new(struct uuid *     dirnode_uuid,
                     struct uuid *     root_uuid,
