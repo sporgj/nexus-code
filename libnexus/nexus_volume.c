@@ -45,20 +45,6 @@ nexus_create_volume(char * volume_path,
 
     }
     
-    
-    // Create Volume key
-    {
-	struct nexus_key vol_key;
-
-	
-	ret = nexus_add_volume_key(&(vol->vol_uuid), &vol_key);
-
-	if (ret == -1) {
-	    log_error("could not add volume key to key list\n");
-	    goto err;
-	}
-	
-    }
 
     
     /* Setup Data store */
@@ -85,6 +71,7 @@ nexus_create_volume(char * volume_path,
 	
 	if (data_store == NULL) {
 	    log_error("Could not create data store\n");
+	    goto err;
 	}
 
 	vol->data_store = data_store;
@@ -114,6 +101,7 @@ nexus_create_volume(char * volume_path,
 	
 	if (meta_data_store == NULL) {
 	    log_error("Could not create data store\n");
+	    goto err;
 	}
 
 	vol->meta_data_store = meta_data_store;
@@ -144,6 +132,7 @@ nexus_create_volume(char * volume_path,
 	
 	if (backend == NULL) {
 	    log_error("Could not create data store\n");
+	    goto err;
 	}
 
 	vol->backend = backend;
@@ -153,7 +142,7 @@ nexus_create_volume(char * volume_path,
     {
 	char * uuid_str = NULL;
 	
-	ret = nexus_backend_create_volume(&(vol->supernode_uuid), vol->backend);
+	ret = nexus_backend_create_volume(&(vol->supernode_uuid), &(vol->vol_key), vol->backend);
 
 	if (ret == -1) {
 	    log_error("Backend Error: Could not create volume\n");
@@ -167,6 +156,10 @@ nexus_create_volume(char * volume_path,
     }
 
 
+    
+ 
+
+    
     /* Write config */
     {
 	char * cfg_filename = NULL;

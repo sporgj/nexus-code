@@ -10,6 +10,8 @@ struct nexus_volume {
 
     struct nexus_uuid vol_uuid;
     struct nexus_uuid supernode_uuid;
+
+    struct nexus_key  vol_key;
     
     struct nexus_backend   * backend;
     struct nexus_datastore * data_store;
