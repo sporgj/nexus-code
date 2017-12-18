@@ -49,24 +49,33 @@ struct dirnode_wrapper {
 extern size_t dirnode_cache_size;
 extern TAILQ_HEAD(dirnode_wrapper_list, dirnode_wrapper) * dirnode_cache;
 
-int
-supernode_encryption1(struct supernode *  supernode,
-                      struct volumekey *  volumekey,
-                      struct supernode ** p_sealed_supernode);
 
 int
-supernode_decryption1(struct supernode *  sealed_supernode,
-                      struct volumekey *  volumekey,
-                      struct supernode ** p_supernode);
+supernode_encryption(struct supernode *  supernode,
+                     struct volumekey *  volumekey,
+                     struct supernode ** p_sealed_supernode);
 
 int
-dirnode_encryption1(struct dirnode_wrapper * dirnode_wrapper,
-                    struct dirnode *         dirnode,
-                    struct volumekey *       volkey,
-                    struct dirnode **        sealed_dirnode);
+supernode_decryption(struct supernode *  sealed_supernode,
+                     struct volumekey *  volumekey,
+                     struct supernode ** p_supernode);
+
+/**
+ * Encrypts and seals a dirnode 
+ * @param dirnode
+ * @param dirnode_wrapper (can be null when no direntries are in the dirnode)
+ * @param volumekey is the volumekey associated with the dirnode
+ * @param p_sealed_dirnode is the destination dirnode
+ */
 int
-dirnode_encryption(struct dirnode_wrapper * dirnode_wrapper,
+dirnode_encryption(struct dirnode *         dirnode,
+                   struct dirnode_wrapper * dirnode_wrapper,
+                   struct volumekey *       volumekey,
                    struct dirnode **        p_sealed_dirnode);
+
+int
+dirnode_encryption_with_wrapper(struct dirnode_wrapper * dirnode_wrapper,
+                                struct dirnode **        p_sealed_dirnode);
 
 int
 dirnode_decryption(struct dirnode *   sealed_dirnode,
@@ -95,7 +104,7 @@ volumekey_from_rootuuid(struct nexus_uuid * root_uuid);
  * @return NULL on FAILURE
  */
 struct dirnode *
-dirnode_new(struct uuid * uuid, struct uuid * root_uuid);
+dirnode_new(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid);
 
 struct dirnode *
 dirnode_copy(struct dirnode * dirnode);

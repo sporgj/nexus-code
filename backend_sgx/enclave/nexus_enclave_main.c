@@ -156,12 +156,12 @@ ecall_create_volume(struct nexus_uuid * supernode_uuid_ext,
     {
         sgx_read_rand((uint8_t *)&volumekey, sizeof(crypto_ekey_t));
 
-        if (supernode_encryption1(&supernode, &volumekey, &sealed_supernode)) {
+        if (supernode_encryption(&supernode, &volumekey, &sealed_supernode)) {
             ocall_debug("supernode sealage FAILED");
             goto out;
         }
 
-        if (dirnode_encryption1(NULL, &dirnode, &volumekey, &sealed_dirnode)) {
+        if (dirnode_encryption(&dirnode, NULL, &volumekey, &sealed_dirnode)) {
             ocall_debug("dirnode sealing FAILED");
             goto out;
         }
@@ -271,7 +271,7 @@ nx_authentication_response(struct volumekey * sealed_volumekey,
             goto out;
         }
 
-        ret = supernode_decryption1(sealed_supernode, _volumekey, &_supernode);
+        ret = supernode_decryption(sealed_supernode, _volumekey, &_supernode);
         if (ret != 0) {
             ocall_debug("could not unseal supernode");
             goto out;
@@ -341,7 +341,8 @@ ecall_authentication_response(struct volumekey * volumekey_ext,
     struct volumekey   volumekey = { 0 };
 
     size_t supernode_size = 0;
-    int    ret            = -1;
+
+    int ret = -1;
 
     // in case someone is trying to skip the challenge
     if (auth_user_pubkey == NULL) {

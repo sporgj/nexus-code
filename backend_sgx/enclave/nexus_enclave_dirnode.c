@@ -26,7 +26,8 @@ dirnode_wrapper_free(struct dirnode_wrapper * wrapper)
 static struct dirnode_wrapper *
 dirnode_find_wrapper(struct dirnode * sealed_dirnode)
 {
-    struct uuid *            uuid            = &sealed_dirnode->header.uuid;
+    struct nexus_uuid * uuid = &sealed_dirnode->header.uuid;
+
     struct dirnode_wrapper * dirnode_wrapper = NULL;
     struct dirnode_header *  header          = NULL;
 
@@ -34,7 +35,7 @@ dirnode_find_wrapper(struct dirnode * sealed_dirnode)
     TAILQ_FOREACH(dirnode_wrapper, dirnode_cache, next_item)
     {
         header = &dirnode_wrapper->dirnode->header;
-        if (memcmp(&header->uuid, uuid, sizeof(struct uuid)) == 0) {
+        if (memcmp(&header->uuid, uuid, sizeof(struct nexus_uuid)) == 0) {
             // JBD; the sealed_dirnode is not checked for integrity
             // before comparing for versions. It doesn't really change much
             // because it will be checked for unsealing.
@@ -191,7 +192,7 @@ dirnode_put_wrapper(struct dirnode_wrapper * dirnode_wrapper)
 }
 
 struct dirnode *
-dirnode_new(struct uuid * uuid, struct uuid * root_uuid)
+dirnode_new(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid)
 {
     // 1 - allocate a new dirnode
     struct dirnode * dirnode = NULL;
@@ -203,8 +204,8 @@ dirnode_new(struct uuid * uuid, struct uuid * root_uuid)
     }
 
     // 2 - copy the uuid & root uuid into the dirnode
-    memcpy(&dirnode->header.uuid, uuid, sizeof(struct uuid));
-    memcpy(&dirnode->header.root_uuid, root_uuid, sizeof(struct uuid));
+    memcpy(&dirnode->header.uuid, uuid, sizeof(struct nexus_uuid));
+    memcpy(&dirnode->header.root_uuid, root_uuid, sizeof(struct nexus_uuid));
     dirnode->header.total_size = sizeof(struct dirnode);
 
     return dirnode;
@@ -218,27 +219,30 @@ dirnode_free(struct dirnode * dirnode)
 
 static int
 dirnode_add(struct dirnode_wrapper * dirnode_wrapper,
-            struct uuid *            entry_uuid,
+            struct nexus_uuid *            entry_uuid,
             const char *             fname_str,
             nexus_fs_obj_type_t      type)
 {
     struct dirnode * dirnode = dirnode_wrapper->dirnode;
 
-    struct dirnode_direntry_list * head      = &dirnode_wrapper->direntry_head;
-    struct dirnode_direntry_item * entryitem = NULL;
-    struct dirnode_direntry *      direntry  = NULL;
+    struct dirnode_direntry_list * direntry_head = NULL;
+    struct dirnode_direntry_item * entryitem     = NULL;
+    struct dirnode_direntry *      direntry      = NULL;
 
-    const char * curr_fname = NULL;
+    size_t fname_len     = 0;
+    size_t direntry_size = 0;
 
-    size_t size      = 0;
-    size_t fname_len = 0;
-    int    ret       = -1;
+    int ret = -1;
+
 
     // 1 - checks if the entry is in the dirnode
     // XXX: this might be an overkill as the "lookup" is always called before
     // creating a file/directory. If it exists, the create call will not be
     // issued
-    TAILQ_FOREACH(entryitem, head, next_item)
+
+    direntry_head = &dirnode_wrapper->direntry_head;
+
+    TAILQ_FOREACH(entryitem, direntry_head, next_item)
     {
         direntry = entryitem->direntry;
 
@@ -248,22 +252,19 @@ dirnode_add(struct dirnode_wrapper * dirnode_wrapper,
             return -1;
         }
 
-        ret = memcmp(&direntry->uuid, entry_uuid, sizeof(struct uuid));
+        ret = memcmp(&direntry->uuid, entry_uuid, sizeof(struct nexus_uuid));
         if (ret == 0) {
             ocall_debug("directory entry already exists");
             return -1;
         }
     }
 
-    // 2 - allocate space for the new dirnode entry
+    fname_len     = strnlen(fname_str, NEXUS_MAX_FILENAME_LEN);
+    direntry_size = sizeof(struct dirnode_direntry) + fname_len + 1;
+
+    // 2 - allocate the new dirnode entry
     {
-        entryitem = NULL;
-        direntry  = NULL;
-
-        fname_len = strnlen(fname_str, NEXUS_MAX_FILENAME_LEN);
-        size      = sizeof(struct dirnode_direntry) + fname_len + 1;
-
-        direntry  = (struct dirnode_direntry *)calloc(1, size);
+        direntry  = (struct dirnode_direntry *)calloc(1, direntry_size);
         entryitem = (struct dirnode_direntry_item *)calloc(
             1, sizeof(struct dirnode_direntry_item));
 
@@ -271,25 +272,25 @@ dirnode_add(struct dirnode_wrapper * dirnode_wrapper,
             ocall_debug("allocation error");
             goto out;
         }
-    }
-
-    // 3 - initialize the contents and add it to the list
-    {
+    
         direntry->type      = type;
-        direntry->entry_len = size;
+        direntry->entry_len = direntry_size;
         direntry->name_len  = fname_len;
 
-        memcpy(&direntry->uuid, entry_uuid, sizeof(struct uuid));
+        memcpy(&direntry->uuid, entry_uuid, sizeof(struct nexus_uuid));
         memcpy(&direntry->name, fname_str, fname_len);
 
         entryitem->freeable = true;
         entryitem->direntry = direntry;
-        TAILQ_INSERT_TAIL(head, entryitem, next_item);
 
-        dirnode->header.total_size += size;
-        dirnode->header.dir_size += size;
-        dirnode->header.dir_count += 1;
     }
+
+    // 3 - add to the list and update the wrapper
+    TAILQ_INSERT_TAIL(direntry_head, entryitem, next_item);
+
+    dirnode->header.total_size += direntry_size;
+    dirnode->header.dir_size += direntry_size;
+    dirnode->header.dir_count += 1;
 
     dirnode_wrapper->modified = true;
 
@@ -307,7 +308,7 @@ static struct dirnode_direntry_item *
 _dirnode_find_or_remove(struct dirnode_wrapper * dirnode_wrapper,
                         const char *             fname_str,
                         nexus_fs_obj_type_t *    p_type,
-                        struct uuid *            uuid)
+                        struct nexus_uuid *            uuid)
 {
     struct dirnode_direntry_list * head      = &dirnode_wrapper->direntry_head;
     struct dirnode_direntry_item * entryitem = NULL;
@@ -320,7 +321,7 @@ _dirnode_find_or_remove(struct dirnode_wrapper * dirnode_wrapper,
 
         if (strncmp(direntry->name, fname_str, direntry->name_len) == 0) {
             *p_type = direntry->type;
-            memcpy(uuid, &direntry->uuid, sizeof(struct uuid));
+            memcpy(uuid, &direntry->uuid, sizeof(struct nexus_uuid));
 
             return entryitem;
         }
@@ -340,9 +341,9 @@ _dirnode_find_or_remove(struct dirnode_wrapper * dirnode_wrapper,
  */
 static int
 dirnode_find_by_name(struct dirnode_wrapper * dirnode_wrapper,
-                     const char *             fname_str,
-                     nexus_fs_obj_type_t *    p_type,
-                     struct uuid *            uuid)
+                     const char             * fname_str,
+                     nexus_fs_obj_type_t    * p_type,
+                     struct nexus_uuid      * uuid)
 {
     // NULL means it failed, so we return 1
     struct dirnode_direntry_item * direntry_item
@@ -353,9 +354,9 @@ dirnode_find_by_name(struct dirnode_wrapper * dirnode_wrapper,
 
 static int
 dirnode_remove(struct dirnode_wrapper * dirnode_wrapper,
-               const char *             fname_str,
-               nexus_fs_obj_type_t *    p_type,
-               struct uuid *            uuid)
+               const char             * fname_str,
+               nexus_fs_obj_type_t    * p_type,
+               struct nexus_uuid      * uuid)
 {
     struct dirnode_direntry_item * direntry_item
         = _dirnode_find_or_remove(dirnode_wrapper, fname_str, p_type, uuid);
@@ -383,10 +384,10 @@ dirnode_remove(struct dirnode_wrapper * dirnode_wrapper,
 
 static int
 dirnode_find_by_uuid(struct dirnode_wrapper * dirnode_wrapper,
-                     struct uuid *            uuid,
-                     nexus_fs_obj_type_t *    p_type,
-                     const char **            p_fname,
-                     size_t *                 p_fname_len)
+                     struct nexus_uuid      * uuid,
+                     nexus_fs_obj_type_t    * p_type,
+                     const char            ** p_fname,
+                     size_t                 * p_fname_len)
 {
     struct dirnode_direntry_list * head      = &dirnode_wrapper->direntry_head;
     struct dirnode_direntry_item * entryitem = NULL;
@@ -397,7 +398,7 @@ dirnode_find_by_uuid(struct dirnode_wrapper * dirnode_wrapper,
     {
         direntry = entryitem->direntry;
 
-        if (memcmp(&direntry->uuid, uuid, sizeof(struct uuid)) == 0) {
+        if (memcmp(&direntry->uuid, uuid, sizeof(struct nexus_uuid)) == 0) {
             // set p_type & p_fname
             *p_type      = direntry->type;
             *p_fname     = direntry->name;
@@ -411,21 +412,23 @@ dirnode_find_by_uuid(struct dirnode_wrapper * dirnode_wrapper,
 }
 
 int
-ecall_dirnode_new(struct uuid *    uuid_ext,
-                  struct uuid *    root_uuid_ext,
-                  struct dirnode * dirnode_out_ext)
+ecall_dirnode_new(struct nexus_uuid * uuid_ext,
+                  struct nexus_uuid * root_uuid_ext,
+                  struct dirnode    * dirnode_out_ext)
 {
-    struct uuid        uuid;
-    struct uuid        root_uuid;
+    struct nexus_uuid uuid;
+    struct nexus_uuid root_uuid;
 
-    struct dirnode *   dirnode        = NULL;
-    struct dirnode *   sealed_dirnode = NULL;
-    struct volumekey * volumekey      = NULL;
+    struct dirnode * dirnode        = NULL;
+    struct dirnode * sealed_dirnode = NULL;
+
+    struct volumekey * volumekey = NULL;
 
     int ret = -1;
 
-    memcpy(&uuid, uuid_ext, sizeof(struct uuid));
-    memcpy(&root_uuid, root_uuid_ext, sizeof(struct uuid));
+
+    memcpy(&uuid, uuid_ext, sizeof(struct nexus_uuid));
+    memcpy(&root_uuid, root_uuid_ext, sizeof(struct nexus_uuid));
 
     volumekey = volumekey_from_rootuuid(&root_uuid);
     if (volumekey == NULL) {
@@ -439,11 +442,13 @@ ecall_dirnode_new(struct uuid *    uuid_ext,
         return -1;
     }
 
-    ret = dirnode_encryption1(NULL, dirnode, volumekey, &sealed_dirnode);
+
+    ret = dirnode_encryption(dirnode, NULL, volumekey, &sealed_dirnode);
     if (ret != 0) {
         ocall_debug("dirnode_encryption1() FAILED");
         goto out;
     }
+
 
     memcpy(dirnode_out_ext, sealed_dirnode, dirnode->header.total_size);
 
@@ -456,14 +461,14 @@ out:
 }
 
 int
-ecall_dirnode_add(struct dirnode *    sealed_dirnode_ext,
-                  struct uuid *       entry_uuid,
-                  const char *        fname_str_in,
-                  nexus_fs_obj_type_t type)
+ecall_dirnode_add(struct dirnode       * sealed_dirnode_ext,
+                  struct nexus_uuid    * entry_uuid,
+                  const char           * fname_str_in,
+                  nexus_fs_obj_type_t    type)
 {
     struct dirnode_wrapper * dirnode_wrapper = NULL;
 
-    struct uuid uuid = { 0 };
+    struct nexus_uuid uuid = { 0 };
 
     int ret = -1;
 
@@ -473,7 +478,7 @@ ecall_dirnode_add(struct dirnode *    sealed_dirnode_ext,
         return -1;
     }
 
-    memcpy(&uuid, entry_uuid, sizeof(struct uuid));
+    memcpy(&uuid, entry_uuid, sizeof(struct nexus_uuid));
 
     // add it and return the status
     ret = dirnode_add(dirnode_wrapper, &uuid, fname_str_in, type);
@@ -484,22 +489,22 @@ ecall_dirnode_add(struct dirnode *    sealed_dirnode_ext,
 }
 
 int
-ecall_dirnode_find_by_uuid(struct dirnode *      sealed_dirnode_ext,
-                           struct uuid *         uuid_ext,
-                           char **               fname_str_out_ext,
-                           nexus_fs_obj_type_t * type_out_ext)
+ecall_dirnode_find_by_uuid(struct dirnode        * sealed_dirnode_ext,
+                           struct nexus_uuid     * uuid_ext,
+                           char                 ** fname_str_out_ext,
+                           nexus_fs_obj_type_t   * type_out_ext)
 {
     struct dirnode_wrapper * dirnode_wrapper = NULL;
 
-    struct uuid uuid = { 0 };
+    struct nexus_uuid uuid = { 0 };
 
     nexus_fs_obj_type_t type = NEXUS_ANY;
 
     const char * fname           = NULL;
     char *       fname_alloc_ext = NULL;
+    size_t       fname_len       = 0;
 
-    size_t fname_len = 0;
-    int    ret       = -1;
+    int ret = -1;
 
     dirnode_wrapper = dirnode_get_wrapper_from_ext(sealed_dirnode_ext);
     if (dirnode_wrapper == NULL) {
@@ -508,7 +513,7 @@ ecall_dirnode_find_by_uuid(struct dirnode *      sealed_dirnode_ext,
     }
 
     // copy in the uuid and call dirnode_find_by_uuid()
-    memcpy(&uuid, uuid_ext, sizeof(struct uuid));
+    memcpy(&uuid, uuid_ext, sizeof(struct nexus_uuid));
 
     ret = dirnode_find_by_uuid(
         dirnode_wrapper, &uuid, &type, &fname, &fname_len);
@@ -535,9 +540,9 @@ out:
 }
 
 int
-ecall_dirnode_find_or_remove(struct dirnode *      sealed_dirnode_ext,
-                             char *                fname_str_in,
-                             struct uuid *         uuid_out_ext,
+ecall_dirnode_find_or_remove(struct dirnode      * sealed_dirnode_ext,
+                             char                * fname_str_in,
+                             struct nexus_uuid   * uuid_out_ext,
                              nexus_fs_obj_type_t * type_out_ext,
                              bool                  remove)
 {
@@ -545,15 +550,17 @@ ecall_dirnode_find_or_remove(struct dirnode *      sealed_dirnode_ext,
 
     nexus_fs_obj_type_t type = NEXUS_ANY;
 
-    struct uuid uuid;
+    struct nexus_uuid uuid;
 
     int ret = -1;
+
 
     dirnode_wrapper = dirnode_get_wrapper_from_ext(sealed_dirnode_ext);
     if (dirnode_wrapper == NULL) {
         ocall_debug("dirnode_get_wrapper_from_ext() FAILED");
         return -1;
     }
+
 
     if (remove) {
         ret = dirnode_remove(dirnode_wrapper, fname_str_in, &type, &uuid);
@@ -566,8 +573,10 @@ ecall_dirnode_find_or_remove(struct dirnode *      sealed_dirnode_ext,
         goto out;
     }
 
+
     // write out the data
-    memcpy(uuid_out_ext, &uuid, sizeof(struct uuid));
+    memcpy(uuid_out_ext, &uuid, sizeof(struct nexus_uuid));
+
     *type_out_ext = type;
 
     ret = 0;
@@ -578,9 +587,9 @@ out:
 }
 
 int
-ecall_dirnode_find_by_name(struct dirnode *      sealed_dirnode_ext,
-                           char *                fname_str_in,
-                           struct uuid *         uuid_out_ext,
+ecall_dirnode_find_by_name(struct dirnode      * sealed_dirnode_ext,
+                           char                * fname_str_in,
+                           struct nexus_uuid   * uuid_out_ext,
                            nexus_fs_obj_type_t * type_out_ext)
 {
     return ecall_dirnode_find_or_remove(
@@ -588,9 +597,9 @@ ecall_dirnode_find_by_name(struct dirnode *      sealed_dirnode_ext,
 }
 
 int
-ecall_dirnode_remove(struct dirnode *      sealed_dirnode_ext,
-                     char *                fname_str_in,
-                     struct uuid *         uuid_out_ext,
+ecall_dirnode_remove(struct dirnode      * sealed_dirnode_ext,
+                     char                * fname_str_in,
+                     struct nexus_uuid   * uuid_out_ext,
                      nexus_fs_obj_type_t * type_out_ext)
 {
     return ecall_dirnode_find_or_remove(
@@ -598,7 +607,7 @@ ecall_dirnode_remove(struct dirnode *      sealed_dirnode_ext,
 }
 
 int
-ecall_dirnode_serialize(struct dirnode *  dirnode,
+ecall_dirnode_serialize(struct dirnode  * dirnode,
                         struct dirnode ** p_sealed_dirnode_out_ext)
 {
     struct dirnode_wrapper * dirnode_wrapper = NULL;
@@ -616,21 +625,27 @@ ecall_dirnode_serialize(struct dirnode *  dirnode,
         return -1;
     }
 
-    ret = dirnode_encryption(dirnode_wrapper, &sealed_dirnode);
+
+    ret = dirnode_encryption_with_wrapper(dirnode_wrapper, &sealed_dirnode);
     if (ret != 0) {
         ocall_debug("dirnode_encryption FAILED");
         goto out;
     }
 
+
     // allocate an external buffer and copy out the sealed dirnode
-    size = sealed_dirnode->header.total_size;
-    ret  = ocall_calloc((void **)&sealed_dirnode_ext, size);
+    ret = ocall_calloc((void **)&sealed_dirnode_ext,
+                       sealed_dirnode->header.total_size);
+
     if (ret != 0) {
         ocall_debug("ocall_calloc for sealed_dirnode FAILED");
         goto out;
     }
 
-    memcpy(sealed_dirnode_ext, sealed_dirnode, size);
+
+    memcpy(
+        sealed_dirnode_ext, sealed_dirnode, sealed_dirnode->header.total_size);
+
     *p_sealed_dirnode_out_ext = sealed_dirnode_ext;
 
     ret = 0;
