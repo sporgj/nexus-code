@@ -15,7 +15,10 @@
 #include <nexus_uuid.h>
 #include <nexus_json.h>
 
+
+
 struct nexus_backend_impl;
+struct nexus_volume;
 
 
 
@@ -23,6 +26,7 @@ struct nexus_backend {
 
     struct nexus_backend_impl * impl;
 
+    void * private_data;
 };
 
 
@@ -32,9 +36,11 @@ nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg);
 
 void nexus_backend_shutdown(struct nexus_backend * backend);
 
+
+
 int
-nexus_backend_create_volume(struct nexus_uuid *    supernode_uuid,
-                            struct nexus_backend * backend);
+nexus_backend_create_volume(struct nexus_backend  * backend,
+			    struct nexus_volume   * volume);
 
 
 
@@ -48,14 +54,8 @@ struct nexus_backend_impl {
     int (*init)();
     int (*deinit)();
 
-    int (*create_volume)(struct nexus_key *  owner_pubkey,
-                         struct supernode ** supernode,
-                         struct volumekey ** volumekey);
-
-    int (*open_volume)(struct supernode * supernode,
-                       struct volumekey * volumekey,
-                       struct nexus_key * user_public_key,
-                       struct nexus_key * user_priv_key);
+    void * (*create_volume)(struct nexus_volume * volume);
+    void * (*open_volume)(struct nexus_volume * volume);
 
     int (*close_volume)(struct nexus_uuid * uuid);
 

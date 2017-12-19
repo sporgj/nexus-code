@@ -142,7 +142,7 @@ nexus_create_volume(char * volume_path,
     {
 	char * uuid_str = NULL;
 	
-	ret = nexus_backend_create_volume(&(vol->supernode_uuid), &(vol->vol_key), vol->backend);
+	ret = nexus_backend_create_volume(vol->backend, vol);
 
 	if (ret == -1) {
 	    log_error("Backend Error: Could not create volume\n");

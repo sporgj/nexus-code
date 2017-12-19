@@ -131,9 +131,12 @@ nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
 
 // TODO
 int
-nexus_backend_create_volume(struct nexus_uuid *    supernode_uuid,
-                            struct nexus_backend * backend)
+nexus_backend_create_volume(struct nexus_backend * backend,
+			    struct nexus_volume  * volume)
 {
+    
+
+    
     return -1;
 }
 
