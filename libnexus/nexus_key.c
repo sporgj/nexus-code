@@ -16,36 +16,6 @@
 
 #include "nexus_key_mbedtls.c"
 
-struct nexus_key * 
-nexus_load_key_from_file(nexus_key_type_t   key_type,
-			 char             * key_path)
-{
-    struct nexus_key * key = NULL;
-
-    key = calloc(sizeof(struct nexus_key), 1);
-
-    if (key == NULL) {
-	log_error("Could not allocate nexus_key\n");
-	return NULL;
-    }
-
-    switch (key_type) {
-	case NEXUS_MBEDTLS_PUB_KEY:
-	case NEXUS_MBEDTLS_PRV_KEY:
-	case NEXUS_RAW_KEY:
-	default:
-	    log_error("Invalid key type: %d\n", key_type);
-	    goto err;
-    }
-
-    return key;
-
- err:
-    nexus_free(key);
-    return NULL;
-}
-
-
 
 void
 nexus_free_key(struct nexus_key * key)
@@ -214,6 +184,38 @@ nexus_key_to_file(struct nexus_key * key,
 
     return ret;
 }
+
+
+struct nexus_key * 
+nexus_key_from_file(nexus_key_type_t   key_type,
+		    char             * key_path)
+{
+    struct nexus_key * key = NULL;
+
+    key = calloc(sizeof(struct nexus_key), 1);
+
+    if (key == NULL) {
+	log_error("Could not allocate nexus_key\n");
+	return NULL;
+    }
+
+    switch (key_type) {
+	case NEXUS_MBEDTLS_PUB_KEY:
+	case NEXUS_MBEDTLS_PRV_KEY:
+	case NEXUS_RAW_KEY:
+	default:
+	    log_error("Invalid key type: %d\n", key_type);
+	    goto err;
+    }
+
+    return key;
+
+ err:
+    nexus_free(key);
+    return NULL;
+}
+
+
 
 
 
