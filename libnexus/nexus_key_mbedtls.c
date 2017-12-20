@@ -252,8 +252,16 @@ __mbedtls_create_prv_key(struct nexus_key * key)
 }
 	
 
+static int
+__mbedtls_load_prv_key(struct nexus_key * key, 
+		       char             * file_path)
+{
+    
 
 
+}
+
+    
 
 
 static int
@@ -271,27 +279,38 @@ __mbedtls_store_prv_key(struct nexus_key * key,
 	return -1;
     }
 
-    file_ptr = fopen(file_path, "wb");
+    ret = nexus_write_raw_file(file_path, key_str, strlen(key_str));
 
-    if (file_ptr == NULL) {
-	log_error("Could not open key file (%s) (errno=%d)\n", file_path, errno);
-	goto err;
+    if (ret == -1) {
+	log_error(
     }
 
-    ret = fwrite(key_str, 1, strlen(key_str), file_ptr);
+    nexus_free(key_str);
+    return ret;
+}
 
-    if (ret != strlen(key_str)) {
-	log_error("Could not write key file (%s) (errno=%d)\n", file_path, errno);
-	goto err;
+
+static int
+__mbedtls_store_pub_key(struct nexus_key * key,
+			char             * file_path)
+{
+    char * key_str  = NULL;
+    FILE * file_ptr = NULL;
+    size_t ret      = 0;
+    
+    key_str = __mbedtls_pub_key_to_str(key);
+
+    if (key_str == NULL) {
+	log_error("Could not get key string (type=%s)\n", nexus_key_type_to_str(key->type));
+	return -1;
     }
 
-    fclose(file_ptr);
-    
-    return 0;
-    
- err:
-    if (file_ptr) fclose(file_ptr);
-    if (key_str)  nexus_free(key_str);
+    ret = nexus_write_raw_file(file_path, key_str, strlen(key_str));
 
-    return -1;
+    if (ret == -1) {
+	log_error(
+    }
+
+    nexus_free(key_str);
+    return ret;
 }
