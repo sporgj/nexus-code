@@ -88,6 +88,41 @@ nexus_datastores_init()
 }
 
 
+struct nexus_datastore *
+nexus_datastore_create(char             * name,
+		       nexus_json_obj_t   cfg)
+{
+    struct nexus_datastore      * datastore = NULL;
+    struct nexus_datastore_impl * impl      = NULL;
+
+    impl = nexus_htable_search(datastore_table, (uintptr_t)name);
+
+    if (impl == NULL) {
+	log_error("Could not find datastore implementation for (%s)\n", name);
+	return NULL;
+    }
+
+    datastore = calloc(sizeof(struct nexus_datastore), 1);
+
+    if (datastore == NULL) {
+	log_error("Could not allocate nexus_datastore\n");
+	return NULL;
+    }
+
+        
+    log_debug("initializing datastore (%s)\n", name);
+
+    datastore->impl      = impl;
+    datastore->priv_data = datastore->impl->create(cfg);
+
+    if (datastore->priv_data == NULL) {
+	log_error("Error initializing datastore (%s)\n", name);
+	nexus_free(datastore);
+	return NULL;
+    }
+
+    return datastore;
+}
 
 
 struct nexus_datastore *

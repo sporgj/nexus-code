@@ -25,3 +25,4 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
 		     struct nexus_key  * key);
 
 
+struct nexus_key * nexus_get_user_key();

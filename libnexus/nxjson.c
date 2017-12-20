@@ -56,7 +56,7 @@ create_json(nx_json_type     type,
 	    char           * key,
 	    struct nx_json * parent)
 {
-    struct nx_json* js = NX_JSON_CALLOC();
+    struct nx_json * js = NX_JSON_CALLOC();
     
     assert(js);
 
@@ -74,6 +74,8 @@ create_json(nx_json_type     type,
 	}
 	
 	parent->length++;
+    } else {
+	js->root = 1;
     }
 
     

@@ -5,6 +5,10 @@
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
  */
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 
 #include <nexus_user_data.h>
 
@@ -17,7 +21,6 @@
 
 
 #define NEXUS_VOLUME_KEY_FILENAME    "nexus_volume_keys"
-
 
 
 
@@ -160,7 +163,7 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
     
     for (i = 0; i < num_keys; i++) {
 	char * key_uuid_base64 = NULL;
-	char * key_base64      = NULL;
+	char * key_str         = NULL;
 	
 	nexus_json_obj_t key   = nexus_json_array_get_object(key_list, i);
 
@@ -172,21 +175,31 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
 	}
 
 	if (strncmp(vol_uuid_base64, key_uuid_base64, strlen(vol_uuid_base64)) == 0) {
-	    ret = nexus_json_get_string(key, "key", &key_base64);
+	    nexus_key_type_t key_type = NEXUS_INVALID_KEY;
 
-	    if (ret == -1) {
+	    char * type_str = NULL;
+	    
+	    ret |= nexus_json_get_string(key, "key",  &key_str);
+	    ret |= nexus_json_get_string(key, "type", &type_str);
+
+	    if (ret != 0) {
 		log_error("Corrupted key entry for Volume (%s): No key entry\n", vol_uuid_base64);
 		goto err;
 	    }
 
-	    /* TODO: Grab the key type to pass to parser */
 	    
+	    key_type = nexus_key_type_from_str(type_str);
 
-	    ret = nexus_key_from_base64(key, key_base64);
+	    if (key_type == NEXUS_INVALID_KEY) {
+		log_error("Tried to load invalid volume key type (%s)\n", type_str);
+		goto err;
+	    }
+	    
+	    key = nexus_key_from_str(key_type, key_str);
 
-	    if (ret == -1) {
-		log_error("Corrupted key entry for Volume (%s): Invalid key format\n", vol_uuid_base64);
-		goto err;		
+	    if (key == NULL) {
+		log_error("Could not load volume key (%s)\n", key_str);
+		goto err;
 	    }
 	    
 	    break;
@@ -218,7 +231,7 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
     nexus_json_obj_t key_json = __get_volume_key_list();
 
     char * uuid_base64 = NULL;
-    char * key_base64  = NULL;
+    char * key_str  = NULL;
     
     int ret = 0;
 
@@ -243,16 +256,16 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
 
 
     uuid_base64 = nexus_uuid_to_base64(vol_uuid);
-    key_base64  = nexus_key_to_base64(key);
+    key_str  = nexus_key_to_str(key);
 
     if ( (uuid_base64 == NULL) ||
-	 (key_base64  == NULL) ) {
+	 (key_str  == NULL) ) {
 
 	goto err;
     }
     
     ret |= nexus_json_add_string(new_key, "uuid", uuid_base64);
-    ret |= nexus_json_add_string(new_key, "key",  key_base64);
+    ret |= nexus_json_add_string(new_key, "key",  key_str);
 
     if (ret != 0) {
 	log_error("Could not create JSON key object\n");
@@ -267,7 +280,7 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
     }
 
     nexus_free(uuid_base64);
-    nexus_free(key_base64);
+    nexus_free(key_str);
 
     nexus_json_free(key_json);
 
@@ -275,12 +288,26 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
 
  err:
     if (uuid_base64) nexus_free(uuid_base64);
-    if (key_base64)  nexus_free(key_base64);
+    if (key_str)  nexus_free(key_str);
     
     nexus_json_free(key_json);
     return -1;
 }
 
+
+struct nexus_key * 
+nexus_get_user_key()
+{
+    struct nexus_key * user_key = NULL;
+
+    user_key = nexus_key_from_file(NEXUS_MBEDTLS_PRV_KEY, nexus_config.user_key_path);
+
+    if (user_key == NULL) {
+	log_error("Could not retrieve nexus user key from file (%s)\n", nexus_config.user_key_path);
+    }    
+
+    return user_key;
+}
 
 
 
@@ -288,13 +315,45 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
 int
 nexus_create_user_data()
 {
+    int ret = 0;
+    
+    /* Make user data directory */
+    ret = mkdir(nexus_config.user_data_dir, 0700);
 
+    if (ret == -1) {
+	log_error("Could not create user data directory at (%s)\n", nexus_config.user_data_dir);
+	return -1;
+    }
+    
     /* Create Volume Key list */
-    __create_volume_key_list();
+    ret = __create_volume_key_list();
 
+    if (ret == -1) {
+	log_error("Could not create volume key file at (%s/%s)\n",
+		  nexus_config.user_data_dir,
+		  NEXUS_VOLUME_KEY_FILENAME);
+	return -1;
+    }
+    
+	
+    /* Generate user private key */
+    {
+	struct nexus_key * user_key = NULL;
+	
+	user_key = nexus_create_key(NEXUS_MBEDTLS_PRV_KEY);
 
-    /* Generate user public/private keys */
+	if (user_key == NULL) {
+	    log_error("Could not create user key\n");
+	    return -1;
+	}
+	
+	ret = nexus_key_to_file(user_key, nexus_config.user_key_path);	
 
+	if (ret == -1) {
+	    log_error("Could not save user key to file (%s)\n", nexus_config.user_key_path);
+	    return -1;
+	}
+    }
 
     return 0;
 }

@@ -15,6 +15,8 @@ extern "C" {
 int nexus_init(void);
 int nexus_deinit(void);
 
+/* Setup the nexus user data */
+int nexus_setup(void);
 
 // volume management
 

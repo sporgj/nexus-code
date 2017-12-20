@@ -21,12 +21,16 @@ struct nexus_datastore {
 
 
 
-struct nexus_datastore * nexus_datastore_create(char             * name,
-					        nexus_json_obj_t   datastore_cfg);
+struct nexus_datastore *
+nexus_datastore_create(char             * name,
+		       nexus_json_obj_t   datastore_cfg);
 
 
-struct nexus_datastore * nexus_datastore_open(char             * name,
-					      nexus_json_obj_t   datastore_cfg);
+struct nexus_datastore *
+nexus_datastore_open(char             * name,
+		     nexus_json_obj_t   datastore_cfg);
+
+
 
 int nexus_datastore_close(struct nexus_datastore * datastore);
 

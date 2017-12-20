@@ -123,23 +123,140 @@ __mbedtls_prv_key_to_str(struct nexus_key * key)
 
 
 
-/* Just create a pub key pem string from private key, and parse it into the public key */
 static int
-__mbedtls_derive_pub_key(struct nexus_key * pub_key,
-			 struct nexus_key * prv_key)
+__mbedtls_prv_key_to_file(struct nexus_key * key,
+		      char             * file_path)
 {
-    mbedtls_pk_context * ctx     = NULL;
-    char               * pem_str = NULL;
-    
+    char * key_str  = NULL;
     int ret = 0;
+    
+    key_str = __mbedtls_prv_key_to_str(key);
 
-    pem_str = __mbedtls_pub_key_to_str(prv_key);
-
-
-    if (pem_str == NULL) {
-	log_error("Could not generate public key PEM\n");
+    if (key_str == NULL) {
+	log_error("Could not get key string (type=%s)\n", nexus_key_type_to_str(key->type));
 	return -1;
     }
+
+    ret = nexus_write_raw_file(file_path, key_str, strlen(key_str));
+
+    if (ret == -1) {
+	log_error("Could not write MBEDTLS private key to file (%s)\n", file_path);
+    }
+
+    nexus_free(key_str);
+    return ret;
+}
+
+
+static int
+__mbedtls_pub_key_to_file(struct nexus_key * key,
+			  char             * file_path)
+{
+    char * key_str  = NULL;
+
+    int ret = 0;
+    
+    key_str = __mbedtls_pub_key_to_str(key);
+
+    if (key_str == NULL) {
+	log_error("Could not get key string (type=%s)\n", nexus_key_type_to_str(key->type));
+	return -1;
+    }
+
+    ret = nexus_write_raw_file(file_path, key_str, strlen(key_str));
+
+    if (ret == -1) {
+	log_error("Could not write MBEDTLS public key to file (%s)\n", file_path);
+    }
+
+    nexus_free(key_str);
+    return ret;
+}
+
+
+static int
+__mbedtls_prv_key_from_str(struct nexus_key * key,
+			   char             * key_str)
+{
+    mbedtls_pk_context * ctx = NULL;
+
+    int ret = 0;
+    
+    ctx = calloc(sizeof(mbedtls_pk_context), 1);
+    
+    if (ctx == NULL) {
+	log_error("Could not allocate key context\n");
+	return -1;
+    }
+
+    mbedtls_pk_init(ctx);    
+
+    /* Currently does not support password protected keys... */
+    ret = mbedtls_pk_parse_key(ctx, (uint8_t *)key_str, strlen(key_str) + 1, NULL, 0);
+
+    if (ret != 0) {
+	log_error("Could not parse private key string (%s)\n", key_str);
+	goto err;
+    }
+
+    key->key_state = ctx;
+    
+    nexus_free(key_str);
+    return 0;
+    
+ err:
+    mbedtls_pk_free(ctx);
+    nexus_free(ctx);
+    
+    return -1;
+}
+
+
+static int
+__mbedtls_pub_key_from_str(struct nexus_key * key,
+			   char             * key_str)
+{
+   mbedtls_pk_context * ctx = NULL;
+
+    int ret = 0;
+    
+    ctx = calloc(sizeof(mbedtls_pk_context), 1);
+    
+    if (ctx == NULL) {
+	log_error("Could not allocate key context\n");
+	return -1;
+    }
+
+    mbedtls_pk_init(ctx);    
+
+    ret = mbedtls_pk_parse_public_key(ctx, (uint8_t *)key_str, strlen(key_str) + 1);
+
+    if (ret != 0) {
+	log_error("Could not parse public key string (%s)\n", key_str);
+	goto err;
+    }
+
+    key->key_state = ctx;
+    
+    nexus_free(key_str);
+    return 0;
+    
+ err:
+    mbedtls_pk_free(ctx);
+    nexus_free(ctx);
+    
+    return -1;
+}
+			   
+
+
+static int
+__mbedtls_prv_key_from_file(struct nexus_key * key, 
+			    char             * file_path)
+{
+    mbedtls_pk_context * ctx = NULL;
+
+    int ret = 0;
     
     ctx = calloc(sizeof(mbedtls_pk_context), 1);
     
@@ -150,26 +267,87 @@ __mbedtls_derive_pub_key(struct nexus_key * pub_key,
 
     mbedtls_pk_init(ctx);
 
+    ret = mbedtls_pk_parse_keyfile(ctx, file_path, NULL);
 
-    ret = mbedtls_pk_parse_public_key(ctx, (unsigned char *)pem_str, strlen(pem_str) + 1);
+    if (ret != 0) {
+	log_error("Could not parse public key file (%s)\n", file_path);
+	goto err;
+    }
+
+    key->key_state = ctx;
+    
+    return 0;
+    
+ err:
+    mbedtls_pk_free(ctx);
+    nexus_free(ctx);
+    
+    return -1;
+}
+
+static int
+__mbedtls_pub_key_from_file(struct nexus_key * key, 
+			    char             * file_path)
+{
+    mbedtls_pk_context * ctx = NULL;
+
+    int ret = 0;
+    
+    ctx = calloc(sizeof(mbedtls_pk_context), 1);
+    
+    if (ctx == NULL) {
+	log_error("Could not allocate key context\n");
+	return -1;
+    }
+
+    mbedtls_pk_init(ctx);
+
+    ret = mbedtls_pk_parse_public_keyfile(ctx, file_path);
 
     if (ret != 0) {
 	log_error("Could not parse public key PEM string\n");
 	goto err;
     }
 
-    pub_key->key_state = ctx;
+    key->key_state = ctx;
     
-    nexus_free(pem_str);
     return 0;
     
  err:
     mbedtls_pk_free(ctx);
     nexus_free(ctx);
-    nexus_free(pem_str);
-    
-    return -1;
 
+    return -1;
+}
+
+
+
+
+
+/* Just create a pub key pem string from private key, and parse it into the public key */
+static int
+__mbedtls_derive_pub_key(struct nexus_key * pub_key,
+			 struct nexus_key * prv_key)
+{
+    char * pem_str = NULL;
+    int    ret     = 0;
+
+    pem_str = __mbedtls_pub_key_to_str(prv_key);
+
+
+    if (pem_str == NULL) {
+	log_error("Could not generate public key PEM\n");
+	return -1;
+    }
+
+    ret = __mbedtls_pub_key_from_str(pub_key, pem_str);
+
+    if (ret == -1) {
+	log_error("Could not derive public key from string (%s)\n", pem_str);
+    }
+    
+    nexus_free(pem_str);
+    return ret;   
 }
 
 
@@ -252,65 +430,10 @@ __mbedtls_create_prv_key(struct nexus_key * key)
 }
 	
 
-static int
-__mbedtls_load_prv_key(struct nexus_key * key, 
-		       char             * file_path)
+
+static void
+__mbedtls_free_key(struct nexus_key * key)
 {
-    
-
-
-}
-
-    
-
-
-static int
-__mbedtls_store_prv_key(struct nexus_key * key,
-			char             * file_path)
-{
-    char * key_str  = NULL;
-    FILE * file_ptr = NULL;
-    size_t ret      = 0;
-    
-    key_str = __mbedtls_prv_key_to_str(key);
-
-    if (key_str == NULL) {
-	log_error("Could not get key string (type=%s)\n", nexus_key_type_to_str(key->type));
-	return -1;
-    }
-
-    ret = nexus_write_raw_file(file_path, key_str, strlen(key_str));
-
-    if (ret == -1) {
-	log_error(
-    }
-
-    nexus_free(key_str);
-    return ret;
-}
-
-
-static int
-__mbedtls_store_pub_key(struct nexus_key * key,
-			char             * file_path)
-{
-    char * key_str  = NULL;
-    FILE * file_ptr = NULL;
-    size_t ret      = 0;
-    
-    key_str = __mbedtls_pub_key_to_str(key);
-
-    if (key_str == NULL) {
-	log_error("Could not get key string (type=%s)\n", nexus_key_type_to_str(key->type));
-	return -1;
-    }
-
-    ret = nexus_write_raw_file(file_path, key_str, strlen(key_str));
-
-    if (ret == -1) {
-	log_error(
-    }
-
-    nexus_free(key_str);
-    return ret;
+    mbedtls_pk_free(key->key_state);
+    nexus_free(key->key_state);
 }

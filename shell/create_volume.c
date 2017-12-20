@@ -16,10 +16,10 @@
 #include <nexus_config.h>
 
 static char * volume_path  = NULL;
-static char * pub_key_path = NULL;
+static char * user_key_path = NULL;
 
 
-static int cmd_line_pub_key = 0;
+static int cmd_line_user_key = 0;
 
 
 static void
@@ -33,8 +33,8 @@ static void usage()
 	   "Usage: create <volume-path> [options]\n"		\
 	   " Options: \n");
 
-    printf("\t[--pub_key]   (default: %-*s)       : Location of User's public key\n",
-	   32, nexus_config.user_pub_key_path);
+    printf("\t[--user_key]   (default: %-*s)       : Location of User's public key\n",
+	   32, nexus_config.user_key_path);
 
     return;
 }
@@ -55,7 +55,7 @@ create_volume_main(int argc, char ** argv)
 	char c = 0;
 
 	static struct option long_options[] = {
-	    { "pub_key"      , required_argument , &cmd_line_pub_key ,  1  },  /* 0 */
+	    { "user_key"      , required_argument , &cmd_line_user_key ,  1  },  /* 0 */
 	    { 0, 0, 0, 0 }
 	};
 	
@@ -67,7 +67,7 @@ create_volume_main(int argc, char ** argv)
 		case 0:
 		    switch (opt_index) {
 			case 0:
-			    nexus_config.user_pub_key_path = optarg;
+			    nexus_config.user_key_path = optarg;
 			    used_opts += 2;
 			    break;
 			    
@@ -96,7 +96,7 @@ create_volume_main(int argc, char ** argv)
 
 	volume_path = argv[used_opts + 1];
 
-	printf("public_key: (%s)\n", pub_key_path);
+	printf("public_key: (%s)\n", user_key_path);
 	
 	
     }

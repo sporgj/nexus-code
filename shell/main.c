@@ -27,7 +27,6 @@
 #include "handler.h"
 
 static const char * nexus_prog_version = "Nexus Admin Shell 0.1";
-static const char * bug_email_addr      = "<jacklange@cs.pitt.edu>";
 
 
 
@@ -38,11 +37,21 @@ struct nexus_cmd {
 };
 
 
+int
+init_main(int argc, char ** argv)
+{
+    /* For now we just do a default config */
+    nexus_setup();
+
+    return 0;
+}
+
 
 extern int create_volume_main(int argc, char ** argv);
 
 static struct nexus_cmd cmds[] = {
-    {"create" , create_volume_main , "Create a Nexus Volume"},
+    {"init"   , init_main          , "Initialize Nexus state" },
+    {"create" , create_volume_main , "Create a Nexus Volume"  },
     {0, 0, 0}
 };
 
@@ -53,7 +62,6 @@ usage(void)
     int i = 0;
 
     printf("%s\n", nexus_prog_version);
-    printf("Report Bugs to %s\n", bug_email_addr);
     printf("Usage: nexus <command> [args...]\n");
     printf("Commands:\n");
 

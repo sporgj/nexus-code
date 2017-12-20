@@ -11,13 +11,13 @@
 #include <nexus_volume.h>
 #include <nexus_backend.h>
 #include <nexus_datastore.h>
+#include <nexus_user_data.h>
 
 #include <nexus_key.h>
 
 #include <nexus_util.h>
 #include <nexus_log.h>
 
-#include "nexus_internal.h"
 
 
 #if 0
@@ -63,7 +63,6 @@ nexus_init()
     printf("Initializing Nexus\n");
 
     nexus_config_init();
-    
     nexus_backend_init();
     nexus_datastores_init();
     
@@ -79,31 +78,21 @@ nexus_deinit()
     return 0;
 }
 
+int
+nexus_setup()
+{
+    return nexus_create_user_data();
+}
+
+
 
 int
-nexus_mount_volume(char * volume_path,
-                   char * vol_key_path,
-                   char * pub_key_path,
-                   char * prv_key_path)
+nexus_mount_volume(char * volume_path)
 {
     struct nexus_volume * volume  = NULL;
-
-    struct nexus_key    * prv_key = NULL;
     
     int    ret  = -1;
 
-
-    /* Grab the keys */
-    prv_key = nexus_load_key_from_file(prv_key_path);
-
-
-    
-    if (prv_key == NULL) {
-	log_error("Could not load private_key (%s)\n", prv_key_path);
-	goto err;
-    }
-
-           
     /* Read in volume information */
     volume = nexus_load_volume(volume_path);
 
@@ -154,11 +143,12 @@ out:
    
 
     return ret;
+
+    /*
 err:
-    if (prv_key) nexus_free(prv_key);
 
     if (volume) nexus_close_volume(volume);    
-
+    */
 
     return -1;
 }
