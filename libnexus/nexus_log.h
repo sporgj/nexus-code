@@ -13,6 +13,7 @@
 #define log_debug(fmt, ...)
 #endif
 
+#define nexus_printf(fmt, ...) fprintf(stdout, "Nexus> " fmt, ##__VA_ARGS__)
 
 
 

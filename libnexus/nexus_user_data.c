@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
+#include <dirent.h>
 
 #include <nexus_user_data.h>
 
@@ -310,6 +310,21 @@ nexus_get_user_key()
 }
 
 
+int
+nexus_user_dir_exists()
+{
+    DIR * user_dir = NULL;
+
+    user_dir = opendir(nexus_config.user_data_dir);
+
+    if (user_dir) {
+	closedir(user_dir);
+	return 1;
+    }
+
+    return 0;
+}
+
 
 
 int
@@ -317,15 +332,25 @@ nexus_create_user_data()
 {
     int ret = 0;
     
+    if (nexus_user_dir_exists()) {
+	nexus_printf("User directory already exists\n");
+	return -1;
+    }
+    
     /* Make user data directory */
+    nexus_printf("Creating Nexus user directory (%s)\n", nexus_config.user_data_dir);
+    
     ret = mkdir(nexus_config.user_data_dir, 0700);
 
     if (ret == -1) {
 	log_error("Could not create user data directory at (%s)\n", nexus_config.user_data_dir);
 	return -1;
     }
-    
+
+
     /* Create Volume Key list */
+    nexus_printf("Creating Volume key list\n");
+
     ret = __create_volume_key_list();
 
     if (ret == -1) {
@@ -337,6 +362,8 @@ nexus_create_user_data()
     
 	
     /* Generate user private key */
+    nexus_printf("Generating User Key (This may take a little while)\n");
+    
     {
 	struct nexus_key * user_key = NULL;
 	

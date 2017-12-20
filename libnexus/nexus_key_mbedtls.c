@@ -16,6 +16,8 @@
 #include <mbedtls/rsa.h>
 #include <mbedtls/error.h>
 
+#if 0
+    /* This makes things take forever, so lets comment this out for now... */
 #define DEV_RANDOM_THRESHOLD        32
 
 static int
@@ -62,7 +64,7 @@ __mbedtls_entropy_fn(void          * data,
 
     return 0;
 }
-
+#endif
 
 
 
@@ -375,6 +377,9 @@ __mbedtls_create_prv_key(struct nexus_key * key)
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init (&entropy);
 
+#if 0
+    /* This makes things take forever, so lets comment this out for now... */
+    log_debug("Adding Entropy source\n");
     ret = mbedtls_entropy_add_source(&entropy,
 				     __mbedtls_entropy_fn,
 				     NULL,
@@ -385,6 +390,7 @@ __mbedtls_create_prv_key(struct nexus_key * key)
 	log_error("Could not add entropy source (ret = %d)\n", ret);
 	goto err;
     }
+#endif
 
     ret = mbedtls_ctr_drbg_seed(&ctr_drbg,
 				mbedtls_entropy_func,

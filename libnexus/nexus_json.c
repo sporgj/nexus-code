@@ -101,7 +101,7 @@ nexus_json_free(nexus_json_obj_t object)
 {
     assert(object != NULL);
 
-    assert(((struct nx_json *)object)->root != 1);
+    assert(((struct nx_json *)object)->root == 1);
 
     nx_json_free(object);
 

@@ -13,6 +13,8 @@
 
 
 int nexus_create_user_data();
+int nexus_user_dir_exists();
+
 
 
 int
