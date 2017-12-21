@@ -42,11 +42,9 @@ nexus_create_volume(char * volume_path,
     /* Init Volume */
     {
 	nexus_uuid_gen(&(vol->vol_uuid));
-
     }
     
 
-    
     /* Setup Data store */
     {
 	void             * data_store      = NULL;
@@ -107,7 +105,6 @@ nexus_create_volume(char * volume_path,
 	vol->meta_data_store = meta_data_store;
     }
 
-
     /* Setup Backend */
     {
 	void             * backend      = NULL;
@@ -152,13 +149,12 @@ nexus_create_volume(char * volume_path,
 	uuid_str = nexus_uuid_to_base64(&vol->supernode_uuid);
 	nexus_json_add_string(vol_config, "supernode_uuid", uuid_str);
 	nexus_free(uuid_str);
-	
     }
 
-
-    
- 
-
+    /* Add volume key to list */
+    {
+	
+    }
     
     /* Write config */
     {
