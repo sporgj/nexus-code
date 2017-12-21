@@ -116,7 +116,7 @@ __create_user_list(struct nexus_volume * volume,
  err:
     if (key_str)    nexus_free(key_str);
     if (user_str)   nexus_free(user_str);
-    if (key_base64) nexus_free(key_str);
+    if (key_base64) nexus_free(key_base64);
 
     if (user_json != NEXUS_JSON_INVALID_OBJ) {
 	nexus_json_free(user_json);
