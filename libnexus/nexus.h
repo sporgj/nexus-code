@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-#include <nexus_types.h>
 #include <nexus_config.h>
 
 
@@ -19,11 +18,13 @@ int nexus_deinit(void);
 int nexus_setup(void);
 
 // volume management
+struct nexus_volume *
+nexus_create_volume(char * volume_path, 
+		    char * config_str);
 
 
 
-
-
+#if 0
 
 
 
@@ -96,6 +97,11 @@ struct nexus_fs_acl {
 int
 nexus_setacl(char * path,
 	      char * acl);
+
+#endif
+
+
+
 #ifdef __cplusplus
 }
 #endif

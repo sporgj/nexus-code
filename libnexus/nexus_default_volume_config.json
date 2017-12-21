@@ -1,16 +1,12 @@
 {
     "metadata_store" : {
         "name" : "FLAT",
-        "config" : {
-            "path" : "./.metadata"
-        }
+        "root_path" : "./.metadata"
     },
     
     "data_store" : {
         "name" : "FLAT",
-        "config" : {
-            "path" : "./.data"
-        }
+        "root_path" : "./.data"
     },
     
     "backend" : {

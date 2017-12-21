@@ -95,9 +95,7 @@ nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
 {
     struct nexus_backend      * backend = NULL;
     struct nexus_backend_impl * impl    = NULL;
-
-    int ret = 0;
-    
+   
     impl = nexus_htable_search(backend_table, (uintptr_t)name);
 
     if (impl == NULL) {
@@ -115,15 +113,8 @@ nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
 
     log_debug("initializing backend (%s)\n", name);
     
-    ret = impl->init();
-
-    if (ret != 0) {
-	log_error("Error initializing backend (%s)\n", name);
-	nexus_free(backend);
-	return NULL;
-    }
-
-    backend->impl = impl;
+    backend->impl      = impl;
+    backend->priv_data = impl->init();
 
     return backend;
 }
@@ -131,13 +122,10 @@ nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
 
 // TODO
 int
-nexus_backend_create_volume(struct nexus_backend * backend,
-			    struct nexus_volume  * volume)
+nexus_backend_init_volume(struct nexus_backend * backend,
+			  struct nexus_volume  * volume)
 {
-    
-
-    
-    return -1;
+    return backend->impl->init_volume(volume, backend->priv_data);
 }
 
 void

@@ -7,45 +7,78 @@
  */
 
 #include <nexus_backend.h>
+#include <nexus_user_data.h>
+#include <nexus_volume.h>
 
+#include <nexus_log.h>
 
-static int
+#include "supernode.h"
+
+static void *
 init(void)
 {
 
     printf("Initializing Cleartext backend\n");
 
-    return 0;
+    return NULL;
 }
 
-static void *
-create_volume(struct nexus_volume * volume)
+int
+init_volume(struct nexus_volume * volume,
+	    void                * priv_data)
 {
-    struct supernode * supernode = NULL;
-
-    struct nexus_uuid   supernode_uuid;
+    struct nexus_uuid supernode_uuid;
+    struct nexus_key  volume_key;
+    
     struct nexus_key  * user_prv_key = NULL;
     struct nexus_key  * user_pub_key = NULL;
 
-    supernode = create_supernode(&supernode_uuid, user_pub_key);
+    int ret = 0;
     
-    
-    if (supernode == NULL) {
-	log_error("Could not create supernode\n");
-	return NULL;
+    user_prv_key = nexus_get_user_key();
+
+    if (user_prv_key == NULL) {
+	log_error("Could not retrieve user key\n");
+	return -1;
     }
 
+    user_pub_key = nexus_derive_key(NEXUS_MBEDTLS_PUB_KEY, user_prv_key);
     
+    if (user_pub_key == NULL) {
+	log_error("Could not derive user public key\n");
+	goto err;
+    }
     
+    ret = create_supernode(volume, user_pub_key, &supernode_uuid, &volume_key);
     
-    return NULL;
+    if (ret != 0) {
+	log_error("Could not create supernode\n");
+	goto err;
+    }
+
+    nexus_uuid_copy(&supernode_uuid, &(volume->supernode_uuid));
+
+    /* Add the volume key to the user data */
+
+    
+    nexus_free_key(user_prv_key);
+    nexus_free_key(user_pub_key);
+    
+    return 0;
+
+ err:
+
+    if (user_prv_key) nexus_free_key(user_prv_key);
+    if (user_pub_key) nexus_free_key(user_pub_key);
+    
+    return -1;
 }
 
 
 static struct nexus_backend_impl clear_impl = {
-    .name          = "CLEARTEXT",
-    .init          = init,
-    .create_volume = create_volume
+    .name        = "CLEARTEXT",
+    .init        = init,
+    .init_volume = init_volume
     
 };
 

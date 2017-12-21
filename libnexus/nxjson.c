@@ -340,7 +340,7 @@ nx_json_serialize(struct nx_json * json)
 
 
 
-static int
+static struct nx_json *
 nx_json_add(struct nx_json * json,
 	    char           * key,
 	    struct nx_json * val)
@@ -375,7 +375,7 @@ nx_json_add(struct nx_json * json,
 	    break;
     }
     
-    return 0;
+    return new_json;
 }
 
 static int

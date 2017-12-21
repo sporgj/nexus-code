@@ -167,5 +167,49 @@ nexus_datastore_close(struct nexus_datastore * datastore)
 {
     log_debug("Shutting down nexus datastore (%s)\n", datastore->impl->name);
 
-    return -1;
+    datastore->impl->close(datastore->priv_data);
+
+    return 0;
+}
+
+
+
+int
+nexus_datastore_get_uuid(struct nexus_datastore * datastore,
+			 struct nexus_uuid      * uuid,
+			 char                   * path,
+			 uint8_t               ** buf,
+			 uint32_t               * size)
+{
+    return datastore->impl->get_uuid(uuid, path, buf, size, datastore->priv_data);
+}
+
+
+int
+nexus_datastore_set_uuid(struct nexus_datastore * datastore,
+			 struct nexus_uuid      * uuid,
+			 char                   * path,
+			 uint8_t                * buf,
+			 uint32_t                 size)
+{
+    return datastore->impl->set_uuid(uuid, path, buf, size, datastore->priv_data);
+}
+
+int
+nexus_datastore_add_uuid(struct nexus_datastore * datastore,
+			 struct nexus_uuid      * uuid,
+			 char                   * path,
+			 uint8_t                * buf,
+			 uint32_t                 size)
+{
+    return datastore->impl->add_uuid(uuid, path, buf, size, datastore->priv_data);
+}
+
+
+int
+nexus_datastore_del_uuid(struct nexus_datastore * datastore,
+			 struct nexus_uuid      * uuid,
+			 char                   * path)
+{
+    return datastore->impl->del_uuid(uuid, path, datastore->priv_data);
 }

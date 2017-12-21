@@ -132,6 +132,24 @@ nexus_derive_key(nexus_key_type_t   key_type,
     return NULL;
 }
 
+int
+nexus_copy_key(struct nexus_key * src_key,
+	       struct nexus_key * dst_key)
+{
+    
+    switch (src_key->type) {
+	case NEXUS_MBEDTLS_PUB_KEY:
+	case NEXUS_MBEDTLS_PRV_KEY:
+	case NEXUS_RAW_KEY:
+	default:
+	    log_error("Could not copy key for invalid key type (type=%s)\n",
+		      nexus_key_type_to_str(src_key->type));
+	    return -1;	
+    }
+    
+    return 0;
+}
+
 
 char *
 nexus_key_to_str(struct nexus_key * key)

@@ -203,7 +203,6 @@ __mbedtls_prv_key_from_str(struct nexus_key * key,
 
     key->key_state = ctx;
     
-    nexus_free(key_str);
     return 0;
     
  err:
@@ -240,7 +239,6 @@ __mbedtls_pub_key_from_str(struct nexus_key * key,
 
     key->key_state = ctx;
     
-    nexus_free(key_str);
     return 0;
     
  err:

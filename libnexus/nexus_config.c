@@ -46,15 +46,15 @@ nexus_config_init()
     
     wordfree(&user_data_dir_exp);
     wordfree(&key_filename_exp);
-
+    
     {
-	uint32_t vol_cfg_len = nexus_default_vol_cfg_end - nexus_default_vol_cfg_end;
+	uint32_t vol_cfg_len = nexus_default_vol_cfg_end - nexus_default_vol_cfg_start;
 
 	nexus_default_volume_config = calloc(1, vol_cfg_len + 1);
 	
-	strncpy(nexus_config.volume_config, (char *)nexus_default_vol_cfg_start, vol_cfg_len);
+	strncpy(nexus_default_volume_config, (char *)nexus_default_vol_cfg_start, vol_cfg_len);
     }
-    
+
     return 0;
 }
 

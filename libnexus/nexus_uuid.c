@@ -15,6 +15,33 @@ nexus_uuid_gen(struct nexus_uuid * uuid)
     return 0;
 }
 
+struct nexus_uuid *
+nexus_uuid_clone(struct nexus_uuid * uuid)
+{
+    struct nexus_uuid * new_uuid = NULL;
+
+    new_uuid = calloc(sizeof(struct nexus_uuid), 1);
+
+    if (new_uuid == NULL) {
+	log_error("Could not allocate new uuid\n");
+	return NULL;
+    }
+
+    memcpy(uuid->raw, new_uuid->raw, NEXUS_UUID_SIZE);
+
+    return new_uuid;
+}
+
+int
+nexus_uuid_copy(struct nexus_uuid * src_uuid,
+		struct nexus_uuid * dst_uuid)
+{
+    memcpy(dst_uuid->raw, src_uuid->raw, NEXUS_UUID_SIZE);
+
+    return 0;
+}
+
+
 
 char *
 nexus_uuid_to_base64(struct nexus_uuid * uuid)

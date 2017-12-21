@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <limits.h>
 
 
 #include <nexus_datastore.h>
@@ -76,7 +77,7 @@ flat_create(nexus_json_obj_t cfg)
 	return NULL;
     }
     
-    ret = mkdir(root_path, 0660);
+    ret = mkdir(root_path, 0770);
 
     if (ret == -1) {
 	log_error("Could not create FLAT datastore directory (%s)\n", root_path);

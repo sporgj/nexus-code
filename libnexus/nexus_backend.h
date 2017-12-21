@@ -26,7 +26,7 @@ struct nexus_backend {
 
     struct nexus_backend_impl * impl;
 
-    void * private_data;
+    void * priv_data;
 };
 
 
@@ -39,8 +39,8 @@ void nexus_backend_shutdown(struct nexus_backend * backend);
 
 
 int
-nexus_backend_create_volume(struct nexus_backend  * backend,
-			    struct nexus_volume   * volume);
+nexus_backend_init_volume(struct nexus_backend  * backend,
+			  struct nexus_volume   * volume);
 
 
 
@@ -51,12 +51,18 @@ nexus_backend_create_volume(struct nexus_backend  * backend,
 struct nexus_backend_impl {
     char * name;
 
-    int (*init)();
+    void * (*init)();
     int (*deinit)();
 
-    void * (*create_volume)(struct nexus_volume * volume);
-    void * (*open_volume)(struct nexus_volume * volume);
+    int (*init_volume)(struct nexus_volume * volume,
+		       void                * priv_data);
+    
+    void * (*open_volume)(struct nexus_volume * volume,
+			  void                * priv_data);
 
+
+
+    
     int (*close_volume)(struct nexus_uuid * uuid);
 
     

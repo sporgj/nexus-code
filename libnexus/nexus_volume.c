@@ -1,3 +1,13 @@
+/* 
+ * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
+ * All rights reserved.
+ *
+ * This is free software.  You are permitted to use,
+ * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
+ */
+
+#include <unistd.h>
+
 #include <nexus_volume.h>
 #include <nexus_backend.h>
 #include <nexus_datastore.h>
@@ -25,10 +35,16 @@ nexus_create_volume(char * volume_path,
     int ret = 0;
     
     // Check for config file, otherwise use default
-    vol_config = nexus_json_parse_file(config_str);
+
+    if (config_str) {
+	vol_config = nexus_json_parse_file(config_str);
+    } else {
+	vol_config = nexus_json_parse_str(nexus_default_volume_config);
+    }
 
     if (vol_config == NEXUS_JSON_INVALID_OBJ) {
-	vol_config = nexus_json_parse_str(nexus_default_volume_config);
+	log_error("Could not parse Volume config\n");
+	return NULL;
     }
     
     // Create Volume
@@ -39,11 +55,17 @@ nexus_create_volume(char * volume_path,
 	return NULL;
     }
 
-    /* Init Volume */
+    /* Init Volume uuid */
     {
 	nexus_uuid_gen(&(vol->vol_uuid));
     }
-    
+
+    ret = chdir(volume_path);
+
+    if (ret == -1) {
+	log_error("Could not chdir to (%s)\n", volume_path);
+	goto err;
+    }
 
     /* Setup Data store */
     {
@@ -81,10 +103,10 @@ nexus_create_volume(char * volume_path,
 	nexus_json_obj_t   meta_data_store_cfg;
 	char             * meta_data_store_name = NULL;
 	
-	meta_data_store_cfg = nexus_json_get_object(vol_config, "meta_data_store");
+	meta_data_store_cfg = nexus_json_get_object(vol_config, "metadata_store");
 
 	if (meta_data_store_cfg == NEXUS_JSON_INVALID_OBJ) {
-	    log_error("Invalid Config: Missing datastore config block\n");
+	    log_error("Invalid Config: Missing meta_data_store config block\n");
 	    goto err;
 	}
 
@@ -139,7 +161,7 @@ nexus_create_volume(char * volume_path,
     {
 	char * uuid_str = NULL;
 	
-	ret = nexus_backend_create_volume(vol->backend, vol);
+	ret = nexus_backend_init_volume(vol->backend, vol);
 
 	if (ret == -1) {
 	    log_error("Backend Error: Could not create volume\n");

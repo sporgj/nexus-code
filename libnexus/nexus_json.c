@@ -129,15 +129,15 @@ nexus_json_get_object(nexus_json_obj_t   obj,
     return tgt_obj;
 }
 
-int
+nexus_json_obj_t
 nexus_json_add_object(nexus_json_obj_t   obj,
 		      char             * key)
 {
-    struct nx_json new_json;
+    struct nx_json   tmp_json;
+    
+    tmp_json.type = NX_JSON_OBJECT;
 
-    new_json.type = NX_JSON_OBJECT;
-
-    return nx_json_add(obj, key, &new_json);
+    return nx_json_add(obj, key, &tmp_json);
 }
 
 
@@ -490,7 +490,7 @@ nexus_json_add_string(nexus_json_obj_t   obj,
     new_json.type       = NX_JSON_STRING;
     new_json.text_value = str;
 
-    return nx_json_add(obj, key, &new_json);
+    return ((nx_json_add(obj, key, &new_json) == NULL) ? -1 : 0);
 }
 
 
@@ -504,7 +504,7 @@ nexus_json_add_bool(nexus_json_obj_t   obj,
     new_json.type      = NX_JSON_BOOL;
     new_json.int_value = val;
 
-    return nx_json_add(obj, key, &new_json);    
+    return ((nx_json_add(obj, key, &new_json) == NULL) ? -1 : 0);    
 }
 
 int
@@ -517,7 +517,7 @@ nexus_json_add_int(nexus_json_obj_t   obj,
     new_json.type      = NX_JSON_INTEGER;
     new_json.int_value = val;
 
-    return nx_json_add(obj, key, &new_json);    
+    return ((nx_json_add(obj, key, &new_json) == NULL) ? -1 : 0);    
 }
 
 int
@@ -530,7 +530,7 @@ nexus_json_add_double(nexus_json_obj_t   obj,
     new_json.type      = NX_JSON_DOUBLE;
     new_json.dbl_value = val;
 
-    return nx_json_add(obj, key, &new_json);    
+    return ((nx_json_add(obj, key, &new_json) == NULL) ? -1 : 0);    
 }
 
 int
@@ -543,7 +543,7 @@ nexus_json_add_s64(nexus_json_obj_t   obj,
     new_json.type      = NX_JSON_INTEGER;
     new_json.int_value = val;
 
-    return nx_json_add(obj, key, &new_json);    
+    return ((nx_json_add(obj, key, &new_json) == NULL) ? -1 : 0);    
 }
 
 int
@@ -757,7 +757,7 @@ nexus_json_get_array_len(nexus_json_obj_t arr)
 }
 
 
-int
+nexus_json_obj_t
 nexus_json_add_array(nexus_json_obj_t   obj,
 		     char             * key)
 {

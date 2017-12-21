@@ -40,6 +40,10 @@ nexus_derive_key(nexus_key_type_t   key_type,
 		 struct nexus_key * src_key);
 
 
+int
+nexus_copy_key(struct nexus_key * src_key,
+	       struct nexus_key * dst_key);
+
 void
 nexus_free_key(struct nexus_key * key);
 

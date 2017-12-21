@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#if 0
 
 
 
@@ -14,43 +15,6 @@ extern "C" {
 struct nexus_nonce {
     uint8_t raw[NEXUS_NONCE_SIZE];
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -177,6 +141,8 @@ struct filenode {
     struct uuid           root_uuid;
 } __attribute__((packed));
 
+
+#endif
 #ifdef __cplusplus
 }
 #endif

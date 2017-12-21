@@ -50,8 +50,8 @@ init_main(int argc, char ** argv)
 extern int create_volume_main(int argc, char ** argv);
 
 static struct nexus_cmd cmds[] = {
-    {"init"   , init_main          , "Initialize Nexus state" },
-    {"create" , create_volume_main , "Create a Nexus Volume"  },
+    {"init"   , init_main          , "Initialize Nexus Environment" },
+    {"create" , create_volume_main , "Create a Nexus Volume"        },
     {0, 0, 0}
 };
 

@@ -63,8 +63,8 @@ static char * nx_json_serialize(struct nx_json * json);
 static void nx_json_free(struct nx_json * js);
 
 static struct nx_json * nx_json_get(struct nx_json * json, char * key); // get object's property by key
+static struct nx_json * nx_json_add(struct nx_json * json, char * key, struct nx_json * new_val);
 static int              nx_json_set(struct nx_json * json, char * key, struct nx_json * val);
-static int              nx_json_add(struct nx_json * json, char * key, struct nx_json * new_val);
 static int              nx_json_del(struct nx_json * json, char * key);
 
 static struct nx_json * nx_json_get_item(struct nx_json * json, int idx); // get array element by index

@@ -14,6 +14,7 @@
 #include <nexus.h>
 #include <nexus_log.h>
 #include <nexus_config.h>
+#include <nexus_volume.h>
 
 static char * volume_path  = NULL;
 static char * user_key_path = NULL;
@@ -45,6 +46,7 @@ static void usage()
 int
 create_volume_main(int argc, char ** argv)
 {
+    struct nexus_volume * vol = NULL;
 
     __set_defaults();
     
@@ -104,8 +106,13 @@ create_volume_main(int argc, char ** argv)
 
     printf("Creating Nexus Volume at (%s)\n", volume_path);
     
-    
-    
+    vol = nexus_create_volume(volume_path, NULL);
+
+    if (vol == NULL) {
+	log_error("Could not create volume at (%s)\n", volume_path);
+	return -1;
+    }
+
     return 0;
 
 }

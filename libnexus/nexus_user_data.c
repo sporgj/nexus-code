@@ -86,6 +86,7 @@ static int
 __create_volume_key_list()
 {
     nexus_json_obj_t key_list = NEXUS_JSON_INVALID_OBJ;
+    nexus_json_obj_t key_arr  = NEXUS_JSON_INVALID_OBJ;
 
     int ret = 0;
     
@@ -96,9 +97,9 @@ __create_volume_key_list()
 	return -1;
     }
     
-    ret = nexus_json_add_array(key_list, "keys");
+    key_arr = nexus_json_add_array(key_list, "keys");
 
-    if (ret == -1) {
+    if (key_arr == NEXUS_JSON_INVALID_OBJ) {
 	log_error("Could not add JSON key array\n");
 	goto err;
     }
