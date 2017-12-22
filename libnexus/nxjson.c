@@ -426,6 +426,28 @@ nx_json_add(struct nx_json * json,
 }
 
 
+static struct nx_json *
+nx_json_get(struct nx_json * json,
+	    char           * key)
+{
+    struct nx_json * js = NULL;
+
+    assert(json != NULL);
+    assert(key  != NULL);
+    
+    
+    for (js = json->child; js; js = js->next) {
+
+	if ( (js->key) &&
+	     (strcmp(js->key, key) == 0)) {
+		
+	    return js;
+	}
+    }
+    
+    return NULL;
+}
+
 static int
 nx_json_del(struct nx_json * json,
 	    char           * key)
@@ -872,31 +894,6 @@ nx_json_parse(char * text)
     
     return js.child;
 }
-
-
-static struct nx_json *
-nx_json_get(struct nx_json * json,
-	    char           * key)
-{
-    struct nx_json * js = NULL;
-
-    assert(json != NULL);
-    assert(key  != NULL);
-    
-    
-    for (js = json->child; js; js = js->next) {
-
-	if ( (js->key) &&
-	     (strcmp(js->key, key) == 0)) {
-		
-	    return js;
-	}
-    }
-    
-    return NULL;
-}
-
-
 
 
 
