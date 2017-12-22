@@ -207,3 +207,13 @@ int nexus_json_array_add_u64   (nexus_json_obj_t arr, uint64_t   val);
 /* Delete an array item */
 int nexus_json_array_del_item  (nexus_json_obj_t arr, int idx);
 
+
+
+
+/* Array iteration 
+ * @iter: (nexus_json_obj_t) - iterator variable
+ * @arr:  (nexus_json_obj_t) - array to iterate through
+ */
+#include "nxjson.h"
+#define nexus_json_arr_foreach(iter, arr)			\
+    for (iter = arr->child; iter != NULL; iter = iter->next)

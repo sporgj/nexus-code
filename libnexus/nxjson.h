@@ -54,9 +54,8 @@ struct nx_json {
     char * raw_string;           // Raw JSON string that is stored by the root
 };
 
-
+#if 0
 static struct nx_json * nx_json_parse(char * text);
-
 
 static char * nx_json_serialize(struct nx_json * json);
 
@@ -71,6 +70,7 @@ static struct nx_json * nx_json_get_item(struct nx_json * json, int idx); // get
 static int              nx_json_set_item(struct nx_json * json, int idx, struct nx_json * val);
 static int              nx_json_add_item(struct nx_json * json, struct nx_json * new_item);
 static int              nx_json_del_item(struct nx_json * json, int idx);
+#endif
 
 #ifdef  __cplusplus
 }
