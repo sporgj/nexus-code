@@ -9,7 +9,7 @@
 
 #pragma once
 
-
+#include <stdint.h>
 
 #define NEXUS_JSON_INVALID_OBJ (NULL)
 
@@ -49,7 +49,14 @@ nexus_json_get_params(nexus_json_obj_t          obj,
 
 
 
-nexus_json_obj_t nexus_json_new_obj();
+nexus_json_obj_t nexus_json_new_obj(char * key);
+nexus_json_obj_t nexus_json_new_arr(char * key);
+
+int nexus_json_splice(nexus_json_obj_t   parent,
+		      nexus_json_obj_t   obj);
+
+int nexus_json_split(nexus_json_obj_t obj);
+
 nexus_json_obj_t nexus_json_parse_str(char * str);
 nexus_json_obj_t nexus_json_parse_file(char * file_name);
 
@@ -68,8 +75,9 @@ void nexus_json_free(nexus_json_obj_t object);
 /* 
  * Object Accessors 
  */
-nexus_json_obj_t nexus_json_get_object(nexus_json_obj_t obj, char * key);
+
 nexus_json_obj_t nexus_json_add_object(nexus_json_obj_t obj, char * key);
+nexus_json_obj_t nexus_json_get_object(nexus_json_obj_t obj, char * key);
 int              nexus_json_del_object(nexus_json_obj_t obj);
 
 
@@ -136,8 +144,9 @@ int nexus_json_del_by_key(nexus_json_obj_t obj, char * key);
 /* 
  * Array Accessors 
  */
-nexus_json_obj_t nexus_json_get_array(nexus_json_obj_t obj, char * key);
+
 nexus_json_obj_t nexus_json_add_array(nexus_json_obj_t obj, char * key);
+nexus_json_obj_t nexus_json_get_array(nexus_json_obj_t obj, char * key);
 int              nexus_json_del_array(nexus_json_obj_t arr);
 
 int              nexus_json_get_array_len(nexus_json_obj_t arr);

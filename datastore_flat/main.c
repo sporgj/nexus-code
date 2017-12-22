@@ -182,12 +182,51 @@ flat_get_uuid(struct nexus_uuid  * uuid,
     return -1;
 }
 
+
 static int
-flat_set_uuid(struct nexus_uuid * uuid,
+flat_put_uuid(struct nexus_uuid * uuid,
 	      char              * path,
 	      uint8_t           * buf,
 	      uint32_t            size,
 	      void              * priv_data)
+{
+    struct flat_datastore * datastore = priv_data;
+    char                  * filename  = NULL;
+
+    int ret = -1;
+
+    filename = __get_full_path(datastore, uuid);
+
+
+    if (filename == NULL) {
+	log_error("Could not get filename\n");
+	goto err;
+    }
+
+    ret = nexus_write_raw_file(filename, buf, size);
+    
+    if (ret != 0) {
+        log_error("Could not add file (%s)", filename);
+	goto err;
+    }
+
+
+    nexus_free(filename);
+    return 0;
+
+ err:
+
+    nexus_free(filename);
+    return -1;
+}
+   
+
+static int
+flat_update_uuid(struct nexus_uuid * uuid,
+		 char              * path,
+		 uint8_t           * buf,
+		 uint32_t            size,
+		 void              * priv_data)
 {
     struct flat_datastore * datastore = priv_data;
     char                  * filename  = NULL;
@@ -233,7 +272,7 @@ flat_set_uuid(struct nexus_uuid * uuid,
 }
 
 static int
-flat_add_uuid(struct nexus_uuid * uuid,
+flat_new_uuid(struct nexus_uuid * uuid,
 	      char              * path,
 	      uint8_t           * buf,
 	      uint32_t            size,
@@ -318,17 +357,18 @@ flat_del_uuid(struct nexus_uuid * uuid,
 
 
 static struct nexus_datastore_impl flat_datastore = {
-    .name     = "FLAT",
+    .name        = "FLAT",
 
-    .create   = flat_create,
+    .create      = flat_create,
     
-    .open     = flat_open,
-    .close    = flat_close,
+    .open        = flat_open,
+    .close       = flat_close,
 
-    .get_uuid = flat_get_uuid,
-    .set_uuid = flat_set_uuid,
-    .add_uuid = flat_add_uuid,
-    .del_uuid = flat_del_uuid
+    .get_uuid    = flat_get_uuid,
+    .put_uuid    = flat_put_uuid,
+    .update_uuid = flat_update_uuid,
+    .new_uuid    = flat_new_uuid,
+    .del_uuid    = flat_del_uuid
 };
 
 

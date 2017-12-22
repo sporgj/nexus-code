@@ -27,14 +27,11 @@ int
 init_volume(struct nexus_volume * volume,
 	    void                * priv_data)
 {
-    struct nexus_uuid supernode_uuid;
-    struct nexus_key  volume_key;
-    
+    struct nexus_key    volume_key;
+    struct supernode  * supernode    = NULL;
     struct nexus_key  * user_prv_key = NULL;
     struct nexus_key  * user_pub_key = NULL;
 
-    int ret = 0;
-    
     user_prv_key = nexus_get_user_key();
 
     if (user_prv_key == NULL) {
@@ -49,17 +46,19 @@ init_volume(struct nexus_volume * volume,
 	goto err;
     }
     
-    ret = create_supernode(volume, user_pub_key, &supernode_uuid, &volume_key);
+    supernode = supernode_create(volume, user_pub_key, &volume_key);
     
-    if (ret != 0) {
+    if (supernode == NULL) {
 	log_error("Could not create supernode\n");
 	goto err;
     }
 
-    nexus_uuid_copy(&supernode_uuid, &(volume->supernode_uuid));
+    nexus_uuid_copy(&(supernode->my_uuid), &(volume->supernode_uuid));
+
 
     /* Add the volume key to the user data */
-
+    /* For this we will just recode the supernode uuid as the key */
+    
     
     nexus_free_key(user_prv_key);
     nexus_free_key(user_pub_key);

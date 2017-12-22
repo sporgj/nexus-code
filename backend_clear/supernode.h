@@ -13,8 +13,25 @@
 
 struct nexus_volume;
 
-int
-create_supernode(struct nexus_volume * volume,
+
+
+struct supernode {
+    struct nexus_uuid my_uuid;
+    struct nexus_uuid root_uuid;    
+    struct nexus_uuid user_list_uuid;
+    // hash of user list
+
+    // hash of volume_config (Is this necessary?)
+
+    uint32_t version;   
+};
+
+
+struct supernode *
+supernode_create(struct nexus_volume * volume,
 		 struct nexus_key    * user_pub_key,
-		 struct nexus_uuid   * supernode_uuid,
 		 struct nexus_key    * volume_key);
+
+int
+supernode_store(struct nexus_volume * volume,
+		struct supernode    * supernode);

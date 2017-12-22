@@ -90,7 +90,7 @@ __create_volume_key_list()
 
     int ret = 0;
     
-    key_list = nexus_json_new_obj();
+    key_list = nexus_json_new_obj("volume_key_list");
 
     if (key_list == NEXUS_JSON_INVALID_OBJ) {	
 	log_error("Could not add JSON root object\n");

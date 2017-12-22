@@ -26,7 +26,9 @@ libs     := -luuid
 
 
 objs := main.o \
-	supernode.o
+	supernode.o \
+	dirnode.o \
+	user_list.o
 
 
 build = \

@@ -51,6 +51,57 @@ extern "C" {
 #define IS_WHITESPACE(c) ((unsigned char)(c) <= (unsigned char)' ')
 
 
+static void
+__add_child(struct nx_json * parent,
+	    struct nx_json * child)
+{
+    if (!parent->last_child) {
+	parent->child            = child;
+	parent->last_child       = child;
+    } else {
+	parent->last_child->next = child;
+	parent->last_child       = child;
+    }
+    
+    parent->length++;
+
+    return;
+}
+
+static void
+__del_child(struct nx_json * parent,
+	    struct nx_json * child)
+{
+    struct nx_json * iter     = parent->child;
+    struct nx_json * tmp_iter = NULL;
+    
+    while (iter != NULL) {
+	
+	if (iter == child) {
+	    break;
+	}
+	
+	tmp_iter = iter;
+	iter     = iter->next;
+    }
+    
+    assert(iter != NULL);
+    
+    if (tmp_iter == NULL) {
+	parent->child  = iter->next;
+    } else {
+	tmp_iter->next = iter->next;
+    }
+    
+    if (parent->last_child == iter) {
+	parent->last_child = tmp_iter;
+    }
+    
+    parent->length--;    
+    
+    return;
+}
+
 static struct nx_json *
 create_json(nx_json_type     type,
 	    char           * key,
@@ -65,15 +116,7 @@ create_json(nx_json_type     type,
     js->parent = parent;
 
     if (parent != NULL) {
-	if (!parent->last_child) {
-	    parent->child            = js;
-	    parent->last_child       = js;
-	} else {
-	    parent->last_child->next = js;
-	    parent->last_child       = js;
-	}
-	
-	parent->length++;
+	__add_child(parent, js);
     } else {
 	js->root = 1;
     }
@@ -87,33 +130,7 @@ nx_json_free(struct nx_json * js)
 {
     /* Unlink from parent */
     if (js->parent) {
-	struct nx_json * parent   = js->parent;
-	struct nx_json * iter     = js->parent->child;
-	struct nx_json * tmp_iter = NULL;
-
-	while (iter != NULL) {
-
-	    if (iter == js) {
-		break;
-	    }
-
-	    tmp_iter = iter;
-	    iter     = iter->next;
-	}
-	
-	assert(iter != NULL);
-	
-	if (tmp_iter == NULL) {
-	    parent->child  = iter->next;
-	} else {
-	    tmp_iter->next = iter->next;
-	}
-
-	if (parent->last_child == iter) {
-	    parent->last_child = tmp_iter;
-	}
-
-	parent->length--;
+	__del_child(js->parent, js);
     }
 
     
@@ -340,6 +357,36 @@ nx_json_serialize(struct nx_json * json)
 
 
 
+static int
+nx_json_splice(struct nx_json * parent,
+	       struct nx_json * new_json)
+{
+    if (new_json->parent) {
+	__del_child(new_json->parent, new_json);
+    }
+    
+    new_json->parent = parent;
+    new_json->root   = 0;       // Clear the root flag
+
+    __add_child(parent, new_json);
+
+    return 0;
+}
+
+static int
+nx_json_split(struct nx_json * obj)
+{
+    if (obj->parent) {
+	__del_child(obj->parent, obj);
+    }
+
+    obj->parent = NULL;
+    obj->root   = 1;
+
+    return 0;
+}
+
+
 static struct nx_json *
 nx_json_add(struct nx_json * json,
 	    char           * key,
@@ -377,6 +424,7 @@ nx_json_add(struct nx_json * json,
     
     return new_json;
 }
+
 
 static int
 nx_json_del(struct nx_json * json,

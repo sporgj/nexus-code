@@ -1,5 +1,11 @@
-#ifndef __LOG_h__
-#define __LOG_h__
+/* 
+ * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
+ * All rights reserved.
+ *
+ * This is free software.  You are permitted to use,
+ * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
+ */
+#pragma once
 
 #include <stdio.h>
 #include <errno.h>
@@ -15,7 +21,4 @@
 
 #define nexus_printf(fmt, ...) fprintf(stdout, "Nexus> " fmt, ##__VA_ARGS__)
 
-
-
-#endif
 

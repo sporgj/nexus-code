@@ -1,3 +1,11 @@
+/* 
+ * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
+ * All rights reserved.
+ *
+ * This is free software.  You are permitted to use,
+ * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
+ */
+
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,9 +25,16 @@
 
 
 nexus_json_obj_t
-nexus_json_new_obj()
+nexus_json_new_obj(char * key)
 {
-    return create_json(NX_JSON_OBJECT, NULL, NULL);
+    return create_json(NX_JSON_OBJECT, key, NULL);
+}
+
+
+nexus_json_obj_t
+nexus_json_new_arr(char * key)
+{
+    return create_json(NX_JSON_ARRAY, key, NULL);
 }
 
 nexus_json_obj_t
@@ -136,8 +151,22 @@ nexus_json_add_object(nexus_json_obj_t   obj,
     struct nx_json   tmp_json;
     
     tmp_json.type = NX_JSON_OBJECT;
-
+    
     return nx_json_add(obj, key, &tmp_json);
+}
+
+int
+nexus_json_splice(nexus_json_obj_t   obj,
+		  nexus_json_obj_t   new_obj)
+{
+    return nx_json_splice(obj, new_obj);
+}
+
+
+int
+nexus_json_split(nexus_json_obj_t obj)
+{
+    return nx_json_split(obj);
 }
 
 

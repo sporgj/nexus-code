@@ -7,7 +7,6 @@
  */
 
 
-#include "supernode.h"
 
 #include <nexus_volume.h>
 #include <nexus_datastore.h>
@@ -17,150 +16,134 @@
 #include <nexus_json.h>
 #include <nexus_log.h>
 
-#define USER_FLAG_OWNER 1
 
-struct user_entry{
-    char             * name;
-    struct nexus_key * pub_key;    
-    uint32_t flags;
-};
-
-struct supernode {
-    struct nexus_uuid my_uuid;
-    struct nexus_uuid root_uuid;    
-    struct nexus_uuid user_list_uuid;
-    // hash of user list
-
-    // hash of volume_config (Is this necessary?)
-
-    uint32_t version;   
-};
+#include "supernode.h"
+#include "dirnode.h"
+#include "user_list.h"
 
 
 
-static int
-__create_user_list(struct nexus_volume * volume,
-		   struct supernode    * supernode, 
-		   struct nexus_key    * user_pub_key)
+struct supernode *
+supernode_create(struct nexus_volume * volume, 
+		 struct nexus_key    * user_pub_key,
+		 struct nexus_key    * volume_key)
 {
-    nexus_json_obj_t user_json = NEXUS_JSON_INVALID_OBJ; 
-    nexus_json_obj_t user_arr  = NEXUS_JSON_INVALID_OBJ; 
-    nexus_json_obj_t user      = NEXUS_JSON_INVALID_OBJ; 
-
-    struct nexus_uuid user_list_uuid;
+    struct supernode * supernode = NULL;
+    struct dirnode   * root_dir  = NULL;
+    struct user_list * user_list = NULL;
     
-    char * key_str    = NULL;
-    char * user_str   = NULL;
-    char * key_base64 = NULL;
-
     int ret = 0;
-    
-    
-    /* Create uuid for user list */
-    nexus_uuid_gen(&user_list_uuid);
-    
-    
-    key_str = nexus_key_to_str(user_pub_key);
 
-    if (key_str == NULL) {
-	log_error("Could not generate key string\n");
-	return -1;
-    }
-
-    /* We double encode the key to base64 because PEM cannot be embedded in JSON */
-    key_base64 = nexus_base64_encode((uint8_t *)key_str, strlen(key_str) + 1);
+    supernode = nexus_malloc(sizeof(struct supernode));
     
+    // generate uuid for supernode
+    nexus_uuid_gen(&(supernode->my_uuid));
     
-    /* Create top level json object */
-    user_json = nexus_json_new_obj();
+    // initialize user list with owner
+    user_list = user_list_create(volume, user_pub_key);
 
-    /* Create user list as an array */
-    user_arr  = nexus_json_add_array(user_json, "users");
-
-    /* Add the 'owner' user to the array */
-    user      = nexus_json_array_add_object(user_arr);
-    
-    /* Set fields in user object */
-    nexus_json_add_string(user, "name", "owner");
-    nexus_json_add_string(user, "key",  key_base64);
-
-    /* Serialize user list to string */
-    user_str = nexus_json_serialize(user_json);
-
-    if (user_str == NULL) {
-	log_error("Could not serialize user list\n");
+    if (user_list == NULL) {
+	log_error("Could not create user list\n");
 	goto err;
     }
 
-    /* Save user list string to metadata object */
-    ret = nexus_datastore_add_uuid(volume->meta_data_store,
-				   &user_list_uuid,
-				   "/",
-				   (uint8_t *)user_str,
-				   strlen(user_str));
+    nexus_uuid_copy(&(user_list->my_uuid), &(supernode->user_list_uuid));
+
+    
+    // create root dir
+    root_dir = dirnode_create(volume, NULL);
+
+    if (root_dir == NULL) {
+	log_error("Could not create dirnode\n");
+	goto err;
+    }
+
+    nexus_uuid_copy(&(root_dir->my_uuid), &(supernode->root_uuid));
+    
+    // save supernode
+    ret = supernode_store(volume, supernode);
 
     if (ret == -1) {
-	log_error("Could not add user_list to metadata store\n");
+	log_error("Could not store supernode\n");
 	goto err;
     }
-    
-    nexus_uuid_copy(&user_list_uuid, &supernode->user_list_uuid);
-    
-    nexus_free(key_str);
-    nexus_free(key_base64);
-    nexus_free(user_str);
-    nexus_json_free(user_json);
 
-    return 0;
-    
+    return supernode;
+
  err:
-    if (key_str)    nexus_free(key_str);
-    if (user_str)   nexus_free(user_str);
-    if (key_base64) nexus_free(key_base64);
 
-    if (user_json != NEXUS_JSON_INVALID_OBJ) {
-	nexus_json_free(user_json);
+    if (user_list) {
+	nexus_datastore_del_uuid(volume->metadata_store, &(user_list->my_uuid), NULL);
+	user_list_free(user_list);
+    }
+
+    if (root_dir) {
+	nexus_datastore_del_uuid(volume->metadata_store, &(root_dir->my_uuid), NULL);
+	dirnode_free(root_dir);
     }
     
-    return -1;
+    if (supernode) nexus_free(supernode);
     
+    return NULL;
+
 }
 
 
 int
-create_supernode(struct nexus_volume * volume, 
-		 struct nexus_key    * user_pub_key,
-		 struct nexus_uuid   * supernode_uuid,
-		 struct nexus_key    * volume_key)
+supernode_store(struct nexus_volume * volume,
+		struct supernode    * supernode)
 {
-    struct supernode * supernode = NULL;
+    nexus_json_obj_t supernode_json = NEXUS_JSON_INVALID_OBJ;
 
-    int ret = 0;
+    char * my_uuid_alt64   = NULL;
+    char * root_uuid_alt64 = NULL;
+    char * user_uuid_alt64 = NULL;
+    
+    char * json_str = NULL;
+    int    ret      = 0;
 
-    supernode = calloc(sizeof(struct supernode), 1);
+    my_uuid_alt64   = nexus_uuid_to_alt64(&(supernode->my_uuid));
+    root_uuid_alt64 = nexus_uuid_to_alt64(&(supernode->root_uuid));
+    user_uuid_alt64 = nexus_uuid_to_alt64(&(supernode->user_list_uuid));
+    
+    supernode_json = nexus_json_new_obj("supernode");
 
-    if (supernode == NULL) {
-	log_error("Cannot allocate supernode\n");
-	return -1;
+    nexus_json_add_string(supernode_json, "uuid",      my_uuid_alt64);
+    nexus_json_add_string(supernode_json, "root_dir",  root_uuid_alt64);
+    nexus_json_add_string(supernode_json, "user_list", user_uuid_alt64);
+    nexus_json_add_u8    (supernode_json, "version",   supernode->version);
+
+    json_str = nexus_json_serialize(supernode_json);
+
+    ret = nexus_datastore_put_uuid(volume->metadata_store,
+				   &(supernode->my_uuid),
+				   NULL,
+				   (uint8_t *)json_str,
+				   strlen(json_str) + 1);
+
+    if (ret == -1) {
+	log_error("Could not store supernode\n");
+	goto err;
     }
+
+
+    nexus_json_free(supernode_json);
+    nexus_free(my_uuid_alt64);
+    nexus_free(root_uuid_alt64);
+    nexus_free(user_uuid_alt64);
+    nexus_free(json_str);
+
+    return 0;
+ err:
     
-    // create allocate uuid for supernode
-    ret |= nexus_uuid_gen(supernode_uuid);
+    if (my_uuid_alt64)   nexus_free(my_uuid_alt64);
+    if (root_uuid_alt64) nexus_free(root_uuid_alt64);
+    if (user_uuid_alt64) nexus_free(user_uuid_alt64);
+    if (json_str)        nexus_free(json_str);
     
-    if (ret != 0) {
-	log_error("Could not generate supernode uuid\n");
-	return -1;
+    if (supernode_json != NEXUS_JSON_INVALID_OBJ) {
+	nexus_json_free(supernode_json);
     }
-    
-
-    // initialize user list with owner
-    __create_user_list(volume, supernode, user_pub_key);
-
-    // create root dir
-
-    
-    // save supernode
-
 
     return -1;
 }

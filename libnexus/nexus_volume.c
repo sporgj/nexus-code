@@ -99,32 +99,32 @@ nexus_create_volume(char * volume_path,
 
     /* Setup Metadata Store */
     {
-	void             * meta_data_store      = NULL;
-	nexus_json_obj_t   meta_data_store_cfg;
-	char             * meta_data_store_name = NULL;
+	void             * metadata_store      = NULL;
+	nexus_json_obj_t   metadata_store_cfg;
+	char             * metadata_store_name = NULL;
 	
-	meta_data_store_cfg = nexus_json_get_object(vol_config, "metadata_store");
+	metadata_store_cfg = nexus_json_get_object(vol_config, "metadata_store");
 
-	if (meta_data_store_cfg == NEXUS_JSON_INVALID_OBJ) {
-	    log_error("Invalid Config: Missing meta_data_store config block\n");
+	if (metadata_store_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid Config: Missing metadata_store config block\n");
 	    goto err;
 	}
 
-	ret = nexus_json_get_string(meta_data_store_cfg, "name", &meta_data_store_name);
+	ret = nexus_json_get_string(metadata_store_cfg, "name", &metadata_store_name);
 
 	if (ret == -1) {
 	    log_error("Invalid Config: Missing datastore name\n");
 	    goto err;
 	}
 
-	meta_data_store = nexus_datastore_create(meta_data_store_name, meta_data_store_cfg);
+	metadata_store = nexus_datastore_create(metadata_store_name, metadata_store_cfg);
 	
-	if (meta_data_store == NULL) {
+	if (metadata_store == NULL) {
 	    log_error("Could not create data store\n");
 	    goto err;
 	}
 
-	vol->meta_data_store = meta_data_store;
+	vol->metadata_store = metadata_store;
     }
 
     /* Setup Backend */

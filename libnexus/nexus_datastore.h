@@ -42,17 +42,27 @@ int nexus_datastore_get_uuid(struct nexus_datastore * datastore,
 			     uint32_t               * size);
 
 
-int nexus_datastore_set_uuid(struct nexus_datastore * datastore,
+
+int nexus_datastore_put_uuid(struct nexus_datastore * datastore,
 			     struct nexus_uuid      * uuid,
 			     char                   * path,
 			     uint8_t                * buf,
 			     uint32_t                 size);
 
-int nexus_datastore_add_uuid(struct nexus_datastore * datastore,
+
+int nexus_datastore_update_uuid(struct nexus_datastore * datastore,
+				struct nexus_uuid      * uuid,
+				char                   * path,
+				uint8_t                * buf,
+				uint32_t                 size);
+
+int nexus_datastore_new_uuid(struct nexus_datastore * datastore,
 			     struct nexus_uuid      * uuid,
 			     char                   * path,
 			     uint8_t                * buf,
 			     uint32_t                 size);
+
+
 
 
 int nexus_datastore_del_uuid(struct nexus_datastore * datastore,
@@ -89,13 +99,22 @@ struct nexus_datastore_impl {
 		    uint32_t           * size,
 		    void               * priv_data);
 
-    int (*set_uuid)(struct nexus_uuid * uuid,
+
+    int (*put_uuid)(struct nexus_uuid * uuid,
 		    char              * path,
 		    uint8_t           * buf,
 		    uint32_t            size,
 		    void              * priv_data);
 
-    int (*add_uuid)(struct nexus_uuid * uuid,
+    int (*update_uuid)(struct nexus_uuid * uuid,
+		    char              * path,
+		    uint8_t           * buf,
+		    uint32_t            size,
+		    void              * priv_data);
+
+
+    /* Do we really need this? */
+    int (*new_uuid)(struct nexus_uuid * uuid,
 		    char              * path,
 		    uint8_t           * buf,
 		    uint32_t            size,

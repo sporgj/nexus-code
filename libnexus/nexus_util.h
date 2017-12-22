@@ -1,3 +1,10 @@
+/* 
+ * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
+ * All rights reserved.
+ *
+ * This is free software.  You are permitted to use,
+ * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
+ */
 #pragma once
 
 #ifdef __cplusplus
@@ -16,6 +23,7 @@ extern "C" {
 
 
 
+void * nexus_malloc(size_t size);
 
 
 
@@ -28,6 +36,8 @@ int nexus_strtou32(char * str, uint32_t * value);
 int nexus_strtoi64(char * str, int64_t  * value);
 int nexus_strtou64(char * str, uint64_t * value);
 
+
+void nexus_print_backtrace();
 
 #ifdef __cplusplus
 }
