@@ -196,7 +196,7 @@ nexus_base64_decode(char      * base64_str,
    
     num_chunks = len / 4;
 
-    if (index(base64_str, '.')) {
+    if (index(base64_str, '=')) {
         padding = (base64_str + len) - index(base64_str, '.');
     }
 
@@ -294,7 +294,7 @@ nexus_base64_encode(uint8_t  * src_buf,
             /* Bounds checking */
             if (j >= 2) {
                 if (((i * 3) + (j - 1)) >= src_len) {
-                    c = '.';
+                    c = '=';
                 }
             }
 
