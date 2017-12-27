@@ -24,11 +24,10 @@ INCLUDE := -I$(SGX_SDK)/include \
 	   -I$(SGX_SDK)/include/tlibc \
 	   -I$(SGX_SDK)/include/stlport \
 	   -Imbedtls/include \
-	   -I../../libnexus 
+	   -Inexus_trusted \
+	   -I..
 
-CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector \
-	   -DNEXUS_ENCLAVE   # WTF is this used for?
-
+CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector
 
 
 
@@ -41,17 +40,25 @@ LDFLAGS += -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_SDK
 	   -Wl,--version-script=enclave.lds
 
 
-CC := gcc # SGX requires GCC (?)
-
 SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 
 
 crypto_lib := mbedtls/library/libmbedcrypto.a
 
+nexus_trusted_objs := \
+	nexus_uuid.o
+
+trusted_objs := \
+	$(foreach o,$(nexus_trusted_objs),nexus_trusted/$(o))
+
 objs := nexus_enclave_t.o \
-	nexus_enclave_main.o \
-	nexus_enclave_crypto.o \
-	nexus_enclave_dirnode.o
+	$(trusted_objs) \
+	crypto.o \
+	dirnode.o \
+	supernode.o \
+	volume_usertable.o \
+	metadata.o \
+	main.o 
 
 
 build = \
@@ -65,7 +72,7 @@ build = \
 
 
 
-private_key := prviate_key.pem
+private_key := private_key.pem
 
 EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
 edl_src := ../nexus_enclave.edl
@@ -77,10 +84,11 @@ all: nexus_enclave.signed.so
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDE) -c $<  -o $@)
 
 nexus_enclave_t.c: $(edl_src)
-	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --trusted --trusted-dir . $(edl_src)
+	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include\
+		--trusted --trusted-dir . $(edl_src)
 
 
-signing_key: $(private_key)
+$(private_key):
 	openssl genrsa -out $@ -3 3072
 
 libmbedcrypto.a:
@@ -89,13 +97,13 @@ libmbedcrypto.a:
 nexus_enclave.so: $(objs) libmbedcrypto.a
 	$(call build,LD,$(CC) $^  $(LDFLAGS) -o $@)
 
-nexus_enclave.signed.so: nexus_enclave.so
-	$(call build,SIGN,$(SGX_ENCLAVE_SIGNER) sign -key private_key.pem -enclave $< -out $@ -config config.xml)
+nexus_enclave.signed.so: nexus_enclave.so $(private_key)
+	$(call build,SIGN,$(SGX_ENCLAVE_SIGNER) sign -key $(private_key)\
+		-enclave $< -out $@ -config config.xml)
 
 
 clean:
-	rm -rf *.a *.o *.so nexus_enclave_t.*
-	make -C mbedtls/library clean
+	rm -rf *.a *.o *.so nexus_enclave_t.* nexus_trusted/*.o
 
 
 .PHONY: all clean

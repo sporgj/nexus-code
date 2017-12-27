@@ -1,0 +1,77 @@
+enclave {
+    include "internal.h"
+    include "sgx_backend_common.h"
+
+    trusted {
+
+        /**
+         * Initializes the enclave with the specified backend info
+         * @param backend_info
+         * @return 0 on success
+         */
+        public int ecall_init_enclave
+        (
+            [user_check] void * backend_info
+        );
+
+
+        // volume management
+
+        /**
+         * Creates a new volume
+         * @param supernode_uuid_out
+         * @param volumekey_out
+         */
+        public int ecall_init_volume
+        (
+            [user_check] struct nexus_raw_key  * user_pubkey_in,
+            [user_check] struct nexus_uuid     * supernode_uuid_out,
+            [user_check] struct nexus_raw_key ** p_volumekey_out
+        );
+    };
+
+    untrusted {
+
+        int ocall_metadata_get
+        (
+                    [in] struct nexus_uuid        * uuid,
+            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
+            [user_check] struct nexus_raw_buffer ** p_raw_buffer_untrusted,
+            [user_check] void                     * backend_info
+        );
+
+        int ocall_metadata_set
+        (
+                    [in] struct nexus_uuid        * uuid,
+            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
+            [user_check] struct nexus_raw_buffer  * raw_buffer_untrusted,
+            [user_check] void                     * backend_info
+        );
+
+        int ocall_metadata_delete
+        (
+                    [in] struct nexus_uuid        * uuid,
+            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
+            [user_check] void                     * backend_info
+        );
+
+        int ocall_metadata_stat
+        (
+                    [in] struct nexus_uuid        * uuid,
+            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
+            [user_check] struct nexus_stat_buffer * stat_buffer_untrusted,
+            [user_check] void                     * backend_info
+        );
+
+
+
+        /* allocates a buffer in untrusted memory */
+        void * ocall_calloc(size_t size);
+
+        /* frees buffer in untrusted memory */
+        void ocall_free([user_check] void * untrusted_ptr);
+
+        void ocall_print([in, string] char * str);
+    };
+
+};
