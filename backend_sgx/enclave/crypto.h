@@ -11,7 +11,7 @@
 // things to fit in the crypto context
 
 #define CRYPTO_EKEY_BYTES   16
-#define CRYPTO_EKEY_BITS   (CONFIG_EKEY_BYTES << 3)
+#define CRYPTO_EKEY_BITS    (CRYPTO_EKEY_BYTES << 3)
 #define CRYPTO_IV_BYTES     16
 #define CRYPTO_MAC_BYTES    16 // size of the GCM integrity tag
 
@@ -38,12 +38,12 @@ struct crypto_context {
 
 // deterministic encryption of a sensitive key using the keywrapping key
 int
-crypto_keywrap(uint8_t * keywrapping_key, uint8_t * sensitive_key);
+crypto_keywrap(crypto_ekey_t * keywrapping_key, crypto_ekey_t * sensitive_key);
 
 
 // deterministic decryption of a sensitive key using the keywrapping key
 int
-crypto_keyunwrap(uint8_t * keywrapping_key, uint8_t * sensitive_key);
+crypto_keyunwrap(crypto_ekey_t * keywrapping_key, crypto_ekey_t * sensitive_key);
 
 
 
