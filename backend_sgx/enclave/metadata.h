@@ -13,7 +13,7 @@
 struct metadata_header {
     uint32_t version;
 
-    uint32_t total_size;
+    uint32_t encrypted_buffer_size;
 
     struct nexus_uuid my_uuid;
 } __attribute__((packed));
@@ -24,7 +24,7 @@ struct metadata_buffer {
     struct crypto_context crypto_context;
 
     // used for integrity checking
-    struct metadata_header metadata_header;
+    struct metadata_header header;
 
     uint8_t encrypted_buffer[0];
 } __attribute__((packed));
@@ -35,10 +35,7 @@ struct metadata {
 
     struct nexus_uuid my_uuid;
 
-    size_t internal_buflen;
-    void * internal_ptr;
-
-    struct metadata_buffer * external_ptr;
+    struct metadata_buffer metadata_buffer;
 };
 
 
@@ -55,14 +52,16 @@ metadata_new(struct nexus_uuid * uuid);
  * 
  * @param uuid is the uuid the user wishes to read
  * @param uuid_path NULL if there's no parent directory
- * @param p_metadata_content will be the destination pointer for the data
+ * @param decrypted_metadata_content
+ * @param mac [optional] for a mac of the plaintext
  *
  * @return NULL on failure
  */
 struct metadata *
 metadata_open(struct nexus_uuid       * uuid,
               struct nexus_uuid_path  * uuid_path,
-              void                   ** p_metadata_content);
+              void                   ** decrypted_metadata_content,
+              crypto_mac_t            * mac);
 
 /**
  * Writes the buffer to output memory.
@@ -77,7 +76,8 @@ metadata_open(struct nexus_uuid       * uuid,
 int
 metadata_write(struct metadata * metadata,
                void            * metadata_content,
-               size_t            buflen);
+               size_t            buflen,
+               crypto_mac_t    * mac);
 
 /**
  * Frees the resources of the metadata object
