@@ -32,15 +32,17 @@ struct nexus_backend {
 
 
 struct nexus_backend *
-nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg);
+nexus_backend_launch(char * name, nexus_json_obj_t backend_cfg);
 
 void nexus_backend_shutdown(struct nexus_backend * backend);
 
 
 
 int
-nexus_backend_init_volume(struct nexus_backend  * backend,
-			  struct nexus_volume   * volume);
+nexus_backend_init_volume(struct nexus_volume * volume);
+
+int
+nexus_backend_open_volume(struct nexus_volume * volume);
 
 
 
@@ -51,14 +53,15 @@ nexus_backend_init_volume(struct nexus_backend  * backend,
 struct nexus_backend_impl {
     char * name;
 
-    void * (*init)();
+    void * (*init)(nexus_json_obj_t backend_cfg);
+    
     int (*deinit)();
 
     int (*init_volume)(struct nexus_volume * volume,
 		       void                * priv_data);
     
-    void * (*open_volume)(struct nexus_volume * volume,
-			  void                * priv_data);
+    int (*open_volume)(struct nexus_volume * volume,
+		       void                * priv_data);
 
 
 

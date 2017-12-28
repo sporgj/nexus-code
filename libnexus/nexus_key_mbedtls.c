@@ -78,7 +78,7 @@ __mbedtls_pub_key_to_str(struct nexus_key * key)
     
     memset(out_buf, 0, 16000);
 
-    ret = mbedtls_pk_write_pubkey_pem(key->key_state, out_buf, 16000);
+    ret = mbedtls_pk_write_pubkey_pem(key->key, out_buf, 16000);
 
     if (ret != 0) {
 	log_error("Could not write MBEDTLS PRV key to string\n");
@@ -106,7 +106,7 @@ __mbedtls_prv_key_to_str(struct nexus_key * key)
     
     memset(out_buf, 0, 16000);
 
-    ret = mbedtls_pk_write_key_pem(key->key_state, out_buf, 16000);
+    ret = mbedtls_pk_write_key_pem(key->key, out_buf, 16000);
 
     if (ret != 0) {
 	log_error("Could not write MBEDTLS PRV key to string\n");
@@ -201,7 +201,7 @@ __mbedtls_prv_key_from_str(struct nexus_key * key,
 	goto err;
     }
 
-    key->key_state = ctx;
+    key->key = ctx;
     
     return 0;
     
@@ -237,7 +237,7 @@ __mbedtls_pub_key_from_str(struct nexus_key * key,
 	goto err;
     }
 
-    key->key_state = ctx;
+    key->key = ctx;
     
     return 0;
     
@@ -274,7 +274,7 @@ __mbedtls_prv_key_from_file(struct nexus_key * key,
 	goto err;
     }
 
-    key->key_state = ctx;
+    key->key = ctx;
     
     return 0;
     
@@ -309,7 +309,7 @@ __mbedtls_pub_key_from_file(struct nexus_key * key,
 	goto err;
     }
 
-    key->key_state = ctx;
+    key->key = ctx;
     
     return 0;
     
@@ -419,7 +419,7 @@ __mbedtls_create_prv_key(struct nexus_key * key)
 	goto err;
     }
 
-    key->key_state = ctx;
+    key->key = ctx;
     
     return 0;
     
@@ -438,6 +438,6 @@ __mbedtls_create_prv_key(struct nexus_key * key)
 static void
 __mbedtls_free_key(struct nexus_key * key)
 {
-    mbedtls_pk_free(key->key_state);
-    nexus_free(key->key_state);
+    mbedtls_pk_free(key->key);
+    nexus_free(key->key);
 }

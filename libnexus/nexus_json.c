@@ -1399,12 +1399,21 @@ nexus_json_array_add_u32(nexus_json_obj_t arr,
 
 
 
-/* Delete an array item */
+/* Delete an array item at index idx */
 int
-nexus_json_del_array_item(nexus_json_obj_t arr,
-			  int              idx)
+nexus_json_array_del_idx(nexus_json_obj_t arr,
+			 int              idx)
 {
     nx_json_del_item(arr, idx);
+    return 0;
+}
+
+
+int
+nexus_json_array_del_item(nexus_json_obj_t arr,
+			  nexus_json_obj_t item)
+{
+    nx_json_free(item);
     return 0;
 }
 

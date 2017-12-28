@@ -123,16 +123,15 @@ __create_volume_key_list()
 
 int
 nexus_get_volume_key(struct nexus_uuid * vol_uuid,
-		     struct nexus_key  * key)
+		     struct nexus_key  * vol_key)
 {
+    nexus_json_obj_t iter     = NEXUS_JSON_INVALID_OBJ;
     nexus_json_obj_t key_list = NEXUS_JSON_INVALID_OBJ;
     nexus_json_obj_t key_json = __get_volume_key_list();
 
     char * vol_uuid_base64 = NULL;
     
-    int num_keys = 0;
     int ret      = 0;
-    int i        = 0;
     
     if (key_json == NEXUS_JSON_INVALID_OBJ) {
 	log_error("Could not read volume key file\n");
@@ -146,15 +145,6 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
 	return -1;
     }
 
-    num_keys = nexus_json_get_array_len(key_list);
-
-
-    log_debug("Found %d keys in volume key list\n", num_keys);
-    
-    if (num_keys == 0) {
-	goto err;
-    }
-
     vol_uuid_base64 = nexus_uuid_to_base64(vol_uuid);
 
     if (vol_uuid_base64 == NULL) {
@@ -162,13 +152,12 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
 	
     }
     
-    for (i = 0; i < num_keys; i++) {
+    nexus_json_arr_foreach(iter, key_list) {
 	char * key_uuid_base64 = NULL;
 	char * key_str         = NULL;
 	
-	nexus_json_obj_t key   = nexus_json_array_get_object(key_list, i);
 
-	ret = nexus_json_get_string(key, "uuid", &key_uuid_base64);
+	ret = nexus_json_get_string(iter, "uuid", &key_uuid_base64);
 
 	if (ret == -1) {
 	    log_error("Malformed key entry in key list. Skipping\n");
@@ -177,11 +166,11 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
 
 	if (strncmp(vol_uuid_base64, key_uuid_base64, strlen(vol_uuid_base64)) == 0) {
 	    nexus_key_type_t key_type = NEXUS_INVALID_KEY;
-
+	    
 	    char * type_str = NULL;
 	    
-	    ret |= nexus_json_get_string(key, "key",  &key_str);
-	    ret |= nexus_json_get_string(key, "type", &type_str);
+	    ret |= nexus_json_get_string(iter, "key",  &key_str);
+	    ret |= nexus_json_get_string(iter, "type", &type_str);
 
 	    if (ret != 0) {
 		log_error("Corrupted key entry for Volume (%s): No key entry\n", vol_uuid_base64);
@@ -196,13 +185,13 @@ nexus_get_volume_key(struct nexus_uuid * vol_uuid,
 		goto err;
 	    }
 	    
-	    key = nexus_key_from_str(key_type, key_str);
+	    ret = __nexus_key_from_str(vol_key, key_type, key_str);
 
-	    if (key == NULL) {
+	    if (ret == -1) {
 		log_error("Could not load volume key (%s)\n", key_str);
 		goto err;
 	    }
-	    
+
 	    break;
 	}
 		      
@@ -285,13 +274,74 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
 
     nexus_json_free(key_json);
 
-    return -1;
+    return 0;
 
  err:
     if (uuid_base64) nexus_free(uuid_base64);
     if (key_str)  nexus_free(key_str);
     
     nexus_json_free(key_json);
+    return -1;
+}
+
+
+int
+nexus_del_volume_key(struct nexus_uuid * vol_uuid)
+{
+    nexus_json_obj_t iter     = NEXUS_JSON_INVALID_OBJ;
+    nexus_json_obj_t key_list = NEXUS_JSON_INVALID_OBJ;
+    nexus_json_obj_t key_json = __get_volume_key_list();
+
+    char * vol_uuid_base64 = nexus_uuid_to_base64(vol_uuid);
+
+    int ret = 0;
+    
+    if (key_json == NEXUS_JSON_INVALID_OBJ) {
+	log_error("Could not parse volume key file\n");
+	return -1;
+    }
+
+    key_list = nexus_json_get_array(key_json, "keys");
+
+    if (key_list == NEXUS_JSON_INVALID_OBJ) {
+	log_error("Could not find volume key list\n");
+	goto err;
+    }
+
+    
+    nexus_json_arr_foreach(iter, key_list) {
+	char * iter_uuid_base64 = NULL;
+	
+	ret = nexus_json_get_string(iter, "uuid", &iter_uuid_base64);
+
+	if (ret == -1) {
+	    log_error("Corrupt volume key list\n");
+	    goto err;
+	}
+
+	if (strncmp(vol_uuid_base64, iter_uuid_base64, strlen(vol_uuid_base64)) == 0) {
+	    nexus_json_array_del_item(key_list, iter);
+	}
+    }
+    
+
+    ret = __save_volume_key_list(key_json);
+    
+    if (ret == -1) {
+	log_error("Could not write Key list\n");
+	goto err;
+    }
+    
+
+    nexus_json_free(key_json);
+    nexus_free(vol_uuid_base64);
+
+    return 0;
+
+ err:
+    if (vol_uuid_base64) nexus_free(vol_uuid_base64);
+    nexus_json_free(key_json);
+    
     return -1;
 }
 

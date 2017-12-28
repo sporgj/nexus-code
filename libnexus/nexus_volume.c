@@ -21,7 +21,27 @@
 #define NEXUS_VOLUME_CONFIG_FILENAME ".nexus_volume.conf"
 
 
+static nexus_json_obj_t
+__get_volume_config(char * volume_path)
+{
+    nexus_json_obj_t   cfg_json = NEXUS_JSON_INVALID_OBJ;
+    char             * cfg_file = NULL;
+    
+    int ret = 0;
+    
+    ret = asprintf(&cfg_file, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
 
+    if (ret == -1) {
+	log_error("Could not allocate config path string\n");
+	return NEXUS_JSON_INVALID_OBJ;
+    }
+
+    cfg_json = nexus_json_parse_file(cfg_file);
+    
+    nexus_free(cfg_file);
+
+    return cfg_json;   
+}
 
 
 struct nexus_volume *
@@ -55,9 +75,18 @@ nexus_create_volume(char * volume_path,
 	return NULL;
     }
 
+    
     /* Init Volume uuid */
     {
+	char * uuid_alt64 = NULL;
+
 	nexus_uuid_gen(&(vol->vol_uuid));
+
+	uuid_alt64 = nexus_uuid_to_alt64(&(vol->vol_uuid));
+
+	nexus_json_add_string(vol_config, "volume_uuid", uuid_alt64);
+
+	nexus_free(uuid_alt64);
     }
 
     ret = chdir(volume_path);
@@ -161,21 +190,28 @@ nexus_create_volume(char * volume_path,
     {
 	char * uuid_str = NULL;
 	
-	ret = nexus_backend_init_volume(vol->backend, vol);
+	ret = nexus_backend_init_volume(vol);
 
 	if (ret == -1) {
 	    log_error("Backend Error: Could not create volume\n");
 	    goto err;
 	}
 	
-	uuid_str = nexus_uuid_to_base64(&vol->supernode_uuid);
+	uuid_str = nexus_uuid_to_alt64(&vol->supernode_uuid);
 	nexus_json_add_string(vol_config, "supernode_uuid", uuid_str);
 	nexus_free(uuid_str);
     }
 
-    /* Add volume key to list */
-    {
+    /* Add volume key to list if it exists */
+    
+    if (nexus_get_key_type(&(vol->vol_key)) != NEXUS_INVALID_KEY) {
 	
+	ret = nexus_add_volume_key(&(vol->vol_uuid), &(vol->vol_key));
+
+	if (ret == -1) {
+	    log_error("Could not add volume key to key list\n");
+	    goto err;
+	}
     }
     
     /* Write config */
@@ -201,101 +237,211 @@ nexus_create_volume(char * volume_path,
     return vol;
 
 err:
+
+    /* TODO: 
+     *  Lots of free/deinits need to happen here....
+     */
+    
     nexus_free(vol);
     return NULL;
 }
 
 
 
+int
+nexus_delete_volume(char * volume_path)
+{
+    struct nexus_volume * volume = NULL;
+
+
+    volume = nexus_mount_volume(volume_path);
+
+    
+    /* Remove volume id/key from volume list */
+
+    nexus_del_volume_key(&(volume->vol_uuid));
+    
+    
+    /* blow away data */
+
+    /* blow away metadata */
+    
+    /* delete volume config file */
+
+    
+    return 0;
+}
+
+
+
 struct nexus_volume *
-nexus_load_volume(char * volume_path)
+nexus_mount_volume(char * volume_path)
 {
 
     struct nexus_volume  * volume  = NULL;
     struct nexus_backend * backend = NULL;
     
-    nexus_json_obj_t volume_config = NEXUS_JSON_INVALID_OBJ;
+    nexus_json_obj_t vol_cfg = NEXUS_JSON_INVALID_OBJ;
 
-    char   * conf_path      = NULL;	
-
-    char   * supernode_str  = NULL;
-    char   * volume_id_str  = NULL;
-    char   * backend_str    = NULL;
 
     int ret = 0;
 
-    volume = calloc(sizeof(struct nexus_volume), 1);
-
-    if (volume == NULL) {
-	log_error("Could not allocate Nexus Volume for (%s)\n", volume_path);
-	goto err;
-    }
-    
+    volume = nexus_malloc(sizeof(struct nexus_volume));
 
     /*
      * Load JSON config file
      */
-    ret = asprintf(&conf_path, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
-    
-    if (ret == -1) {
-	log_error("Could not create config path\n");
-	goto err;
-    }
-
-    volume_config = nexus_json_parse_file(conf_path);
-
-    if (ret == -1) {
-	log_error("Failed to load Nexus Volume (%s)\n", volume_path);
-	goto err;
+    {
+	vol_cfg = __get_volume_config(volume_path);
+	
+	if (vol_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Could not get volume config\n");
+	    goto err;
+	}
     }
     
-    nexus_free(conf_path);
-    
+    /* 
+     * parse volume UUID and get the volume key 
+     */
+    {
+	char   * volume_id_str  = NULL;
 
+	ret = nexus_json_get_string(vol_cfg, "volume_id", &volume_id_str);
+	
+	if (ret == -1) {
+	    log_error("Invalid volume configuration (missing volume_id)\n");
+	    goto err;
+	}
+	
+	log_debug("Volume_ID = %s\n", volume_id_str);
+	
+	/* parse volume ID */
+	nexus_uuid_from_alt64(&(volume->vol_uuid), volume_id_str);
+
+
+	/* Fetch the volume key */
+	ret = nexus_get_volume_key(&(volume->vol_uuid), &(volume->vol_key));
+	
+	if (ret == -1) {
+	    log_error("Could not find volume key for volume (%s)\n", volume_id_str);
+	    goto err;
+	}
+    }
+
+
+    /* 
+     * Initialize the metadata store 
+     */
+    {
+	nexus_json_obj_t   metadata_cfg  = NEXUS_JSON_INVALID_OBJ;
+	char             * metadata_name = NULL;
+	
+	metadata_cfg = nexus_json_get_object(vol_cfg, "metadata_store");
+	
+	if (metadata_cfg  == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid volume configuration. Missing metadata config\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(metadata_cfg, "name", &metadata_name);
+
+	if (ret == -1) {
+	    log_error("Invalid volume configuration. Missing metadata name\n");
+	    goto err;
+	}
+        	
+	volume->metadata_store = nexus_datastore_open(metadata_name, metadata_cfg);
+	
+	if (volume->metadata_store == NULL) {
+	    log_error("Could not initialize metadata_store (%s)\n", metadata_name);
+	    goto err;
+	}
+    }
+
+    /* 
+     * Initialize the data store 
+     */
+    {
+	nexus_json_obj_t   data_cfg  = NEXUS_JSON_INVALID_OBJ;
+	char             * data_name = NULL;
+	
+	data_cfg = nexus_json_get_object(vol_cfg, "data_store");
+	
+	if (data_cfg  == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid volume configuration. Missing data config\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(data_cfg, "name", &data_name);
+
+	if (ret == -1) {
+	    log_error("Invalid volume configuration. Missing data name\n");
+	    goto err;
+	}
+        	
+	volume->data_store = nexus_datastore_open(data_name, data_cfg);
+	
+	if (volume->data_store == NULL) {
+	    log_error("Could not initialize data_store (%s)\n", data_name);
+	    goto err;
+	}
+
+
+    }
+   
+    
+    
     /* 
      * Initialize the backend 
      */
-    ret = nexus_json_get_string(volume_config, "backend", &backend_str);
+    {
+	nexus_json_obj_t   backend_cfg  = NEXUS_JSON_INVALID_OBJ;
+	char             * backend_name = NULL;
+	
+	backend_cfg = nexus_json_get_object(vol_cfg, "backend");
+	
+	if (backend_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid volume configuration. Missing backend configuration\n");
+	    goto err;
+	}
 
-    if (ret  == -1) {
-	log_error("Invalid volume configuration. Missing backend\n");
-	goto err;
+	ret = nexus_json_get_string(backend_cfg, "name", &backend_name);
+
+	if (ret == -1) {
+	    log_error("Invalid volume configuration. Missing backend name\n");
+	    goto err;
+	}
+	
+	volume->backend = nexus_backend_launch(backend_name, backend_cfg);
+	
+	if (volume->backend == NULL) {
+	    log_error("Could not initialize backend (%s)\n", backend_name);
+	    goto err;
+	}
+
     }
-    
-    backend = nexus_backend_launch(backend_str, NULL);
-    
-    if (backend == NULL) {
-	log_error("Could not initialize backend (%s)\n", backend_str);
-	goto err;
-    }
 
-
-    /* 
-     * parse volume UUID
-     */
-    ret = nexus_json_get_string(volume_config, "volume_id", &volume_id_str);
-
-    log_debug("Volume_ID = %s\n", volume_id_str);
-
-    // Generate UUID from volume ID
     
 
     /* 
      * parse Supernode UUID
      */
-    ret = nexus_json_get_string(volume_config, "supernode_id", &supernode_str);
+    {
+	char * supernode_str  = NULL;
+
+	ret = nexus_json_get_string(vol_cfg, "supernode_id", &supernode_str);
+	
+	log_debug("Supernode_ID=%s\n", supernode_str);
+	
+	// Generate UUID from string
+	nexus_uuid_from_alt64(&(volume->supernode_uuid), supernode_str);
+    }
+
+
     
-    log_debug("Supernode_ID=%s\n", supernode_str);
+    ret = nexus_backend_open_volume(volume);
 
-    // Generate UUID from string
-
-
-    // Find the volume key using volume ID
-    // __load_volume_key(volume->id);
-
-
-    // backend_volume_open(volume->supernode_id, prvkey);
-
+    
     
     
     return volume;
@@ -303,7 +449,6 @@ nexus_load_volume(char * volume_path)
  err:
 
     if (backend)   nexus_backend_shutdown(backend);
-    if (conf_path) nexus_free(conf_path);
     if (volume)    nexus_free(volume);
     
 

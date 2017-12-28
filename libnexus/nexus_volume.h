@@ -15,6 +15,8 @@
 struct nexus_volume {
     char * volume_path;
 
+    struct nexus_key vol_key;
+    
     struct nexus_uuid vol_uuid;
     struct nexus_uuid supernode_uuid;
     
@@ -32,8 +34,11 @@ nexus_create_volume(char * volume_path,
                     char * config_str);
 
 
+int
+nexus_delete_volume(char * volume_path);
+
 struct nexus_volume *
-nexus_load_volume(char * volume_path);
+nexus_mount_volume(char * volume_path);
 
 
 void

@@ -11,11 +11,18 @@
 #include <nexus_volume.h>
 
 #include <nexus_log.h>
+#include <nexus_json.h>
 
 #include "supernode.h"
 
+struct backend_state {
+    
+
+};
+
+
 static void *
-init(void)
+init(nexus_json_obj_t backend_cfg)
 {
 
     printf("Initializing Cleartext backend\n");
@@ -27,7 +34,6 @@ int
 init_volume(struct nexus_volume * volume,
 	    void                * priv_data)
 {
-    struct nexus_key    volume_key;
     struct supernode  * supernode    = NULL;
     struct nexus_key  * user_prv_key = NULL;
     struct nexus_key  * user_pub_key = NULL;
@@ -45,8 +51,9 @@ init_volume(struct nexus_volume * volume,
 	log_error("Could not derive user public key\n");
 	goto err;
     }
+
     
-    supernode = supernode_create(volume, user_pub_key, &volume_key);
+    supernode = supernode_create(volume, user_pub_key, &(volume->vol_key));
     
     if (supernode == NULL) {
 	log_error("Could not create supernode\n");
@@ -55,10 +62,6 @@ init_volume(struct nexus_volume * volume,
 
     nexus_uuid_copy(&(supernode->my_uuid), &(volume->supernode_uuid));
 
-
-    /* Add the volume key to the user data */
-    /* For this we will just recode the supernode uuid as the key */
-    
     
     nexus_free_key(user_prv_key);
     nexus_free_key(user_pub_key);
@@ -74,10 +77,57 @@ init_volume(struct nexus_volume * volume,
 }
 
 
+
+int
+open_volume(struct nexus_volume * volume,
+	    void                * priv_data)
+{
+    //    struct supernode * supernode    = NULL;
+    struct nexus_key * user_prv_key = NULL;
+    struct nexus_key * user_pub_key = NULL;
+
+    user_prv_key = nexus_get_user_key();
+
+    if (user_prv_key == NULL) {
+	log_error("Could not retrieve user key\n");
+	return -1;
+    }
+
+    user_pub_key = nexus_derive_key(NEXUS_MBEDTLS_PUB_KEY, user_prv_key);
+    
+    if (user_pub_key == NULL) {
+	log_error("Could not derive user public key\n");
+	goto err;
+    }
+
+
+
+    
+    //   supernode = supernode_load(supernode, user_pub_key, backend_state);
+
+
+    
+    
+    nexus_free_key(user_prv_key);
+    nexus_free_key(user_pub_key);
+    
+    return 0;
+
+ err:
+
+    if (user_prv_key) nexus_free_key(user_prv_key);
+    if (user_pub_key) nexus_free_key(user_pub_key);
+    
+    return -1;
+    
+}
+
+
 static struct nexus_backend_impl clear_impl = {
     .name        = "CLEARTEXT",
     .init        = init,
-    .init_volume = init_volume
+    .init_volume = init_volume,
+    .open_volume = open_volume
     
 };
 

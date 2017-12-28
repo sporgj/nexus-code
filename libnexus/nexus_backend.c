@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#include <nexus_volume.h>
+
 #include <nexus_backend.h>
 
 #include <nexus_hashtable.h>
@@ -91,7 +93,8 @@ nexus_backend_init()
 
 
 struct nexus_backend *
-nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
+nexus_backend_launch(char             * name,
+		     nexus_json_obj_t   backend_cfg)
 {
     struct nexus_backend      * backend = NULL;
     struct nexus_backend_impl * impl    = NULL;
@@ -103,29 +106,32 @@ nexus_backend_launch(char * name, nexus_json_obj_t * backend_cfg)
 	return NULL;
     }
 
-    backend = calloc(sizeof(struct nexus_backend), 1);
-
-    if (backend == NULL) {
-	log_error("Could not allocate nexus_backend\n");
-	return NULL;
-    }
-
+    backend = nexus_malloc(sizeof(struct nexus_backend));
 
     log_debug("initializing backend (%s)\n", name);
     
     backend->impl      = impl;
-    backend->priv_data = impl->init();
+    backend->priv_data = impl->init(backend_cfg);
 
     return backend;
 }
 
 
-// TODO
 int
-nexus_backend_init_volume(struct nexus_backend * backend,
-			  struct nexus_volume  * volume)
+nexus_backend_init_volume(struct nexus_volume * volume)
 {
+    struct nexus_backend * backend = volume->backend;
+    
     return backend->impl->init_volume(volume, backend->priv_data);
+}
+
+
+int
+nexus_backend_open_volume(struct nexus_volume * volume)
+{
+    struct nexus_backend * backend = volume->backend;
+    
+    return backend->impl->open_volume(volume, backend->priv_data);
 }
 
 void

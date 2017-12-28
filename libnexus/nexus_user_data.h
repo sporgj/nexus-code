@@ -21,6 +21,8 @@ int
 nexus_add_volume_key(struct nexus_uuid * vol_uuid,
 		     struct nexus_key  * key);
 
+int
+nexus_del_volume_key(struct nexus_uuid * vol_uuid);
 
 int
 nexus_get_volume_key(struct nexus_uuid * vol_uuid,

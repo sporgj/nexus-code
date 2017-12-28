@@ -16,8 +16,7 @@
 #include <nexus_config.h>
 #include <nexus_volume.h>
 
-static char * volume_path  = NULL;
-static char * user_key_path = NULL;
+static char * volume_path   = NULL;
 
 
 static int cmd_line_user_key = 0;
@@ -62,9 +61,8 @@ create_volume_main(int argc, char ** argv)
 	};
 	
 	
-	while ((c = getopt_long_only(argc, argv, "", long_options, &opt_index)) != -1) {	    
+	while ((c = getopt_long_only(argc, argv, "h", long_options, &opt_index)) != -1) {	    
 
-	    printf("C=%d\n", c);
 	    switch (c) {
 		case 0:
 		    switch (opt_index) {
@@ -97,10 +95,6 @@ create_volume_main(int argc, char ** argv)
 
 
 	volume_path = argv[used_opts + 1];
-
-	printf("public_key: (%s)\n", user_key_path);
-	
-	
     }
 
 

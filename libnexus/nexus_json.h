@@ -214,7 +214,8 @@ int nexus_json_array_add_u32   (nexus_json_obj_t arr, uint32_t   val);
 int nexus_json_array_add_u64   (nexus_json_obj_t arr, uint64_t   val);
 
 /* Delete an array item */
-int nexus_json_array_del_item  (nexus_json_obj_t arr, int idx);
+int nexus_json_array_del_idx   (nexus_json_obj_t arr, int idx);
+int nexus_json_array_del_item  (nexus_json_obj_t arr, nexus_json_obj_t item);
 
 
 
@@ -225,4 +226,4 @@ int nexus_json_array_del_item  (nexus_json_obj_t arr, int idx);
  */
 #include "nxjson.h"
 #define nexus_json_arr_foreach(iter, arr)			\
-    for (iter = arr->child; iter != NULL; iter = iter->next)
+    for ((iter) = ((struct nx_json *)(arr))->child; (iter) != NULL; (iter) = ((struct nx_json *)(iter))->next)

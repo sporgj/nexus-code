@@ -31,10 +31,19 @@ supernode_create(struct nexus_volume * volume,
     struct supernode * supernode = NULL;
     struct dirnode   * root_dir  = NULL;
     struct user_list * user_list = NULL;
+    struct nexus_key * tmp_key   = NULL;
     
     int ret = 0;
 
     supernode = nexus_malloc(sizeof(struct supernode));
+
+    // generate a volume key
+    tmp_key = nexus_create_key(NEXUS_RAW_256_KEY);
+
+    if (tmp_key == NULL) {
+	log_error("Could not generate a volume key\n");
+	goto err;
+    }
     
     // generate uuid for supernode
     nexus_uuid_gen(&(supernode->my_uuid));
@@ -68,9 +77,13 @@ supernode_create(struct nexus_volume * volume,
 	goto err;
     }
 
+    nexus_copy_key(tmp_key, volume_key);
+    nexus_free_key(tmp_key);
+    
     return supernode;
 
  err:
+
 
     if (user_list) {
 	nexus_datastore_del_uuid(volume->metadata_store, &(user_list->my_uuid), NULL);
@@ -82,7 +95,9 @@ supernode_create(struct nexus_volume * volume,
 	dirnode_free(root_dir);
     }
     
-    if (supernode) nexus_free(supernode);
+    if (tmp_key)    nexus_free_key(tmp_key);
+
+    if (supernode)  nexus_free(supernode);
     
     return NULL;
 

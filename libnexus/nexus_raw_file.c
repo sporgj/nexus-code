@@ -46,15 +46,9 @@ nexus_read_raw_file(char     * path,
 	return -1;
     }
 
-    file_data = calloc(1, file_size);
-
-    if (file_data == NULL) {
-        log_error("could not allocate buffer for file (%s) (size=%zu)\n", path, file_size);
-	return -1;
-    }
-
+    file_data = nexus_malloc(file_size);
     
-    file_ptr = fopen(path, "rb");
+    file_ptr  = fopen(path, "rb");
 
     if (file_ptr == NULL) {
         log_error("Could not open file (%s)\n", path);
