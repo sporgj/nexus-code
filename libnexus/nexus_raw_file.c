@@ -46,7 +46,7 @@ nexus_read_raw_file(char     * path,
 	return -1;
     }
 
-    file_data = nexus_malloc(file_size);
+    file_data = nexus_malloc(file_size + 1); // We add an extra byte here to make sure strings are NULL terminated
     
     file_ptr  = fopen(path, "rb");
 
