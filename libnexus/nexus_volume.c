@@ -361,8 +361,6 @@ nexus_delete_volume(char * volume_path)
 	    goto err;
 	}
 
-	printf("Vol UUID String=(%s)\n", uuid_str);
-
 	nexus_uuid_from_alt64(&vol_uuid, uuid_str);
 	
 	nexus_del_volume_key(&vol_uuid);

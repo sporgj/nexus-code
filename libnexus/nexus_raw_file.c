@@ -130,7 +130,8 @@ delete_fn(const char        * fpath,
 	  int                 typeflag,
 	  struct FTW        * ftwbuf)
 {
-    printf("Deleting (%s)\n", fpath);
+    log_debug("Deleting: %s\n", fpath);
+
     return remove(fpath);
 }
 
@@ -142,8 +143,8 @@ nexus_delete_path(char * path)
 {
 
     int ret = 0;
-    printf("Deleting path (%s)\n", path);
-    
+
+    log_debug("Deleting Path: %s\n", path);
     
     ret = nftw(path, delete_fn, 20, FTW_DEPTH);
 
