@@ -46,8 +46,6 @@ nexus_alt64_decode(char      * alt64_str,
     }
 
     len = strlen(alt64_str);
-
-    printf("decoding alt64: str=(%s), strlen=%d\n", alt64_str, len);
     
     if (len % 4) {
         log_error("Invalid Alt64 Length");
@@ -59,8 +57,6 @@ nexus_alt64_decode(char      * alt64_str,
     if (index(alt64_str, '.')) {
         padding = (alt64_str + len) - index(alt64_str, '.');
     }
-
-    printf("padding=%d\n", padding);
 
     out_len = (num_chunks * 3) - padding;
     out_buf = (uint8_t *)nexus_malloc(out_len);
