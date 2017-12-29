@@ -123,7 +123,7 @@ nexus_uuid_from_alt64(struct nexus_uuid * uuid,
 	   
     
     if (size != NEXUS_UUID_SIZE) {
-	log_error("Decoded a UUID with invalid length (%d)\n", size);
+	log_error("Decoded a UUID with invalid length (%d) (uuid_str=%s)\n", size, alt64_str);
 	return -1;
     }
 

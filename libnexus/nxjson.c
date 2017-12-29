@@ -350,6 +350,7 @@ nx_json_serialize(struct nx_json * json)
 	NX_JSON_FREE(srlzer.str);
 	return NULL;
     }
+
     
     return srlzer.str;
 }
@@ -872,6 +873,8 @@ nx_json_parse(char * text)
     struct nx_json js = {0};
     char * raw_text   = NULL;
 
+    printf("json parsing (%s)\n", text);
+    
     raw_text = strdup(text);
 
     if (raw_text == NULL) {

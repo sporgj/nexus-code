@@ -17,9 +17,26 @@
 #include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_util.h>
+#include <nexus_raw_file.h>
 
 #define NEXUS_VOLUME_CONFIG_FILENAME ".nexus_volume.conf"
 
+static char *
+__get_volume_config_path(char * volume_path)
+{
+    char * cfg_filename = NULL;
+    int    ret          = 0;
+    
+    ret = asprintf(&cfg_filename, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
+    
+    if (ret == -1) {
+	log_error("Could not allocate cfg_filename\n");
+	return NULL;
+    }
+
+    return cfg_filename;
+}
+    
 
 static nexus_json_obj_t
 __get_volume_config(char * volume_path)
@@ -27,11 +44,9 @@ __get_volume_config(char * volume_path)
     nexus_json_obj_t   cfg_json = NEXUS_JSON_INVALID_OBJ;
     char             * cfg_file = NULL;
     
-    int ret = 0;
-    
-    ret = asprintf(&cfg_file, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
+    cfg_file = __get_volume_config_path(volume_path);
 
-    if (ret == -1) {
+    if (cfg_file == NULL) {
 	log_error("Could not allocate config path string\n");
 	return NEXUS_JSON_INVALID_OBJ;
     }
@@ -218,9 +233,9 @@ nexus_create_volume(char * volume_path,
     {
 	char * cfg_filename = NULL;
 
-	ret = asprintf(&cfg_filename, "%s/%s", volume_path, NEXUS_VOLUME_CONFIG_FILENAME);
+	cfg_filename = __get_volume_config_path(volume_path);
 
-	if (ret == -1) {
+	if (cfg_filename == NULL) {
 	    log_error("Could not allocate cfg_filename\n");
 	    goto err;
 	}
@@ -251,25 +266,139 @@ err:
 int
 nexus_delete_volume(char * volume_path)
 {
-    struct nexus_volume * volume = NULL;
+    nexus_json_obj_t vol_cfg = NEXUS_JSON_INVALID_OBJ;
+
+    int ret = 0;
 
 
-    volume = nexus_mount_volume(volume_path);
-
+    /* Change to volume dir */
+    {
+	ret = chdir(volume_path);
+	
+	if (ret == -1) {
+	    log_error("Could not chdir to (%s)\n", volume_path);
+	    goto err;
+	}
+    }
     
-    /* Remove volume id/key from volume list */
 
-    nexus_del_volume_key(&(volume->vol_uuid));
+    /*
+     * Load JSON config file
+     */
+    {
+	vol_cfg = __get_volume_config(volume_path);
+	
+	if (vol_cfg == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Could not get volume config\n");
+	    goto err;
+	}
+    }
     
-    
+
     /* blow away data */
+    {
+	nexus_json_obj_t   data_cfg  = NEXUS_JSON_INVALID_OBJ;
+	char             * data_name = NULL;
+
+	data_cfg = nexus_json_get_object(vol_cfg, "data_store");
+	
+	if (data_cfg  == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid volume configuration. Missing data config\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(data_cfg, "name", &data_name);
+
+	if (ret == -1) {
+	    log_error("Invalid volume configuration. Missing data name\n");
+	    goto err;
+	}
+        	
+	ret = nexus_datastore_delete(data_name, data_cfg);
+	
+	if (ret == -1) {
+	    log_error("Could not delete data_store (%s)\n", data_name);
+	}
+    }
+    
 
     /* blow away metadata */
+    {
+	nexus_json_obj_t   metadata_cfg  = NEXUS_JSON_INVALID_OBJ;
+	char             * metadata_name = NULL;
+	
+	metadata_cfg = nexus_json_get_object(vol_cfg, "metadata_store");
+	
+	if (metadata_cfg  == NEXUS_JSON_INVALID_OBJ) {
+	    log_error("Invalid volume configuration. Missing metadata config\n");
+	    goto err;
+	}
+
+	ret = nexus_json_get_string(metadata_cfg, "name", &metadata_name);
+
+	if (ret == -1) {
+	    log_error("Invalid volume configuration. Missing metadata name\n");
+	    goto err;
+	}
+        	
+	ret = nexus_datastore_delete(metadata_name, metadata_cfg);
+	
+	if (ret == -1) {
+	    log_error("Could not delete metadata_store (%s)\n", metadata_name);
+	}
+    }
+    
+    
+    /* Remove volume id/key from volume list */
+    {
+	struct nexus_uuid   vol_uuid;
+	char              * uuid_str = NULL;
+	
+	ret = nexus_json_get_string(vol_cfg, "volume_uuid", &uuid_str);
+
+	if (ret == -1) {
+	    log_error("Invalid volume config. Missing volume uuid\n");
+	    goto err;
+	}
+
+	printf("Vol UUID String=(%s)\n", uuid_str);
+
+	nexus_uuid_from_alt64(&vol_uuid, uuid_str);
+	
+	nexus_del_volume_key(&vol_uuid);
+    }
+    
     
     /* delete volume config file */
+    {
+	char * cfg_filename = NULL;
+
+	cfg_filename = __get_volume_config_path(volume_path);
+
+	if (cfg_filename == NULL) {
+	    log_error("could not get config path\n");
+	    goto err;
+	}
+	
+	ret = nexus_delete_raw_file(cfg_filename);
+
+	nexus_free(cfg_filename);
+
+	if (ret == -1) {
+	    log_error("Could not delete volume config file\n");
+	    goto err;
+	}
+    }
 
     
+    nexus_json_free(vol_cfg);
+    
     return 0;
+ err:
+    
+    if (vol_cfg != NEXUS_JSON_INVALID_OBJ) nexus_json_free(vol_cfg);
+    
+    return -1;
 }
 
 

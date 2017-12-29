@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
+#include <ftw.h>
 
 
 #include <nexus_raw_file.h>
@@ -122,3 +122,31 @@ nexus_delete_raw_file(char * path)
     
     return ret;
 }
+
+
+static int
+delete_fn(const char        * fpath,
+	  const struct stat * sb,
+	  int                 typeflag,
+	  struct FTW        * ftwbuf)
+{
+    printf("Deleting (%s)\n", fpath);
+    return remove(fpath);
+}
+
+
+
+
+int
+nexus_delete_path(char * path)
+{
+
+    int ret = 0;
+    printf("Deleting path (%s)\n", path);
+    
+    
+    ret = nftw(path, delete_fn, 20, FTW_DEPTH);
+
+    return ret;
+}
+

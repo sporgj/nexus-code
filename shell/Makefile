@@ -10,8 +10,9 @@ AR = ar
 
 
 exec_objs :=	main.o \
-		create_volume.o
-#		handler.o
+		create_volume.o \
+		delete_volume.o \
+		ls_path.o
 
 execs := nexus_shell
 

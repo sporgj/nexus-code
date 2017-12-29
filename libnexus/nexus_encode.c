@@ -11,14 +11,14 @@
 #include <string.h>
 
 #include <nexus_log.h>
+#include <nexus_util.h>
 
 /* Alternate Nexus alphabet for base64 encoding
  * Padding Character is '.' 
  */
-static const char alt64_table[] = ("-_0123456789ABCD"
-				   "EFGHIJKLMNOPQRST"
-				   "UVWXYZabcdefghij"
-				   "klmnopqrstuvwxyz");
+static const char alt64_table[] = ("ABCDEFGHIJKLMNOPQRSTU"
+				   "VWXYZabcdefghijklmnop"
+				   "qrstuvwxyz0123456789-_");
 
 const char * base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const char * hex_table    = "0123456789abcdef";
@@ -47,6 +47,8 @@ nexus_alt64_decode(char      * alt64_str,
 
     len = strlen(alt64_str);
 
+    printf("decoding alt64: str=(%s), strlen=%d\n", alt64_str, len);
+    
     if (len % 4) {
         log_error("Invalid Alt64 Length");
         return -1;
@@ -58,8 +60,10 @@ nexus_alt64_decode(char      * alt64_str,
         padding = (alt64_str + len) - index(alt64_str, '.');
     }
 
-    out_len = (num_chunks * 3) + padding;
-    out_buf = (uint8_t *)calloc(1, out_len);
+    printf("padding=%d\n", padding);
+
+    out_len = (num_chunks * 3) - padding;
+    out_buf = (uint8_t *)nexus_malloc(out_len);
 
     for (i = 0; i < num_chunks; i++) {
         char  * chunk   = (char *)alt64_str + (i * 4);
@@ -110,7 +114,7 @@ nexus_alt64_encode(uint8_t  * src_buf,
     }
 
 
-    alt64_str = calloc(1, (num_chunks * 4) + 1);
+    alt64_str = nexus_malloc((num_chunks * 4) + 1);
 
     if (alt64_str == NULL) {
 	log_error("Could not allocate alt64 string\n");

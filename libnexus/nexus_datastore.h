@@ -26,9 +26,15 @@ nexus_datastore_create(char             * name,
 		       nexus_json_obj_t   datastore_cfg);
 
 
+int
+nexus_datastore_delete(char             * name,
+		       nexus_json_obj_t   datastore_cfg);
+
 struct nexus_datastore *
 nexus_datastore_open(char             * name,
 		     nexus_json_obj_t   datastore_cfg);
+
+
 
 
 
@@ -87,7 +93,7 @@ struct nexus_datastore_impl {
     char * name;
 
     void * (*create)(nexus_json_obj_t datastore_cfg);
-    int    (*delete)(void * priv_data);
+    int    (*delete)(nexus_json_obj_t datastore_cfg);
 
     void * (*open)(nexus_json_obj_t datastore_cfg);
     int    (*close)(void * priv_data);

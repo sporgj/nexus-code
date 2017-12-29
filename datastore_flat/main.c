@@ -103,6 +103,31 @@ flat_create(nexus_json_obj_t cfg)
 }
 
 
+static int
+flat_delete(nexus_json_obj_t cfg)
+{
+    char * root_path = NULL;
+
+    int    ret = 0;
+
+    ret = nexus_json_get_string(cfg, "root_path", &root_path);
+
+    if (ret == -1) {
+	log_error("Invalid FLAT datastore config. Missing root_path\n");
+	return -1;
+    }
+
+    
+    ret = nexus_delete_path(root_path);
+
+    if (ret == -1) {
+	log_error("Could not delete path (%s)\n", root_path);
+	return -1;
+    }
+    
+    return 0;
+}
+
 static void *
 flat_open(nexus_json_obj_t cfg)
 {
@@ -360,6 +385,7 @@ static struct nexus_datastore_impl flat_datastore = {
     .name        = "FLAT",
 
     .create      = flat_create,
+    .delete      = flat_delete,
     
     .open        = flat_open,
     .close       = flat_close,

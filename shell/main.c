@@ -48,10 +48,14 @@ init_main(int argc, char ** argv)
 
 
 extern int create_volume_main(int argc, char ** argv);
+extern int delete_volume_main(int argc, char ** argv);
+extern int       ls_path_main(int argc, char ** argv);
 
 static struct nexus_cmd cmds[] = {
     {"init"   , init_main          , "Initialize Nexus Environment" },
     {"create" , create_volume_main , "Create a Nexus Volume"        },
+    {"delete" , delete_volume_main , "Delete a Nexus Volume"        },
+    {"ls"     , ls_path_main       , "'ls' a path"                  },
     {0, 0, 0}
 };
 
@@ -79,8 +83,9 @@ usage(void)
 int
 main(int argc, char ** argv)
 {
-    int i   = 0;
-    int ret = 0;
+    int i     = 0;
+    int ret   = 0;
+    int found = 0;
 
    if (argc < 2) {
 	usage();
@@ -88,21 +93,28 @@ main(int argc, char ** argv)
     }
     
 
-    nexus_init();
 
     
     while (cmds[i].name) {
 
     	if (strncmp(cmds[i].name, argv[1], strlen(cmds[i].name)) == 0) {
+
+	    found = 1;
+	    
+	    nexus_init();
 	    ret = cmds[i].handler(argc - 1, &argv[1]);
+	    nexus_deinit();
+
 	    break;
 	}
 
 	i++;
     }
 
-
-    nexus_deinit();
+    if (found == 0) {
+	usage();
+	exit(-1);
+    }
 
     
 #if 0

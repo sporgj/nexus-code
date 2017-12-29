@@ -102,12 +102,7 @@ nexus_datastore_create(char             * name,
 	return NULL;
     }
 
-    datastore = calloc(sizeof(struct nexus_datastore), 1);
-
-    if (datastore == NULL) {
-	log_error("Could not allocate nexus_datastore\n");
-	return NULL;
-    }
+    datastore = nexus_malloc(sizeof(struct nexus_datastore));
 
         
     log_debug("initializing datastore (%s)\n", name);
@@ -122,6 +117,31 @@ nexus_datastore_create(char             * name,
     }
 
     return datastore;
+}
+
+
+int
+nexus_datastore_delete(char             * name,
+		       nexus_json_obj_t   cfg)
+{
+    struct nexus_datastore_impl * impl = NULL;
+
+    int ret = 0;
+    
+    impl = nexus_htable_search(datastore_table, (uintptr_t)name);
+
+    if (impl == NULL) {
+	log_error("Could not find datastore implementation for (%s)\n", name);
+	return -1;
+    }
+
+    ret = impl->delete(cfg);
+
+    if (ret == -1) {
+	log_error("Could not delete datastore (%s)\n", name);
+    }    
+
+    return ret;
 }
 
 
