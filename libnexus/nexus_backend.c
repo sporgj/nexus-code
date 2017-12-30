@@ -122,7 +122,7 @@ nexus_backend_init_volume(struct nexus_volume * volume)
 {
     struct nexus_backend * backend = volume->backend;
     
-    return backend->impl->init_volume(volume, backend->priv_data);
+    return backend->impl->volume_init(volume, backend->priv_data);
 }
 
 
@@ -131,7 +131,7 @@ nexus_backend_open_volume(struct nexus_volume * volume)
 {
     struct nexus_backend * backend = volume->backend;
     
-    return backend->impl->open_volume(volume, backend->priv_data);
+    return backend->impl->volume_open(volume, backend->priv_data);
 }
 
 void
@@ -141,3 +141,17 @@ nexus_backend_shutdown(struct nexus_backend * backend)
 
 
 }
+
+
+int
+nexus_backend_fs_create(struct nexus_volume * volume,
+			char                * path,
+			nexus_dirent_type_t   type,
+			struct nexus_stat   * stat)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->fs_create(volume, path, type, stat, backend->priv_data);
+}
+
+			

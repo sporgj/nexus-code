@@ -30,8 +30,8 @@ init(nexus_json_obj_t backend_cfg)
     return NULL;
 }
 
-int
-init_volume(struct nexus_volume * volume,
+static int
+volume_init(struct nexus_volume * volume,
 	    void                * priv_data)
 {
     struct supernode  * supernode    = NULL;
@@ -78,8 +78,8 @@ init_volume(struct nexus_volume * volume,
 
 
 
-int
-open_volume(struct nexus_volume * volume,
+static int
+volume_open(struct nexus_volume * volume,
 	    void                * priv_data)
 {
     //    struct supernode * supernode    = NULL;
@@ -122,12 +122,26 @@ open_volume(struct nexus_volume * volume,
     
 }
 
+static int
+fs_create(struct nexus_volume * volume,
+	  char                * path,
+	  nexus_dirent_type_t   type,
+	  struct nexus_stat   * stat,
+	  void                * priv_data)
+{
+    printf("Create A file...\n");
+
+    return -1;
+}
 
 static struct nexus_backend_impl clear_impl = {
     .name        = "CLEARTEXT",
     .init        = init,
-    .init_volume = init_volume,
-    .open_volume = open_volume
+    .volume_init = volume_init,
+    .volume_open = volume_open,
+
+
+    .fs_create   = fs_create
     
 };
 

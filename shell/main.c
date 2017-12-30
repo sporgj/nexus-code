@@ -49,13 +49,15 @@ init_main(int argc, char ** argv)
 
 extern int create_volume_main(int argc, char ** argv);
 extern int delete_volume_main(int argc, char ** argv);
-extern int       ls_path_main(int argc, char ** argv);
+//extern int       ls_path_main(int argc, char ** argv);
+extern int   create_file_main(int argc, char ** argv);
 
 static struct nexus_cmd cmds[] = {
-    {"init"   , init_main          , "Initialize Nexus Environment" },
-    {"create" , create_volume_main , "Create a Nexus Volume"        },
-    {"delete" , delete_volume_main , "Delete a Nexus Volume"        },
-    {"ls"     , ls_path_main       , "'ls' a path"                  },
+    {"init"         , init_main          , "Initialize Nexus Environment" },
+    {"create"       , create_volume_main , "Create a Nexus Volume"        },
+    {"delete"       , delete_volume_main , "Delete a Nexus Volume"        },
+    //    {"ls"           , ls_path_main       , "'ls' a path"                  },
+    {"create_file"  , create_file_main   , "Create a new file"            },
     {0, 0, 0}
 };
 
@@ -97,7 +99,7 @@ main(int argc, char ** argv)
     
     while (cmds[i].name) {
 
-    	if (strncmp(cmds[i].name, argv[1], strlen(cmds[i].name)) == 0) {
+    	if (strncmp(cmds[i].name, argv[1], strlen(argv[1])) == 0) {
 
 	    found = 1;
 	    

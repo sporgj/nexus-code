@@ -15,6 +15,7 @@
 #include <nexus_log.h>
 #include <nexus_config.h>
 #include <nexus_volume.h>
+#include <nexus_fs.h>
 
 static int cmd_line_user_key = 0;
 
@@ -34,7 +35,7 @@ ls_path_main(int argc, char ** argv)
     char * volume_path  = NULL;
     char * dir_path     = NULL;
 
-    //    struct nexus_volume * vol = NULL;
+    struct nexus_volume * vol = NULL;
 
   /* Override defaults with command line arguments */
     {
@@ -91,10 +92,20 @@ ls_path_main(int argc, char ** argv)
 	   dir_path);
     
 
-    nexus_mount_volume(volume_path);
-    
-    //    nexus_volume_ls(vol, dir_path);
+    vol = nexus_mount_volume(volume_path);
 
+    if (vol == NULL) {
+	printf("Error: could not mount nexus volume (%s)\n", volume_path);
+	return -1;
+    }
+
+    
+    {
+	struct nexus_dirent * dirents = NULL;
+	nexus_fs_readdir(vol, dir_path, &dirents);
+
+
+    }
     
 
     return 0;

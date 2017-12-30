@@ -41,9 +41,6 @@ __get_volume_key_list()
 	log_error("Could not allocate volume key string\n");
 	return NEXUS_JSON_INVALID_OBJ;
     }
-
-    printf("key_file: %s\n", key_file_path);
-
     
     key_json = nexus_json_parse_file(key_file_path);
     

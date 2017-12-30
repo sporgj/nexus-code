@@ -15,7 +15,7 @@
 #include <nexus_uuid.h>
 #include <nexus_json.h>
 
-
+#include <nexus_fs.h>
 
 struct nexus_backend_impl;
 struct nexus_volume;
@@ -45,8 +45,12 @@ int
 nexus_backend_open_volume(struct nexus_volume * volume);
 
 
-
-
+int
+nexus_backend_fs_create(struct nexus_volume * volume,
+			char                * path,
+			nexus_dirent_type_t   type,
+			struct nexus_stat   * stat);
+			
 
 
 
@@ -54,45 +58,35 @@ struct nexus_backend_impl {
     char * name;
 
     void * (*init)(nexus_json_obj_t backend_cfg);
-    
-    int (*deinit)();
+    int    (*deinit)();
 
-    int (*init_volume)(struct nexus_volume * volume,
+    int (*volume_init)(struct nexus_volume * volume,
 		       void                * priv_data);
     
-    int (*open_volume)(struct nexus_volume * volume,
+    int (*volume_open)(struct nexus_volume * volume,
 		       void                * priv_data);
+   
+    int (*volume_close)(struct nexus_uuid * uuid);
 
+    
 
 
     
-    int (*close_volume)(struct nexus_uuid * uuid);
-
-    
-    
-    int (*add_user)(struct nexus_uuid * vol_uuid,
+    int (*user_add)(struct nexus_uuid * vol_uuid,
 		    struct nexus_key  * user_pub_key,
 		    char              * user_name);
 
-    int (*del_user)(struct nexus_uuid * vol_uuid,
+    int (*user_del)(struct nexus_uuid * vol_uuid,
 		    struct nexus_key  * user_name);
 
 
-    int (*add_dir)(struct nexus_uuid * vol_uuid,
-		   char              * name,
-		   char              * path);
-    
-    int (*del_dir)();
 
-    int (*read_dir)();
-    
-    int (*add_file)();
-    int (*del_file)();
 
-    int (*read_file)();
-    int (*write_file)();
-
-    int (*setacl)();
+    int (*fs_create)(struct nexus_volume * volume,
+		     char                * path,
+		     nexus_dirent_type_t   type,
+		     struct nexus_stat   * stat,
+		     void                * priv_data);
     
 };
 

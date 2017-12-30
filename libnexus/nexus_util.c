@@ -31,7 +31,7 @@ nexus_print_backtrace()
     sym_cnt  = backtrace(backtrace_buffer, BACKTRACE_SIZE);
     sym_strs = backtrace_symbols(backtrace_buffer, sym_cnt);
 
-    log_error("Nexus Backtrace:\n");
+    log_error("Nexus Backtrace: (sym_cnt = %d)\n", sym_cnt);
     
     if (sym_strs == NULL) {
 	/* Failed to translate symbols, print out the raw addresses */
@@ -45,8 +45,10 @@ nexus_print_backtrace()
     } else {
 
 	for (i = 0; i < sym_cnt; i++) {
-	    log_error("\t(%p) %s\n", backtrace_buffer[i], sym_strs[i]); 
+	    log_error("\t%s\n",sym_strs[i]); 
 	}
+
+	nexus_free(sym_strs);
     }
     
     return;

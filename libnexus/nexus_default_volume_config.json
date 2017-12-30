@@ -1,12 +1,12 @@
 {
     "metadata_store" : {
         "name" : "FLAT",
-        "root_path" : "./.metadata"
+        "root_path" : "./.nexus_metadata"
     },
     
     "data_store" : {
         "name" : "FLAT",
-        "root_path" : "./.data"
+        "root_path" : "./.nexus_data"
     },
     
     "backend" : {

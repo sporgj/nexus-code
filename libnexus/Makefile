@@ -18,6 +18,7 @@ objs :=	nexus_main.o \
 	nexus_backend.o \
 	nexus_config.o \
 	nexus_datastore.o \
+	nexus_fs.o \
 	nexus_hashtable.o \
 	nexus_user_data.o \
 	nexus_binaries.o \
