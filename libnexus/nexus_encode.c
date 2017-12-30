@@ -41,14 +41,14 @@ nexus_alt64_decode(char      * alt64_str,
 
     
     if (alt64_str == 0) {
-	log_error("Error: Could not parse empty String");
+	log_error("Error: Could not parse empty String\n");
         return -1;
     }
 
     len = strlen(alt64_str);
     
     if (len % 4) {
-        log_error("Invalid Alt64 Length");
+        log_error("Invalid Alt64 Length\n");
         return -1;
     }
    
@@ -183,24 +183,24 @@ nexus_base64_decode(char      * base64_str,
 
     
     if (base64_str == 0) {
-	log_error("Error: Could not parse empty String");
+	log_error("Error: Could not parse empty String\n");
         return -1;
     }
-
+    
     len = strlen(base64_str);
 
     if (len % 4) {
-        log_error("Invalid Base64 Length");
+        log_error("Invalid Base64 Length\n");
         return -1;
     }
    
     num_chunks = len / 4;
 
     if (index(base64_str, '=')) {
-        padding = (base64_str + len) - index(base64_str, '.');
+        padding = (base64_str + len) - index(base64_str, '=');
     }
 
-    out_len = (num_chunks * 3) + padding;
+    out_len = (num_chunks * 3) - padding;
     out_buf = (uint8_t *)calloc(1, out_len);
 
     for (i = 0; i < num_chunks; i++) {

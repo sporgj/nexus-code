@@ -89,8 +89,8 @@ create_file_main(int argc, char ** argv)
     char * volume_path  = NULL;
     char * file_path    = NULL;
 
-    int used_opts = 0;
-    int ret       = 0;
+    int    used_opts    = 0;
+    int    ret          = 0;
 
     
     used_opts = __parse_nexus_options(argc, argv);
@@ -103,7 +103,7 @@ create_file_main(int argc, char ** argv)
 		
     /* At this point we should just have the volume path in ARGV */
     
-    if (argc - used_opts != 2) {
+    if ((argc - used_opts) != 3) {
 	create_file_usage();
 	return -1;
     }

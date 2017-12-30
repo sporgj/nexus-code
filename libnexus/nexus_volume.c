@@ -433,7 +433,7 @@ nexus_mount_volume(char * volume_path)
     {
 	char   * volume_id_str  = NULL;
 
-	ret = nexus_json_get_string(vol_cfg, "volume_id", &volume_id_str);
+	ret = nexus_json_get_string(vol_cfg, "volume_uuid", &volume_id_str);
 	
 	if (ret == -1) {
 	    log_error("Invalid volume configuration (missing volume_id)\n");
@@ -556,9 +556,14 @@ nexus_mount_volume(char * volume_path)
     {
 	char * supernode_str  = NULL;
 
-	ret = nexus_json_get_string(vol_cfg, "supernode_id", &supernode_str);
+	ret = nexus_json_get_string(vol_cfg, "supernode_uuid", &supernode_str);
+
+	if (ret == -1) {
+	    log_error("Invalid volume configuration. Missing Supernode UUID\n");
+	    goto err;
+	}
 	
-	log_debug("Supernode_ID=%s\n", supernode_str);
+	log_debug("Supernode_UUID=%s\n", supernode_str);
 	
 	// Generate UUID from string
 	nexus_uuid_from_alt64(&(volume->supernode_uuid), supernode_str);

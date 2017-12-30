@@ -70,7 +70,7 @@ cscope:
 
 
 clean:
-	rm -f $(wildcard *.o *.a *.so) cscope.* nexus_enclave_u.*
+	rm -f $(wildcard *.o *.a) cscope.* 
 
 
 .PHONY: clean 

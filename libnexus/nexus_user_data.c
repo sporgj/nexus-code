@@ -221,7 +221,8 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
     nexus_json_obj_t key_json = __get_volume_key_list();
 
     char * uuid_alt64 = NULL;
-    char * key_str  = NULL;
+    char * key_str    = NULL;
+    char * type_str   = NULL;
     
     int ret = 0;
 
@@ -246,15 +247,17 @@ nexus_add_volume_key(struct nexus_uuid * vol_uuid,
 
 
     uuid_alt64 = nexus_uuid_to_alt64(vol_uuid);
-    key_str     = nexus_key_to_str(key);
-
+    key_str    = nexus_key_to_str(key);
+    type_str   = nexus_key_type_to_str(key->type);
+    
     if ( (uuid_alt64 == NULL) ||
-	 (key_str  == NULL) ) {
+	 (key_str    == NULL) ) {
 
 	goto err;
     }
     
     ret |= nexus_json_add_string(new_key, "uuid", uuid_alt64);
+    ret |= nexus_json_add_string(new_key, "type", type_str);
     ret |= nexus_json_add_string(new_key, "key",  key_str);
 
     if (ret != 0) {

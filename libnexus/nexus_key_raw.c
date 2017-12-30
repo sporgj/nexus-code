@@ -107,10 +107,6 @@ __raw_key_to_str(struct nexus_key * key)
 }
 
 
-/* This is nasty....
- *  We need to detect the encoding somehow... 
- */
-
 static int
 __raw_key_from_str(struct nexus_key * key,
 		   char             * key_str)
@@ -119,7 +115,7 @@ __raw_key_from_str(struct nexus_key * key,
     uint32_t dec_len = 0;
 
     int ret = 0;
-    
+
     ret = nexus_base64_decode(key_str, (uint8_t **)&(key->key), &dec_len);
 
     if (ret == -1) {

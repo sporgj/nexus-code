@@ -230,6 +230,8 @@ __nexus_key_from_str(struct nexus_key * key,
 {
     int ret = 0;
 
+    key->type = key_type;
+
     switch (key_type) {
 	case NEXUS_MBEDTLS_PUB_KEY:
 	    ret = __mbedtls_pub_key_from_str(key, key_str);
@@ -260,7 +262,6 @@ nexus_key_from_str(nexus_key_type_t   key_type,
     int ret = 0;
 
     key       = nexus_malloc(sizeof(struct nexus_key));    
-    key->type = key_type;
     
     ret       = __nexus_key_from_str(key, key_type, key_str);
     
