@@ -53,6 +53,8 @@ trusted_objs := \
 
 objs := nexus_enclave_t.o \
 	$(trusted_objs) \
+	crypto_buffer.o \
+	raw_buffer.o \
 	crypto.o \
 	dirnode.o \
 	supernode.o \

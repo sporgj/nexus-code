@@ -31,9 +31,9 @@ ecall_init_enclave(void * backend_info)
 }
 
 int
-ecall_init_volume(struct nexus_raw_key  * user_pubkey_in,
-                  struct nexus_uuid     * supernode_uuid_out,
-                  struct nexus_raw_key ** p_volumekey_out)
+ecall_init_volume(struct nexus_key   * user_pubkey_in,
+                  struct nexus_uuid  * supernode_uuid_out,
+                  struct nexus_key  ** p_volumekey_out)
 {
     struct supernode * supernode = NULL;
     struct dirnode *   dirnode   = NULL;

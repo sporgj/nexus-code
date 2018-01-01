@@ -24,19 +24,19 @@ enclave {
          */
         public int ecall_init_volume
         (
-            [user_check] struct nexus_raw_key  * user_pubkey_in,
-            [user_check] struct nexus_uuid     * supernode_uuid_out,
-            [user_check] struct nexus_raw_key ** p_volumekey_out
+            [user_check] struct nexus_key   * user_pubkey_in,
+            [user_check] struct nexus_uuid  * supernode_uuid_out,
+            [user_check] struct nexus_key  ** p_volumekey_out
         );
     };
 
     untrusted {
 
-        int ocall_metadata_get
+        struct crypto_buffer *
+        ocall_metadata_get
         (
                     [in] struct nexus_uuid        * uuid,
             [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-            [user_check] struct nexus_raw_buffer ** p_raw_buffer_untrusted,
             [user_check] void                     * backend_info
         );
 
@@ -44,7 +44,7 @@ enclave {
         (
                     [in] struct nexus_uuid        * uuid,
             [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-            [user_check] struct nexus_raw_buffer  * raw_buffer_untrusted,
+                    [in] struct crypto_buffer     * crypto_buffer,
             [user_check] void                     * backend_info
         );
 

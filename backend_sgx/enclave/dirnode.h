@@ -7,11 +7,15 @@
  */
 #pragma once
 
-#include "nexus_uuid.h"
+#include <nexus_uuid.h>
+#include "sgx_backend_common.h"
 
 struct dirnode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
+
+    uint32_t dir_count; // number of files & subdirs
+    uint32_t dirbuf_size;
 };
 
 
@@ -31,7 +35,9 @@ dirnode_create(struct nexus_uuid * root_uuid);
  * @return 0 on success
  */
 int
-dirnode_store(struct dirnode * dirnode);
+dirnode_store(struct dirnode         * dirnode,
+              struct nexus_uuid_path * uuid_path,
+              crypto_mac_t           * mac);
 
 void
 dirnode_free(struct dirnode * dirnode);

@@ -64,7 +64,7 @@ supernode_create(struct nexus_raw_key * user_pubkey)
 
         nexus_uuid_copy(&root_dirnode->my_uuid, &root_dirnode->root_uuid);
 
-        ret = dirnode_store(root_dirnode);
+        ret = dirnode_store(root_dirnode, NULL, NULL);
 
         dirnode_free(root_dirnode);
 

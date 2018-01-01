@@ -16,6 +16,9 @@
 
 #include "nexus_enclave_t.h"
 
+#include "crypto_buffer.h"
+#include "raw_buffer.h"
+
 #include "crypto.h"
 #include "supernode.h"
 #include "volume_usertable.h"
