@@ -46,6 +46,9 @@ SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 crypto_lib := mbedtls/library/libmbedcrypto.a
 
 nexus_trusted_objs := \
+	nexus_util.o \
+	nexus_key.o \
+	nexus_encode.o \
 	nexus_uuid.o
 
 trusted_objs := \
@@ -54,12 +57,14 @@ trusted_objs := \
 objs := nexus_enclave_t.o \
 	$(trusted_objs) \
 	crypto_buffer.o \
+	sealed_buffer.o \
 	raw_buffer.o \
 	crypto.o \
 	dirnode.o \
 	supernode.o \
-	volume_usertable.o \
+	usertable.o \
 	metadata.o \
+	volume.o \
 	main.o 
 
 

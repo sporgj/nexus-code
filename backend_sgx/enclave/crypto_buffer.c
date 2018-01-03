@@ -5,13 +5,7 @@ crypto_buffer_alloc(void * untrusted_addr, size_t size)
 {
     struct crypto_buffer * crypto_buffer = NULL;
 
-    crypto_buffer = (struct crypto_buffer *)
-                            calloc(1, sizeof(struct crypto_buffer));
-
-    if (crypto_buffer == NULL) {
-        ocall_debug("allocation error");
-        return NULL;
-    }
+    crypto_buffer = nexus_malloc(sizeof(struct crypto_buffer));
 
     crypto_buffer->untrusted_addr = untrusted_addr;
     crypto_buffer->size           = size;
@@ -87,11 +81,7 @@ crypto_buffer_read(struct crypto_buffer * crypto_buffer, crypto_mac_t * mac)
 
 
     // allocate buffer and decrypt the contents
-    decrypted_buffer = (uint8_t *)calloc(1, metadata_header.info.buffer_size);
-    if (!decrypted_buffer) {
-        ocall_debug("allocation error");
-        goto out;
-    }
+    decrypted_buffer = nexus_malloc(metadata_header.info.buffer_size);
 
     ret = crypto_decrypt(&metadata_header.crypto_context,
                          metadata_header.info.buffer_size,

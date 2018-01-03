@@ -6,14 +6,10 @@ dirnode_create(struct nexus_uuid * root_uuid)
 {
     struct dirnode * dirnode = NULL;
 
-    dirnode = (struct dirnode *)calloc(1, sizeof(struct dirnode));
-    if (dirnode == NULL) {
-        ocall_debug("allocation error");
-        return NULL;
-    }
+    dirnode = nexus_malloc(sizeof(struct dirnode));
 
     nexus_uuid_gen(&dirnode->my_uuid);
-    nexus_uuid_copy(&dirnode->root_uuid, root_uuid);
+    nexus_uuid_copy(root_uuid, &dirnode->root_uuid);
 
 
     return dirnode;
@@ -30,6 +26,7 @@ dirnode_serialize(struct dirnode * dirnode, size_t * p_size)
 int
 dirnode_store(struct dirnode         * dirnode,
               struct nexus_uuid_path * uuid_path,
+              struct nexus_key       * volumekey,
               crypto_mac_t           * mac)
 {
     struct crypto_buffer * crypto_buffer = NULL;

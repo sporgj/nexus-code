@@ -37,6 +37,7 @@ dirnode_create(struct nexus_uuid * root_uuid);
 int
 dirnode_store(struct dirnode         * dirnode,
               struct nexus_uuid_path * uuid_path,
+              struct nexus_key       * volumekey,
               crypto_mac_t           * mac);
 
 void

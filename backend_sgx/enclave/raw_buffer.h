@@ -1,0 +1,42 @@
+#pragma once
+
+#include <stdint.h>
+
+#include "sgx_backend_common.h"
+
+/**
+ * allocates a raw_buffer structure in untrusted memory and copies content
+ * of trusted buffer
+ * @param size
+ */
+struct raw_buffer *
+raw_buffer_write(void * trusted_buffer, size_t size);
+
+/**
+ * Initializes a raw_buffer
+ * @param raw_buffer
+ * @param untrusted_addr
+ * @param size
+ *
+ * @return a new raw_buffer
+ */
+
+void
+raw_buffer_init(struct raw_buffer * raw_buffer,
+                void              * untrusted_addr,
+                size_t              size);
+
+/**
+ * Returns the pointer to the untrusted ptr
+ * @param raw_buffer
+ */
+void *
+raw_buffer_get(struct raw_buffer * raw_buffer);
+
+/**
+ * Copies the content of the buffer into the enclave and returns buffer
+ * @param raw_buffer
+ * @return NULL
+ */
+void *
+raw_buffer_read_trusted(struct raw_buffer * raw_buffer);

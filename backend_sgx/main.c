@@ -4,6 +4,8 @@
 
 #include "internal.h"
 
+#include <nexus_user_data.h>
+
 #define DEFAULT_ENCLAVE_PATH "nexus_enclave.signed.so"
 
 static int
@@ -78,40 +80,80 @@ sgx_backend_init()
 static int
 sgx_backend_init_volume(struct nexus_volume * volume, void * priv_data)
 {
-#if 0
-    struct sgx_backend_info * sgx_backend = NULL;
 
-    struct nexus_uuid supernode_uuid;
+    char * public_key_str = NULL;
 
-    struct nexus_raw_key * volumekey_sealed = NULL;
+    struct sealed_buffer * sealed_volumekey = NULL;
 
-    int err = -1;
     int ret = -1;
 
 
-    sgx_backend = (struct sgx_backend_info *)priv_data;
+    // derive the public key string
+    {
+        struct nexus_key  * user_prv_key = NULL;
+        struct nexus_key  * user_pub_key = NULL;
+
+        user_prv_key = nexus_get_user_key();
+
+        if (user_prv_key == NULL) {
+            log_error("Could not retrieve user key\n");
+            return -1;
+        }
+
+        user_pub_key = nexus_derive_key(NEXUS_MBEDTLS_PUB_KEY, user_prv_key);
+
+        nexus_free_key(user_prv_key);
+
+
+        if (user_pub_key == NULL) {
+            log_error("Could not derive user public key\n");
+            goto out;
+        }
+
+        public_key_str = nexus_key_to_str(user_pub_key);
+
+        nexus_free_key(user_pub_key);
+    }
 
 
     // call the enclave
+    {
+        struct sgx_backend_info * sgx_backend = NULL;
+
+        struct raw_buffer user_pubkey_rawbuf = {
+            .size           = strlen(public_key_str),
+            .untrusted_addr = public_key_str
+        };
+
+
+        sgx_backend = (struct sgx_backend_info *)priv_data;
+
+        int err = ecall_create_volume(sgx_backend->enclave_id,
+                                      &ret,
+                                      &user_pubkey_rawbuf,
+                                      &volume->supernode_uuid,
+                                      &sealed_volumekey);
+
+        if (err || ret) {
+            log_error("ecall_create_volume() FAILED\n");
+            goto out;
+        }
+    }
 
 
     ret = 0;
 out:
-    if (err || ret) {
-        if (volumekey_sealed) {
-            nexus_free(volumekey_sealed);
-        }
+    if (public_key_str) {
+        nexus_free(public_key_str);
     }
 
     return ret;
-#endif
-    return -1;
 }
 
 static struct nexus_backend_impl sgx_backend_impl = {
     .name            = "SGX",
     .init            = sgx_backend_init,
-    .init_volume     = sgx_backend_init_volume
+    .volume_init     = sgx_backend_init_volume
 };
 
 

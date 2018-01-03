@@ -12,11 +12,15 @@
 #include "nexus_uuid.h"
 #include "nexus_key.h"
 
+#include "sgx_backend_common.h"
+
 
 struct supernode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
     struct nexus_uuid user_list_uuid;
+
+    crypto_mac_t user_list_mac;
 
     uint8_t owner_pubkey[CRYPTO_HASH_BYTES];
 };
@@ -25,10 +29,11 @@ struct supernode {
 /**
  * Instantiates a new supernode and generates both its uuid and the root uuid
  * @param user_pubkey is the user's public key
+ * @param volumekey
  * @return NULL on failure
  */
 struct supernode *
-supernode_create(struct nexus_raw_key * user_pubkey);
+supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey);
 
 /**
  * Writes the supernode to the backing store
@@ -36,7 +41,10 @@ supernode_create(struct nexus_raw_key * user_pubkey);
  * @return 0 on success
  */
 int
-supernode_store(struct supernode * supernode);
+supernode_store(struct supernode       * supernode,
+                struct nexus_uuid_path * uuid_path,
+                struct nexus_key       * volumekey,
+                crypto_mac_t           * mac);
 
 void
 supernode_free(struct supernode * supernode);

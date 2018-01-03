@@ -19,14 +19,16 @@ enclave {
 
         /**
          * Creates a new volume
+         *
+         * @param user_pubkey_in
          * @param supernode_uuid_out
-         * @param volumekey_out
+         * @param sealed_volumekey_out
          */
-        public int ecall_init_volume
+        public int ecall_create_volume
         (
-            [user_check] struct nexus_key   * user_pubkey_in,
-            [user_check] struct nexus_uuid  * supernode_uuid_out,
-            [user_check] struct nexus_key  ** p_volumekey_out
+            [user_check] struct raw_buffer     * user_pubkey_in,
+            [user_check] struct nexus_uuid     * supernode_uuid_out,
+            [user_check] struct sealed_buffer ** sealed_volumekey_out
         );
     };
 

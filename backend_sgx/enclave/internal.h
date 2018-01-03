@@ -17,15 +17,18 @@
 #include "nexus_enclave_t.h"
 
 #include "crypto_buffer.h"
+#include "sealed_buffer.h"
 #include "raw_buffer.h"
 
 #include "crypto.h"
 #include "supernode.h"
-#include "volume_usertable.h"
+#include "usertable.h"
 #include "dirnode.h"
 #include "metadata.h"
 
 #include "nexus_trusted/nexus_uuid.h"
+#include "nexus_trusted/nexus_util.h"
+#include "nexus_trusted/nexus_key.h"
 
 #define ocall_debug(str) \
     ocall_print("enclave> " str "\n")
