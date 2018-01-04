@@ -10,9 +10,9 @@
     },
     
     "backend" : {
-        "name" : "CLEARTEXT"
+        "name" : "CLEARTEXT",
         "config" : { }
-    },
+    }
 
 }
 

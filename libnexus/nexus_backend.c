@@ -113,6 +113,12 @@ nexus_backend_launch(char             * name,
     backend->impl      = impl;
     backend->priv_data = impl->init(backend_cfg);
 
+    if (backend->priv_data == NULL) {
+	log_error("backend_init FAILED (%s)\n", name);
+	nexus_free(backend);
+	return NULL;
+    }
+
     return backend;
 }
 

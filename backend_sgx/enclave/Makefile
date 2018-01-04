@@ -109,6 +109,17 @@ nexus_enclave.signed.so: nexus_enclave.so $(private_key)
 		-enclave $< -out $@ -config config.xml)
 
 
+define cscope-all-sources
+	( find . $(RCS_FIND_IGNORE) \
+		\( -name '*.[chS]' -o -name '*.cc' \) -print; \
+	)
+endef
+
+cscope:
+	$(call build,FILELIST,(echo \-k; echo \-q; $(cscope-all-sources)) > cscope.files)
+	$(call build,MAKE,cscope -b)
+
+
 clean:
 	rm -rf *.a *.o *.so nexus_enclave_t.* nexus_trusted/*.o
 

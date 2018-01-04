@@ -80,8 +80,13 @@ flat_create(nexus_json_obj_t cfg)
     ret = mkdir(root_path, 0770);
 
     if (ret == -1) {
-	log_error("Could not create FLAT datastore directory (%s)\n", root_path);
-	return NULL;
+	if (errno == EEXIST) {
+	    printf(". WARNING: directory (%s) already exists\n", root_path);
+	} else {
+	    log_error("Could not create FLAT datastore directory (%s)\n", root_path);
+	    printf("%s\n", strerror(errno));
+	    return NULL;
+	}
     }
     
     datastore = calloc(1, sizeof(struct flat_datastore));

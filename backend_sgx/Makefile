@@ -57,11 +57,12 @@ build = \
                 $2; \
         fi
 
+static_lib := backend_sgx.a
 
-all: backend_sgx.so
+all: $(static_lib)
 	make -C enclave DEBUG=$(DEBUG)
-	@cp backend_sgx.so ../build
-	@cp enclave/nexus_enclave.signed.so ..
+	@cp $(static_lib) ../build
+	@cp enclave/nexus_enclave.signed.so ../build
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -73,8 +74,8 @@ nexus_enclave_u.c: $(edl_src)
 	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --untrusted --untrusted-dir ./ $(edl_src)
 
 
-backend_sgx.so:  $(objs) 
-	$(call build,LD,$(CC) $(LDFLAGS) $(objs) $(libs) -shared -o $@)
+$(static_lib):  $(objs) 
+	$(call build,AR,$(AR) rcs $@ $(objs))
 
 
 

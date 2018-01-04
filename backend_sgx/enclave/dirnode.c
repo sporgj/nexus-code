@@ -55,14 +55,14 @@ dirnode_store(struct dirnode         * dirnode,
                               serialized_buflen,
                               mac);
 
-    if (!ret) {
+    if (ret) {
         ocall_debug("crypto_buffer_write");
         goto out;
     }
 
     // write it to the datastore
     ret = metadata_write(&dirnode->my_uuid, uuid_path, crypto_buffer);
-    if (!ret) {
+    if (ret) {
         ocall_debug("metadata_write failed");
     }
 

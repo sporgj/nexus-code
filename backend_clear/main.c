@@ -8,6 +8,7 @@
 
 #include <nexus_backend.h>
 #include <nexus_user_data.h>
+#include <nexus_util.h>
 #include <nexus_volume.h>
 
 #include <nexus_log.h>
@@ -27,7 +28,7 @@ init(nexus_json_obj_t backend_cfg)
 
     printf("Initializing Cleartext backend\n");
 
-    return NULL;
+    return nexus_malloc(sizeof(struct backend_state));
 }
 
 static int

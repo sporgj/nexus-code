@@ -6,8 +6,8 @@ build_path := $(nexus_home)/build/
 nexus_frontends :=	shell
 #			frontend_afs \
 
-nexus_backends  :=     	backend_clear \
-#			backend_sgx
+nexus_backends  :=     	backend_sgx \
+			backend_clear
 
 nexus_datastores :=     datastore_flat 
 

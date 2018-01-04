@@ -22,7 +22,7 @@ init_enclave(const char * enclave_fpath, sgx_enclave_id_t * p_enclave_id)
         enclave_fpath, SGX_DEBUG_FLAG, &token, &updated, p_enclave_id, NULL);
 
     if (ret != SGX_SUCCESS) {
-        log_error("Could not open enclave: ret=%#x", ret);
+        log_error("Could not open enclave(%s): ret=%#x\n", enclave_fpath, ret);
         return -1;
     }
 
@@ -43,28 +43,38 @@ exit_enclave(sgx_enclave_id_t enclave_id)
 
 
 static void *
-sgx_backend_init()
+sgx_backend_init(nexus_json_obj_t backend_cfg)
 {
     struct sgx_backend_info * sgx_backend = NULL;
 
-    sgx_backend = nexus_malloc(sizeof(struct sgx_backend_info));
+    char * enclave_path = NULL;
+
+    int ret = -1;
 
 
-    if (init_enclave(DEFAULT_ENCLAVE_PATH, &sgx_backend->enclave_id)) {
-        log_error("nexus_init_enclave FAILED");
-        nexus_free(sgx_backend);
+    ret = nexus_json_get_string(backend_cfg, "enclave_path", &enclave_path);
+    if (ret) {
+        log_error("sgx_backend: no 'enclave_path' in config\n");
         return NULL;
     }
 
 
+    sgx_backend = nexus_malloc(sizeof(struct sgx_backend_info));
+
+    if (init_enclave(enclave_path, &sgx_backend->enclave_id)) {
+        nexus_free(sgx_backend);
+
+        log_error("nexus_init_enclave FAILED\n");
+        return NULL;
+    }
+
     {
-        int ret = -1;
         int err = -1;
 
         err = ecall_init_enclave(sgx_backend->enclave_id, &ret, sgx_backend);
 
         if (err || ret) {
-            log_error("ecall_init_enclave() FAILED");
+            log_error("ecall_init_enclave() FAILED\n");
 
             exit_enclave(sgx_backend->enclave_id);
 
@@ -78,7 +88,7 @@ sgx_backend_init()
 }
 
 static int
-sgx_backend_init_volume(struct nexus_volume * volume, void * priv_data)
+sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
 
     char * public_key_str = NULL;
@@ -153,7 +163,7 @@ out:
 static struct nexus_backend_impl sgx_backend_impl = {
     .name            = "SGX",
     .init            = sgx_backend_init,
-    .volume_init     = sgx_backend_init_volume
+    .volume_init     = sgx_backend_create_volume
 };
 
 

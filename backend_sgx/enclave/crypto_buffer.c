@@ -18,7 +18,7 @@ crypto_buffer_new(size_t size)
 {
     struct crypto_buffer * crypto_buffer = NULL;
 
-    void * untrusted_addr;
+    void * untrusted_addr = NULL;
 
     int err = -1;
     int ret = -1;
@@ -26,7 +26,7 @@ crypto_buffer_new(size_t size)
     err = ocall_calloc(&untrusted_addr,
                        sizeof(struct metadata_header) + size);
 
-    if (err || ret) {
+    if (err) {
         return NULL;
     }
 
@@ -131,7 +131,7 @@ crypto_buffer_write(struct crypto_buffer * crypto_buffer,
     // 
     // TODO how to keep track of the version ?
     metadata_header.info.buffer_size = serialized_buflen;
-    nexus_uuid_copy(&metadata_header.info.my_uuid, uuid);
+    nexus_uuid_copy(uuid, &metadata_header.info.my_uuid);
 
     ret = crypto_encrypt(&metadata_header.crypto_context,
                          serialized_buflen,
@@ -141,7 +141,7 @@ crypto_buffer_write(struct crypto_buffer * crypto_buffer,
                          (uint8_t *)&metadata_header.info,
                          sizeof(struct metadata_info));
 
-    if (!ret) {
+    if (ret) {
         ocall_debug("crypto_encrypt() FAILED");
         return -1;
     }
