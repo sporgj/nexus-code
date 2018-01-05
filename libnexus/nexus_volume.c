@@ -104,13 +104,6 @@ nexus_create_volume(char * volume_path,
 	nexus_free(uuid_alt64);
     }
 
-    ret = chdir(volume_path);
-
-    if (ret == -1) {
-	log_error("Could not chdir to (%s)\n", volume_path);
-	goto err;
-    }
-
     /* Setup Data store */
     {
 	void             * data_store      = NULL;
