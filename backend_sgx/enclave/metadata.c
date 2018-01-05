@@ -24,17 +24,16 @@ metadata_open(struct nexus_uuid       * uuid,
 
     struct nexus_uuid_path  * untrusted_path = NULL;
 
-    int err = -1;
     int ret = -1;
 
 
     // invoke the ocall to get metadata contents
-    err = ocall_metadata_get(&crypto_buffer,
+    ret = ocall_metadata_get(&crypto_buffer,
                              uuid,
                              untrusted_path,
                              global_backend_ext);
 
-    if (err || ret) {
+    if (ret || crypto_buffer == NULL) {
         ocall_debug("ocall_metadata_get FAILED");
         goto out;
     }
@@ -62,13 +61,20 @@ metadata_write(struct nexus_uuid      * uuid,
                struct nexus_uuid_path * uuid_path,
                struct crypto_buffer   * crypto_buffer)
 {
+    struct nexus_uuid_path * uuid_path_untrusted = NULL;
+
     int err = -1;
     int ret = -1;
 
-    // TODO
 
-    ret = 0;
-out:
-    return ret;
+    err = ocall_metadata_set(
+        &ret, uuid, uuid_path_untrusted, crypto_buffer, global_backend_ext);
+
+    if (err || ret) {
+        ocall_debug("ocall_metadata_set FAILED");
+        return -1;
+    }
+
+    return 0;
 }
 

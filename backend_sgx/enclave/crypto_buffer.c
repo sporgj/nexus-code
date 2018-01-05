@@ -21,7 +21,7 @@ crypto_buffer_new(size_t size)
     void * untrusted_addr = NULL;
 
     int err = -1;
-    int ret = -1;
+
 
     err = ocall_calloc(&untrusted_addr,
                        sizeof(struct metadata_header) + size);
