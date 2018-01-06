@@ -22,10 +22,9 @@ static inline int
 __raw_key_bits(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_RAW_256_KEY:        return 256;
-	case NEXUS_RAW_128_KEY:        return 128;
-	case NEXUS_RAW_GENERIC_KEY:    return (key->raw_bytes << 3);
-	default:                       return -1;
+	case NEXUS_RAW_256_KEY:    return 256;
+	case NEXUS_RAW_128_KEY:    return 128;
+	default:                   return -1;
     }
     
     return -1;
@@ -35,10 +34,9 @@ static inline int
 __raw_key_bytes(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_RAW_256_KEY:        return (256 / 8);
-	case NEXUS_RAW_128_KEY:        return (128 / 8);
-	case NEXUS_RAW_GENERIC_KEY:    return key->raw_bytes;
-	default:                       return -1;
+	case NEXUS_RAW_256_KEY:    return (256 / 8);
+	case NEXUS_RAW_128_KEY:    return (128 / 8);
+	default:                   return -1;
     }
     
     return -1;
@@ -88,7 +86,6 @@ __raw_copy_key(struct nexus_key * src_key,
     assert(key_len > 0);
 
     dst_key->key = nexus_malloc(key_len);
-    dst_key->raw_bytes = src_key->raw_bytes;
 
     memcpy(dst_key->key, src_key->key, key_len);
 

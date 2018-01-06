@@ -155,36 +155,10 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     }
 
 
-    // assign the volumekey
-    {
-        struct nexus_key * vol_key = NULL;
-
-        vol_key = nexus_alloc_generic_key(sealed_volumekey,
-                                          sealed_volumekey->size);
-
-        if (vol_key == NULL) {
-            ret = -1;
-
-            log_error("allocating generic key FAILED\n");
-            goto out;
-        }
-
-
-        nexus_copy_key(vol_key, &volume->vol_key);
-        nexus_free_key(vol_key); // deletes sealed_volumekey
-    }
-
-
     ret = 0;
 out:
     if (public_key_str) {
         nexus_free(public_key_str);
-    }
-
-    if (ret) {
-        if (sealed_volumekey) {
-            nexus_free(sealed_volumekey);
-        }
     }
 
     return ret;
