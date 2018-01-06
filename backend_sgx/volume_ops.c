@@ -68,6 +68,7 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     }
 
 
+#if 0
     // assign the volumekey
     {
         struct nexus_key * vol_key = NULL;
@@ -90,7 +91,7 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
         nexus_copy_key(vol_key, &volume->vol_key);
         nexus_free_key(vol_key);
     }
-
+#endif
 
     ret = 0;
 out:

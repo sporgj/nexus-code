@@ -17,40 +17,41 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/error.h>
 
-struct nexus_raw_key {
-    size_t  size;
-    uint8_t data[0];
-};
 
+static inline int
+__raw_key_bits(struct nexus_key * key)
+{
+    switch (key->type) {
+	case NEXUS_RAW_256_KEY:    return 256;
+	case NEXUS_RAW_128_KEY:    return 128;
+	default:                   return -1;
+    }
+}
 
 static inline int
 __raw_key_bytes(struct nexus_key * key)
 {
-    return ((struct nexus_raw_key *)key->key)->size + sizeof(struct nexus_raw_key);
+    switch (key->type) {
+	case NEXUS_RAW_256_KEY:    return (256 / 8);
+	case NEXUS_RAW_128_KEY:    return (128 / 8);
+	default:                   return -1;
+    }
+    
+    return -1;
 }
 
 static int
-__raw_create_key(struct nexus_key * key, size_t size)
+__raw_create_key(struct nexus_key * key)
 {
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context  entropy;
-
-    struct nexus_raw_key * raw_key = NULL;
     
-    uint32_t key_len = size;
+    uint32_t key_len = __raw_key_bytes(key);
     int      ret     = 0;
     
     assert(key_len > 0);
     
-    raw_key = nexus_malloc(sizeof(struct nexus_raw_key) + key_len);
-    raw_key->size = key_len;
-
-    key->key = raw_key;
-
-
-    if (key_len == 0) {
-	return 0;
-    }
+    key->key = nexus_malloc(key_len);
 
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
@@ -62,7 +63,7 @@ __raw_create_key(struct nexus_key * key, size_t size)
 	return -1;
     }
     
-    ret = mbedtls_ctr_drbg_random(&ctr_drbg, (uint8_t *)(raw_key->data), key_len);
+    ret = mbedtls_ctr_drbg_random(&ctr_drbg, (uint8_t *)(key->key), key_len);
 
     if (ret != 0) {
 	log_error("Could not generate random key (key_len=%u) (ret = %d)\n", key_len, ret);
@@ -80,11 +81,6 @@ __raw_copy_key(struct nexus_key * src_key,
     uint32_t key_len = __raw_key_bytes(src_key);
     
     assert(key_len > 0);
-
-    // preallocated in create_key
-    if (dst_key->key != NULL) {
-	nexus_free(dst_key->key);
-    }
 
     dst_key->key = nexus_malloc(key_len);
 
