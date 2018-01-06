@@ -3,37 +3,25 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define CRYPTO_HASH_BYTES  32  // sha256
-
-#define CRYPTO_NONCE_BYTES 64
-
-
-// things to fit in the crypto context
-
-#define CRYPTO_EKEY_BYTES   16
-#define CRYPTO_EKEY_BITS    (CRYPTO_EKEY_BYTES << 3)
-#define CRYPTO_IV_BYTES     16
-#define CRYPTO_MAC_BYTES    16 // size of the GCM integrity tag
+#include <nexus_key.h>
+#include <nexus_mac.h>
 
 
-typedef struct {
-    uint8_t bytes[CRYPTO_EKEY_BYTES];
-} crypto_ekey_t;
-
-typedef struct {
-    uint8_t bytes[CRYPTO_IV_BYTES];
-} crypto_iv_t;
-
-typedef struct {
-    uint8_t bytes[CRYPTO_MAC_BYTES];
-} crypto_mac_t;
-
-
-struct crypto_context {
-    crypto_ekey_t ekey;
-    crypto_iv_t   iv;
-    crypto_mac_t  mac;
+struct nexus_crypto_ctx {
+    struct nexus_key key;
+    struct nexus_key iv;   /* Isn't this basically just like a key? Or do we need a separate 'struct nexus_iv'*/
+    struct nexus_mac mac;
 } __attribute__((packed));
+
+
+
+
+
+
+
+
+
+
 
 
 // deterministic encryption of a sensitive key using the keywrapping key

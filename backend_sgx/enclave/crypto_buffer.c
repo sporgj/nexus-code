@@ -1,155 +1,187 @@
 #include "internal.h"
 
-struct crypto_buffer *
-crypto_buffer_alloc(void * untrusted_addr, size_t size)
+
+
+
+/* Crypto buffer serialized format */
+/* 
+   uint32_t magic;   // This should be used to determine which crypto algo's we're using and what the size of the crypto_ctx is... 
+   crypto_ctx;       // Contains the sealed crypto information
+   uint32_t version; // Version of the data 
+   Data
+*/
+
+struct nexus_crypto_buf {    
+    struct nexus_crypto_ctx crypto_ctx;    
+    uint32_t                version;
+
+    size_t    size;
+    
+    uint8_t * untrusted_addr;
+    size_t    untrusted_size;
+
+    uint8_t * trusted_addr;
+
+};
+
+
+
+static int
+__get_header_len(uint32_t magic)
 {
-    struct crypto_buffer * crypto_buffer = NULL;
+    switch (magic) {
 
-    crypto_buffer = nexus_malloc(sizeof(struct crypto_buffer));
+	default:
+	    log_error("Invalid magic value\n");
+	    return -1;
+    }
 
-    crypto_buffer->untrusted_addr = untrusted_addr;
-    crypto_buffer->size           = size;
-
-    return crypto_buffer;
+    return -1;
 }
 
-struct crypto_buffer *
-crypto_buffer_new(size_t size)
+
+static int
+__parse_header(struct nexus_crypto_buf * buf)
 {
-    struct crypto_buffer * crypto_buffer = NULL;
-
-    void * untrusted_addr = NULL;
-
-    int err = -1;
-    int ret = -1;
-
-    err = ocall_calloc(&untrusted_addr,
-                       sizeof(struct metadata_header) + size);
-
-    if (err) {
-        return NULL;
+    uint32_t magic = 0;
+    
+    if (buf->untrusted_addr == NULL) {
+	log_error("Tried to parse header of nexus_crypto_buf with no untrusted_addr\n");
+	return -1;
     }
 
-    crypto_buffer = crypto_buffer_alloc(untrusted_addr, size);
-    if (crypto_buffer == NULL) {
-        ocall_free(untrusted_addr);
-        ocall_debug("allocating crypto_buffer failed");
+    magic = *(uint32_t *)(buf->untrusted_addr);
+    
+
+    /* Check magic against a version */
+    switch (magic) {
+
+	// case xxx:
+	// Deserialize the crypto context based on this value
+	
+	default:
+	    log_error("Invalid magic value in crypto buffer\n");
+	    return -1;
     }
 
-    return crypto_buffer;
+    return 0;
+}
+
+static int
+__serialize_header(struct nexus_crypto_buf * buf)
+{
+    /* Serialize the header to the start of the untrusted buffer */
+
+    return -1;
+}
+
+
+struct nexus_crypto_buf *
+nexus_crypto_buf_alloc(void   * untrusted_addr,
+		       size_t   size)
+{
+    struct nexus_crypto_buf * buf = NULL;
+
+    buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
+
+    buf->size           = size;
+    buf->untrusted_addr = untrusted_addr;
+    buf->truested_addr  = NULL;
+
+    return nexus_crypto_buf;
+}
+
+
+struct nexus_crypto_buf *
+nexus_crypto_buf_new(size_t size)
+{
+    struct nexus_crypto_buf * buf = NULL;
+
+    buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
+
+    buf->untrusted_addr = NULL;
+    buf->truested_addr  = NULL;
+    buf->size           = size;
+    
+    return buf;
 }
 
 void
-crypto_buffer_free(struct crypto_buffer * crypto_buffer)
+nexus_crypto_buf_free(struct nexus_crypto_buf * buf)
 {
-    if (!crypto_buffer) {
-        return;
+    assert(buf != NULL);
+    
+    if (buf->untrusted_addr) {
+	ocall_put(buf->untrusted_addr);
     }
 
-    ocall_free(crypto_buffer->untrusted_addr);
-
-    // as it stands, the crypto_buffer is either allocated inside the enclave
-    // or outside within ocall_metadata_get
-    //
-    if (sgx_is_within_enclave(crypto_buffer, sizeof(struct crypto_buffer))) {
-        free(crypto_buffer);
-    } else {
-        ocall_free(crypto_buffer);
+    if (buf->trusted_addr) {
+	nexus_free(buf->trusted_addr);
     }
+    
+    nexus_free(buf);
 }
 
 void *
-crypto_buffer_read(struct crypto_buffer * crypto_buffer, crypto_mac_t * mac)
+nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
+		     struct nexus_mac        * mac)
 {
-    uint8_t * decrypted_buffer = NULL;
-    uint8_t * encrypted_buffer = NULL;
 
-    struct metadata_header metadata_header = { 0 };
-
-    int ret = -1;
-
-
-    // copy in the the static data and set the encrypted_buffer_ptr 
-
-    memcpy(&metadata_header,
-           crypto_buffer->untrusted_addr,
-           sizeof(struct metadata_header));
-
-    encrypted_buffer
-        = crypto_buffer->untrusted_addr + sizeof(struct metadata_header);
+    /* If its already there, just return it */
+    if (buf->trusted_addr != NULL) {
+	return buf->trusted_addr;
+    }
+    
+    /* Allocate trusted memory */
+    buf->trusted_addr = nexus_malloc(buf->size);
+    
 
 
+    
+    /* Check if there is an untrusted buf we need to decrypt. If so, copy in and decrypt. */    
+    if (buf->untrusted_addr != NULL) {    
+	void * sealed_ctx     = buf->untrusted_addr;
 
-    // allocate buffer and decrypt the contents
-    decrypted_buffer = nexus_malloc(metadata_header.info.buffer_size);
+#define JRL_CRYPTO_CTX_SIZE (64) /* This needs to be determined dynamically */
 
-    ret = crypto_decrypt(&metadata_header.crypto_context,
-                         metadata_header.info.buffer_size,
-                         encrypted_buffer,
-                         decrypted_buffer,
-                         mac,
-                         (uint8_t *)&metadata_header.info,
-                         sizeof(struct metadata_info));
+	void * untrusted_data = buf->untrusted_addr + JRL_CRYPTO_CTX_SIZE;
 
-    if (ret) {
-        ocall_debug("crypto_decrypt FAILED");
-        goto out;
+	
+	uint8_t WTF_IS_AN_AAD;
+
+
+	/* Unseal the crypto_ctx */
+
+
+	/* Decrypt the buffer */
+
+	/* Check MAC ? */
+	
     }
 
-
-    ret = 0;
-out:
-    if (ret) {
-        if (decrypted_buffer) {
-            free(decrypted_buffer);
-        }
-
-        return NULL;
-    }
-
-    return decrypted_buffer;
+    return buf->trusted_addr;
+    
+err:
+    
+    nexus_free(buf->trusted_addr);
+    
+    return NULL;
 }
 
 int
-crypto_buffer_write(struct crypto_buffer * crypto_buffer,
-                    struct nexus_uuid    * uuid,
-                    uint8_t              * serialized_buffer,
-                    size_t                 serialized_buflen,
-                    crypto_mac_t         * mac)
+nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
+		     struct nexus_mac        * mac)
 {
-    struct metadata_header metadata_header = { 0 };
 
-    uint8_t * untrusted_dest_ptr = NULL;
-
-    int ret = -1;
-
-
-    untrusted_dest_ptr
-        = crypto_buffer->untrusted_addr + sizeof(struct metadata_header);
-
-    // initialize the header and perform the encryption
-    // 
-    // TODO how to keep track of the version ?
-    metadata_header.info.buffer_size = serialized_buflen;
-    nexus_uuid_copy(uuid, &metadata_header.info.my_uuid);
-
-    ret = crypto_encrypt(&metadata_header.crypto_context,
-                         serialized_buflen,
-                         serialized_buffer,
-                         untrusted_dest_ptr,
-                         mac,
-                         (uint8_t *)&metadata_header.info,
-                         sizeof(struct metadata_info));
-
-    if (ret) {
-        ocall_debug("crypto_encrypt() FAILED");
-        return -1;
+    if (buf->untrusted_addr == NULL) {
+	// Allocate untrusted buffer space (buf->size + header_len)
     }
 
-    // copy the metadata header
-    memcpy(crypto_buffer->untrusted_addr,
-           &metadata_header,
-           sizeof(struct metadata_header));
 
-    return 0;
+    __serialize_header(buf);
+
+    /* Encrypt trusted buffer to untrusted buffer after the header */
+    
+    
+    return -1;
 }
