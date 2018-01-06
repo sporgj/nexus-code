@@ -28,6 +28,8 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_print, (char* str));
 
 sgx_status_t ecall_init_enclave(sgx_enclave_id_t eid, int* retval, void* backend_info);
 sgx_status_t ecall_create_volume(sgx_enclave_id_t eid, int* retval, struct raw_buffer* user_pubkey_in, struct nexus_uuid* supernode_uuid_out, struct sealed_buffer** sealed_volumekey_out);
+sgx_status_t ecall_auth_request(sgx_enclave_id_t eid, int* retval, struct raw_buffer* user_pubkey_in, struct sealed_buffer* sealed_volkey_in, struct raw_buffer** nonce_challenge_out);
+sgx_status_t ecall_auth_response(sgx_enclave_id_t eid, int* retval, struct crypto_buffer* supernode_in, struct raw_buffer* signature_in);
 
 #ifdef __cplusplus
 }

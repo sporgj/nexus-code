@@ -13,6 +13,19 @@ typedef struct ms_ecall_create_volume_t {
 	struct sealed_buffer** ms_sealed_volumekey_out;
 } ms_ecall_create_volume_t;
 
+typedef struct ms_ecall_auth_request_t {
+	int ms_retval;
+	struct raw_buffer* ms_user_pubkey_in;
+	struct sealed_buffer* ms_sealed_volkey_in;
+	struct raw_buffer** ms_nonce_challenge_out;
+} ms_ecall_auth_request_t;
+
+typedef struct ms_ecall_auth_response_t {
+	int ms_retval;
+	struct crypto_buffer* ms_supernode_in;
+	struct raw_buffer* ms_signature_in;
+} ms_ecall_auth_response_t;
+
 typedef struct ms_ocall_metadata_get_t {
 	struct crypto_buffer* ms_retval;
 	struct nexus_uuid* ms_uuid;
@@ -145,6 +158,29 @@ sgx_status_t ecall_create_volume(sgx_enclave_id_t eid, int* retval, struct raw_b
 	ms.ms_supernode_uuid_out = supernode_uuid_out;
 	ms.ms_sealed_volumekey_out = sealed_volumekey_out;
 	status = sgx_ecall(eid, 1, &ocall_table_nexus_enclave, &ms);
+	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
+	return status;
+}
+
+sgx_status_t ecall_auth_request(sgx_enclave_id_t eid, int* retval, struct raw_buffer* user_pubkey_in, struct sealed_buffer* sealed_volkey_in, struct raw_buffer** nonce_challenge_out)
+{
+	sgx_status_t status;
+	ms_ecall_auth_request_t ms;
+	ms.ms_user_pubkey_in = user_pubkey_in;
+	ms.ms_sealed_volkey_in = sealed_volkey_in;
+	ms.ms_nonce_challenge_out = nonce_challenge_out;
+	status = sgx_ecall(eid, 2, &ocall_table_nexus_enclave, &ms);
+	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
+	return status;
+}
+
+sgx_status_t ecall_auth_response(sgx_enclave_id_t eid, int* retval, struct crypto_buffer* supernode_in, struct raw_buffer* signature_in)
+{
+	sgx_status_t status;
+	ms_ecall_auth_response_t ms;
+	ms.ms_supernode_in = supernode_in;
+	ms.ms_signature_in = signature_in;
+	status = sgx_ecall(eid, 3, &ocall_table_nexus_enclave, &ms);
 	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
 	return status;
 }

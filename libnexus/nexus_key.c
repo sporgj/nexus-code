@@ -26,7 +26,7 @@ nexus_free_key(struct nexus_key * key)
 
 	case NEXUS_RAW_128_KEY: 
 	case NEXUS_RAW_256_KEY: 
-	case NEXUS_RAW_GENERIC_KEY:
+	case NEXUS_RAW_SEALED_KEY:
 	    nexus_free(key->key);
 	    break;
 	case NEXUS_MBEDTLS_PUB_KEY:
@@ -39,21 +39,24 @@ nexus_free_key(struct nexus_key * key)
 
 }
 
-
-
 struct nexus_key *
-nexus_alloc_generic_key(void * key_data, size_t size)
+nexus_key_from_binary(nexus_key_type_t key_type, void * data, size_t size)
 {
-    struct nexus_key * key = NULL;
+    struct nexus_key * nexus_key = nexus_malloc(sizeof(struct nexus_key));
 
-    key = nexus_malloc(sizeof(struct nexus_key));
+    struct nexus_raw_key * raw_key = NULL;
 
-    key->type      = NEXUS_RAW_GENERIC_KEY;
-    key->key       = key_data;
-    key->raw_bytes = size;
+    raw_key = nexus_malloc(sizeof(struct nexus_raw_key) + size);
 
-    return key;
+    memcpy(raw_key->data, data, size);
+    raw_key->size = size;
+
+    nexus_key->key  = raw_key;
+    nexus_key->type = key_type;
+
+    return nexus_key;
 }
+
 
 int
 nexus_generate_key(struct nexus_key * key,
@@ -71,12 +74,14 @@ nexus_generate_key(struct nexus_key * key,
 	    log_error("Public keys can only be derived from pre-existing private keys <see nexus_derive_key()>\n");
 	    return -1;
 	case NEXUS_RAW_128_KEY:
-	case NEXUS_RAW_256_KEY:
-	    ret = __raw_create_key(key);
+	    ret = __raw_create_key(key, 16);
 	    break;
-	case NEXUS_RAW_GENERIC_KEY:
-	    log_error("Use nexus_alloc_generic_key()\n");
-	    return -1;
+	case NEXUS_RAW_256_KEY:
+	    ret = __raw_create_key(key, 32);
+	    break;
+	case NEXUS_RAW_SEALED_KEY:
+	    ret = __raw_create_key(key, 0);
+	    break;
 	default:
 	    log_error("Invalid key type: %d\n", key_type);
 	    return -1;
@@ -136,7 +141,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
 
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	case NEXUS_RAW_GENERIC_KEY:
+	case NEXUS_RAW_SEALED_KEY:
 	default:
 	    log_error("Invalid key type: %d\n", key_type);
 	    goto err;
@@ -193,7 +198,7 @@ nexus_copy_key(struct nexus_key * src_key,
     switch (src_key->type) {
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	case NEXUS_RAW_GENERIC_KEY:
+	case NEXUS_RAW_SEALED_KEY:
 	    ret = __raw_copy_key(src_key, dst_key);
 	    break;
 
@@ -226,7 +231,7 @@ nexus_key_to_str(struct nexus_key * key)
 	    break;
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	case NEXUS_RAW_GENERIC_KEY:
+	case NEXUS_RAW_SEALED_KEY:
 	    str = __raw_key_to_str(key);
 	    break;
 	default:
@@ -319,6 +324,7 @@ nexus_key_to_file(struct nexus_key * key,
 	    break;
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
+	case NEXUS_RAW_SEALED_KEY:
 	    ret = __raw_key_to_file(key, file_path);
 	    break;
 	default:
@@ -353,6 +359,7 @@ __nexus_key_from_file(struct nexus_key * key,
 	    break;
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
+	case NEXUS_RAW_SEALED_KEY:
 	    ret = __raw_key_from_file(key, key_path);
 	    break;
 	default:
@@ -396,28 +403,50 @@ nexus_key_from_file(nexus_key_type_t   key_type,
 
 
 
+struct nexus_key_desc {
+    nexus_key_type_t type;
+    char *           desc;
+};
+
+struct nexus_key_desc nexus_key_descriptors[] = {
+    { NEXUS_MBEDTLS_PUB_KEY, "NEXUS_MBEDTLS_PUB_KEY" },
+    { NEXUS_MBEDTLS_PRV_KEY, "NEXUS_MBEDTLS_PRV_KEY" },
+    { NEXUS_RAW_128_KEY, "NEXUS_RAW_128_KEY" },
+    { NEXUS_RAW_256_KEY, "NEXUS_RAW_256_KEY" },
+    { NEXUS_RAW_SEALED_KEY, "NEXUS_RAW_SEALED_KEY" },
+    { NEXUS_INVALID_KEY, "NEXUS_INVALID_KEY_TYPE" }
+};
 
 
 char *
 nexus_key_type_to_str(nexus_key_type_t type)
 {
-    switch (type) {
-	case NEXUS_MBEDTLS_PUB_KEY: return "NEXUS_MBEDTLS_PUB_KEY";
-	case NEXUS_MBEDTLS_PRV_KEY: return "NEXUS_MBEDTLS_PRV_KEY";
-	case NEXUS_RAW_128_KEY:     return "NEXUS_RAW_128_KEY";
-	case NEXUS_RAW_256_KEY:     return "NEXUS_RAW_256_KEY";
-	default:                    return "NEXUS_INVALID_KEY_TYPE";
+    size_t count
+        = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
+
+    for (size_t i = 0; i < count; i++) {
+	if (type == nexus_key_descriptors[i].type) {
+	    return nexus_key_descriptors[i].desc;
+	}
     }
+
+    return "NEXUS_INVALID_KEY_TYPE";
 }
 
 
 nexus_key_type_t
 nexus_key_type_from_str(char * type_str)
 {
-    if (strncmp(type_str, "NEXUS_MBEDTLS_PUB_KEY", strlen("NEXUS_MBDTLS_PUB_KEY")) == 0) return NEXUS_MBEDTLS_PUB_KEY;
-    if (strncmp(type_str, "NEXUS_MBEDTLS_PRV_KEY", strlen("NEXUS_MBDTLS_PRV_KEY")) == 0) return NEXUS_MBEDTLS_PRV_KEY;
-    if (strncmp(type_str, "NEXUS_RAW_128_KEY",     strlen("NEXUS_RAW_128_KEY"))    == 0) return NEXUS_RAW_128_KEY;
-    if (strncmp(type_str, "NEXUS_RAW_256_KEY",     strlen("NEXUS_RAW_256_KEY"))    == 0) return NEXUS_RAW_256_KEY;
+    size_t count
+        = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
+
+    for (size_t i = 0; i < count; i++) {
+	char * desc = nexus_key_descriptors[i].desc;
+
+	if (strncmp(type_str, desc, strlen(desc)) == 0) {
+	    return nexus_key_descriptors[i].type;
+	}
+    }
 
     return NEXUS_INVALID_KEY;
 }

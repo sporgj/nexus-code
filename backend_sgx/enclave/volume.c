@@ -78,3 +78,21 @@ ecall_create_volume(struct raw_buffer     * user_pubkey_in,
 
     return 0;
 }
+
+
+int
+ecall_auth_request(struct raw_buffer *    user_pubkey_in,
+                   struct sealed_buffer * sealed_volkey_in,
+                   struct raw_buffer **   nonce_challenge_out)
+{
+    // TODO
+    return -1;
+}
+
+int
+ecall_auth_response(struct crypto_buffer * supernode_in,
+                    struct raw_buffer *    signature_in)
+{
+    // TODO
+    return -1;
+}

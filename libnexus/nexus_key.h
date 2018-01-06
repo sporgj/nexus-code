@@ -16,7 +16,7 @@ typedef enum {
     NEXUS_MBEDTLS_PRV_KEY  = 2,
     NEXUS_RAW_128_KEY      = 3,
     NEXUS_RAW_256_KEY      = 4,
-    NEXUS_RAW_GENERIC_KEY  = 5 // essentially a raw buffer
+    NEXUS_RAW_SEALED_KEY   = 5
     /*
     NEXUS_SEALED_256_KEY   = 6
     */
@@ -26,21 +26,10 @@ typedef enum {
 struct nexus_key {
     nexus_key_type_t type;
 
-    size_t raw_bytes; // set for GENERIC keys
-    
     void * key;
 };
 
 
-/**
- * Allocates a NEXUS_RAW_GENERIC_KEY with preallcoate buffer and size
- * @param key_data heap-allocated data
- * @param size
- *
- * @return struct nexus_key
- */
-struct nexus_key *
-nexus_alloc_generic_key(void * key_data, size_t size); 
 
 
 /* Creates a new random key */
@@ -92,6 +81,12 @@ nexus_key_to_file(struct nexus_key * key,
 struct nexus_key *
 nexus_key_from_str(nexus_key_type_t   key_type,
 		   char             * key_str);
+
+/**
+ * Creates nexus key from binary content
+ */
+struct nexus_key *
+nexus_key_from_binary(nexus_key_type_t key_type, void * data, size_t size);
 
 /* Copies file contents into existing key structure */
 int
