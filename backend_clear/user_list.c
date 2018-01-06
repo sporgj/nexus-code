@@ -15,6 +15,8 @@
 
 #include "user_list.h"
 
+
+
 struct user_list *
 user_list_create(struct nexus_volume * volume,
 		 struct nexus_key    * owner_pub_key)
@@ -78,6 +80,8 @@ user_list_create(struct nexus_volume * volume,
     return NULL;
     
 }
+
+
 
 
 int

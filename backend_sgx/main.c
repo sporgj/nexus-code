@@ -90,6 +90,7 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 static int
 sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
+    struct sgx_backend_info * sgx_backend = NULL;
 
     char * public_key_str = NULL;
 
@@ -97,6 +98,8 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 
     int ret = -1;
 
+
+    sgx_backend = (struct sgx_backend_info *)priv_data;
 
     // derive the public key string
     {
@@ -128,15 +131,13 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 
     // call the enclave
     {
-        struct sgx_backend_info * sgx_backend = NULL;
-
         struct raw_buffer user_pubkey_rawbuf = {
             .size           = strlen(public_key_str),
             .untrusted_addr = public_key_str
         };
 
+        sgx_backend->volume = volume;
 
-        sgx_backend = (struct sgx_backend_info *)priv_data;
 
         int err = ecall_create_volume(sgx_backend->enclave_id,
                                       &ret,
@@ -148,6 +149,29 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
             log_error("ecall_create_volume() FAILED\n");
             goto out;
         }
+
+        // restore the volume pointer
+        sgx_backend->volume = NULL;
+    }
+
+
+    // assign the volumekey
+    {
+        struct nexus_key * vol_key = NULL;
+
+        vol_key = nexus_alloc_generic_key(sealed_volumekey,
+                                          sealed_volumekey->size);
+
+        if (vol_key == NULL) {
+            ret = -1;
+
+            log_error("allocating generic key FAILED\n");
+            goto out;
+        }
+
+
+        nexus_copy_key(vol_key, &volume->vol_key);
+        nexus_free_key(vol_key); // deletes sealed_volumekey
     }
 
 
@@ -155,6 +179,12 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 out:
     if (public_key_str) {
         nexus_free(public_key_str);
+    }
+
+    if (ret) {
+        if (sealed_volumekey) {
+            nexus_free(sealed_volumekey);
+        }
     }
 
     return ret;

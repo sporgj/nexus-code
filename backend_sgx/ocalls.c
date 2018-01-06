@@ -48,7 +48,7 @@ ocall_metadata_get(struct nexus_uuid      * uuid,
                                        (uint32_t *)&crypto_buffer->size);
 
         if (ret != 0) {
-            log_error("nexus_datastore_get_uuid FAILED");
+            log_error("nexus_datastore_get_uuid FAILED\n");
             goto out;
         }
     }
@@ -70,7 +70,25 @@ ocall_metadata_set(struct nexus_uuid       * uuid,
                    struct crypto_buffer    * crypto_buffer,
                    void                    * backend_info)
 {
-    return -1;
+    struct sgx_backend_info * sgx_backend = NULL;
+
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend_info *)backend_info;
+
+    ret = nexus_datastore_put_uuid(sgx_backend->volume->metadata_store,
+                                   uuid,
+                                   NULL,
+                                   crypto_buffer->untrusted_addr,
+                                   crypto_buffer->size);
+
+    if (ret) {
+        log_error("nexus_datastore_put_uuid FAILED\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 int

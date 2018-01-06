@@ -18,6 +18,7 @@
 #include "nexus_key_raw.c"
 
 
+
 void
 nexus_free_key(struct nexus_key * key)
 {
@@ -25,6 +26,7 @@ nexus_free_key(struct nexus_key * key)
 
 	case NEXUS_RAW_128_KEY: 
 	case NEXUS_RAW_256_KEY: 
+	case NEXUS_RAW_GENERIC_KEY:
 	    nexus_free(key->key);
 	    break;
 	case NEXUS_MBEDTLS_PUB_KEY:
@@ -39,6 +41,19 @@ nexus_free_key(struct nexus_key * key)
 
 
 
+struct nexus_key *
+nexus_alloc_generic_key(void * key_data, size_t size)
+{
+    struct nexus_key * key = NULL;
+
+    key = nexus_malloc(sizeof(struct nexus_key));
+
+    key->type      = NEXUS_RAW_GENERIC_KEY;
+    key->key       = key_data;
+    key->raw_bytes = size;
+
+    return key;
+}
 
 int
 nexus_generate_key(struct nexus_key * key,
@@ -59,6 +74,9 @@ nexus_generate_key(struct nexus_key * key,
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_create_key(key);
 	    break;
+	case NEXUS_RAW_GENERIC_KEY:
+	    log_error("Use nexus_alloc_generic_key()\n");
+	    return -1;
 	default:
 	    log_error("Invalid key type: %d\n", key_type);
 	    return -1;
@@ -118,6 +136,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
 
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
+	case NEXUS_RAW_GENERIC_KEY:
 	default:
 	    log_error("Invalid key type: %d\n", key_type);
 	    goto err;
@@ -174,6 +193,7 @@ nexus_copy_key(struct nexus_key * src_key,
     switch (src_key->type) {
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
+	case NEXUS_RAW_GENERIC_KEY:
 	    ret = __raw_copy_key(src_key, dst_key);
 	    break;
 
@@ -206,6 +226,7 @@ nexus_key_to_str(struct nexus_key * key)
 	    break;
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
+	case NEXUS_RAW_GENERIC_KEY:
 	    str = __raw_key_to_str(key);
 	    break;
 	default:
