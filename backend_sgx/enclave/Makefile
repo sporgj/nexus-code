@@ -24,7 +24,7 @@ INCLUDE := -I$(SGX_SDK)/include \
 	   -I$(SGX_SDK)/include/tlibc \
 	   -I$(SGX_SDK)/include/stlport \
 	   -Imbedtls/include \
-	   -Inexus_trusted \
+	   -Ilibnexus_trusted \
 	   -I..
 
 CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector
@@ -47,12 +47,13 @@ crypto_lib := mbedtls/library/libmbedcrypto.a
 
 nexus_trusted_objs := \
 	nexus_util.o \
+	nexus_hash.o \
 	nexus_key.o \
 	nexus_encode.o \
 	nexus_uuid.o
 
 trusted_objs := \
-	$(foreach o,$(nexus_trusted_objs),nexus_trusted/$(o))
+	$(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 objs := nexus_enclave_t.o \
 	$(trusted_objs) \

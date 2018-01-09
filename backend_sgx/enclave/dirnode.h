@@ -38,7 +38,7 @@ int
 dirnode_store(struct dirnode         * dirnode,
               struct nexus_uuid_path * uuid_path,
               struct nexus_key       * volumekey,
-              crypto_mac_t           * mac);
+              struct nexus_mac       * mac);
 
 void
 dirnode_free(struct dirnode * dirnode);

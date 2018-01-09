@@ -9,7 +9,7 @@
 
 struct nexus_crypto_ctx {
     struct nexus_key key;
-    struct nexus_key iv;   /* Isn't this basically just like a key? Or do we need a separate 'struct nexus_iv'*/
+    struct nexus_key iv; // let's leverage the IV as a 128-bit key
     struct nexus_mac mac;
 } __attribute__((packed));
 
@@ -21,25 +21,15 @@ struct nexus_crypto_ctx {
 
 
 
-
-
-
 // deterministic encryption of a sensitive key using the keywrapping key
 int
-crypto_keywrap(crypto_ekey_t * keywrapping_key, crypto_ekey_t * sensitive_key);
-
+crypto_keywrap(struct nexus_key * keywrapping_key,
+               struct nexus_key * sensitive_key);
 
 // deterministic decryption of a sensitive key using the keywrapping key
 int
-crypto_keyunwrap(crypto_ekey_t * keywrapping_key, crypto_ekey_t * sensitive_key);
-
-
-
-// computes the sha256
-void
-crypto_sha256(uint8_t * input,
-              size_t    input_len,
-              uint8_t   output[CRYPTO_HASH_BYTES]);
+crypto_keyunwrap(struct nexus_key * keywrapping_key,
+                 struct nexus_key * sensitive_key);
 
 
 /**
@@ -55,13 +45,13 @@ crypto_sha256(uint8_t * input,
  * @return 0 on success. Overwriting crypto_context
  */
 int
-crypto_encrypt(struct crypto_context * crypto_context,
-               size_t                  input_len,
-               uint8_t               * plaintext,
-               uint8_t               * ciphertext,
-               crypto_mac_t          * mac,
-               uint8_t               * aad,
-               size_t                  add_len);
+crypto_encrypt(struct nexus_crypto_ctx * crypto_context,
+               size_t                    input_len,
+               uint8_t                 * plaintext,
+               uint8_t                 * ciphertext,
+               struct nexus_mac        * mac,
+               uint8_t                 * aad,
+               size_t                    add_len);
 
 
 /**
@@ -77,10 +67,10 @@ crypto_encrypt(struct crypto_context * crypto_context,
  * @return 0 on success. Overwriting crypto_context
  */
 int
-crypto_decrypt(struct crypto_context * crypto_context,
-               size_t                  input_len,
-               uint8_t               * ciphertext,
-               uint8_t               * plaintext,
-               crypto_mac_t          * mac,
-               uint8_t               * aad,
-               size_t                  add_len);
+crypto_decrypt(struct nexus_crypto_ctx * crypto_context,
+               size_t                    input_len,
+               uint8_t                 * ciphertext,
+               uint8_t                 * plaintext,
+               struct nexus_mac        * mac,
+               uint8_t                 * aad,
+               size_t                    add_len);

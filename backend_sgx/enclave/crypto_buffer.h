@@ -28,6 +28,11 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * buf, struct nexus_mac * mac);
 
+/**
+ * Returns the pointer to the untrusted buffer
+ */
+void *
+nexus_crypto_buf_untrusted(struct nexus_crypto_buf * buf);
 
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf, struct nexus_mac * mac);

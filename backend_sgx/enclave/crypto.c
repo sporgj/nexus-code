@@ -34,44 +34,37 @@ __keywrap(uint8_t * key_encryption_key, uint8_t * sensitive_ekey, bool wrap)
 }
 
 int
-crypto_keywrap(crypto_ekey_t * keywrapping_key, crypto_ekey_t * sensitive_key)
+crypto_keywrap(struct nexus_key * keywrapping_key, struct nexus_key * sensitive_key)
 {
     return __keywrap(keywrapping_key->bytes, sensitive_key->bytes, true);
 }
 
 
 int
-crypto_keyunwrap(crypto_ekey_t * keywrapping_key, crypto_ekey_t * sensitive_key)
+crypto_keyunwrap(struct nexus_key * keywrapping_key, struct nexus_key * sensitive_key)
 {
     return __keywrap(keywrapping_key->bytes, sensitive_key->bytes, false);
 }
 
-void
-crypto_sha256(uint8_t * input,
-              size_t    input_len,
-              uint8_t   output[CRYPTO_HASH_BYTES])
-{
-    mbedtls_sha256(input, input_len, output, 0); // 0 -> sha256, 1 -> sha224
-}
-
 int
-crypto_encrypt(struct crypto_context * crypto_context,
-               size_t                  input_len,
-               uint8_t               * plaintext,
-               uint8_t               * ciphertext,
-               crypto_mac_t          * mac,
-               uint8_t               * aad,
-               size_t                  aad_len)
+crypto_encrypt(struct nexus_crypto_ctx * crypto_context,
+               size_t                    input_len,
+               uint8_t                 * plaintext,
+               uint8_t                 * ciphertext,
+               struct nexus_mac        * mac,
+               uint8_t                 * aad,
+               size_t                    add_len)
 {
-    crypto_iv_t iv_copy;
+    struct nexus_key * iv_copy = NULL;
 
     int ret = -1;
 
 
     // generate key and IV
-    sgx_read_rand((uint8_t *)crypto_context, sizeof(struct crypto_context));
+    nexus_generate_key(&crypto_context->key, NEXUS_RAW_128_KEY);
+    nexus_generate_key(&crypto_context->iv, NEXUS_RAW_128_KEY);
 
-    memcpy(&iv_copy, &crypto_context->iv, sizeof(crypto_iv_t));
+    iv_copy = nexus_clone_key(&crypto_context->iv);
 
 
     // intiialize the gcm context and perform the encryption
@@ -82,13 +75,13 @@ crypto_encrypt(struct crypto_context * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&crypto_context->ekey,
-                           CRYPTO_EKEY_BITS);
+                           (uint8_t *)&crypto_context->key->key,
+                           nexus_key_size_bits(&crypto_context->key));
 
         mbedtls_gcm_starts(&gcm_context,
                            MBEDTLS_GCM_ENCRYPT,
-                           iv_copy.bytes,
-                           CRYPTO_IV_BYTES,
+                           iv_copy->key,
+                           nexus_key_size_bytes(iv_copy),
                            (uint8_t *) aad, // AAD used for integrity
                            aad_len);
 
@@ -102,38 +95,42 @@ crypto_encrypt(struct crypto_context * crypto_context,
 
         mbedtls_gcm_finish(&gcm_context,
                            (uint8_t *)&crypto_context->mac,
-                           CRYPTO_MAC_BYTES);
+                           sizeof(struct nexus_mac));
 
         mbedtls_gcm_free(&gcm_context);
     }
 
     // if the mac is needed
     if (mac) {
-        memcpy(mac, &crypto_context->mac, sizeof(crypto_mac_t));
+        nexus_mac_copy(&crypto_context->mac, mac);
     }
 
     ret = 0;
 out:
+    if (iv_copy) {
+        nexus_free_key(iv_copy);
+    }
+
     return ret;
 }
 
 
 int
-crypto_decrypt(struct crypto_context * crypto_context,
-               size_t                  input_len,
-               uint8_t               * ciphertext,
-               uint8_t               * plaintext,
-               crypto_mac_t          * mac,
-               uint8_t               * aad,
-               size_t                  aad_len)
+crypto_decrypt(struct nexus_crypto_ctx * crypto_context,
+               size_t                    input_len,
+               uint8_t                 * ciphertext,
+               uint8_t                 * plaintext,
+               struct nexus_mac        * mac,
+               uint8_t                 * aad,
+               size_t                    add_len)
 {
-    crypto_iv_t  iv_copy;
-    crypto_mac_t computed_mac;
+    struct nexus_key * iv_copy = NULL;
+
+    struct nexus_mac computed_mac;
 
     int ret = -1;
 
-
-    memcpy(&iv_copy, &crypto_context->iv, sizeof(crypto_iv_t));
+    iv_copy = nexus_clone_key(&crypto_context->iv);
 
 
     // intiialize the gcm context and perform the encryption
@@ -144,13 +141,13 @@ crypto_decrypt(struct crypto_context * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&crypto_context->ekey,
-                           CRYPTO_EKEY_BITS);
+                           (uint8_t *)&crypto_context->ekey->key,
+                           neuxs_key_size_bits(&crypto_context->ekey));
 
         mbedtls_gcm_starts(&gcm_context,
                            MBEDTLS_GCM_DECRYPT,
-                           iv_copy.bytes,
-                           CRYPTO_IV_BYTES,
+                           iv_copy->key,
+                           nexus_key_size_bytes(iv_copy),
                            (uint8_t *) aad, // AAD used for integrity
                            aad_len);
 
@@ -163,15 +160,15 @@ crypto_decrypt(struct crypto_context * crypto_context,
 
         mbedtls_gcm_finish(&gcm_context,
                            (uint8_t *)&computed_mac,
-                           CRYPTO_MAC_BYTES);
+                           sizeof(struct nexus_mac));
 
         mbedtls_gcm_free(&gcm_context);
     }
 
-    ret = memcmp(&computed_mac, &crypto_context->mac, sizeof(crypto_mac_t));
+    ret = memcmp(&computed_mac, &crypto_context->mac, sizeof(struct nexus_mac));
 
     if (ret == 0 && mac) {
-        memcpy(mac, &crypto_context->mac, sizeof(crypto_mac_t));
+        memcpy(mac, &crypto_context->mac, sizeof(struct nexus_mac));
     }
 
     ret = 0;

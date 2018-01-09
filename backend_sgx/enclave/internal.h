@@ -26,9 +26,9 @@
 #include "dirnode.h"
 #include "metadata.h"
 
-#include "nexus_trusted/nexus_uuid.h"
-#include "nexus_trusted/nexus_util.h"
-#include "nexus_trusted/nexus_key.h"
+#include "nexus_uuid.h"
+#include "nexus_util.h"
+#include "nexus_key.h"
 
 #define ocall_debug(str) \
     ocall_print("enclave> " str "\n")

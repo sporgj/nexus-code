@@ -11,6 +11,7 @@
 
 #include "nexus_uuid.h"
 #include "nexus_key.h"
+#include "nexus_hash.h"
 
 #include "sgx_backend_common.h"
 
@@ -20,9 +21,9 @@ struct supernode {
     struct nexus_uuid root_uuid;
     struct nexus_uuid user_list_uuid;
 
-    crypto_mac_t user_list_mac;
+    struct nexus_mac  volume_userlist_mac;
 
-    uint8_t owner_pubkey[CRYPTO_HASH_BYTES];
+    struct nexus_hash owner_pubkey;
 };
 
 
@@ -44,7 +45,7 @@ int
 supernode_store(struct supernode       * supernode,
                 struct nexus_uuid_path * uuid_path,
                 struct nexus_key       * volumekey,
-                crypto_mac_t           * mac);
+                struct nexus_mac       * mac);
 
 void
 supernode_free(struct supernode * supernode);

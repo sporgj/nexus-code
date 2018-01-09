@@ -31,6 +31,11 @@ raw_buffer_get(struct raw_buffer * raw_buffer)
     return raw_buffer->untrusted_addr;
 }
 
+size_t
+raw_buffer_size(struct raw_buffer * raw_buffer)
+{
+    return raw_buffer->size;
+}
 
 void
 raw_buffer_init(struct raw_buffer * raw_buffer,

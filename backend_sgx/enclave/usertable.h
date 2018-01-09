@@ -24,7 +24,7 @@ volume_usertable_create(struct nexus_uuid * supernode_uuid);
  */
 int
 volume_usertable_store(struct volume_usertable * usertable,
-                       crypto_mac_t            * usertable_mac);
+                       struct nexus_mac        * usertable_mac);
 
 void
 volume_usertable_free(struct volume_usertable * usertable);

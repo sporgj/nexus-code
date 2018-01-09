@@ -29,9 +29,18 @@ raw_buffer_init(struct raw_buffer * raw_buffer,
 /**
  * Returns the pointer to the untrusted ptr
  * @param raw_buffer
+ * @return the size of the raw_buffer
  */
 void *
 raw_buffer_get(struct raw_buffer * raw_buffer);
+
+/**
+ * Returns the size of the raw buffer
+ * @param raw_buffer
+ * @return the size of the raw_buffer
+ */
+size_t
+raw_buffer_size(struct raw_buffer * raw_buffer);
 
 /**
  * Copies the content of the buffer into the enclave and returns buffer

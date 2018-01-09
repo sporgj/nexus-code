@@ -61,6 +61,29 @@ nexus_free_key(struct nexus_key * key);
 
 
 
+// buffer operations
+
+/**
+ * Returns the raw size in bytes
+ * @return 0 if it cannot be serialized as a binary
+ */
+size_t
+nexus_key_buflen(struct nexus_key * key);
+
+/**
+ * Writes the nexus key into the buffer
+ * @param key
+ * @param buffer is the buffer to write into
+ * @param buflen is the size of the buffer
+ * @return -1 if the buflen is too small
+ */
+int
+nexus_key_to_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen);
+
+struct nexus_key *
+nexus_key_from_buffer(nexus_key_type_t key_type, uint8_t * buffer);
+
+
 
 struct nexus_key *
 nexus_key_from_file(nexus_key_type_t   key_type,

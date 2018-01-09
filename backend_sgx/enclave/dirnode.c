@@ -27,9 +27,9 @@ int
 dirnode_store(struct dirnode         * dirnode,
               struct nexus_uuid_path * uuid_path,
               struct nexus_key       * volumekey,
-              crypto_mac_t           * mac)
+              struct nexus_mac       * mac)
 {
-    struct crypto_buffer * crypto_buffer = NULL;
+    struct nexus_crypto_buf * crypto_buffer = NULL;
 
     uint8_t * serialized_buffer = NULL;
     size_t    serialized_buflen = 0;
@@ -44,16 +44,12 @@ dirnode_store(struct dirnode         * dirnode,
     }
 
     // allocate the crypto buffer
-    crypto_buffer = crypto_buffer_new(serialized_buflen);
+    crypto_buffer = nexus_crypto_buf_alloc(serialized_buflen);
     if (!crypto_buffer) {
         goto out;
     }
 
-    ret = crypto_buffer_write(crypto_buffer,
-                              &dirnode->my_uuid,
-                              serialized_buffer,
-                              serialized_buflen,
-                              mac);
+    ret = nexus_crypto_buf_put(crypto_buffer, serialized_buffer, mac);
 
     if (ret) {
         ocall_debug("crypto_buffer_write");
@@ -69,7 +65,7 @@ dirnode_store(struct dirnode         * dirnode,
     ret = 0;
 out:
     if (crypto_buffer) {
-        crypto_buffer_free(crypto_buffer);
+        nexus_crypto_buf_free(crypto_buffer);
     }
 
     return ret;

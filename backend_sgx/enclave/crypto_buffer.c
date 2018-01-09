@@ -11,12 +11,17 @@
    Data
 */
 
-struct nexus_crypto_buf {    
-    struct nexus_crypto_ctx crypto_ctx;    
-    uint32_t                version;
+struct nexus_crypto_buf_hdr {
+    uint32_t magic;
 
-    size_t    size;
-    
+    uint32_t total_size;
+} __attribute__((packed));
+
+struct nexus_crypto_buf {
+    struct nexus_crypto_buf_hdr header;
+
+    struct nexus_crypto_ctx     crypto_ctx;
+
     uint8_t * untrusted_addr;
     size_t    untrusted_size;
 
@@ -86,9 +91,9 @@ nexus_crypto_buf_alloc(void   * untrusted_addr,
 
     buf->size           = size;
     buf->untrusted_addr = untrusted_addr;
-    buf->truested_addr  = NULL;
+    buf->trusted_addr   = NULL;
 
-    return nexus_crypto_buf;
+    return buf;
 }
 
 
@@ -97,10 +102,22 @@ nexus_crypto_buf_new(size_t size)
 {
     struct nexus_crypto_buf * buf = NULL;
 
+    int err = -1;
+
     buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
 
+    err = ocall_calloc((void **) &buf->untrusted_addr,
+                       size + sizeof(struct nexus_crypto_buf_hdr));
+
+    if (err) {
+	ocall_debug("could not allocate space for crypto_buffer");
+	nexus_free(buf);
+	return NULL;
+    }
+
+
     buf->untrusted_addr = NULL;
-    buf->truested_addr  = NULL;
+    buf->trusted_addr   = NULL;
     buf->size           = size;
     
     return buf;
@@ -133,7 +150,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
     }
     
     /* Allocate trusted memory */
-    buf->trusted_addr = nexus_malloc(buf->size);
+    buf->trusted_addr = nexus_malloc(buf->buf_header.size);
     
 
 

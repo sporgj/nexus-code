@@ -11,9 +11,9 @@ supernode_new(struct raw_buffer * user_pubkey)
     nexus_uuid_gen(&supernode->root_uuid);
     nexus_uuid_gen(&supernode->user_list_uuid);
 
-    crypto_sha256(raw_buffer_get(user_pubkey),
-                  user_pubkey->size,
-                  supernode->owner_pubkey);
+    nexus_hash_gen(&supernode->owner_pubkey,
+                   raw_buffer_get(user_pubkey),
+                   raw_buffer_size(user_pubkey));
 
     return supernode;
 }
@@ -94,8 +94,9 @@ int
 supernode_store(struct supernode       * supernode,
                 struct nexus_uuid_path * uuid_path,
                 struct nexus_key       * volumekey,
-                crypto_mac_t           * mac)
+                struct nexus_mac       * mac)
 {
+#if 0
     struct crypto_buffer * crypto_buffer = NULL;
 
     uint8_t * serialized_buffer = NULL;
@@ -140,6 +141,9 @@ out:
     }
 
     return ret;
+#endif
+
+    return 0;
 }
 
 void
