@@ -200,32 +200,42 @@ nexus_key_buflen(struct nexus_key * key)
  * @param key
  * @param buffer is the buffer to write into
  * @param buflen is the size of the buffer
- * @return -1 if the buflen is too small
+ * @return -1 if the buflen is too small or serialization not supported
  */
 int
 nexus_key_to_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen)
 {
-    size_t bufsize = nexus_key_buflen(key);
+    switch (key->type) {
+	case NEXUS_RAW_128_KEY:
+	case NEXUS_RAW_256_KEY:
+	    return __raw_key_to_buffer(key, buffer, buflen);
 
-    if (bufsize > buflen) {
-	return -1;
+	case NEXUS_MBEDTLS_PUB_KEY:
+	case NEXUS_MBEDTLS_PRV_KEY:
+	    ocall_debug("Could not copy key for invalid key type");
+	    return -1;
+
+	default:
+	    return -1;
     }
-
-    memcpy(buffer, &key->key, bufsize);
-
-    return 0;
 }
 
-struct nexus_key *
-nexus_key_from_buffer(nexus_key_type_t key_type, uint8_t * buffer)
+int
+nexus_key_from_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen)
 {
-    struct nexus_key * key = nexus_create_key(key_type);
+    switch (key->type) {
+	case NEXUS_RAW_128_KEY:
+	case NEXUS_RAW_256_KEY:
+	    return __raw_key_from_buffer(key, buffer, buflen);
 
-    size_t bufsize = nexus_key_buflen(key);
+	case NEXUS_MBEDTLS_PUB_KEY:
+	case NEXUS_MBEDTLS_PRV_KEY:
+	    ocall_debug("Could not copy key for invalid key type");
+	    return -1;
 
-    memcpy(&key->key, buffer, bufsize);
-
-    return key;
+	default:
+	    return -1;
+    }
 }
 
 char *

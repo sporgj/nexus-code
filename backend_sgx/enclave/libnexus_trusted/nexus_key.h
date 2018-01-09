@@ -80,8 +80,8 @@ nexus_key_buflen(struct nexus_key * key);
 int
 nexus_key_to_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen);
 
-struct nexus_key *
-nexus_key_from_buffer(nexus_key_type_t key_type, uint8_t * buffer);
+int
+nexus_key_from_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen);
 
 
 

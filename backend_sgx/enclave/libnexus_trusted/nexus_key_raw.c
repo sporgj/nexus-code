@@ -74,6 +74,30 @@ __raw_copy_key(struct nexus_key * src_key,
 }
 
 
+static int
+__raw_key_to_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen)
+{
+    size_t bufsize = nexus_key_buflen(key);
+
+    if (bufsize > buflen) {
+	return -1;
+    }
+
+    memcpy(buffer, &key->key, bufsize);
+
+    return 0;
+}
+
+static int
+__raw_key_from_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen)
+{
+    size_t bufsize = nexus_key_buflen(key);
+
+    memcpy(&key->key, buffer, bufsize);
+
+    return 0;
+}
+
 static char *
 __raw_key_to_str(struct nexus_key * key)
 {
