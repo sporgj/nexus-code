@@ -14,8 +14,10 @@
 #include <sgx_trts.h>
 
 
+extern struct nexus_key * sealing_key;
+
 static inline int
-__raw_key_bits(struct nexus_key * key)
+__sealed_key_bits(struct nexus_key * key)
 {
     switch (key->type) {
 	case NEXUS_RAW_256_KEY:    return 256;
@@ -27,7 +29,7 @@ __raw_key_bits(struct nexus_key * key)
 }
 
 static inline int
-__raw_key_bytes(struct nexus_key * key)
+__sealed_key_bytes(struct nexus_key * key)
 {
     switch (key->type) {
 	case NEXUS_RAW_256_KEY:    return (256 / 8);
@@ -39,30 +41,46 @@ __raw_key_bytes(struct nexus_key * key)
 }
 
 
+
 static int
-__raw_create_key(struct nexus_key * key)
+__seal_key(struct nexus_key * sealed_key,
+	   struct nexus_key * unsealed_key)
 {
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context  entropy;
+    sealed_key->key = crypto_aes_ecb_encrypt(sealing_key,
+					     __sealed_key_bytes(unsealed_key),
+					     unsealed_key->key);
     
-    uint32_t key_len = __raw_key_bytes(key);
-    int      ret     = 0;
-    
-    
-    key->key = nexus_malloc(key_len);
-
-
-    sgx_read_rand((uint8_t *) key->key, key_len);
-    
+    if (sealed_key->key == NULL) {
+	log_error("Could not seal key\n");
+	return -1;
+    }
+	
     return 0;
 }
 
 
 static int
-__raw_copy_key(struct nexus_key * src_key,
-	       struct nexus_key * dst_key)
+__unseal_key(struct nexus_key * unsealed_key,
+	     struct nexus_key * sealed_key,)
 {
-    uint32_t key_len = __raw_key_bytes(src_key);
+    unsealed_key->key = crypto_aes_ecb_decrypt(sealing_key,
+					       __sealed_key_bytes(sealed_key),
+					       sealed_key->key);
+    
+    if (unsealed_key->key == NULL) {
+	log_error("Could not unseal key\n");
+	return -1;
+    }
+	
+    return 0;
+}
+
+
+static int
+__sealed_copy_key(struct nexus_key * src_key,
+		  struct nexus_key * dst_key)
+{
+    uint32_t key_len = __sealed_key_bytes(src_key);
     
     assert(key_len > 0);
 
@@ -74,38 +92,39 @@ __raw_copy_key(struct nexus_key * src_key,
 }
 
 
-
-
 static uint8_t *
-__raw_key_to_buf(struct nexus_key * key,
-		 uint8_t          * dst_buf,
-		 size_t             dst_size)
+__sealed_key_to_buf(struct nexus_key * key,
+		    uint8_t          * dst_buf,
+		    size_t             dst_size)
 {
-    size_t    key_len = __raw_key_bytes(key);
+    size_t    key_len = __sealed_key_bytes(key);
     uint8_t * tgt_buf = NULL;
-    
+
+
     if (dst_buf == NULL) {
-	tgt_buf = nexus_malloc(key_len);	
+
+	tgt_buf = nexus_malloc(key_len);
+	
     } else {
 	if (key_len != dst_size) {
 	    log_error("Buffer length mismatch (key_size = %lu) (dst_size = %lu)\n", key_len, dst_size);
-	    return NULL;
+	    return -1;
 	}
-
+	
 	tgt_buf = dst_buf;
     }
 
     memcpy(tgt_buf, &key->key, key_len);
 
-    return tgt_buf;
+    return 0;
 }
 
 static int
-__raw_key_from_buf(struct nexus_key * key,
-		   uint8_t          * src_buf,
-		   size_t             src_size)
+__sealed_key_from_buf(struct nexus_key * key,
+		      uint8_t          * src_buf,
+		      size_t             src_size)
 {
-    size_t key_len = __raw_key_bytes(key);
+    size_t key_len = __sealed_key_bytes(key);
 
     // in case the key exists
     if (key->key) {
@@ -120,10 +139,10 @@ __raw_key_from_buf(struct nexus_key * key,
 }
 
 static char *
-__raw_key_to_str(struct nexus_key * key)
+__sealed_key_to_str(struct nexus_key * key)
 {
     char   * key_str = NULL;
-    uint32_t key_len = __raw_key_bytes(key);
+    uint32_t key_len = __sealed_key_bytes(key);
 
     assert(key_len > 0);
 
@@ -134,10 +153,10 @@ __raw_key_to_str(struct nexus_key * key)
 
 
 static int
-__raw_key_from_str(struct nexus_key * key,
-		   char             * key_str)
+__sealed_key_from_str(struct nexus_key * key,
+		      char             * key_str)
 {
-    uint32_t key_len = __raw_key_bytes(key);
+    uint32_t key_len = __sealed_key_bytes(key);
     uint32_t dec_len = 0;
 
     int ret = 0;
@@ -145,12 +164,12 @@ __raw_key_from_str(struct nexus_key * key,
     ret = nexus_base64_decode(key_str, (uint8_t **)&(key->key), &dec_len);
 
     if (ret == -1) {
-	ocall_debug("Could not decode raw key from base64\n");
+	log_error("Could not decode raw key from base64\n");
 	return -1;
     }
 	
     if (dec_len != key_len) {
-        ocall_debug("Invalid Key length\n");
+        log_error("Invalid Key length\n");
         return -1;
     }
 

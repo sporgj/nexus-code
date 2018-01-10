@@ -15,11 +15,9 @@ typedef enum {
     NEXUS_MBEDTLS_PUB_KEY  = 1,
     NEXUS_MBEDTLS_PRV_KEY  = 2,
     NEXUS_RAW_128_KEY      = 3,
-    NEXUS_RAW_256_KEY      = 4
-    /*
+    NEXUS_RAW_256_KEY      = 4,
     NEXUS_SEALED_128_KEY   = 5,
     NEXUS_SEALED_256_KEY   = 6
-    */
 } nexus_key_type_t;
 
 
@@ -65,43 +63,38 @@ nexus_free_key(struct nexus_key * key);
 
 
 
-// buffer operations
 
-/**
- * Returns the raw size in bytes
- * @return 0 if it cannot be serialized as a binary
+/* Return Value: 
+ *    NULL on error, otherwise a pointer to the buffer serialized into
+ *    If dst_buf is NULL, then a new buffer is allocated
  */
-size_t
-nexus_key_buflen(struct nexus_key * key);
+uint8_t *
+nexus_key_to_buf(struct nexus_key * key,
+		 uint8_t          * dst_buf,
+		 size_t             dst_size);
 
-size_t
-nexus_key_size_bits(struct nexus_key * key);
 
-size_t
-nexus_key_size_bytes(struct nexus_key * key);
-
-/**
- * Writes the nexus key into the buffer
- * @param key
- * @param buffer is the buffer to write into
- * @param buflen is the size of the buffer
- * @return -1 if the buflen is too small
- */
-int
-nexus_key_to_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen);
 
 int
-nexus_key_from_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen);
+__nexus_key_from_buf(struct nexus_key * key,
+		     nexus_key_type_t   key_type, 
+		     uint8_t          * src_buf,
+		     size_t             src_buf);
+    
 
-
-
+struct nexus_key *
+nexus_key_from_buf(nexus_key_type_t   key_type,
+		   uint8_t          * src_buf,
+		   size_t             src_size);
+    
 struct nexus_key *
 nexus_key_from_file(nexus_key_type_t   key_type,
 		    char             * key_path);
 
-int __nexus_key_from_file(struct nexus_key * key,
-			  nexus_key_type_t   key_type,
-			  char             * key_path);
+int
+__nexus_key_from_file(struct nexus_key * key,
+		      nexus_key_type_t   key_type,
+		      char             * key_path);
 
 
 int
