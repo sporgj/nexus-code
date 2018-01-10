@@ -7,57 +7,126 @@
 #include <mbedtls/gcm.h>
 #include <mbedtls/sha256.h>
 
-static int
-__keywrap(struct nexus_key * keywrapping_key,
-          struct nexus_key * sensitive_ekey,
-          bool               wrap)
+
+
+
+int
+__crypto_aes_ecb_encrypt(struct nexus_key * key,
+			 size_t             data_size,
+			 uint8_t          * in_buf,
+			 uint8_t          * out_buf)
 {
     mbedtls_aes_context aes_context;
     mbedtls_aes_init(&aes_context);
-
-    size_t keylen_bits = nexus_key_size_bits(keywrapping_key);
-
-    if (wrap) {
-        mbedtls_aes_setkey_enc(&aes_context, keywrapping_key->key, keylen_bits);
+    
+    int bit_length = 0;
+    
+    if (key->type == NEXUS_RAW_128_BIT_KEY) {
+	bit_length = 128;
+    } else if (key->type == NEXUS_RAW_256_BIT_KEY) {
+	bit_length = 256;
     } else {
-        mbedtls_aes_setkey_dec(&aes_context, keywrapping_key->key, keylen_bits);
-    }
+	log_error("invalid key type (%s) for AES ECB\n", nexus_key_type_to_str(key->type));
+	return -1;
+    } 
+    
+    mbedtls_aes_setkey_enc(&aes_context, key->key, bit_length);
 
-    // XXX for now, we will just do ECB in-place.
-    // TODO switch to a proper key-wrapping routine (SIV modes)
     {
-        int mode = (wrap ? MBEDTLS_AES_ENCRYPT : MBEDTLS_AES_DECRYPT);
-        
-        uint8_t * buffer = (uint8_t *)(sensitive_ekey->key);
+	size_t i  = 0;
 
-        size_t size = nexus_key_buflen(sensitive_ekey);
-        size_t i    = 0;
-
-        while (i < size) {
-            mbedtls_aes_crypt_ecb(&aes_context, mode, (buffer + i), (buffer + i));
-
-            i += 16;
-        }
+	while (i < data_size) {
+	    mbedtls_aes_crypt_ecb(&aes_context, MBEDTLS_AES_ENCRYPT, in_buf + i, out_buf + i);
+	    i += 16;
+	}
     }
 
     mbedtls_aes_free(&aes_context);
 
+    return 0;
+}
+
+uint8_t * 
+crypto_aes_ecb_encrypt(struct nexus_key * key,
+		       size_t             data_size,
+		       uint8_t          * in_buf)
+{
+    uint8_t * out_buf = NULL;
+
+    int ret = 0;
+
+    out_buf = nexus_malloc(data_size);
+
+    ret = __crypto_aes_ecb_encrypt(key, data_size, in_buf, out_buf);
+
+    if (ret == -1) {
+	log_error("Could not encrypt buffer\n");
+	nexus_free(out_buf);
+	return NULL;
+    }
+   
+    return out_buf;
+}
+
+
+int
+__crypto_aes_ecb_decrypt(struct nexus_key * key,
+			 size_t             data_size,
+			 uint8_t          * in_buf,
+			 uint8_t          * out_buf)
+{
+    mbedtls_aes_context aes_context;
+    mbedtls_aes_init(&aes_context);
+    
+    int bit_length = 0;
+    
+    if (key->type == NEXUS_RAW_128_BIT_KEY) {
+	bit_length = 128;
+    } else if (key->type == NEXUS_RAW_256_BIT_KEY) {
+	bit_length = 256;
+    } else {
+	log_error("invalid key type (%s) for AES ECB\n", nexus_key_type_to_str(key->type));
+	return -1;
+    } 
+    
+    mbedtls_aes_setkey_dec(&aes_context, key->key, bit_length);
+
+    {
+	size_t i  = 0;
+
+	while (i < data_size) {
+	    mbedtls_aes_crypt_ecb(&aes_context, MBEDTLS_AES_DECRYPT, in_buf + i, out_buf + i);
+	    i += 16;
+	}
+    }
+
+    mbedtls_aes_free(&aes_context);
 
     return 0;
 }
 
-int
-crypto_keywrap(struct nexus_key * keywrapping_key, struct nexus_key * sensitive_key)
+uint8_t * 
+crypto_aes_ecb_decrypt(struct nexus_key * key,
+		       size_t             data_size,
+		       uint8_t          * in_buf)
 {
-    return __keywrap(keywrapping_key, sensitive_key, true);
+    uint8_t * out_buf = NULL;
+
+    int ret = 0;
+
+    out_buf = nexus_malloc(data_size);
+
+    ret = __crypto_aes_ecb_decrypt(key, data_size, in_buf, out_buf);
+
+    if (ret == -1) {
+	log_error("Could not decrypt buffer\n");
+	nexus_free(out_buf);
+	return NULL;
+    }
+   
+    return out_buf;
 }
 
-
-int
-crypto_keyunwrap(struct nexus_key * keywrapping_key, struct nexus_key * sensitive_key)
-{
-    return __keywrap(keywrapping_key, sensitive_key, false);
-}
 
 int
 crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,

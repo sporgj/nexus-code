@@ -20,8 +20,8 @@ static inline int
 __sealed_key_bits(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_RAW_256_KEY:    return 256;
-	case NEXUS_RAW_128_KEY:    return 128;
+	case NEXUS_SEALED_256_KEY:    return 256;
+	case NEXUS_SEALED_128_KEY:    return 128;
 	default:                   return -1;
     }
     
@@ -32,8 +32,8 @@ static inline int
 __sealed_key_bytes(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_RAW_256_KEY:    return (256 / 8);
-	case NEXUS_RAW_128_KEY:    return (128 / 8);
+	case NEXUS_SEALED_256_KEY:    return (256 / 8);
+	case NEXUS_SEALED_128_KEY:    return (128 / 8);
 	default:                   return -1;
     }
     
