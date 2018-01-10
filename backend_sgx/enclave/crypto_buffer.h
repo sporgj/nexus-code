@@ -16,7 +16,7 @@ struct nexus_crypto_buf;
  * @return nexus_crypto_buf
  */
 struct nexus_crypto_buf *
-nexus_crypto_buf_alloc(void * untrusted_addr, size_t untrusted_size);
+nexus_crypto_buf_alloc(void * untrusted_addr, size_t size);
 
 /**
  * Creates a new crypto buffer which will encrypt a metadata buffer of size.
@@ -40,15 +40,10 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
  * @return NULL on failure
  */
 void *
-nexus_crypto_buf_get(struct nexus_crypto_buf * buf, struct nexus_mac * mac);
+nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
+		     struct nexus_mac        * mac);
 
-/**
- * Returns the pointer to the untrusted buffer
- */
-void *
-nexus_crypto_buf_untrusted(struct nexus_crypto_buf * buf);
 
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
-                     uint8_t                 * trusted_buf,
                      struct nexus_mac        * mac);
