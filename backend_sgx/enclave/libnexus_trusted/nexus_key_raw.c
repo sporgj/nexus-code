@@ -93,6 +93,13 @@ __raw_key_from_buffer(struct nexus_key * key, uint8_t * buffer, size_t buflen)
 {
     size_t bufsize = nexus_key_buflen(key);
 
+    // in case the key exists
+    if (key->key) {
+	nexus_free(key->key);
+    }
+
+    key->key = nexus_malloc(bufsize);
+
     memcpy(&key->key, buffer, bufsize);
 
     return 0;

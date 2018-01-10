@@ -56,3 +56,10 @@ raw_buffer_read_trusted(struct raw_buffer * raw_buffer)
 
     return ptr;
 }
+
+void
+raw_buffer_free_ext(struct raw_buffer * raw_buffer_ext)
+{
+    ocall_free(raw_buffer_ext->untrusted_addr);
+    ocall_free(raw_buffer_ext);
+}

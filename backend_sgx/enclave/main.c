@@ -1,13 +1,17 @@
 #include "internal.h"
 
-// the sealing key used in protecting volumekeys
-sgx_key_128bit_t global_enclave_sealing_key = { 0 };
+struct nexus_key * global_enclave_sealing_key = NULL;
 
+struct nexus_key * global_volumekey = NULL;
+
+// the sealing key used in protecting volumekeys
 void * global_backend_ext  = NULL;
 
 int
 ecall_init_enclave(void * backend_info)
 {
+    sgx_key_128bit_t global_enclave_sealing_key = { 0 };
+
     // initialize the enclave_sealing_key
     {
         sgx_key_request_t request = { 0 };

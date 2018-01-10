@@ -49,3 +49,10 @@ raw_buffer_size(struct raw_buffer * raw_buffer);
  */
 void *
 raw_buffer_read_trusted(struct raw_buffer * raw_buffer);
+
+/**
+ * Free an externally allocated raw_buffer
+ * @param raw_buffer_ext
+ */
+void
+raw_buffer_free_ext(struct raw_buffer * raw_buffer_ext);

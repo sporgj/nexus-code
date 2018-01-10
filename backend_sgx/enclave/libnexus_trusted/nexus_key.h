@@ -40,6 +40,10 @@ int
 nexus_generate_key(struct nexus_key * key,
 		   nexus_key_type_t   key_type);
 
+/* initializes key to a type, call nexus_generate_key() to fill contents */
+int
+nexus_init_key(struct nexus_key * key, nexus_key_type_t key_type);
+
 
 /* Use this to generate a public key from a private key */
 struct nexus_key *
@@ -69,6 +73,12 @@ nexus_free_key(struct nexus_key * key);
  */
 size_t
 nexus_key_buflen(struct nexus_key * key);
+
+size_t
+nexus_key_size_bits(struct nexus_key * key);
+
+size_t
+nexus_key_size_bytes(struct nexus_key * key);
 
 /**
  * Writes the nexus key into the buffer

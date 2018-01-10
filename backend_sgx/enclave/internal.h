@@ -34,7 +34,9 @@
     ocall_print("enclave> " str "\n")
 
 
-extern sgx_key_128bit_t global_enclave_sealing_key;
+extern struct nexus_key * global_enclave_sealing_key;
+
+extern struct nexus_key * global_volumekey;
 
 // pointer to the backend info. Used in ocalls;
 void * global_backend_ext;

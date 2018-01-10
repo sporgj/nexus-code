@@ -19,7 +19,7 @@
  *
  * @return NULL on failure
  */
-struct crypto_buffer *
+struct raw_buffer *
 metadata_read(struct nexus_uuid       * uuid,
               struct nexus_uuid_path  * uuid_path);
 
@@ -33,6 +33,6 @@ metadata_read(struct nexus_uuid       * uuid,
  * @return 0 on success
  */
 int
-metadata_write(struct nexus_uuid      * uuid,
-               struct nexus_uuid_path * uuid_path,
-               struct crypto_buffer   * crypto_buffer);
+metadata_write(struct nexus_uuid       * uuid,
+               struct nexus_uuid_path  * uuid_path,
+               struct nexus_crypto_buf * crypto_buffer);

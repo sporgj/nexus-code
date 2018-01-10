@@ -44,7 +44,7 @@ dirnode_store(struct dirnode         * dirnode,
     }
 
     // allocate the crypto buffer
-    crypto_buffer = nexus_crypto_buf_alloc(serialized_buflen);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen);
     if (!crypto_buffer) {
         goto out;
     }

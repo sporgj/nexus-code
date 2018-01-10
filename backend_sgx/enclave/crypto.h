@@ -45,13 +45,13 @@ crypto_keyunwrap(struct nexus_key * keywrapping_key,
  * @return 0 on success. Overwriting crypto_context
  */
 int
-crypto_encrypt(struct nexus_crypto_ctx * crypto_context,
-               size_t                    input_len,
-               uint8_t                 * plaintext,
-               uint8_t                 * ciphertext,
-               struct nexus_mac        * mac,
-               uint8_t                 * aad,
-               size_t                    add_len);
+crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
+                   size_t                    input_len,
+                   uint8_t                 * plaintext,
+                   uint8_t                 * ciphertext,
+                   struct nexus_mac        * mac,
+                   uint8_t                 * aad,
+                   size_t                    add_len);
 
 
 /**
@@ -67,10 +67,10 @@ crypto_encrypt(struct nexus_crypto_ctx * crypto_context,
  * @return 0 on success. Overwriting crypto_context
  */
 int
-crypto_decrypt(struct nexus_crypto_ctx * crypto_context,
-               size_t                    input_len,
-               uint8_t                 * ciphertext,
-               uint8_t                 * plaintext,
-               struct nexus_mac        * mac,
-               uint8_t                 * aad,
-               size_t                    add_len);
+crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
+                   size_t                    input_len,
+                   uint8_t                 * ciphertext,
+                   uint8_t                 * plaintext,
+                   struct nexus_mac        * mac,
+                   uint8_t                 * aad,
+                   size_t                    add_len);

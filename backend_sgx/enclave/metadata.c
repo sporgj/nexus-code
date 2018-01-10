@@ -1,39 +1,23 @@
 #include "internal.h"
 
-#if 0
-struct metadata *
-metadata_new(struct nexus_uuid * uuid)
-{
-    struct metadata * metadata = NULL;
-
-    // allocate a new metadata object
-
-    // copy uuid into the metadata uuid
-
-    return metadata;
-}
-#endif
-
-struct crypto_buffer *
+struct raw_buffer *
 metadata_open(struct nexus_uuid       * uuid,
-              struct nexus_uuid_path  * uuid_path,
-              void                   ** decrypted_metadata_contents,
-              crypto_mac_t            * mac)
+              struct nexus_uuid_path  * uuid_path)
 {
-    struct crypto_buffer    * crypto_buffer  = NULL;
+    struct raw_buffer      * raw_buffer_ext = NULL;
 
-    struct nexus_uuid_path  * untrusted_path = NULL;
+    struct nexus_uuid_path * untrusted_path = NULL;
 
     int ret = -1;
 
 
     // invoke the ocall to get metadata contents
-    ret = ocall_metadata_get(&crypto_buffer,
+    ret = ocall_metadata_get(&raw_buffer_ext,
                              uuid,
                              untrusted_path,
                              global_backend_ext);
 
-    if (ret || crypto_buffer == NULL) {
+    if (ret || raw_buffer == NULL) {
         ocall_debug("ocall_metadata_get FAILED");
         goto out;
     }
@@ -46,29 +30,31 @@ out:
     }
 
     if (ret) {
-        if (crypto_buffer) {
-            crypto_buffer_free(crypto_buffer);
+        if (raw_buffer_ext) {
+            raw_buffer_free_ext(raw_buffer_ext);
         }
 
         return NULL;
     }
 
-    return crypto_buffer;
+    return raw_buffer;
 }
 
 int
-metadata_write(struct nexus_uuid      * uuid,
-               struct nexus_uuid_path * uuid_path,
-               struct crypto_buffer   * crypto_buffer)
+metadata_write(struct nexus_uuid       * uuid,
+               struct nexus_uuid_path  * uuid_path,
+               struct nexus_crypto_buf * crypto_buffer)
 {
     struct nexus_uuid_path * uuid_path_untrusted = NULL;
 
     int err = -1;
     int ret = -1;
 
-
-    err = ocall_metadata_set(
-        &ret, uuid, uuid_path_untrusted, crypto_buffer, global_backend_ext);
+    err = ocall_metadata_set(&ret,
+                             uuid,
+                             uuid_path_untrusted,
+                             crypto_buffer->untrusted_addr,
+                             global_backend_ext);
 
     if (err || ret) {
         ocall_debug("ocall_metadata_set FAILED");

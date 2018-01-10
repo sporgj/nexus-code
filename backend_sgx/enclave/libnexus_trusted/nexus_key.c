@@ -37,6 +37,15 @@ nexus_free_key(struct nexus_key * key)
 }
 
 
+int
+nexus_init_key(struct nexus_key * key, nexus_key_type_t key_type)
+{
+    memset(key, 0, sizeof(struct nexus_key));
+
+    key->type = key_type;
+
+    return 0;
+}
 
 
 int
@@ -178,7 +187,7 @@ nexus_copy_key(struct nexus_key * src_key,
 }
 
 size_t
-nexus_key_buflen(struct nexus_key * key)
+nexus_key_size_bytes(struct nexus_key * key)
 {
     switch (key->type) {
 	case NEXUS_RAW_128_KEY:
@@ -193,6 +202,18 @@ nexus_key_buflen(struct nexus_key * key)
 	default:
 	    return 0;
     }
+}
+
+size_t
+nexus_key_size_bits(struct nexus_key * key)
+{
+    return (nexus_key_size_bytes(key) << 3);
+}
+
+size_t
+nexus_key_buflen(struct nexus_key * key)
+{
+    return nexus_key_size_bytes(key);
 }
 
 /**

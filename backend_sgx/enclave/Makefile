@@ -122,7 +122,7 @@ cscope:
 
 
 clean:
-	rm -rf *.a *.o *.so nexus_enclave_t.* nexus_trusted/*.o
+	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o
 
 
 .PHONY: all clean
