@@ -28,36 +28,14 @@ enclave {
         (
             [user_check] struct raw_buffer     * user_pubkey_in,
             [user_check] struct nexus_uuid     * supernode_uuid_out,
-            [user_check] struct sealed_buffer ** sealed_volumekey_out
-        );
-
-        /**
-         * Requests a new authentication challenge from the enclave
-         * @param user_pubkey_in
-         * @param sealed_volkey_in
-         * @param nonce_out
-         */
-        public int ecall_auth_request
-        (
-            [user_check] struct raw_buffer     * user_pubkey_in,
-            [user_check] struct sealed_buffer  * sealed_volkey_in,
-            [user_check] struct raw_buffer    ** nonce_challenge_out
-        );
-
-        /**
-         * Responds to the enclave challenge
-         */
-        public int ecall_auth_response
-        (
-            [user_check] struct crypto_buffer  * supernode_in,
-            [user_check] struct raw_buffer     * signature_in
+            [user_check] struct raw_buffer    ** sealed_volumekey_out
         );
     };
 
 
     untrusted {
 
-        struct crypto_buffer *
+        struct raw_buffer *
         ocall_metadata_get
         (
                     [in] struct nexus_uuid        * uuid,
@@ -69,7 +47,7 @@ enclave {
         (
                     [in] struct nexus_uuid        * uuid,
             [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-                    [in] struct crypto_buffer     * crypto_buffer,
+                    [in] struct raw_buffer        * raw_buffer,
             [user_check] void                     * backend_info
         );
 

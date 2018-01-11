@@ -79,7 +79,7 @@ int
 __nexus_key_from_buf(struct nexus_key * key,
 		     nexus_key_type_t   key_type, 
 		     uint8_t          * src_buf,
-		     size_t             src_buf);
+		     size_t             src_buflen);
     
 
 struct nexus_key *

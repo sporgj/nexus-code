@@ -239,7 +239,7 @@ nexus_key_to_buf(struct nexus_key * key,
     switch (key->type) {
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	    buf = __raw_key_to_buffer(key, dst_buf, dst_size);
+	    buf = __raw_key_to_buf(key, dst_buf, dst_size);
 	    break;
 	case NEXUS_SEALED_128_KEY:
 	case NEXUS_SEALED_256_KEY:
@@ -247,8 +247,8 @@ nexus_key_to_buf(struct nexus_key * key,
 	    break;
 	default:
 	    log_error("Cannot serialize this key type (%s) to a buffer\n",
-		      nexus_key_type_to_str(key->key_type));
-	    return -1;
+		      nexus_key_type_to_str(key->type));
+	    return NULL;
     }
 
     return buf;
@@ -261,7 +261,7 @@ int
 __nexus_key_from_buf(struct nexus_key * key,
 		     nexus_key_type_t   key_type, 
 		     uint8_t          * src_buf,
-		     size_t             src_buf)
+		     size_t             src_buflen)
 {
     int ret = 0;
 
@@ -270,15 +270,15 @@ __nexus_key_from_buf(struct nexus_key * key,
     switch (key->type) {
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	    ret = __raw_key_from_buffer(key, buffer, buflen);
+	    ret = __raw_key_from_buffer(key, src_buf, src_buflen);
 	    break;
 	case NEXUS_SEALED_128_KEY:
 	case NEXUS_SEALED_256_KEY:
-	    ret = __sealed_key_from_buffer(key, buffer, buflen);
+	    ret = __sealed_key_from_buffer(key, src_buf, src_buflen);
 	    break;
 	default:
 	    log_error("Cannot unserialize this key type (%s) from a buffer\n",
-		      nexus_key_type_to_str(key->key_type));
+		      nexus_key_type_to_str(key->type));
 	    return -1;
     }
 

@@ -8,10 +8,14 @@ struct nexus_mac {
 
 
 /**
- * returns 1 if mac1 == mac2
+ * Compares two macs
+ * @param mac1
+ * @param mac2
+ *
+ * return 0 if equal
  */
 int
-nexus_mac_equals(struct nexus_mac * mac1, struct nexus_mac * mac2);
+nexus_mac_compare(struct nexus_mac * mac1, struct nexus_mac * mac2);
 
 void
 nexus_mac_copy(struct nexus_mac * src_mac, struct nexus_mac * dst_mac);

@@ -13,6 +13,8 @@
 
 #include <sgx_trts.h>
 
+#include "../crypto.h"
+
 
 extern struct nexus_key * sealing_key;
 
@@ -61,7 +63,7 @@ __seal_key(struct nexus_key * sealed_key,
 
 static int
 __unseal_key(struct nexus_key * unsealed_key,
-	     struct nexus_key * sealed_key,)
+	     struct nexus_key * sealed_key)
 {
     unsealed_key->key = crypto_aes_ecb_decrypt(sealing_key,
 					       __sealed_key_bytes(sealed_key),
@@ -107,8 +109,11 @@ __sealed_key_to_buf(struct nexus_key * key,
 	
     } else {
 	if (key_len != dst_size) {
-	    log_error("Buffer length mismatch (key_size = %lu) (dst_size = %lu)\n", key_len, dst_size);
-	    return -1;
+            log_error(
+                "Buffer length mismatch (key_size = %lu) (dst_size = %lu)\n",
+                key_len,
+                dst_size);
+            return NULL;
 	}
 	
 	tgt_buf = dst_buf;

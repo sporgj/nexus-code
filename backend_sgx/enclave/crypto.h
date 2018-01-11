@@ -21,15 +21,17 @@ struct nexus_crypto_ctx {
 
 
 
-// deterministic encryption of a sensitive key using the keywrapping key
-int
-crypto_keywrap(struct nexus_key * keywrapping_key,
-               struct nexus_key * sensitive_key);
+uint8_t *
+crypto_aes_ecb_encrypt(struct nexus_key * key,
+                       size_t             data_size,
+                       uint8_t          * in_buf);
 
-// deterministic decryption of a sensitive key using the keywrapping key
-int
-crypto_keyunwrap(struct nexus_key * keywrapping_key,
-                 struct nexus_key * sensitive_key);
+
+uint8_t *
+crypto_aes_ecb_decrypt(struct nexus_key * key,
+                       size_t             data_size,
+                       uint8_t          * in_buf);
+
 
 
 /**

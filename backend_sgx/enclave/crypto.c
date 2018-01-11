@@ -46,7 +46,7 @@ __crypto_aes_ecb_encrypt(struct nexus_key * key,
     return 0;
 }
 
-uint8_t * 
+uint8_t *
 crypto_aes_ecb_encrypt(struct nexus_key * key,
 		       size_t             data_size,
 		       uint8_t          * in_buf)
@@ -105,7 +105,7 @@ __crypto_aes_ecb_decrypt(struct nexus_key * key,
     return 0;
 }
 
-uint8_t * 
+uint8_t *
 crypto_aes_ecb_decrypt(struct nexus_key * key,
 		       size_t             data_size,
 		       uint8_t          * in_buf)
@@ -191,6 +191,7 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 out:
     if (iv_copy) {
         nexus_free_key(iv_copy);
+        nexus_free(iv_copy);
     }
 
     return ret;
@@ -247,13 +248,21 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
         mbedtls_gcm_free(&gcm_context);
     }
 
-    ret = memcmp(&computed_mac, &crypto_context->mac, sizeof(struct nexus_mac));
+    if (nexus_mac_compare(&computed_mac, &crypto_context->mac) != 0) {
+        ret = -1;
+        goto out;
+    }
 
-    if (ret == 0 && mac) {
-        memcpy(mac, &crypto_context->mac, sizeof(struct nexus_mac));
+    if (mac) {
+        nexus_mac_copy(&computed_mac, mac);
     }
 
     ret = 0;
 out:
+    if (iv_copy) {
+        nexus_free_key(iv_copy);
+        nexus_free(iv_copy);
+    }
+
     return ret;
 }
