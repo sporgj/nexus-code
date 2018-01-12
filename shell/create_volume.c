@@ -26,7 +26,6 @@ static int cmd_line_config_file = 0;
 static void
 __set_defaults()
 {
-    nexus_config.user_volconfig_path = NULL;
 }
 
 static void usage()
@@ -37,10 +36,6 @@ static void usage()
 
     printf("\t[--user_key]   (default: %-*s)       : Location of User's public key\n",
 	   32, nexus_config.user_key_path);
-
-    // this is hardcoded in libnexus/nexus_binaries.S
-    printf("\t  [--config]   "
-           "(default:libnexus/nexus_default_volume_config.json)\n");
 
     return;
 }
@@ -63,7 +58,6 @@ create_volume_main(int argc, char ** argv)
 
 	static struct option long_options[] = {
 	    { "user_key"      , required_argument , &cmd_line_user_key ,  1  },  /* 0 */
-	    { "config"      , required_argument , &cmd_line_config_file ,  1  },  /* 1 */
 	    { 0, 0, 0, 0 }
 	};
 	
@@ -77,12 +71,6 @@ create_volume_main(int argc, char ** argv)
 			    nexus_config.user_key_path = optarg;
 			    used_opts += 2;
 			    break;
-
-			case 1:
-			    nexus_config.user_volconfig_path = optarg;
-			    used_opts += 2;
-			    break;
-			    
 
 			default:
 			    usage();
@@ -112,7 +100,7 @@ create_volume_main(int argc, char ** argv)
 
     printf("Creating Nexus Volume at (%s)\n", volume_path);
     
-    vol = nexus_create_volume(volume_path, nexus_config.user_volconfig_path);
+    vol = nexus_create_volume(volume_path, NULL);
 
     if (vol == NULL) {
 	log_error("Could not create volume at (%s)\n", volume_path);

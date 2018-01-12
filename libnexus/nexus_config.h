@@ -15,7 +15,6 @@ struct nexus_config {
     
     char * user_key_path;
 
-    char * user_volconfig_path;
 };
 
 
