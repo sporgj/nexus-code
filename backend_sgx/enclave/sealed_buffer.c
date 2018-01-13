@@ -4,7 +4,7 @@
 
 
 struct sealed_buffer *
-sealed_buffer_write(void * data, size_t size)
+sealed_buffer_put(void * data, size_t size)
 {
     struct sealed_buffer * sealed_buffer = NULL;
 
@@ -22,7 +22,7 @@ sealed_buffer_write(void * data, size_t size)
 
     ret = sgx_seal_data(0, NULL, size, data, sealed_data_size, sealed_data_ptr);
     if (ret) {
-        ocall_debug("sgx_seal_data() FAILED");
+        log_error("sgx_seal_data() FAILED\n");
         goto out;
     }
 
@@ -55,7 +55,7 @@ out:
  * Unseals the content of the sealed buffer and returns the content
  */
 void *
-sealed_buffer_read(struct sealed_buffer * sealed_buffer)
+sealed_buffer_get(struct sealed_buffer * sealed_buffer)
 {
     sgx_sealed_data_t * sealed_data_trusted  = NULL;
 
@@ -80,7 +80,7 @@ sealed_buffer_read(struct sealed_buffer * sealed_buffer)
             sealed_data_trusted, NULL, 0, unsealed_contents, &unsealed_size);
 
         if (ret) {
-            ocall_debug("sgx_unseal_data FAILED");
+            log_error("sgx_unseal_data FAILED \n");
             goto out;
         }
     }

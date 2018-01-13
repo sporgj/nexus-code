@@ -87,8 +87,8 @@ __raw_key_to_buf(struct nexus_key * key,
     if (dst_buf == NULL) {
 	tgt_buf = nexus_malloc(key_len);	
     } else {
-	if (key_len != dst_size) {
-	    log_error("Buffer length mismatch (key_size = %lu) (dst_size = %lu)\n", key_len, dst_size);
+	if (key_len > dst_size) {
+	    log_error("destination buffer too small (key_size = %lu) (dst_size = %lu)\n", key_len, dst_size);
 	    return NULL;
 	}
 

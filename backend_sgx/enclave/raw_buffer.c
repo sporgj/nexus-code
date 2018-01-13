@@ -1,7 +1,7 @@
 #include "internal.h"
 
 struct raw_buffer *
-raw_buffer_write(void * trusted_buffer, size_t size)
+raw_buffer_put(void * trusted_buffer, size_t size)
 {
     struct raw_buffer * raw_buffer = NULL;
 

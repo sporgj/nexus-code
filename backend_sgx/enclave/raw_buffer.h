@@ -7,10 +7,13 @@
 /**
  * allocates a raw_buffer structure in untrusted memory and copies content
  * of trusted buffer
+ * @param trusted_buffer
  * @param size
+ *
+ * @return new raw_buffer
  */
 struct raw_buffer *
-raw_buffer_write(void * trusted_buffer, size_t size);
+raw_buffer_put(void * trusted_buffer, size_t size);
 
 /**
  * Initializes a raw_buffer

@@ -1,4 +1,4 @@
-#include "crypto.h"
+#include "internal.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -21,9 +21,9 @@ __crypto_aes_ecb_encrypt(struct nexus_key * key,
     
     int bit_length = 0;
     
-    if (key->type == NEXUS_RAW_128_BIT_KEY) {
+    if (key->type == NEXUS_RAW_128_KEY) {
 	bit_length = 128;
-    } else if (key->type == NEXUS_RAW_256_BIT_KEY) {
+    } else if (key->type == NEXUS_RAW_256_KEY) {
 	bit_length = 256;
     } else {
 	log_error("invalid key type (%s) for AES ECB\n", nexus_key_type_to_str(key->type));
@@ -48,8 +48,8 @@ __crypto_aes_ecb_encrypt(struct nexus_key * key,
 
 uint8_t *
 crypto_aes_ecb_encrypt(struct nexus_key * key,
-		       size_t             data_size,
-		       uint8_t          * in_buf)
+		       uint8_t          * in_buf,
+		       size_t             data_size)
 {
     uint8_t * out_buf = NULL;
 
@@ -80,9 +80,9 @@ __crypto_aes_ecb_decrypt(struct nexus_key * key,
     
     int bit_length = 0;
     
-    if (key->type == NEXUS_RAW_128_BIT_KEY) {
+    if (key->type == NEXUS_RAW_128_KEY) {
 	bit_length = 128;
-    } else if (key->type == NEXUS_RAW_256_BIT_KEY) {
+    } else if (key->type == NEXUS_RAW_256_KEY) {
 	bit_length = 256;
     } else {
 	log_error("invalid key type (%s) for AES ECB\n", nexus_key_type_to_str(key->type));
@@ -107,8 +107,8 @@ __crypto_aes_ecb_decrypt(struct nexus_key * key,
 
 uint8_t *
 crypto_aes_ecb_decrypt(struct nexus_key * key,
-		       size_t             data_size,
-		       uint8_t          * in_buf)
+		       uint8_t          * in_buf,
+		       size_t             data_size)
 {
     uint8_t * out_buf = NULL;
 

@@ -15,8 +15,8 @@
 
 #include "../crypto.h"
 
-
-extern struct nexus_key * sealing_key;
+/// the volume key will be used to "seal" (keywrapping, to be more precise)
+extern struct nexus_key * global_volumekey;
 
 static inline int
 __sealed_key_bits(struct nexus_key * key)
@@ -48,9 +48,9 @@ static int
 __seal_key(struct nexus_key * sealed_key,
 	   struct nexus_key * unsealed_key)
 {
-    sealed_key->key = crypto_aes_ecb_encrypt(sealing_key,
-					     __sealed_key_bytes(unsealed_key),
-					     unsealed_key->key);
+    sealed_key->key = crypto_aes_ecb_encrypt(global_volumekey,
+					     unsealed_key->key,
+					     __sealed_key_bytes(unsealed_key));
     
     if (sealed_key->key == NULL) {
 	log_error("Could not seal key\n");
@@ -65,9 +65,9 @@ static int
 __unseal_key(struct nexus_key * unsealed_key,
 	     struct nexus_key * sealed_key)
 {
-    unsealed_key->key = crypto_aes_ecb_decrypt(sealing_key,
-					       __sealed_key_bytes(sealed_key),
-					       sealed_key->key);
+    unsealed_key->key = crypto_aes_ecb_decrypt(global_volumekey,
+					       sealed_key->key,
+					       __sealed_key_bytes(sealed_key));
     
     if (unsealed_key->key == NULL) {
 	log_error("Could not unseal key\n");
@@ -108,9 +108,9 @@ __sealed_key_to_buf(struct nexus_key * key,
 	tgt_buf = nexus_malloc(key_len);
 	
     } else {
-	if (key_len != dst_size) {
+	if (key_len > dst_size) {
             log_error(
-                "Buffer length mismatch (key_size = %lu) (dst_size = %lu)\n",
+                "destination buffer too small (key_size = %lu) (dst_size = %lu)\n",
                 key_len,
                 dst_size);
             return NULL;

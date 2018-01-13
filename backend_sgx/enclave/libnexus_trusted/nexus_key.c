@@ -243,7 +243,7 @@ nexus_key_to_buf(struct nexus_key * key,
 	    break;
 	case NEXUS_SEALED_128_KEY:
 	case NEXUS_SEALED_256_KEY:
-	    buf = __sealed_key_to_buffer(key, dst_buf, dst_size);
+	    buf = __sealed_key_to_buf(key, dst_buf, dst_size);
 	    break;
 	default:
 	    log_error("Cannot serialize this key type (%s) to a buffer\n",

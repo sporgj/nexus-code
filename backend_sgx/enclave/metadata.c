@@ -17,7 +17,7 @@ metadata_open(struct nexus_uuid       * uuid,
                              untrusted_path,
                              global_backend_ext);
 
-    if (ret || raw_buffer == NULL) {
+    if (ret || raw_buffer_ext == NULL) {
         ocall_debug("ocall_metadata_get FAILED");
         goto out;
     }
@@ -37,7 +37,7 @@ out:
         return NULL;
     }
 
-    return raw_buffer;
+    return raw_buffer_ext;
 }
 
 int
@@ -53,7 +53,7 @@ metadata_write(struct nexus_uuid       * uuid,
     err = ocall_metadata_set(&ret,
                              uuid,
                              uuid_path_untrusted,
-                             crypto_buffer->untrusted_addr,
+                             nexus_crypto_buf_untrusted_addr(crypto_buffer),
                              global_backend_ext);
 
     if (err || ret) {

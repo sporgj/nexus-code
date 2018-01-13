@@ -23,14 +23,14 @@ struct nexus_crypto_ctx {
 
 uint8_t *
 crypto_aes_ecb_encrypt(struct nexus_key * key,
-                       size_t             data_size,
-                       uint8_t          * in_buf);
+                       uint8_t          * in_buf,
+                       size_t             data_size);
 
 
 uint8_t *
 crypto_aes_ecb_decrypt(struct nexus_key * key,
-                       size_t             data_size,
-                       uint8_t          * in_buf);
+                       uint8_t          * in_buf,
+                       size_t             data_size);
 
 
 

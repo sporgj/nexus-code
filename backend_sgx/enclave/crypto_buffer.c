@@ -61,6 +61,83 @@ __get_header_len(struct nexus_crypto_buf * crypto_buf)
     return -1;
 }
 
+struct nexus_crypto_buf *
+nexus_crypto_buf_new(size_t size)
+{
+    struct nexus_crypto_buf * crypto_buf = NULL;
+
+    int err = -1;
+
+
+    // by default we perform 128 bit GCM
+    crypto_buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
+
+    crypto_buf->trusted_addr = NULL;
+    crypto_buf->trusted_size = size;
+
+    // allocate the untrusted buffer
+    err = ocall_calloc((void **) &crypto_buf->untrusted_addr,
+                       size + __get_header_len(crypto_buf));
+
+    if (err) {
+        log_error("could not allocate space for crypto_buffer");
+        nexus_free(crypto_buf);
+        return NULL;
+    }
+
+    return crypto_buf;
+}
+
+void
+nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
+{
+    assert(crypto_buf != NULL);
+
+    if (crypto_buf->untrusted_addr) {
+        ocall_free(crypto_buf->untrusted_addr);
+    }
+
+    // free the crypto context
+    {
+        struct nexus_crypto_ctx * crypto_context = &crypto_buf->crypto_context;
+
+        if (crypto_context->key.key != NULL) {
+            nexus_free_key(&crypto_context->key);
+        }
+
+        if (crypto_context->iv.key != NULL) {
+            nexus_free_key(&crypto_context->iv);
+        }
+    }
+
+    nexus_free(crypto_buf);
+}
+
+
+
+static int
+__unseal_gcm128_crypto_context(struct nexus_crypto_buf * crypto_buf)
+{
+    struct nexus_crypto_ctx * crypto_context = &crypto_buf->crypto_ctx;
+
+    struct nexus_key * unsealed_ekey = NULL;
+
+    // derive a sealed_128 key from a raw_128 key
+    unsealed_ekey = nexus_derive_key(NEXUS_RAW_128_KEY, &crypto_context->key);
+    if (unsealed_ekey == NULL) {
+        return -1;
+    }
+
+    // now copy and replace the crypto context encryption key
+    nexus_free_key(&crypto_context->key);
+    nexus_copy_key(unsealed_ekey, &crypto_context->key); // mallocs and copies
+
+    nexus_free_key(unsealed_ekey);
+    nexus_free(unsealed_ekey);
+
+    return 0;
+}
+
 static int
 __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
                        uint8_t                  * untrusted_crypto_ctx_ptr)
@@ -79,7 +156,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 
     crypto_ctx = &crypto_buf->crypto_ctx;
 
-    nexus_init_key(&crypto_ctx->key, NEXUS_RAW_128_KEY);
+    nexus_init_key(&crypto_ctx->key, NEXUS_SEALED_128_KEY);
     nexus_init_key(&crypto_ctx->iv, NEXUS_RAW_128_KEY);
     
     {
@@ -91,7 +168,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
                                     buflen_size);
 
         if (ret) {
-	    ocall_debug("parsing crypto_ctx key FAILED\n");
+	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
 	}
 
@@ -106,7 +183,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 
         if (ret) {
 	    nexus_key_free(&crypto_ctx->key);
-	    ocall_debug("parsing crypto_ctx key FAILED\n");
+	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
 	}
 
@@ -118,6 +195,13 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
         memcpy(&crypto_ctx->mac,
                crypto_buf->untrusted_addr + crypto_ctx_size,
                sizeof(struct nexus_mac));
+    }
+
+
+    ret = __unseal_gcm128_crypto_context(crypto_buf);
+    if (ret) {
+        log_error("could not unseal crypto context\n");
+        goto out;
     }
 
     ret = 0;
@@ -168,44 +252,10 @@ nexus_crypto_buf_alloc(void   * untrusted_addr,
     return crypto_buf;
 }
 
-
-struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size)
+void *
+nexus_crypto_buf_untrusted_addr(struct nexus_crypto_buf * crypto_buf)
 {
-    struct nexus_crypto_buf * crypto_buf = NULL;
-
-    int err = -1;
-
-
-    // by default we perform 128 bit GCM
-    crypto_buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
-
-    crypto_buf->trusted_addr = NULL;
-    crypto_buf->trusted_size = size;
-
-    // allocate the untrusted buffer
-    err = ocall_calloc((void **) &crypto_buf->untrusted_addr,
-                       size + __get_header_len(crypto_buf));
-
-    if (err) {
-        ocall_debug("could not allocate space for crypto_buffer");
-        nexus_free(crypto_buf);
-        return NULL;
-    }
-
-    return crypto_buf;
-}
-
-void
-nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
-{
-    assert(crypto_buf != NULL);
-
-    if (crypto_buf->untrusted_addr) {
-        ocall_free(crypto_buf->untrusted_addr);
-    }
-
-    nexus_free(crypto_buf);
+    return crypto_buf->untrusted_addr;
 }
 
 void *
@@ -230,22 +280,14 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     void * encrypted_data_ptr = NULL;
 
     int ret = -1;
-    
 
+
+    // parses and "unseals" the buffer's crypto context
     ret = __parse_header(crypto_buf);
     if (ret) {
-        ocall_debug("parsing crypto_buf header FAILED\n");
+        log_error("parsing crypto_buf header FAILED\n");
         goto err;
     }
-
-    /* Unseal the crypto_ctx */
-#if 0
-    ret = crypto_keyunwrap(global_volumekey, &crypto_buf->crypto_ctx.key);
-    if (ret) {
-        ocall_debug("crypto_keyunwrap FAILED\n");
-        goto err;
-    }
-#endif
 
     encrypted_data_ptr
         = crypto_buf->untrusted_addr + __get_header_len(crypto_buf);
@@ -260,7 +302,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
                              sizeof(struct crypto_buf_info));
 
     if (ret) {
-        ocall_debug("crypto_gcm_decrypt() FAILED\n");
+        log_error("crypto_gcm_decrypt() FAILED\n");
         goto err;
     }
 
@@ -274,6 +316,29 @@ err:
 }
 
 static int
+__seal_gcm128_crypto_context(struct nexus_crypto_buf * crypto_buf)
+{
+    struct nexus_crypto_ctx * crypto_context = &crypto_buf->crypto_ctx;
+
+    struct nexus_key * sealed_ekey = NULL;
+
+    // derive a sealed_128 key from a raw_128 key
+    sealed_ekey = nexus_derive_key(NEXUS_SEALED_128_KEY, &crypto_context->key);
+    if (sealed_ekey == NULL) {
+        return -1;
+    }
+
+    // now copy and replace the crypto context encryption key
+    nexus_free_key(&crypto_context->key);
+    nexus_copy_key(sealed_ekey, &crypto_context->key); // mallocs and copies
+
+    nexus_free_key(sealed_ekey);
+    nexus_free(sealed_ekey);
+
+    return 0;
+}
+
+static int
 __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
                           uint8_t                 * untrusted_crypto_ctx_ptr)
 {
@@ -282,10 +347,14 @@ __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
     int ret = -1;
 
 
-    // write out the info into the buffer
+    ret = __seal_gcm128_crypto_context(crypto_buf);
+    if (ret) {
+        log_error("could not seal gcm128 crypto context\n");
+        return -1;
+    }
+
 
     buflen_size = crypto_buf->untrusted_size - sizeof(struct crypto_buf_info);
-
 
     // serialize the crypto context
     {
@@ -298,7 +367,7 @@ __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
                                   buflen_size);
 
         if (ret) {
-	    ocall_debug("parsing crypto_ctx key FAILED\n");
+	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
 	}
 
@@ -313,7 +382,7 @@ __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
 
         if (ret) {
 	    nexus_key_free(&crypto_ctx->key);
-	    ocall_debug("parsing crypto_ctx key FAILED\n");
+	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
 	}
 
@@ -374,14 +443,14 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
                                crypto_buf->trusted_size + header_len);
 
         if (err) {
-            ocall_debug("could not allocate space for crypto_buffer");
+            log_error("could not allocate space for crypto_buffer\n");
             nexus_free(crypto_buf);
             return -1;
         }
     }
 
 
-    // adjust the crypto info. This is used as additional authentication
+    // Set the crypto info. This is used as additional authentication
     // material when encrypting the trusted buffer
     crypto_buf->info.magic = MAGIC_GCM_128;
     crypto_buf->info.size  = crypto_buf->trusted_size;
@@ -398,13 +467,10 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
                              sizeof(struct crypto_buf_info));
 
 
-    // TODO keywrap the crypto context
-
-
-    // write the info + crypto_context to the buffer
+    // write the info + sealed(crypto_context) to the buffer
     ret = __serialize_header(crypto_buf);
     if (ret) {
-        ocall_debug("serializing header FAILED \n");
+        log_error("serializing header FAILED\n");
         return -1;
     }
 

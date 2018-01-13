@@ -31,6 +31,13 @@ nexus_crypto_buf_new(size_t size);
 void
 nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
 
+/**
+ * Returns the pointer to the untrusted buffer
+ * @param crypto_buf
+ */
+void *
+nexus_crypto_buf_untrusted_addr(struct nexus_crypto_buf * crypto_buf);
+
 
 
 /**
@@ -46,4 +53,5 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
 
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
+                     uint8_t                 * trusted_buf,
                      struct nexus_mac        * mac);
