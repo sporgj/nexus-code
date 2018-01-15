@@ -143,10 +143,10 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
 
     // generate key and IV
-    nexus_generate_key(&crypto_context->key, NEXUS_RAW_128_KEY);
-    nexus_generate_key(&crypto_context->iv, NEXUS_RAW_128_KEY);
+    nexus_generate_key(crypto_context->key, NEXUS_RAW_128_KEY);
+    nexus_generate_key(crypto_context->iv, NEXUS_RAW_128_KEY);
 
-    iv_copy = nexus_clone_key(&crypto_context->iv);
+    iv_copy = nexus_clone_key(crypto_context->iv);
 
 
     // intiialize the gcm context and perform the encryption
@@ -157,13 +157,13 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&crypto_context->key.key,
-                           nexus_key_size_bits(&crypto_context->key));
+                           (uint8_t *)&crypto_context->key->key,
+                           nexus_key_bits(crypto_context->key));
 
         mbedtls_gcm_starts(&gcm_context,
                            MBEDTLS_GCM_ENCRYPT,
                            iv_copy->key,
-                           nexus_key_size_bytes(iv_copy),
+                           nexus_key_bytes(iv_copy),
                            (uint8_t *) aad, // AAD used for integrity
                            aad_len);
 
@@ -213,7 +213,7 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
     int ret = -1;
 
-    iv_copy = nexus_clone_key(&crypto_context->iv);
+    iv_copy = nexus_clone_key(crypto_context->iv);
 
 
     // intiialize the gcm context and perform the encryption
@@ -224,13 +224,13 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&crypto_context->key.key,
-                           neuxs_key_size_bits(&crypto_context->key));
+                           (uint8_t *)&crypto_context->key->key,
+                           nexus_key_bits(crypto_context->key));
 
         mbedtls_gcm_starts(&gcm_context,
                            MBEDTLS_GCM_DECRYPT,
                            iv_copy->key,
-                           nexus_key_size_bytes(iv_copy),
+                           nexus_key_bytes(iv_copy),
                            (uint8_t *) aad, // AAD used for integrity
                            aad_len);
 

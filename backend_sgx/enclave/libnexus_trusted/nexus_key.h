@@ -62,6 +62,17 @@ void
 nexus_free_key(struct nexus_key * key);
 
 
+/**
+ * Returns the size of the key in bytes.
+ *
+ * @return -1 for invalid key types
+ */
+int
+nexus_key_bytes(struct nexus_key * key);
+
+int
+nexus_key_bits(struct nexus_key * key);
+
 
 
 /* Return Value: 

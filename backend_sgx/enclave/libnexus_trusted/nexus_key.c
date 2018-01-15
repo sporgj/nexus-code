@@ -225,6 +225,55 @@ nexus_copy_key(struct nexus_key * src_key,
     return ret;
 }
 
+
+int
+nexus_key_bytes(struct nexus_key * key)
+{
+    int ret = -1;
+
+    switch (key->type) {
+	case NEXUS_RAW_128_KEY:
+	case NEXUS_RAW_256_KEY:
+	    ret = __raw_key_bytes(key);
+	    break;
+	case NEXUS_SEALED_128_KEY:
+	case NEXUS_SEALED_256_KEY:
+	    ret = __sealed_key_bytes(key);
+	    break;
+
+	default:
+	    log_error("could not get size for key type\n");
+	    return -1;
+    }
+
+    return ret;
+}
+
+int
+nexus_key_bits(struct nexus_key * key)
+{
+    int ret = -1;
+
+    switch (key->type) {
+	case NEXUS_RAW_128_KEY:
+	case NEXUS_RAW_256_KEY:
+	    ret = __raw_key_bits(key);
+	    break;
+	case NEXUS_SEALED_128_KEY:
+	case NEXUS_SEALED_256_KEY:
+	    ret = __sealed_key_bits(key);
+	    break;
+
+	default:
+	    log_error("could not get size for key type\n");
+	    return -1;
+    }
+
+    return ret;
+}
+
+
+
 /* Return Value: 
  *    NULL on error, otherwise a pointer to the buffer serialized into
  *    If dst_buf is NULL, then a new buffer is allocated
@@ -270,11 +319,11 @@ __nexus_key_from_buf(struct nexus_key * key,
     switch (key->type) {
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	    ret = __raw_key_from_buffer(key, src_buf, src_buflen);
+	    ret = __raw_key_from_buf(key, src_buf, src_buflen);
 	    break;
 	case NEXUS_SEALED_128_KEY:
 	case NEXUS_SEALED_256_KEY:
-	    ret = __sealed_key_from_buffer(key, src_buf, src_buflen);
+	    ret = __sealed_key_from_buf(key, src_buf, src_buflen);
 	    break;
 	default:
 	    log_error("Cannot unserialize this key type (%s) from a buffer\n",

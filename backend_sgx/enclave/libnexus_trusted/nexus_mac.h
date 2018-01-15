@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #define CONFIG_MAC_SIZE 16
 
 struct nexus_mac {

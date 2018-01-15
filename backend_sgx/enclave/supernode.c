@@ -11,10 +11,6 @@ supernode_new(struct raw_buffer * user_pubkey)
     nexus_uuid_gen(&supernode->root_uuid);
     nexus_uuid_gen(&supernode->user_list_uuid);
 
-    nexus_hash_gen(&supernode->owner_pubkey,
-                   raw_buffer_get(user_pubkey),
-                   raw_buffer_size(user_pubkey));
-
     return supernode;
 }
 

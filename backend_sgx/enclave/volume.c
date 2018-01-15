@@ -51,9 +51,9 @@ out:
 }
 
 int
-ecall_create_volume(struct raw_buffer     * user_pubkey_in,
-                    struct nexus_uuid     * supernode_uuid_out,
-                    struct sealed_buffer ** sealed_volumekey_out)
+ecall_create_volume(struct raw_buffer  * user_pubkey_in,
+                    struct nexus_uuid  * supernode_uuid_out,
+                    struct raw_buffer ** sealed_volumekey_out)
 {
     struct nexus_key * volumekey = NULL;
 
@@ -66,9 +66,11 @@ ecall_create_volume(struct raw_buffer     * user_pubkey_in,
         return -1;
     }
 
+#if 0
     // seal the volumekey and return to untrusted memory
     *sealed_volumekey_out = sealed_buffer_write(volumekey->key,
                                                 VOLUMEKEY_SIZE_BYTES);
+#endif
 
     nexus_free_key(volumekey);
 
@@ -80,6 +82,7 @@ ecall_create_volume(struct raw_buffer     * user_pubkey_in,
 }
 
 
+#if 0
 int
 ecall_auth_request(struct raw_buffer *    user_pubkey_in,
                    struct sealed_buffer * sealed_volkey_in,
@@ -96,3 +99,4 @@ ecall_auth_response(struct crypto_buffer * supernode_in,
     // TODO
     return -1;
 }
+#endif

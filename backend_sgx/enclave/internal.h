@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <assert.h>
+
 #include <sgx_trts.h>
 #include <sgx_tseal.h>
 #include <sgx_utils.h>
@@ -26,6 +28,9 @@
 #include "dirnode.h"
 #include "metadata.h"
 
+#include "nexus_log.h"
+#include "nexus_mac.h"
+#include "nexus_hash.h"
 #include "nexus_uuid.h"
 #include "nexus_util.h"
 #include "nexus_key.h"
