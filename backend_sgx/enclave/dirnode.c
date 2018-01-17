@@ -52,14 +52,14 @@ dirnode_store(struct dirnode         * dirnode,
     ret = nexus_crypto_buf_put(crypto_buffer, serialized_buffer, mac);
 
     if (ret) {
-        ocall_debug("crypto_buffer_write");
+        log_error("nexus_crypto_buf_put FAILED\n");
         goto out;
     }
 
     // write it to the datastore
     ret = metadata_write(&dirnode->my_uuid, uuid_path, crypto_buffer);
     if (ret) {
-        ocall_debug("metadata_write failed");
+        log_error("metadata_write failed\n");
     }
 
     ret = 0;

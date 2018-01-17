@@ -52,6 +52,7 @@ supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey)
     {
         struct dirnode * root_dirnode = dirnode_create(&supernode->root_uuid);
         if (root_dirnode == NULL) {
+            ret = -1;
             goto out;
         }
 
@@ -62,7 +63,7 @@ supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey)
         dirnode_free(root_dirnode);
 
         if (ret != 0) {
-            ocall_debug("dirnode_store FAILED");
+            log_error("dirnode_store FAILED\n");
             goto out;
         }
     }
@@ -92,8 +93,7 @@ supernode_store(struct supernode       * supernode,
                 struct nexus_key       * volumekey,
                 struct nexus_mac       * mac)
 {
-#if 0
-    struct crypto_buffer * crypto_buffer = NULL;
+    struct nexus_crypto_buf * crypto_buffer = NULL;
 
     uint8_t * serialized_buffer = NULL;
     size_t    serialized_buflen = 0;
@@ -107,39 +107,32 @@ supernode_store(struct supernode       * supernode,
         return -1;
     }
 
-    // allocate the crypto buffer
-    crypto_buffer = crypto_buffer_new(serialized_buflen);
+    // allocates the crypto buffer
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen);
     if (!crypto_buffer) {
         goto out;
     }
 
-    ret = crypto_buffer_write(crypto_buffer,
-                              &supernode->my_uuid,
-                              serialized_buffer,
-                              serialized_buflen,
-                              mac);
+    ret = nexus_crypto_buf_put(crypto_buffer, serialized_buffer, mac);
 
     if (ret) {
-        ocall_debug("crypto_buffer_write");
+        log_error("crypto_buffer_write\n");
         goto out;
     }
 
     // write it to the datastore
     ret = metadata_write(&supernode->my_uuid, uuid_path, crypto_buffer);
     if (ret) {
-        ocall_debug("metadata_write failed");
+        log_error("metadata_write failed\n");
     }
 
     ret = 0;
 out:
     if (crypto_buffer) {
-        crypto_buffer_free(crypto_buffer);
+        nexus_crypto_buf_free(crypto_buffer);
     }
 
     return ret;
-#endif
-
-    return 0;
 }
 
 void

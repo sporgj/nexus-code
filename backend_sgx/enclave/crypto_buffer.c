@@ -119,30 +119,11 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
 
 
 
-static int
-__unseal_gcm128_crypto_context(struct nexus_crypto_ctx * crypto_context)
+static struct nexus_key *
+__unwrap_gcm128_key(struct nexus_key * wrapped_key)
 {
-    struct nexus_key * unsealed_key = NULL;
-
-
-    if (crypto_context->key == NULL) {
-        log_error("cannot unseal empty key\n");
-        return -1;
-    }
-
     // derive a sealed_128 key from a raw_128 key
-    unsealed_key = nexus_derive_key(NEXUS_RAW_128_KEY, crypto_context->key);
-    if (unsealed_key == NULL) {
-        return -1;
-    }
-
-    // now copy and replace the crypto context encryption key
-    nexus_free_key(crypto_context->key);
-    nexus_free(crypto_context->key);
-
-    crypto_context->key = unsealed_key;
-
-    return 0;
+    return nexus_derive_key(NEXUS_RAW_128_KEY, wrapped_key);
 }
 
 static int
@@ -151,12 +132,9 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 {
     struct nexus_crypto_ctx * crypto_ctx = NULL;
 
-    struct nexus_key * key = NULL;
-    struct nexus_key * iv  = NULL;
-    struct nexus_mac * mac = NULL;
-
-    static const size_t key_size = 16;
-    static const size_t iv_size  = 16;
+    struct nexus_key * wrapped_key = NULL;
+    struct nexus_key * iv          = NULL;
+    struct nexus_mac * mac         = NULL;
 
     int ret = -1;
 
@@ -176,16 +154,18 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
         in_buflen = crypto_buf->untrusted_size - sizeof(struct crypto_buf_info);
         in_buffer = untrusted_crypto_ctx_ptr;
 
-	// EKEY is sealed in the buffer
-        key = nexus_key_from_buf(NEXUS_WRAPPED_128_KEY, in_buffer, in_buflen);
-        if (key == NULL) {
+
+        wrapped_key
+            = nexus_key_from_buf(NEXUS_WRAPPED_128_KEY, in_buffer, in_buflen);
+
+        if (wrapped_key == NULL) {
 	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
 	}
 
         key_size   = 16;
-        in_buffer += key_size;
-        in_buflen -= key_size;
+        in_buffer += GCM128_KEY_SIZE;
+        in_buflen -= GCM128_KEY_SIZE;
 
         // IV
         iv = nexus_key_from_buf(NEXUS_RAW_128_KEY, in_buffer, in_buflen);
@@ -194,38 +174,36 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 	    goto out;
 	}
 
-        in_buffer += key_size;
-	in_buflen -= iv_size;
+        in_buffer += GCM128_IV_SIZE;
+	in_buflen -= GCM128_IV_SIZE;
 
 
 	// MAC
         nexus_mac_copy((struct nexus_mac *)in_buffer, mac);
     }
 
-    crypto_ctx->key = key;
-    crypto_ctx->iv  = iv;
-
-    ret = __unseal_gcm128_crypto_context(crypto_ctx);
-    if (ret) {
-        log_error("could not unseal crypto context\n");
+    crypto_ctx->key = __unwrap_gcm128_key(wrapped_key);
+    if (crypto_ctx->key == NULL) {
+        ret = -1;
+        log_error("__unwrap_gcm128_key FAILED\n");
         goto out;
     }
 
+    crypto_ctx->iv  = iv;
+
+
     ret = 0;
 out:
-    if (ret) {
-        if (key) {
-            nexus_free_key(key);
-            nexus_free(key);
-        }
+    if (wrapped_key) {
+        nexus_free_key(wrapped_key);
+        nexus_free(wrapped_key);
+    }
 
+    if (ret) {
         if (iv) {
             nexus_free_key(iv);
             nexus_free(iv);
         }
-
-        crypto_ctx->key = NULL;
-        crypto_ctx->iv  = NULL;
     }
 
     return ret;
@@ -337,44 +315,29 @@ err:
     return NULL;
 }
 
-// XXX as of now, we just replace the key with its sealed copy, making the
-// crypto context unusable once it's serialized.
-static int
-__seal_gcm128_crypto_context(struct nexus_crypto_ctx * crypto_context)
+static struct nexus_key *
+__wrap_gcm128_key(struct nexus_crypto_ctx * crypto_context)
 {
-    struct nexus_key * sealed_ekey = NULL;
-
     // derive a sealed_128 key from a raw_128 key
-    sealed_ekey = nexus_derive_key(NEXUS_WRAPPED_128_KEY, crypto_context->key);
-    if (sealed_ekey == NULL) {
-        return -1;
-    }
-
-    nexus_free_key(crypto_context->key);
-    nexus_free(crypto_context->key);
-
-    crypto_context->key = sealed_ekey;
-
-    return 0;
+    return nexus_derive_key(NEXUS_WRAPPED_128_KEY, crypto_context->key);
 }
 
 static int
 __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
                           uint8_t                 * untrusted_crypto_ctx_ptr)
 {
-    struct nexus_crypto_ctx * crypto_ctx = NULL;
+    struct nexus_crypto_ctx * crypto_ctx  = NULL;
 
-    static const size_t key_size = 16;
-    static const size_t iv_size  = 16;
+    struct nexus_key        * wrapped_key = NULL;
 
     int ret = -1;
 
 
     crypto_ctx = &crypto_buf->crypto_ctx;
 
-    ret = __seal_gcm128_crypto_context(crypto_ctx);
-    if (ret) {
-        log_error("could not seal gcm128 crypto context\n");
+    wrapped_key = __wrap_gcm128_key(crypto_ctx);
+    if (wrapped_key == NULL) {
+        log_error("could not wrap gcm128 key\n");
         return -1;
     }
 
@@ -392,14 +355,14 @@ __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
         out_buffer = untrusted_crypto_ctx_ptr;
 
 	// EKEY is sealed in the buffer
-        out_ptr = nexus_key_to_buf(crypto_ctx->key, out_buffer, out_buflen);
+        out_ptr = nexus_key_to_buf(wrapped_key, out_buffer, out_buflen);
         if (out_ptr == NULL) {
 	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
 	}
 
-        out_buffer += key_size;
-	out_buflen -= key_size;
+        out_buffer += GCM128_KEY_SIZE;
+	out_buflen -= GCM128_KEY_SIZE;
 
 
 	// IV
@@ -409,8 +372,8 @@ __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
 	    goto out;
 	}
 
-        out_buffer += iv_size;
-	out_buflen -= iv_size;
+        out_buffer += GCM128_IV_SIZE;
+	out_buflen -= GCM128_IV_SIZE;
 
 
 	// MAC
@@ -419,6 +382,9 @@ __serialize_gcm128_header(struct nexus_crypto_buf * crypto_buf,
 
     ret = 0;
 out:
+    nexus_free_key(wrapped_key);
+    nexus_free(wrapped_key);
+
     return ret;
 }
 

@@ -39,8 +39,6 @@
     ocall_print("enclave> " str "\n")
 
 
-extern struct nexus_key * global_enclave_sealing_key;
-
 extern struct nexus_key * global_volumekey;
 
 // pointer to the backend info. Used in ocalls;

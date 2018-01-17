@@ -1,8 +1,5 @@
 #include "internal.h"
 
-// TODO move this to nexus_key
-#define VOLUMEKEY_SIZE_BYTES    128
-
 static int
 nx_create_volume(struct raw_buffer * user_pubkey,
                  struct nexus_uuid * supernode_uuid_out,
