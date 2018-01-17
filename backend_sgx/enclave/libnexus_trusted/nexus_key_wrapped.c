@@ -19,11 +19,11 @@
 extern struct nexus_key * global_volumekey;
 
 static inline int
-__sealed_key_bits(struct nexus_key * key)
+__wrapped_key_bits(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_SEALED_256_KEY:    return 256;
-	case NEXUS_SEALED_128_KEY:    return 128;
+	case NEXUS_WRAPPED_256_KEY:    return 256;
+	case NEXUS_WRAPPED_128_KEY:    return 128;
 	default:                   return -1;
     }
     
@@ -31,58 +31,51 @@ __sealed_key_bits(struct nexus_key * key)
 }
 
 static inline int
-__sealed_key_bytes(struct nexus_key * key)
+__wrapped_key_bytes(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_SEALED_256_KEY:    return (256 / 8);
-	case NEXUS_SEALED_128_KEY:    return (128 / 8);
+	case NEXUS_WRAPPED_256_KEY:    return (256 / 8);
+	case NEXUS_WRAPPED_128_KEY:    return (128 / 8);
 	default:                   return -1;
     }
     
     return -1;
 }
 
-
-
 static int
-__seal_key(struct nexus_key * sealed_key,
-	   struct nexus_key * unsealed_key)
+__wrap_key(struct nexus_key * sealed_key, struct nexus_key * unsealed_key)
 {
     sealed_key->key = crypto_aes_ecb_encrypt(global_volumekey,
 					     unsealed_key->key,
-					     __sealed_key_bytes(unsealed_key));
+					     __wrapped_key_bytes(unsealed_key));
     
     if (sealed_key->key == NULL) {
-	log_error("Could not seal key\n");
+	log_error("Could not wrap key\n");
 	return -1;
     }
 	
     return 0;
 }
 
-
 static int
-__unseal_key(struct nexus_key * unsealed_key,
-	     struct nexus_key * sealed_key)
+__unwrap_key(struct nexus_key * unsealed_key, struct nexus_key * sealed_key)
 {
     unsealed_key->key = crypto_aes_ecb_decrypt(global_volumekey,
 					       sealed_key->key,
-					       __sealed_key_bytes(sealed_key));
+					       __wrapped_key_bytes(sealed_key));
     
     if (unsealed_key->key == NULL) {
-	log_error("Could not unseal key\n");
+	log_error("Could not unwrap key\n");
 	return -1;
     }
 	
     return 0;
 }
 
-
 static int
-__sealed_copy_key(struct nexus_key * src_key,
-		  struct nexus_key * dst_key)
+__wrapped_copy_key(struct nexus_key * src_key, struct nexus_key * dst_key)
 {
-    uint32_t key_len = __sealed_key_bytes(src_key);
+    uint32_t key_len = __wrapped_key_bytes(src_key);
     
     assert(key_len > 0);
 
@@ -93,13 +86,10 @@ __sealed_copy_key(struct nexus_key * src_key,
     return 0;
 }
 
-
 static uint8_t *
-__sealed_key_to_buf(struct nexus_key * key,
-		    uint8_t          * dst_buf,
-		    size_t             dst_size)
+__wrapped_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
 {
-    size_t    key_len = __sealed_key_bytes(key);
+    size_t    key_len = __wrapped_key_bytes(key);
     uint8_t * tgt_buf = NULL;
 
 
@@ -125,11 +115,11 @@ __sealed_key_to_buf(struct nexus_key * key,
 }
 
 static int
-__sealed_key_from_buf(struct nexus_key * key,
-		      uint8_t          * src_buf,
-		      size_t             src_size)
+__wrapped_key_from_buf(struct nexus_key * key,
+                       uint8_t          * src_buf,
+                       size_t             src_size)
 {
-    size_t key_len = __sealed_key_bytes(key);
+    size_t key_len = __wrapped_key_bytes(key);
 
     // in case the key exists
     if (key->key) {
@@ -144,10 +134,10 @@ __sealed_key_from_buf(struct nexus_key * key,
 }
 
 static char *
-__sealed_key_to_str(struct nexus_key * key)
+__wrapped_key_to_str(struct nexus_key * key)
 {
     char   * key_str = NULL;
-    uint32_t key_len = __sealed_key_bytes(key);
+    uint32_t key_len = __wrapped_key_bytes(key);
 
     assert(key_len > 0);
 
@@ -156,12 +146,10 @@ __sealed_key_to_str(struct nexus_key * key)
     return key_str;
 }
 
-
 static int
-__sealed_key_from_str(struct nexus_key * key,
-		      char             * key_str)
+__wrapped_key_from_str(struct nexus_key * key, char * key_str)
 {
-    uint32_t key_len = __sealed_key_bytes(key);
+    uint32_t key_len = __wrapped_key_bytes(key);
     uint32_t dec_len = 0;
 
     int ret = 0;

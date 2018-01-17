@@ -177,7 +177,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
         in_buffer = untrusted_crypto_ctx_ptr;
 
 	// EKEY is sealed in the buffer
-        key = nexus_key_from_buf(NEXUS_SEALED_128_KEY, in_buffer, in_buflen);
+        key = nexus_key_from_buf(NEXUS_WRAPPED_128_KEY, in_buffer, in_buflen);
         if (key == NULL) {
 	    log_error("parsing crypto_ctx key FAILED\n");
 	    goto out;
@@ -345,7 +345,7 @@ __seal_gcm128_crypto_context(struct nexus_crypto_ctx * crypto_context)
     struct nexus_key * sealed_ekey = NULL;
 
     // derive a sealed_128 key from a raw_128 key
-    sealed_ekey = nexus_derive_key(NEXUS_SEALED_128_KEY, crypto_context->key);
+    sealed_ekey = nexus_derive_key(NEXUS_WRAPPED_128_KEY, crypto_context->key);
     if (sealed_ekey == NULL) {
         return -1;
     }

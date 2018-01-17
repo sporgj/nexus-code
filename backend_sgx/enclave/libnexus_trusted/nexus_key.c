@@ -15,7 +15,7 @@
 
 #include "nexus_key_mbedtls.c"
 #include "nexus_key_raw.c"
-#include "nexus_key_sealed.c"
+#include "nexus_key_wrapped.c"
 
 
 void
@@ -25,8 +25,8 @@ nexus_free_key(struct nexus_key * key)
 
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
-	case NEXUS_SEALED_128_KEY:
-	case NEXUS_SEALED_256_KEY:
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
 	    nexus_free(key->key);
 	    break;
 	case NEXUS_MBEDTLS_PUB_KEY:
@@ -118,38 +118,38 @@ nexus_derive_key(nexus_key_type_t   key_type,
 	case NEXUS_MBEDTLS_PUB_KEY:
 	    ret = __mbedtls_derive_pub_key(key, src_key);
 	    break;
-	case NEXUS_SEALED_128_KEY:
+	case NEXUS_WRAPPED_128_KEY:
 	    if (src_key->type != NEXUS_RAW_128_KEY) {
 		log_error("Error: Can only seal 128 bit RAW key as 128 bit SEALED key\n");
 		goto err;
 	    }
 
-	    ret = __seal_key(key, src_key);
+	    ret = __wrap_key(key, src_key);
 	    break;
 	    
-	case NEXUS_SEALED_256_KEY:
+	case NEXUS_WRAPPED_256_KEY:
 	    if (src_key->type != NEXUS_RAW_256_KEY) {
 		log_error("Error: Can only seal 256 bit RAW key as 256 SEALED key\n");
 		goto err;
 	    }
 
-	    ret = __seal_key(key, src_key);
+	    ret = __wrap_key(key, src_key);
 	    break;
 	case NEXUS_RAW_128_KEY:
-	    if (src_key->type != NEXUS_SEALED_128_KEY) {
+	    if (src_key->type != NEXUS_WRAPPED_128_KEY) {
 		log_error("Error: Can only unseal 128 bit SEALED key in to 128 RAW key\n");
 		goto err;
 	    }
 
-	    ret = __unseal_key(key, src_key);
+	    ret = __unwrap_key(key, src_key);
 	    break;
 	case NEXUS_RAW_256_KEY:
-	    if (src_key->type != NEXUS_SEALED_256_KEY) {
+	    if (src_key->type != NEXUS_WRAPPED_256_KEY) {
 		log_error("Error: Can only unseal 256 bit SEALED key in to 256 RAW key\n");
 		goto err;
 	    }
 
-	    ret = __unseal_key(key, src_key);
+	    ret = __unwrap_key(key, src_key);
 	    break;
 	    
 
@@ -209,9 +209,9 @@ nexus_copy_key(struct nexus_key * src_key,
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_copy_key(src_key, dst_key);
 	    break;
-	case NEXUS_SEALED_128_KEY:
-	case NEXUS_SEALED_256_KEY:
-	    ret = __sealed_copy_key(src_key, dst_key);
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    ret = __wrapped_copy_key(src_key, dst_key);
 	    break;
 
 
@@ -236,9 +236,9 @@ nexus_key_bytes(struct nexus_key * key)
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_bytes(key);
 	    break;
-	case NEXUS_SEALED_128_KEY:
-	case NEXUS_SEALED_256_KEY:
-	    ret = __sealed_key_bytes(key);
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    ret = __wrapped_key_bytes(key);
 	    break;
 
 	default:
@@ -259,9 +259,9 @@ nexus_key_bits(struct nexus_key * key)
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_bits(key);
 	    break;
-	case NEXUS_SEALED_128_KEY:
-	case NEXUS_SEALED_256_KEY:
-	    ret = __sealed_key_bits(key);
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    ret = __wrapped_key_bits(key);
 	    break;
 
 	default:
@@ -290,9 +290,9 @@ nexus_key_to_buf(struct nexus_key * key,
 	case NEXUS_RAW_256_KEY:
 	    buf = __raw_key_to_buf(key, dst_buf, dst_size);
 	    break;
-	case NEXUS_SEALED_128_KEY:
-	case NEXUS_SEALED_256_KEY:
-	    buf = __sealed_key_to_buf(key, dst_buf, dst_size);
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    buf = __wrapped_key_to_buf(key, dst_buf, dst_size);
 	    break;
 	default:
 	    log_error("Cannot serialize this key type (%s) to a buffer\n",
@@ -321,9 +321,9 @@ __nexus_key_from_buf(struct nexus_key * key,
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_from_buf(key, src_buf, src_buflen);
 	    break;
-	case NEXUS_SEALED_128_KEY:
-	case NEXUS_SEALED_256_KEY:
-	    ret = __sealed_key_from_buf(key, src_buf, src_buflen);
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    ret = __wrapped_key_from_buf(key, src_buf, src_buflen);
 	    break;
 	default:
 	    log_error("Cannot unserialize this key type (%s) from a buffer\n",

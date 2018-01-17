@@ -16,8 +16,8 @@ typedef enum {
     NEXUS_MBEDTLS_PRV_KEY  = 2,
     NEXUS_RAW_128_KEY      = 3,
     NEXUS_RAW_256_KEY      = 4,
-    NEXUS_SEALED_128_KEY   = 5,
-    NEXUS_SEALED_256_KEY   = 6
+    NEXUS_WRAPPED_128_KEY   = 5,
+    NEXUS_WRAPPED_256_KEY   = 6
 } nexus_key_type_t;
 
 
