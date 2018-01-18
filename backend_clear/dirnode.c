@@ -14,13 +14,10 @@
 #include "dirnode.h"
 
 struct dirnode *
-dirnode_create(struct nexus_volume * volume,
-	       struct nexus_uuid   * parent_uuid)
+dirnode_create(struct nexus_uuid   * parent_uuid)
 {
     struct dirnode * new_dir = NULL;
 
-    int ret = 0;
-    
     new_dir = nexus_malloc(sizeof(struct dirnode));
     
     nexus_uuid_gen(&(new_dir->my_uuid));
@@ -34,17 +31,7 @@ dirnode_create(struct nexus_volume * volume,
     new_dir->version = 1;
     new_dir->file_list = nexus_json_new_arr("entries");
 
-    
-    ret = dirnode_store(volume, new_dir);
-
-    if (ret == -1) {
-	log_error("Could not store new dirnode\n");
-
-	nexus_json_free(new_dir->file_list);
-	nexus_free(new_dir);
-	return NULL;
-    }
-    
+        
     return new_dir;
 }
 

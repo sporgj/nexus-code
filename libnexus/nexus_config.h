@@ -15,6 +15,8 @@ struct nexus_config {
     
     char * user_key_path;
 
+    char * username;
+
 };
 
 

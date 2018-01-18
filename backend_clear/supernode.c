@@ -19,22 +19,19 @@
 
 #include "supernode.h"
 #include "dirnode.h"
-#include "user_list.h"
+#include "users.h"
 
 
 
 struct supernode *
-supernode_create(struct nexus_volume * volume, 
-		 struct nexus_key    * user_pub_key,
-		 struct nexus_key    * volume_key)
+supernode_create(struct nexus_key * user_pub_key,
+		 struct user_list * user_list,
+		 struct dirnode   * root_dir,
+		 struct nexus_key * volume_key)
 {
     struct supernode * supernode = NULL;
-    struct dirnode   * root_dir  = NULL;
-    struct user_list * user_list = NULL;
     struct nexus_key * tmp_key   = NULL;
     
-    int ret = 0;
-
     supernode = nexus_malloc(sizeof(struct supernode));
 
     // generate a volume key
@@ -47,35 +44,10 @@ supernode_create(struct nexus_volume * volume,
     
     // generate uuid for supernode
     nexus_uuid_gen(&(supernode->my_uuid));
-    
-    // initialize user list with owner
-    user_list = user_list_create(volume, user_pub_key);
-
-    if (user_list == NULL) {
-	log_error("Could not create user list\n");
-	goto err;
-    }
 
     nexus_uuid_copy(&(user_list->my_uuid), &(supernode->user_list_uuid));
-
+    nexus_uuid_copy(&(root_dir->my_uuid),  &(supernode->root_uuid));
     
-    // create root dir
-    root_dir = dirnode_create(volume, NULL);
-
-    if (root_dir == NULL) {
-	log_error("Could not create dirnode\n");
-	goto err;
-    }
-
-    nexus_uuid_copy(&(root_dir->my_uuid), &(supernode->root_uuid));
-    
-    // save supernode
-    ret = supernode_store(volume, supernode);
-
-    if (ret == -1) {
-	log_error("Could not store supernode\n");
-	goto err;
-    }
 
     nexus_copy_key(tmp_key, volume_key);
     nexus_free_key(tmp_key);
@@ -83,20 +55,8 @@ supernode_create(struct nexus_volume * volume,
     return supernode;
 
  err:
-
-
-    if (user_list) {
-	nexus_datastore_del_uuid(volume->metadata_store, &(user_list->my_uuid), NULL);
-	user_list_free(user_list);
-    }
-
-    if (root_dir) {
-	nexus_datastore_del_uuid(volume->metadata_store, &(root_dir->my_uuid), NULL);
-	dirnode_free(root_dir);
-    }
     
     if (tmp_key)    nexus_free_key(tmp_key);
-
     if (supernode)  nexus_free(supernode);
     
     return NULL;
@@ -161,4 +121,98 @@ supernode_store(struct nexus_volume * volume,
     }
 
     return -1;
+}
+
+
+
+struct supernode * 
+supernode_load(struct nexus_volume * volume, 
+	       struct nexus_uuid   * supernode_uuid)
+{
+    struct supernode * supernode      = NULL;
+    nexus_json_obj_t   supernode_json = NEXUS_JSON_INVALID_OBJ;
+
+    char     * json_str = NULL;
+    uint32_t   json_len = 0;
+
+    int ret = 0;
+
+    /* Load UUID from metadata store */
+    ret = nexus_datastore_get_uuid(volume->metadata_store,
+				   supernode_uuid,
+				   NULL,
+				   (uint8_t **)&json_str,
+				   &json_len);
+    
+    if (ret == -1) {
+	char * uuid_str = nexus_uuid_to_alt64(supernode_uuid);
+	log_error("Could not get supernode UUID (%s)\n", uuid_str);
+	nexus_free(uuid_str);
+
+	return NULL;
+    }
+    
+    /* Parse Supernode */
+    supernode_json = nexus_json_parse_str(json_str);
+
+    if (supernode_json == NEXUS_JSON_INVALID_OBJ) {
+	log_error("Could not parse supernode structure\n");
+	goto err;
+    }
+    
+    /* Allocate supernode */
+    supernode = nexus_malloc(sizeof(struct supernode));
+    
+
+    /* Load UUIDs from JSON */
+    {
+	char * supernode_uuid_str = NULL;
+	char * user_list_uuid_str = NULL;
+	char *  root_dir_uuid_str = NULL;
+
+	nexus_json_get_string(supernode_json, "uuid",      &supernode_uuid_str);
+	nexus_json_get_string(supernode_json, "user_list", &user_list_uuid_str);
+	nexus_json_get_string(supernode_json, "root_dir",   &root_dir_uuid_str);
+
+	if ( (supernode_uuid_str == NULL) ||
+	     (user_list_uuid_str == NULL) ||
+	     ( root_dir_uuid_str == NULL) ) {
+	    log_error("Invalid supernode structure\n");
+	    goto err;	    
+	}
+	
+	nexus_uuid_from_alt64(&(supernode->my_uuid),        supernode_uuid_str);
+	nexus_uuid_from_alt64(&(supernode->user_list_uuid), user_list_uuid_str);
+	nexus_uuid_from_alt64(&(supernode->root_uuid),       root_dir_uuid_str);
+	
+	if (nexus_uuid_compare(&(supernode->my_uuid), supernode_uuid) != 0) {
+	    log_error("UUID Mismatch in supernode\n");
+	    goto err;
+	}
+    }
+    
+    nexus_free(json_str);
+    nexus_json_free(supernode_json);
+
+    return supernode;
+
+ err:
+
+    if (supernode) nexus_free(supernode);
+    if (json_str)  nexus_free(json_str);
+    
+    if (supernode_json != NEXUS_JSON_INVALID_OBJ) {
+	nexus_json_free(supernode_json);
+    }
+    
+    return NULL;    
+}
+
+
+
+void
+supernode_free(struct supernode * supernode)
+{
+    return;
+
 }

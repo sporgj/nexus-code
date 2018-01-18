@@ -38,8 +38,7 @@ struct dirnode {
 
 
 
-struct dirnode * dirnode_create(struct nexus_volume * volume,
-				struct nexus_uuid   * parent_uuid);
+struct dirnode * dirnode_create(struct nexus_uuid * parent_uuid);
 
 
 struct dirnode * dirnode_load(struct nexus_volume * volume,

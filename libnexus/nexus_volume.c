@@ -455,6 +455,13 @@ nexus_mount_volume(char * volume_path)
 	}
     }
 
+    ret = chdir(volume_path);
+
+    if (ret == -1) {
+	log_error("Could not chdir to (%s)\n", volume_path);
+	goto err;
+    }
+    
 
     /* 
      * Initialize the metadata store 
@@ -572,9 +579,6 @@ nexus_mount_volume(char * volume_path)
 
     
     ret = nexus_backend_open_volume(volume);
-
-    
-    
     
     return volume;
 

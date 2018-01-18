@@ -49,6 +49,13 @@ nexus_uuid_copy(struct nexus_uuid * src_uuid,
 }
 
 
+int
+nexus_uuid_compare(struct nexus_uuid * uuid1,
+		   struct nexus_uuid * uuid2)
+{
+    return memcmp(uuid1->raw, uuid2->raw, NEXUS_UUID_SIZE);
+}
+
 
 char *
 nexus_uuid_to_base64(struct nexus_uuid * uuid)

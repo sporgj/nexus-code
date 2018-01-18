@@ -12,7 +12,8 @@
 #include <nexus_key.h>
 
 struct nexus_volume;
-
+struct user_list;
+struct dirnode;
 
 
 struct supernode {
@@ -28,10 +29,19 @@ struct supernode {
 
 
 struct supernode *
-supernode_create(struct nexus_volume * volume,
-		 struct nexus_key    * user_pub_key,
-		 struct nexus_key    * volume_key);
+supernode_create(struct nexus_key * user_pub_key,
+		 struct user_list * user_list,
+		 struct dirnode   * root_dir,
+		 struct nexus_key * volume_key);
 
 int
 supernode_store(struct nexus_volume * volume,
 		struct supernode    * supernode);
+
+
+struct supernode *
+supernode_load(struct nexus_volume * volume,
+	       struct nexus_uuid   * supernode_uuid);
+
+void
+supernode_free(struct supernode * supernode);

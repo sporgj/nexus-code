@@ -20,7 +20,6 @@ static char * volume_path   = NULL;
 
 
 static int cmd_line_user_key    = 0;
-static int cmd_line_config_file = 0;
 
 
 static void

@@ -74,7 +74,6 @@ static void create_file_usage()
     printf("create_file: create a file at a volume path\n\n"\
 	   "Usage: create_file <volume> <path-in-volume>\n");
 
-    nexus_print_backtrace();
     return;
 }
 

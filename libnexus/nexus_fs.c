@@ -29,5 +29,5 @@ nexus_fs_create(struct nexus_volume * volume,
 		nexus_dirent_type_t   type,
 		struct nexus_stat   * stat)
 {
-    return nexus_backend_fs_create(volume, path, type, stat);   
+    return nexus_backend_fs_create(volume, path, type, stat);
 }
