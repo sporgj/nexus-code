@@ -16,12 +16,15 @@
 #include "users.h"
 
 
+#define MAX_USERNAME_LEN (32)
+
 
 struct user *
 get_user(struct user_list * list,
 	 char             * username)
 {
-    nexus_json_obj_t user_iter = NEXUS_JSON_INVALID_OBJ;
+    struct user      * user      = NULL;
+    nexus_json_obj_t   user_iter = NEXUS_JSON_INVALID_OBJ;
     
     if (list->users == NEXUS_JSON_INVALID_OBJ) {
 	log_error("Invalid user list\n");	
@@ -29,13 +32,67 @@ get_user(struct user_list * list,
     }
 
     nexus_json_arr_foreach(user_iter, list->users) {
-	
+	char    * iter_name   = NULL;
+	char    * key_str     = NULL;
+	uint8_t   admin_flag  = 0;
 
+	int ret = 0;
+		
+	ret = nexus_json_get_string(user_iter, "name", &iter_name);
+
+	if (ret == -1) {
+	    log_error("Invalid User List (Could not find name field)\n");
+	    return NULL;
+	}
+
+	
+	if (strncmp(iter_name, username, MAX_USERNAME_LEN) != 0) {
+	    continue;
+	}
+
+        nexus_json_get_u8(user_iter, "admin", &admin_flag);
+	
+	/* Handle ugly key decoding */
+	{
+	    char    * key_alt64   = NULL;
+	    uint32_t  key_str_len = 0;
+
+	    ret = nexus_json_get_string(user_iter, "key",   &key_alt64);
+
+	    if (ret == -1) {
+		log_error("Invalid User entry (missing key)\n");
+		return NULL;
+	    }
+	    
+	    ret = nexus_alt64_decode(key_alt64, (uint8_t **)&key_str, &key_str_len);
+
+	    if (ret == -1) {
+		log_error("Could not decode user public key\n");
+		return NULL;
+	    }
+	    
+	}
+
+
+	user = nexus_malloc(sizeof(struct user));
+
+	user->name  = strndup(iter_name, MAX_USERNAME_LEN);
+	user->admin = admin_flag;
+
+	ret = __nexus_key_from_str(&(user->pub_key), NEXUS_MBEDTLS_PUB_KEY, key_str);
+	nexus_free(key_str);
+
+	if (ret == -1) {
+	    log_error("Could not load user public key from string\n");
+	    nexus_free(user);
+	    return NULL;
+	}
+
+	break;
+	
     }
-	
 
-    
-    return NULL;
+    return user;
 }
 
 
@@ -206,6 +263,8 @@ user_list_load(struct nexus_volume * volume,
 	    goto err;
 	}
 
+	nexus_uuid_from_alt64(&(user_list->my_uuid), user_list_uuid_str);
+
 	if (nexus_uuid_compare(&(user_list->my_uuid), user_list_uuid) != 0) {
 	    log_error("UUID mismatch in user list\n");
 	    goto err;
@@ -219,7 +278,7 @@ user_list_load(struct nexus_volume * volume,
 	    goto err;
 	}
 
-	user_list->users = nexus_json_get_object(user_list_json, "users");	
+	user_list->users = nexus_json_get_array(user_list_json, "users");	
 
 	if (user_list->users == NEXUS_JSON_INVALID_OBJ) {
 	    log_error("Invalid User list structure (Missing users)\n");

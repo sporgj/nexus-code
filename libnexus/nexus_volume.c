@@ -579,6 +579,11 @@ nexus_mount_volume(char * volume_path)
 
     
     ret = nexus_backend_open_volume(volume);
+
+    if (ret == -1) {
+	log_error("Could not open volume (backend error)\n");
+	goto err;
+    }
     
     return volume;
 
