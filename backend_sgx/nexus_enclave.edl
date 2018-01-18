@@ -35,6 +35,43 @@ enclave {
 
     untrusted {
 
+        // ---------------- untrusted buffer management --------------------
+
+        /**
+         * Creates a new untrusted buffer
+         * @param size is the size of the new buffer
+         */
+        struct nexus_uuid * ocall_buffer_alloc(size_t size);
+
+        /**
+         * Creates a new untrusted buffer from an existing address and size
+         * @param size is the size of the new buffer
+         */
+        struct nexus_uuid * ocall_buffer_create([user_check] uint8_t * untrusted_addr, size_t size);
+
+        /**
+         * Reallocates a previously allocated buffer
+         * @param buffer_uuid
+         * @param newsize
+         * @return the new address it points to
+         */
+        uint8_t * ocall_buffer_realloc([in] struct nexus_uuid * buffer_uuid, size_t newsize);
+
+        /**
+         * Returns the untrusted pointer to the buffer
+         * @param buffer_uuid
+         * @return NULL on failure
+         */
+        uint8_t * ocall_buffer_get([in] struct nexus_uuid * buffer_uuid);
+
+        /**
+         * Frees an allocated buffer
+         * @param buffer_uuid
+         */
+        void ocall_buffer_free([in] struct nexus_uuid * buffer_uuid);
+
+        // ----------------- METADATA stuff ------------------------
+
         struct raw_buffer *
         ocall_metadata_get
         (

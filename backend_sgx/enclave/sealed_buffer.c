@@ -3,99 +3,162 @@
 #include "internal.h"
 
 
-struct sealed_buffer *
-sealed_buffer_put(void * data, size_t size)
-{
-    struct sealed_buffer * sealed_buffer = NULL;
+struct nexus_sealed_buf {
+    struct nexus_uuid * buffer_uuid;
 
-    sgx_sealed_data_t * sealed_data_ptr  = NULL;
-    size_t              sealed_data_size = 0;
+    size_t    untrusted_size;
+    uint8_t * untrusted_addr;
+
+    size_t    trusted_size;
+    uint8_t * trusted_addr;
+};
+
+
+struct nexus_sealed_buf *
+nexus_sealed_buf_create(void * untrusted_addr, size_t untrusted_size)
+{
+    struct nexus_sealed_buf * sealed_buf = NULL;
+
+    sealed_buf = nexus_malloc(sizeof(struct nexus_sealed_buf));
+
+    sealed_buf->buffer_uuid = buffer_layer_create(untrusted_addr, untrusted_size);
+    if (sealed_buf->buffer_uuid == NULL) {
+        nexus_free(sealed_buf);
+        log_error("buffer_layer_create FAILED\n");
+        return NULL;
+    }
+
+    sealed_buf->untrusted_addr = untrusted_addr;
+    sealed_buf->untrusted_size = untrusted_size;
+
+    return sealed_buf;
+}
+
+struct nexus_sealed_buf *
+nexus_sealed_buf_new(size_t size)
+{
+    struct nexus_sealed_buf * sealed_buf = NULL;
+
+    sealed_buf = nexus_malloc(sizeof(struct nexus_sealed_buf));
+
+    sealed_buf->trusted_size = size;
+
+    return sealed_buf;
+}
+
+void
+nexus_sealed_buf_free(struct nexus_sealed_buf * sealed_buf)
+{
+    if (sealed_buf->buffer_uuid) {
+        buffer_layer_free(sealed_buf->buffer_uuid);
+    }
+
+    nexus_free(sealed_buf);
+}
+
+uint8_t *
+nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf)
+{
+    sgx_sealed_data_t * sealed_data = NULL;
+
+    uint32_t payload_size = 0;
 
     int ret = -1;
 
 
-    // calculate how much memory we need to allocate
-    // aad_len, encrypted_data_len
-    sealed_data_size = sgx_calc_sealed_data_size(0, size);
+    if (sealed_buf->trusted_addr != NULL) {
+        return sealed_buf->trusted_addr;
+    }
 
-    sealed_data_ptr = nexus_malloc(sealed_data_size);
+    if (sealed_buf->untrusted_addr == NULL) {
+        log_error("raw buffer untrusted_addr is NULL");
+        return NULL;
+    }
 
-    ret = sgx_seal_data(0, NULL, size, data, sealed_data_size, sealed_data_ptr);
+    // XXX copy the buffer into trusted memory
+    sealed_data = nexus_malloc(sealed_buf->untrusted_size);
+    memcpy(sealed_data, sealed_buf->untrusted_addr, sealed_buf->untrusted_size);
+
+
+    payload_size = sgx_get_encrypt_txt_len(sealed_data);
+
+    if (payload_size == UINT32_MAX || payload_size > sealed_buf->untrusted_size) {
+        log_error("sgx_get_encrypt_txt_len FAILED\n");
+        goto out;
+    }
+
+
+    // now allocate the buffer and unseal
+    sealed_buf->trusted_size = payload_size;
+    sealed_buf->trusted_addr = nexus_malloc(payload_size);
+
+    ret = sgx_unseal_data(sealed_data, NULL, 0, sealed_buf->trusted_addr, &payload_size);
+    if (ret) {
+        log_error("sgx_unseal_data FAILED \n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (sealed_data) {
+        nexus_free(sealed_data);
+    }
+
+    if (ret) {
+        nexus_free(sealed_buf->trusted_addr);
+        sealed_buf->trusted_addr = NULL;
+    }
+
+    return sealed_buf->trusted_addr;
+}
+
+/**
+ * Copies data into untrusted memory
+ * @param trusted_buffer
+ */
+int
+nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * trusted_addr)
+{
+    sgx_sealed_data_t * sealed_data = NULL;
+
+    int ret = -1;
+
+
+    sealed_buf->untrusted_size = sgx_calc_sealed_data_size(0, sealed_buf->trusted_size);
+
+    if (sealed_buf->untrusted_addr == NULL) {
+        sealed_buf->buffer_uuid = buffer_layer_alloc(sealed_buf->untrusted_size,
+                                                     &sealed_buf->untrusted_addr);
+
+        if (sealed_buf->buffer_uuid == NULL) {
+            log_error("buffer_layer_alloc FAILED\n");
+            return -1;
+        }
+    }
+
+    // seal the data
+    sealed_data = nexus_malloc(sealed_buf->untrusted_size);
+
+    ret = sgx_seal_data(0,
+                        NULL,
+                        sealed_buf->trusted_size,
+                        trusted_addr,
+                        sealed_buf->untrusted_size,
+                        sealed_data);
+
     if (ret) {
         log_error("sgx_seal_data() FAILED\n");
         goto out;
     }
 
-    ret = ocall_calloc((void **)&sealed_buffer,
-                       sealed_data_size + sizeof(struct sealed_buffer));
+    memcpy(sealed_buf->untrusted_addr, sealed_data, sealed_buf->untrusted_size);
 
-    if (ret || !sealed_buffer) {
-        goto out;
-    }
-
-    sealed_buffer->size = sealed_data_size;
-    memcpy(sealed_buffer->untrusted_buffer, sealed_data_ptr, sealed_data_size);
 
     ret = 0;
 out:
-    nexus_free(sealed_data_ptr);
-
-    if (ret) {
-        if (sealed_buffer) {
-            ocall_free(sealed_buffer);
-        }
-
-        return NULL;
+    if (sealed_data) {
+        nexus_free(sealed_data);
     }
 
-    return sealed_buffer;
-}
-
-/**
- * Unseals the content of the sealed buffer and returns the content
- */
-void *
-sealed_buffer_get(struct sealed_buffer * sealed_buffer)
-{
-    sgx_sealed_data_t * sealed_data_trusted  = NULL;
-
-    void *   unsealed_contents = NULL;
-    uint32_t unsealed_size     = 0;
-
-    int ret = -1;
-
-
-    sealed_data_trusted = nexus_malloc(sealed_buffer->size);
-    memcpy(sealed_data_trusted,
-           sealed_buffer->untrusted_buffer,
-           sealed_buffer->size);
-
-
-    // allocate buffer and unseal the contents 
-    {
-        unsealed_contents
-            = nexus_malloc(sgx_get_encrypt_txt_len(sealed_data_trusted));
-
-        ret = sgx_unseal_data(
-            sealed_data_trusted, NULL, 0, unsealed_contents, &unsealed_size);
-
-        if (ret) {
-            log_error("sgx_unseal_data FAILED \n");
-            goto out;
-        }
-    }
-
-    ret = 0;
-out:
-    nexus_free(sealed_data_trusted);
-
-    if (ret) {
-        if (unsealed_contents) {
-            nexus_free(unsealed_contents);
-        }
-
-        return NULL;
-    }
-
-    return unsealed_contents;
+    return ret;
 }

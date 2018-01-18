@@ -2,10 +2,9 @@
 
 #include <stdint.h>
 
-#include "crypto.h"
+#include "nexus_mac.h"
 
 // represents an encrypted metadata object
-
 struct nexus_crypto_buf;
 
 /**
@@ -16,7 +15,7 @@ struct nexus_crypto_buf;
  * @return nexus_crypto_buf
  */
 struct nexus_crypto_buf *
-nexus_crypto_buf_alloc(void * untrusted_addr, size_t size);
+nexus_crypto_buf_create(void * untrusted_addr, size_t untrusted_size);
 
 /**
  * Creates a new crypto buffer which will encrypt a metadata buffer of size.
@@ -31,18 +30,10 @@ nexus_crypto_buf_new(size_t size);
 void
 nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
 
-/**
- * Returns the pointer to the untrusted buffer
- * @param crypto_buf
- */
-void *
-nexus_crypto_buf_untrusted_addr(struct nexus_crypto_buf * crypto_buf);
-
-
 
 /**
  * Returns a pointer to trusted memory containing the buffer's data
- *    Will decrypt existing data if it exists. 
+ *    Will decrypt existing data if it exists.
  * @param nexus_crypto_buf
  * @return NULL on failure
  */

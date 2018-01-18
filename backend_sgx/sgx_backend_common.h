@@ -7,6 +7,7 @@
 #include <nexus_uuid.h>
 #include <nexus_key.h>
 
+// TODO JBD: remove this (note to self)
 struct raw_buffer {
     size_t size;
     void * untrusted_addr;

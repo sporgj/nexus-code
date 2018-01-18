@@ -21,23 +21,23 @@ endif
 
 
 INCLUDE := -I$(SGX_SDK)/include \
-	   -I$(SGX_SDK)/include/tlibc \
-	   -I$(SGX_SDK)/include/stlport \
-	   -Imbedtls/include \
-	   -Ilibnexus_trusted \
-	   -I..
+	-I$(SGX_SDK)/include/tlibc \
+	-I$(SGX_SDK)/include/stlport \
+	-Imbedtls/include \
+	-Ilibnexus_trusted \
+	-I..
 
 CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector
 
 
 
 LDFLAGS += -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_SDK)/lib64 \
-	   -Wl,--whole-archive -l$(sgx_trts_lib) -Wl,--no-whole-archive \
-	   -Wl,--start-group -lsgx_tstdc -lsgx_tstdcxx -lsgx_tcrypto -l$(sgx_svc_lib) -Wl,--end-group \
-	   -Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
-	   -Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
-	   -Wl,--defsym,__ImageBase=0 \
-	   -Wl,--version-script=enclave.lds
+           -Wl,--whole-archive -l$(sgx_trts_lib) -Wl,--no-whole-archive \
+           -Wl,--start-group -lsgx_tstdc -lsgx_tstdcxx -lsgx_tcrypto -l$(sgx_svc_lib) -Wl,--end-group \
+           -Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
+           -Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
+           -Wl,--defsym,__ImageBase=0 \
+           -Wl,--version-script=enclave.lds
 
 
 SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
@@ -60,6 +60,7 @@ trusted_objs := \
 
 objs := nexus_enclave_t.o \
 	$(trusted_objs) \
+	buffer_layer.o \
 	crypto_buffer.o \
 	sealed_buffer.o \
 	raw_buffer.o \

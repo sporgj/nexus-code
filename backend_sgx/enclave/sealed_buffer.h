@@ -1,29 +1,45 @@
 #pragma oncec
 
-#include "raw_buffer.h"
+#include <stdint.h>
 
-#include "nexus_key.h"
 
-struct sealed_buffer {
-    size_t  size;
-    uint8_t untrusted_buffer[0];
-};
+// represents a generic buffer of memory
+struct nexus_sealed_buf;
 
 /**
- * Allocates a sealed_buffer in untrusted memory and seals (using the enclave
- * seaing key) the data into the buffer
- *
- * @param data
+ * Creates raw buffer from existing preallocated untrusted buffer
+ * @param untrusted_addr
  * @param size
- *
- * @return sealed_buffer 
  */
-struct sealed_buffer *
-sealed_buffer_put(void * data, size_t size);
+struct nexus_sealed_buf *
+nexus_sealed_buf_create(void * untrusted_addr, size_t size);
 
 /**
- * Unseals the content of the sealed buffer and returns the content
- * @param sealed_buffer
+ * Allocates new sealed_buf of specified size
+ * @param size
+ * @return sealed_buffer
  */
-void *
-sealed_buffer_get(struct sealed_buffer * sealed_buffer);
+struct nexus_sealed_buf *
+nexus_sealed_buf_new(size_t size);
+
+/**
+ * Frees sealed_buf with its allocated resources
+ * @param sealed_buf
+ */
+void
+nexus_sealed_buf_free(struct nexus_sealed_buf * sealed_buf);
+
+/**
+ * Copies the buffer into enclave memory and returns the pointer
+ * @param sealed_buf
+ */
+uint8_t *
+nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf);
+
+/**
+ * Copies data into untrusted memory
+ * @param sealed_buf
+ * @param trusted_buffer
+ */
+int
+nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * trusted_addr);

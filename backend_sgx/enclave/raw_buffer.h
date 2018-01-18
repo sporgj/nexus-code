@@ -2,60 +2,41 @@
 
 #include <stdint.h>
 
-#include "sgx_backend_common.h"
+// represents a generic buffer of memory
+struct nexus_raw_buf;
 
 /**
- * allocates a raw_buffer structure in untrusted memory and copies content
- * of trusted buffer
- * @param trusted_buffer
- * @param size
- *
- * @return new raw_buffer
- */
-struct raw_buffer *
-raw_buffer_put(void * trusted_buffer, size_t size);
-
-/**
- * Initializes a raw_buffer
- * @param raw_buffer
+ * Creates raw buffer from existing preallocated untrusted buffer
  * @param untrusted_addr
  * @param size
- *
- * @return a new raw_buffer
  */
-
-void
-raw_buffer_init(struct raw_buffer * raw_buffer,
-                void              * untrusted_addr,
-                size_t              size);
+struct nexus_raw_buf *
+nexus_raw_buf_create(void * untrusted_addr, size_t size);
 
 /**
- * Returns the pointer to the untrusted ptr
- * @param raw_buffer
- * @return the size of the raw_buffer
+ * Allocates new raw_buf of specified size
+ * @param size
+ * @return raw_buffer
  */
-void *
-raw_buffer_get(struct raw_buffer * raw_buffer);
+struct nexus_raw_buf *
+nexus_raw_buf_new(size_t size);
 
 /**
- * Returns the size of the raw buffer
- * @param raw_buffer
- * @return the size of the raw_buffer
- */
-size_t
-raw_buffer_size(struct raw_buffer * raw_buffer);
-
-/**
- * Copies the content of the buffer into the enclave and returns buffer
- * @param raw_buffer
- * @return NULL
- */
-void *
-raw_buffer_read_trusted(struct raw_buffer * raw_buffer);
-
-/**
- * Free an externally allocated raw_buffer
- * @param raw_buffer_ext
+ * Frees raw_buf with its allocated resources
+ * @param raw_buf
  */
 void
-raw_buffer_free_ext(struct raw_buffer * raw_buffer_ext);
+nexus_raw_buf_free(struct nexus_raw_buf * raw_buf);
+
+/**
+ * Copies the buffer into enclave memory and returns the pointer
+ */
+uint8_t *
+nexus_raw_buf_get(struct nexus_raw_buf * raw_buf);
+
+/**
+ * Copies data into untrusted memory
+ * @param trusted_buffer
+ */
+int
+nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * trusted_addr);

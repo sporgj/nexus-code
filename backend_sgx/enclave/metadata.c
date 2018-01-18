@@ -4,6 +4,7 @@ struct raw_buffer *
 metadata_open(struct nexus_uuid       * uuid,
               struct nexus_uuid_path  * uuid_path)
 {
+#if 0
     struct raw_buffer      * raw_buffer_ext = NULL;
 
     struct nexus_uuid_path * untrusted_path = NULL;
@@ -38,6 +39,8 @@ out:
     }
 
     return raw_buffer_ext;
+#endif
+    return NULL;
 }
 
 int
@@ -45,6 +48,7 @@ metadata_write(struct nexus_uuid       * uuid,
                struct nexus_uuid_path  * uuid_path,
                struct nexus_crypto_buf * crypto_buffer)
 {
+#if 0
     struct nexus_uuid_path * uuid_path_untrusted = NULL;
 
     int err = -1;
@@ -62,5 +66,7 @@ metadata_write(struct nexus_uuid       * uuid,
     }
 
     return 0;
+#endif
+    return -1;
 }
 

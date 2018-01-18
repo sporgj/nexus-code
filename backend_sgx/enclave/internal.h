@@ -18,6 +18,7 @@
 
 #include "nexus_enclave_t.h"
 
+#include "buffer_layer.h"
 #include "crypto_buffer.h"
 #include "sealed_buffer.h"
 #include "raw_buffer.h"

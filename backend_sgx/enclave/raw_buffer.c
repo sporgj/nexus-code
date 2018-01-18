@@ -1,65 +1,89 @@
 #include "internal.h"
 
-struct raw_buffer *
-raw_buffer_put(void * trusted_buffer, size_t size)
+struct nexus_raw_buf {
+    size_t size;
+
+    struct nexus_uuid * buffer_uuid;
+    uint8_t           * untrusted_addr;
+
+    uint8_t           * trusted_addr;
+};
+
+
+struct nexus_raw_buf *
+nexus_raw_buf_create(void * untrusted_addr, size_t size)
 {
-    struct raw_buffer * raw_buffer = NULL;
+    struct nexus_raw_buf * raw_buf = NULL;
 
-    int ret = -1;
+    raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
 
-
-    ret = ocall_calloc((void **) &raw_buffer, sizeof(struct raw_buffer));
-    if (ret || !raw_buffer) {
+    raw_buf->buffer_uuid = buffer_layer_create(untrusted_addr, size);
+    if (raw_buf->buffer_uuid == NULL) {
+        nexus_free(raw_buf);
+        log_error("buffer_layer_create FAILED\n");
         return NULL;
     }
 
-    ret = ocall_calloc(&raw_buffer->untrusted_addr, size);
-    if (ret || !raw_buffer->untrusted_addr) {
-        ocall_free(raw_buffer);
+    raw_buf->untrusted_addr = untrusted_addr;
+    raw_buf->size           = size;
+
+    return raw_buf;
+}
+
+struct nexus_raw_buf *
+nexus_raw_buf_new(size_t size)
+{
+    struct nexus_raw_buf * raw_buf = NULL;
+
+    raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
+
+    raw_buf->size = size;
+
+    return raw_buf;
+}
+
+void
+nexus_raw_buf_free(struct nexus_raw_buf * raw_buf)
+{
+    if (raw_buf->buffer_uuid) {
+        buffer_layer_free(raw_buf->buffer_uuid);
+    }
+
+    nexus_free(raw_buf);
+}
+
+uint8_t *
+nexus_raw_buf_get(struct nexus_raw_buf * raw_buf)
+{
+    if (raw_buf->trusted_addr != NULL) {
+        return raw_buf->trusted_addr;
+    }
+
+    if (raw_buf->untrusted_addr == NULL) {
+        log_error("raw buffer untrusted_addr is NULL");
         return NULL;
     }
 
-    memcpy(raw_buffer->untrusted_addr, trusted_buffer, size);
+    raw_buf->trusted_addr = nexus_malloc(raw_buf->size);
 
-    return raw_buffer;
+    memcpy(raw_buf->trusted_addr, raw_buf->untrusted_addr, raw_buf->size);
+
+    return raw_buf->trusted_addr;
 }
 
-// XXX this should be inlined in the header
-void *
-raw_buffer_get(struct raw_buffer * raw_buffer)
+int
+nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * trusted_addr)
 {
-    return raw_buffer->untrusted_addr;
-}
+    if (raw_buf->untrusted_addr == NULL) {
+        raw_buf->buffer_uuid = buffer_layer_alloc(raw_buf->size, &raw_buf->untrusted_addr);
 
-size_t
-raw_buffer_size(struct raw_buffer * raw_buffer)
-{
-    return raw_buffer->size;
-}
+        if (raw_buf->buffer_uuid == NULL) {
+            log_error("buffer_layer_alloc FAILED\n");
+            return -1;
+        }
+    }
 
-void
-raw_buffer_init(struct raw_buffer * raw_buffer,
-                void              * untrusted_addr,
-                size_t              size)
-{
-    raw_buffer->untrusted_addr = untrusted_addr;
-    raw_buffer->size = size;
-}
+    memcpy(trusted_addr, raw_buf->untrusted_addr, raw_buf->size);
 
-
-void *
-raw_buffer_read_trusted(struct raw_buffer * raw_buffer)
-{
-    void * ptr = nexus_malloc(raw_buffer->size);
-
-    memcpy(ptr, raw_buffer->untrusted_addr, raw_buffer->size);
-
-    return ptr;
-}
-
-void
-raw_buffer_free_ext(struct raw_buffer * raw_buffer_ext)
-{
-    ocall_free(raw_buffer_ext->untrusted_addr);
-    ocall_free(raw_buffer_ext);
+    return 0;
 }
