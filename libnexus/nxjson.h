@@ -52,6 +52,7 @@ struct nx_json {
     struct nx_json * parent;
 
     char * raw_string;           // Raw JSON string that is stored by the root
+    char * raw_key;
 };
 
 #if 0

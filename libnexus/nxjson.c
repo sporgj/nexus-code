@@ -145,6 +145,10 @@ nx_json_free(struct nx_json * js)
 	NX_JSON_FREE(js->raw_string);
     }
 
+    if (js->raw_key != NULL) {
+	NX_JSON_FREE(js->raw_key);
+    }
+
     
     NX_JSON_FREE(js);
 }
@@ -374,6 +378,38 @@ nx_json_splice(struct nx_json * parent,
     return 0;
 }
 
+
+static void
+__nx_json_fixup_strings(struct nx_json * obj)
+{
+
+    if ((obj->key     != NULL) &&
+	(obj->raw_key == NULL)) {
+
+	obj->raw_key = strdup(obj->key);
+	obj->key     = obj->raw_key;
+    }
+    
+    if ((obj->type       == NX_JSON_STRING) &&
+	(obj->raw_string == NULL)) {
+
+	obj->raw_string = strdup(obj->text_value);
+	obj->text_value = obj->raw_string;
+
+    } else if ((obj->type == NX_JSON_OBJECT) ||
+	       (obj->type == NX_JSON_ARRAY)) {
+
+	struct nx_json * child = obj->child;
+
+	while (child) {
+	    __nx_json_fixup_strings(child);
+	    child = child->next;
+	}
+    }
+    
+    return;
+}
+
 static int
 nx_json_split(struct nx_json * obj)
 {
@@ -384,6 +420,9 @@ nx_json_split(struct nx_json * obj)
     obj->parent = NULL;
     obj->root   = 1;
 
+    /* We have to walk the tree, and duplicate any string values */
+    __nx_json_fixup_strings(obj);
+    
     return 0;
 }
 
@@ -397,8 +436,10 @@ nx_json_add(struct nx_json * json,
 
     assert(json->type == NX_JSON_OBJECT);
     
-    new_json = create_json(val->type, key, json);
+    new_json = create_json(val->type, NULL, json);
 
+    new_json->raw_key = strdup(key);
+    new_json->key     = new_json->raw_key;
 
     switch (val->type) {
 	case NX_JSON_STRING:
