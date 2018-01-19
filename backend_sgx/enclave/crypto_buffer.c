@@ -137,7 +137,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 	goto err;
     }
     
-    ret = __nexus_derive_key(&crypto_ctx->key, NEXUS_RAW_128_KEY, &wrapped_key);
+    ret = __nexus_derive_key(&(crypto_ctx->key), NEXUS_RAW_128_KEY, &wrapped_key);
     nexus_free_key(&wrapped_key);
     
     if (ret == -1) {
@@ -147,7 +147,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
    
 
     // IV
-    ret = __nexus_key_from_buf(&crypto_ctx->iv, NEXUS_RAW_128_KEY, buf_hdr->gcm_hdr.iv, GCM128_IV_SIZE);
+    ret = __nexus_key_from_buf(&(crypto_ctx->iv), NEXUS_RAW_128_KEY, buf_hdr->gcm_hdr.iv, GCM128_IV_SIZE);
 
     if (ret == -1) {
 	log_error("Could not retrieve IV from GCM header\n");
@@ -155,7 +155,7 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
     }
         
     // MAC
-    ret = __nexus_mac_from_buf(&crypto_ctx->mac, buf_hdr->gcm_hdr.mac);
+    ret = __nexus_mac_from_buf(&(crypto_ctx->mac), buf_hdr->gcm_hdr.mac);
 
     if (ret == -1) {
 	log_error("Could not retrieve MAC from GCM header\n");
@@ -245,7 +245,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 
     /* Decrypt the buffer */
     {
-        ret = crypto_gcm_decrypt(&crypto_buf->crypto_ctx,
+        ret = crypto_gcm_decrypt(&(crypto_buf->crypto_ctx),
                                  crypto_buf->internal_size,
                                  crypto_buf->external_addr + __get_header_len(),
                                  crypto_buf->internal_addr,
@@ -390,7 +390,7 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
 
 
     /* Encrypt the data with the buf_hdr as AAD for authentication*/
-    ret = crypto_gcm_encrypt(&crypto_buf->crypto_ctx,
+    ret = crypto_gcm_encrypt(&(crypto_buf->crypto_ctx),
                              crypto_buf->internal_size,
                              crypto_buf->internal_addr,
                              crypto_buf->external_addr + __get_header_len(),
