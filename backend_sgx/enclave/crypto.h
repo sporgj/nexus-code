@@ -8,8 +8,8 @@
 
 
 struct nexus_crypto_ctx {
-    struct nexus_key * key;
-    struct nexus_key * iv; // let's leverage the IV as a 128-bit key
+    struct nexus_key key;
+    struct nexus_key iv; // let's leverage the IV as a 128-bit key
     struct nexus_mac mac;
 } __attribute__((packed));
 

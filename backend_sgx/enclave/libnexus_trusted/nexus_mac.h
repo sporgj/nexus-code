@@ -2,10 +2,10 @@
 
 #include <stdint.h>
 
-#define CONFIG_MAC_SIZE 16
+#define NEXUS_MAC_SIZE 16
 
 struct nexus_mac {
-    uint8_t bytes[CONFIG_MAC_SIZE];
+    uint8_t bytes[NEXUS_MAC_SIZE];
 };
 
 

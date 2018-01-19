@@ -44,3 +44,17 @@ nexus_uuid_copy(struct nexus_uuid * src_uuid,
 
     return 0;
 }
+
+int
+nexus_uuid_is_valid(struct nexus_uuid * uuid)
+{    
+    int i = 0;
+
+    for (i = 0; i < NEXUS_UUID_SIZE; i++) {
+	if (uuid->raw[i] != 0) {
+	    return 1;
+	}
+    }
+
+    return 0;
+}

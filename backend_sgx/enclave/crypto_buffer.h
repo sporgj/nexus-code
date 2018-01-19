@@ -19,7 +19,6 @@ nexus_crypto_buf_create(void * untrusted_addr, size_t untrusted_size);
 
 /**
  * Creates a new crypto buffer which will encrypt a metadata buffer of size.
- * This will cause the crypto buf to allocate data in untrusted memory.
  *
  * @param size
  * @return crypto_buf
@@ -44,5 +43,4 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
 
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
-                     uint8_t                 * trusted_buf,
                      struct nexus_mac        * mac);
