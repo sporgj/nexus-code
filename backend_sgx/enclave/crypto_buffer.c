@@ -84,7 +84,7 @@ nexus_crypto_buf_create(struct nexus_uuid * buf_uuid)
     void   * external_addr = NULL;
     size_t   external_size = 0;
 	
-    external_addr = bufer_layer_get(buf_uuid, &external_size);
+    external_addr = buffer_layer_get(buf_uuid, &external_size);
 	
     if (external_addr == NULL) {
 	log_error("Could not retrieve external addr for buffer\n");
@@ -175,37 +175,47 @@ __get_header_len()
       return sizeof(struct crypto_buf_hdr);
 }
 
-static int
+static struct crypto_buf_hdr * 
 __parse_header(struct nexus_crypto_buf * crypto_buf)
 {
-    struct crypto_buf_hdr buf_hdr;
+    struct crypto_buf_hdr * buf_hdr = NULL;
+    int ret = 0;
+    
+    buf_hdr = nexus_malloc(sizeof(struct nexus_crypto_buf));
 
-    /* JRL: At the moment this will parse the buffer from untrusted memory
-     *      I am not sure whether we need to copy it in first...
-     */
-
-    memcpy(&buf_hdr, crypto_buf->external_addr, __get_header_len());
+    
+    memcpy(buf_hdr, crypto_buf->external_addr, __get_header_len());
         
-    if (buf_hdr.magic != NEXUS_MAGIC_V1) {
+    if (buf_hdr->magic != NEXUS_MAGIC_V1) {
 	log_error("invalid magic value in crypto_buffer\n");
-	return -1;
+	goto err;
     }
 
-    if (buf_hdr.size != (crypto_buf->external_size - __get_header_len())) {
+    if (buf_hdr->size != (crypto_buf->external_size - __get_header_len())) {
 	log_error("Size mismatch in crypto_buffer\n");
-	return -1;
+	goto err;
     }
     
-    crypto_buf->version       = buf_hdr.version;
-    crypto_buf->internal_size = buf_hdr.size;
     
-    return __parse_gcm128_context(crypto_buf, &buf_hdr);
+    ret = __parse_gcm128_context(crypto_buf, buf_hdr);
+
+    if (ret == -1) {
+	log_error("Failed to parse GCM header\n");
+	goto err;
+    }
+    
+    return buf_hdr;
+
+ err:
+    nexus_free(buf_hdr);
+    return NULL;
 }
 
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
                      struct nexus_mac        * mac)
 {
+    struct crypto_buf_hdr * buf_hdr = NULL;
     int ret = -1;
 
     /* Internal buffer already exists */
@@ -222,14 +232,15 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 
     
     // parses and unwraps the buffer's crypto context
-    ret = __parse_header(crypto_buf);
+    buf_hdr = __parse_header(crypto_buf);
     
-    if (ret == -1) {
+    if (buf_hdr == NULL) {
         log_error("parsing crypto_buf header FAILED\n");
         goto err;
     }
-
+    
     /* Allocate internal memory */
+    crypto_buf->internal_size = crypto_buf->external_size - __get_header_len();
     crypto_buf->internal_addr = nexus_malloc(crypto_buf->internal_size);
 
     /* Decrypt the buffer */
@@ -239,8 +250,8 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
                                  crypto_buf->external_addr + __get_header_len(),
                                  crypto_buf->internal_addr,
                                  mac,
-                                 NULL,
-                                 0);
+                                 (uint8_t *)buf_hdr,
+				 __get_header_len());
 
         if (ret) {
             log_error("crypto_gcm_decrypt() FAILED\n");
@@ -249,9 +260,15 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     }
 
 
-    return crypto_buf->internal_addr;
+    crypto_buf->version = buf_hdr->version;
 
+    nexus_free(buf_hdr);
+    
+    return crypto_buf->internal_addr;
+    
  err:
+    if (buf_hdr) nexus_free(buf_hdr);
+    
     nexus_free(crypto_buf->internal_addr);
 
     return NULL;
@@ -311,29 +328,37 @@ err:
 /**
  * Writes the crypto_context + buf_info into external_addr
  */
-static int
+static struct crypto_buf_hdr *
 __serialize_header(struct nexus_crypto_buf * crypto_buf)
 {
     struct crypto_buf_hdr * buf_hdr = NULL;
-
     int ret = 0;
+
+    buf_hdr = nexus_malloc(sizeof(struct crypto_buf_hdr));
     
-
-    buf_hdr = (struct crypto_buf_hdr *)(crypto_buf->external_addr);
-
-
     buf_hdr->magic   = NEXUS_MAGIC_V1;
     buf_hdr->version = crypto_buf->version;
-    buf_hdr->size    = crypto_buf->external_size;    
+    buf_hdr->size    = crypto_buf->external_size;
     
-    return __serialize_gcm128_context(crypto_buf, buf_hdr);
+    ret = __serialize_gcm128_context(crypto_buf, buf_hdr);
+
+    if (ret == -1) {
+	log_error("Could not serialize GCM header\n");
+	nexus_free(buf_hdr);
+	return NULL;
+    }
+    
+    return buf_hdr;
 }
 
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
                      struct nexus_mac        * mac)
 {
+    struct crypto_buf_hdr * buf_hdr = NULL;
+
     int ret = -1;
+
 
 
     // if we have no space allocated...
@@ -354,26 +379,31 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
 
     crypto_buf->version += 1;
 
+    /* Generate the header for the external buffer */
+    buf_hdr = __serialize_header(crypto_buf);
 
-    ret = crypto_gcm_encrypt(&crypto_buf->crypto_ctx,
-                             crypto_buf->internal_size,
-                             crypto_buf->internal_addr,
-                             crypto_buf->external_addr + __get_header_len(),
-                             mac,
-                             NULL,
-                             0);
-
-
-
-    
-    // write the info + sealed(crypto_context) to the buffer
-    ret = __serialize_header(crypto_buf);
-
-    if (ret) {
+    if (buf_hdr == NULL) {
 	crypto_buf->version -= 1;
         log_error("serializing header FAILED\n");
         return -1;
     }
 
+
+    /* Encrypt the data with the buf_hdr as AAD for authentication*/
+    ret = crypto_gcm_encrypt(&crypto_buf->crypto_ctx,
+                             crypto_buf->internal_size,
+                             crypto_buf->internal_addr,
+                             crypto_buf->external_addr + __get_header_len(),
+                             mac,
+                             (uint8_t *)buf_hdr,
+                             __get_header_len());
+
+
+
+    /* Finally copy the header out to the external buffer */
+    memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
+    nexus_free(buf_hdr);
+    
+ 
     return 0;
 }
