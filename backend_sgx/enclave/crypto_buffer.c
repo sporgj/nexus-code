@@ -111,6 +111,10 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
     }
 
 
+    if (crypto_buf->internal_addr) {
+	nexus_free(crypto_buf->internal_addr);
+    }
+
     // free the crypto context
     {
         struct nexus_crypto_ctx * crypto_context = &(crypto_buf->crypto_ctx);
@@ -403,7 +407,9 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     /* Finally copy the header out to the external buffer */
     memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
     nexus_free(buf_hdr);
-    
+
+
+    buffer_layer_put(crypto_buf->uuid);
  
     return 0;
 }
