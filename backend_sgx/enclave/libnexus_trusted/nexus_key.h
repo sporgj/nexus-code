@@ -49,6 +49,12 @@ nexus_derive_key(nexus_key_type_t   key_type,
 		 struct nexus_key * src_key);
 
 
+/* Use this to generate a public key from a private key */
+int
+__nexus_derive_key(struct nexus_key * new_key,
+		   nexus_key_type_t   key_type,
+		   struct nexus_key * src_key);
+
 int
 nexus_copy_key(struct nexus_key * src_key,
 	       struct nexus_key * dst_key);

@@ -143,10 +143,10 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
 
     // generate key and IV
-    nexus_generate_key(crypto_context->key, NEXUS_RAW_128_KEY);
-    nexus_generate_key(crypto_context->iv, NEXUS_RAW_128_KEY);
+    nexus_generate_key(&(crypto_context->key), NEXUS_RAW_128_KEY);
+    nexus_generate_key(&(crypto_context->iv),  NEXUS_RAW_128_KEY);
 
-    iv_copy = nexus_clone_key(crypto_context->iv);
+    iv_copy = nexus_clone_key(&(crypto_context->iv));
 
 
     // intiialize the gcm context and perform the encryption
@@ -157,8 +157,8 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&crypto_context->key->key,
-                           nexus_key_bits(crypto_context->key));
+                           (uint8_t *)&(crypto_context->key.key),
+                           nexus_key_bits(&(crypto_context->key)));
 
         mbedtls_gcm_starts(&gcm_context,
                            MBEDTLS_GCM_ENCRYPT,
@@ -176,7 +176,7 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
 
         mbedtls_gcm_finish(&gcm_context,
-                           (uint8_t *)&crypto_context->mac,
+                           (uint8_t *)&(crypto_context->mac),
                            sizeof(struct nexus_mac));
 
         mbedtls_gcm_free(&gcm_context);
@@ -184,7 +184,7 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
     // if the mac is needed
     if (mac) {
-        nexus_mac_copy(&crypto_context->mac, mac);
+        nexus_mac_copy(&(crypto_context->mac), mac);
     }
 
     ret = 0;
@@ -213,7 +213,7 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
     int ret = -1;
 
-    iv_copy = nexus_clone_key(crypto_context->iv);
+    iv_copy = nexus_clone_key(&(crypto_context->iv));
 
 
     // intiialize the gcm context and perform the encryption
@@ -224,8 +224,8 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&crypto_context->key->key,
-                           nexus_key_bits(crypto_context->key));
+                           (uint8_t *)&(crypto_context->key.key),
+                           nexus_key_bits(&(crypto_context->key)));
 
         mbedtls_gcm_starts(&gcm_context,
                            MBEDTLS_GCM_DECRYPT,
@@ -248,7 +248,7 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
         mbedtls_gcm_free(&gcm_context);
     }
 
-    if (nexus_mac_compare(&computed_mac, &crypto_context->mac) != 0) {
+    if (nexus_mac_compare(&computed_mac, &(crypto_context->mac)) != 0) {
         ret = -1;
         goto out;
     }

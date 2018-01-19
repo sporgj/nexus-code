@@ -21,3 +21,13 @@ nexus_mac_compare(struct nexus_mac * mac1, struct nexus_mac * mac2);
 
 void
 nexus_mac_copy(struct nexus_mac * src_mac, struct nexus_mac * dst_mac);
+
+
+int
+nexus_mac_to_buf(struct nexus_mac * mac, uint8_t * buf);
+
+struct nexus_mac *
+nexus_mac_from_buf(uint8_t * buf);
+
+int
+__nexus_mac_from_buf(struct nexus_mac * mac, uint8_t * buf);

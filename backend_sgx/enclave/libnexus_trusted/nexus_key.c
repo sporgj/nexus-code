@@ -99,24 +99,21 @@ nexus_create_key(nexus_key_type_t key_type)
 }
 
 
-struct nexus_key *
-nexus_derive_key(nexus_key_type_t   key_type,
-		 struct nexus_key * src_key)
-{
-    struct nexus_key * key = NULL;
-
-    int ret   = 0;
-
-    key       = nexus_malloc(sizeof(struct nexus_key));
+int
+__nexus_derive_key(struct nexus_key * new_key,
+		   nexus_key_type_t   key_type,
+		   struct nexus_key * src_key)
+{		   
+    int ret = 0;
     
-    key->type = key_type;
+    new_key->type = key_type;
     
     switch (key_type) {
 	case NEXUS_MBEDTLS_PRV_KEY:
 	    log_error("Private keys cannot be derived, they must be created\n");
 	    goto err;
 	case NEXUS_MBEDTLS_PUB_KEY:
-	    ret = __mbedtls_derive_pub_key(key, src_key);
+	    ret = __mbedtls_derive_pub_key(new_key, src_key);
 	    break;
 	case NEXUS_WRAPPED_128_KEY:
 	    if (src_key->type != NEXUS_RAW_128_KEY) {
@@ -124,7 +121,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
 		goto err;
 	    }
 
-	    ret = __wrap_key(key, src_key);
+	    ret = __wrap_key(new_key, src_key);
 	    break;
 	    
 	case NEXUS_WRAPPED_256_KEY:
@@ -133,7 +130,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
 		goto err;
 	    }
 
-	    ret = __wrap_key(key, src_key);
+	    ret = __wrap_key(new_key, src_key);
 	    break;
 	case NEXUS_RAW_128_KEY:
 	    if (src_key->type != NEXUS_WRAPPED_128_KEY) {
@@ -141,7 +138,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
 		goto err;
 	    }
 
-	    ret = __unwrap_key(key, src_key);
+	    ret = __unwrap_key(new_key, src_key);
 	    break;
 	case NEXUS_RAW_256_KEY:
 	    if (src_key->type != NEXUS_WRAPPED_256_KEY) {
@@ -149,7 +146,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
 		goto err;
 	    }
 
-	    ret = __unwrap_key(key, src_key);
+	    ret = __unwrap_key(new_key, src_key);
 	    break;
 	    
 
@@ -158,6 +155,26 @@ nexus_derive_key(nexus_key_type_t   key_type,
 	    goto err;
     }
 
+
+    return ret;
+
+ err:
+    return -1;
+}
+
+
+struct nexus_key *
+nexus_derive_key(nexus_key_type_t   key_type,
+		 struct nexus_key * src_key)
+{
+    struct nexus_key * key = NULL;
+
+    int ret = 0;
+
+    key = nexus_malloc(sizeof(struct nexus_key));
+    
+    ret = __nexus_derive_key(key, key_type, src_key);
+    
     if (ret == -1) {
 	log_error("Could not create key");
 	goto err;
