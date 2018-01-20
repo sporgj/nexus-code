@@ -15,7 +15,8 @@ struct nexus_crypto_ctx {
 
 
 
-
+void
+nexus_crypto_ctx_free(struct nexus_crypto_ctx * crypto_ctx);
 
 
 
@@ -35,7 +36,7 @@ crypto_aes_ecb_decrypt(struct nexus_key * key,
 
 
 /**
- * Encrypts and seals buffer using the specified crypto_context 
+ * Encrypts and seals buffer using the specified crypto_context
  * @param crypto_context will be overriden with new key/iv/mac
  * @param input_len
  * @param plaintext

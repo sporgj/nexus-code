@@ -7,12 +7,12 @@
 struct nexus_sealed_buf;
 
 /**
- * Creates raw buffer from existing preallocated untrusted buffer
- * @param untrusted_addr
- * @param size
+ * Creates sealed_buffer from preallocated buffer
+ * @param uuid
+ * @return a sealed_buffer
  */
 struct nexus_sealed_buf *
-nexus_sealed_buf_create(void * untrusted_addr, size_t size);
+nexus_sealed_buf_create(struct nexus_uuid * uuid);
 
 /**
  * Allocates new sealed_buf of specified size
@@ -37,9 +37,9 @@ uint8_t *
 nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf);
 
 /**
- * Copies data into untrusted memory
+ * Copies data into uninternal memory
  * @param sealed_buf
- * @param trusted_buffer
+ * @param internal_buffer
  */
 int
-nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * trusted_addr);
+nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * internal_addr);

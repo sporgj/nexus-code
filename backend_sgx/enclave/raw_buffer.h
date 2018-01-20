@@ -6,12 +6,12 @@
 struct nexus_raw_buf;
 
 /**
- * Creates raw buffer from existing preallocated untrusted buffer
- * @param untrusted_addr
- * @param size
+ * Creates sealed_buffer from preallocated buffer
+ * @param uuid
+ * @return a sealed_buffer
  */
 struct nexus_raw_buf *
-nexus_raw_buf_create(void * untrusted_addr, size_t size);
+nexus_raw_buf_create(struct nexus_uuid * uuid);
 
 /**
  * Allocates new raw_buf of specified size

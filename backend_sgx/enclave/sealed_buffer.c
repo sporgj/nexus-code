@@ -4,32 +4,36 @@
 
 
 struct nexus_sealed_buf {
-    struct nexus_uuid * buffer_uuid;
+    struct nexus_uuid uuid;
 
-    size_t    untrusted_size;
-    uint8_t * untrusted_addr;
+    size_t    external_size;
+    uint8_t * external_addr;
 
-    size_t    trusted_size;
-    uint8_t * trusted_addr;
+    size_t    internal_size;
+    uint8_t * internal_addr;
 };
 
 
 struct nexus_sealed_buf *
-nexus_sealed_buf_create(void * untrusted_addr, size_t untrusted_size)
+nexus_sealed_buf_create(struct nexus_uuid * uuid)
 {
     struct nexus_sealed_buf * sealed_buf = NULL;
 
-    sealed_buf = nexus_malloc(sizeof(struct nexus_sealed_buf));
+    void * external_addr = NULL;
+    size_t external_size = 0;
 
-    sealed_buf->buffer_uuid = buffer_layer_create(untrusted_addr, untrusted_size);
-    if (sealed_buf->buffer_uuid == NULL) {
-        nexus_free(sealed_buf);
-        log_error("buffer_layer_create FAILED\n");
+    external_addr = buffer_layer_get(uuid, &external_size);
+    if (external_addr == NULL) {
+        log_error("could not retrieve external address\n");
         return NULL;
     }
 
-    sealed_buf->untrusted_addr = untrusted_addr;
-    sealed_buf->untrusted_size = untrusted_size;
+    sealed_buf = nexus_malloc(sizeof(struct nexus_sealed_buf));
+
+    sealed_buf->external_addr = external_addr;
+    sealed_buf->external_size = external_size;
+
+    nexus_uuid_copy(uuid, &sealed_buf->uuid);
 
     return sealed_buf;
 }
@@ -41,7 +45,7 @@ nexus_sealed_buf_new(size_t size)
 
     sealed_buf = nexus_malloc(sizeof(struct nexus_sealed_buf));
 
-    sealed_buf->trusted_size = size;
+    sealed_buf->internal_size = size;
 
     return sealed_buf;
 }
@@ -49,8 +53,12 @@ nexus_sealed_buf_new(size_t size)
 void
 nexus_sealed_buf_free(struct nexus_sealed_buf * sealed_buf)
 {
-    if (sealed_buf->buffer_uuid) {
-        buffer_layer_free(sealed_buf->buffer_uuid);
+    if (sealed_buf->external_addr) {
+        buffer_layer_put(&sealed_buf->uuid);
+    }
+
+    if (sealed_buf->internal_addr) {
+        nexus_free(sealed_buf->internal_addr);
     }
 
     nexus_free(sealed_buf);
@@ -66,33 +74,33 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf)
     int ret = -1;
 
 
-    if (sealed_buf->trusted_addr != NULL) {
-        return sealed_buf->trusted_addr;
+    if (sealed_buf->internal_addr != NULL) {
+        return sealed_buf->internal_addr;
     }
 
-    if (sealed_buf->untrusted_addr == NULL) {
-        log_error("raw buffer untrusted_addr is NULL");
+    if (sealed_buf->external_addr == NULL) {
+        log_error("raw buffer external_addr is NULL");
         return NULL;
     }
 
-    // XXX copy the buffer into trusted memory
-    sealed_data = nexus_malloc(sealed_buf->untrusted_size);
-    memcpy(sealed_data, sealed_buf->untrusted_addr, sealed_buf->untrusted_size);
+    // XXX copy the buffer into internal memory
+    sealed_data = nexus_malloc(sealed_buf->external_size);
+    memcpy(sealed_data, sealed_buf->external_addr, sealed_buf->external_size);
 
 
     payload_size = sgx_get_encrypt_txt_len(sealed_data);
 
-    if (payload_size == UINT32_MAX || payload_size > sealed_buf->untrusted_size) {
+    if (payload_size == UINT32_MAX || payload_size > sealed_buf->external_size) {
         log_error("sgx_get_encrypt_txt_len FAILED\n");
         goto out;
     }
 
 
     // now allocate the buffer and unseal
-    sealed_buf->trusted_size = payload_size;
-    sealed_buf->trusted_addr = nexus_malloc(payload_size);
+    sealed_buf->internal_size = payload_size;
+    sealed_buf->internal_addr = nexus_malloc(payload_size);
 
-    ret = sgx_unseal_data(sealed_data, NULL, 0, sealed_buf->trusted_addr, &payload_size);
+    ret = sgx_unseal_data(sealed_data, NULL, 0, sealed_buf->internal_addr, &payload_size);
     if (ret) {
         log_error("sgx_unseal_data FAILED \n");
         goto out;
@@ -105,45 +113,45 @@ out:
     }
 
     if (ret) {
-        nexus_free(sealed_buf->trusted_addr);
-        sealed_buf->trusted_addr = NULL;
+        nexus_free(sealed_buf->internal_addr);
+        sealed_buf->internal_addr = NULL;
     }
 
-    return sealed_buf->trusted_addr;
+    return sealed_buf->internal_addr;
 }
 
 /**
- * Copies data into untrusted memory
- * @param trusted_buffer
+ * Copies data into external memory
+ * @param internal_buffer
  */
 int
-nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * trusted_addr)
+nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * internal_addr)
 {
     sgx_sealed_data_t * sealed_data = NULL;
 
     int ret = -1;
 
 
-    sealed_buf->untrusted_size = sgx_calc_sealed_data_size(0, sealed_buf->trusted_size);
+    sealed_buf->external_size = sgx_calc_sealed_data_size(0, sealed_buf->internal_size);
 
-    if (sealed_buf->untrusted_addr == NULL) {
-        sealed_buf->buffer_uuid = buffer_layer_alloc(sealed_buf->untrusted_size,
-                                                     &sealed_buf->untrusted_addr);
+    if (sealed_buf->external_addr == NULL) {
+        sealed_buf->external_addr = buffer_layer_alloc(sealed_buf->external_size,
+                                                       &sealed_buf->uuid);
 
-        if (sealed_buf->buffer_uuid == NULL) {
+        if (sealed_buf->external_addr == NULL) {
             log_error("buffer_layer_alloc FAILED\n");
             return -1;
         }
     }
 
     // seal the data
-    sealed_data = nexus_malloc(sealed_buf->untrusted_size);
+    sealed_data = nexus_malloc(sealed_buf->external_size);
 
     ret = sgx_seal_data(0,
                         NULL,
-                        sealed_buf->trusted_size,
-                        trusted_addr,
-                        sealed_buf->untrusted_size,
+                        sealed_buf->internal_size,
+                        internal_addr,
+                        sealed_buf->external_size,
                         sealed_data);
 
     if (ret) {
@@ -151,7 +159,7 @@ nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * trusted_add
         goto out;
     }
 
-    memcpy(sealed_buf->untrusted_addr, sealed_data, sealed_buf->untrusted_size);
+    memcpy(sealed_buf->external_addr, sealed_data, sealed_buf->external_size);
 
 
     ret = 0;

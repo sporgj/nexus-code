@@ -1,31 +1,37 @@
 #include "internal.h"
 
 struct nexus_raw_buf {
-    size_t size;
+    struct nexus_uuid uuid;
 
-    struct nexus_uuid * buffer_uuid;
-    uint8_t           * untrusted_addr;
+    size_t buffer_size;
 
-    uint8_t           * trusted_addr;
+    uint8_t * external_addr;
+
+    uint8_t * internal_addr;
 };
 
 
 struct nexus_raw_buf *
-nexus_raw_buf_create(void * untrusted_addr, size_t size)
+nexus_raw_buf_create(struct nexus_uuid * uuid)
 {
     struct nexus_raw_buf * raw_buf = NULL;
 
-    raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
+    void * external_addr = NULL;
+    size_t external_size = 0;
 
-    raw_buf->buffer_uuid = buffer_layer_create(untrusted_addr, size);
-    if (raw_buf->buffer_uuid == NULL) {
-        nexus_free(raw_buf);
-        log_error("buffer_layer_create FAILED\n");
+    external_addr = buffer_layer_get(uuid, &external_size);
+    if (external_addr == NULL) {
+        log_error("could not retrieve external address\n");
         return NULL;
     }
 
-    raw_buf->untrusted_addr = untrusted_addr;
-    raw_buf->size           = size;
+    raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
+
+
+    raw_buf->external_addr = external_addr;
+    raw_buf->buffer_size   = external_size;
+
+    nexus_uuid_copy(uuid, &raw_buf->uuid);
 
     return raw_buf;
 }
@@ -37,7 +43,7 @@ nexus_raw_buf_new(size_t size)
 
     raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
 
-    raw_buf->size = size;
+    raw_buf->buffer_size = size;
 
     return raw_buf;
 }
@@ -45,8 +51,12 @@ nexus_raw_buf_new(size_t size)
 void
 nexus_raw_buf_free(struct nexus_raw_buf * raw_buf)
 {
-    if (raw_buf->buffer_uuid) {
-        buffer_layer_free(raw_buf->buffer_uuid);
+    if (raw_buf->external_addr) {
+        buffer_layer_put(&raw_buf->uuid);
+    }
+
+    if (raw_buf->internal_addr) {
+        nexus_free(raw_buf->internal_addr);
     }
 
     nexus_free(raw_buf);
@@ -55,35 +65,35 @@ nexus_raw_buf_free(struct nexus_raw_buf * raw_buf)
 uint8_t *
 nexus_raw_buf_get(struct nexus_raw_buf * raw_buf)
 {
-    if (raw_buf->trusted_addr != NULL) {
-        return raw_buf->trusted_addr;
+    if (raw_buf->internal_addr != NULL) {
+        return raw_buf->internal_addr;
     }
 
-    if (raw_buf->untrusted_addr == NULL) {
-        log_error("raw buffer untrusted_addr is NULL");
+    if (raw_buf->external_addr == NULL) {
+        log_error("raw buffer external_addr is NULL");
         return NULL;
     }
 
-    raw_buf->trusted_addr = nexus_malloc(raw_buf->size);
+    raw_buf->internal_addr = nexus_malloc(raw_buf->buffer_size);
 
-    memcpy(raw_buf->trusted_addr, raw_buf->untrusted_addr, raw_buf->size);
+    memcpy(raw_buf->internal_addr, raw_buf->external_addr, raw_buf->buffer_size);
 
-    return raw_buf->trusted_addr;
+    return raw_buf->internal_addr;
 }
 
 int
-nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * trusted_addr)
+nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * internal_addr)
 {
-    if (raw_buf->untrusted_addr == NULL) {
-        raw_buf->buffer_uuid = buffer_layer_alloc(raw_buf->size, &raw_buf->untrusted_addr);
+    if (raw_buf->external_addr == NULL) {
+        raw_buf->external_addr = buffer_layer_alloc(raw_buf->buffer_size, &raw_buf->uuid);
 
-        if (raw_buf->buffer_uuid == NULL) {
+        if (raw_buf->external_addr == NULL) {
             log_error("buffer_layer_alloc FAILED\n");
             return -1;
         }
     }
 
-    memcpy(trusted_addr, raw_buf->untrusted_addr, raw_buf->size);
+    memcpy(internal_addr, raw_buf->external_addr, raw_buf->buffer_size);
 
     return 0;
 }
