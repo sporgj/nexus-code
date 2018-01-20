@@ -113,12 +113,14 @@ supernode_store(struct supernode       * supernode,
         goto out;
     }
 
+#if 0
     ret = nexus_crypto_buf_put(crypto_buffer, serialized_buffer, mac);
 
     if (ret) {
         log_error("crypto_buffer_write\n");
         goto out;
     }
+#endif
 
     // write it to the datastore
     ret = metadata_write(&supernode->my_uuid, uuid_path, crypto_buffer);

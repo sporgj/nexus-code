@@ -22,6 +22,14 @@
 #define GCM128_KEY_SIZE (16)
 #define GCM128_IV_SIZE  (16)
 
+struct __buf_info {
+    uint32_t magic;
+
+    uint32_t version;
+
+    uint32_t size; // size of the encrypted buffer
+} __attribute__((packed));
+
 struct __gcm_header {
     uint8_t key[GCM128_KEY_SIZE];
     uint8_t  iv[GCM128_IV_SIZE];
@@ -30,12 +38,7 @@ struct __gcm_header {
 
 
 struct crypto_buf_hdr {
-    uint32_t magic;
-
-    uint32_t version;
-
-    uint32_t size; // size of the encrypted buffer
-
+    struct __buf_info   buf_info;
     struct __gcm_header gcm_hdr;
 } __attribute__((packed));
 
@@ -174,6 +177,18 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 }
 
 static int
+__get_buf_info_len()
+{
+    return sizeof(struct __buf_info);
+}
+
+static uint8_t *
+__get_buf_info(struct crypto_buf_hdr * buf_hdr)
+{
+    return (uint8_t *)&(buf_hdr->buf_info);
+}
+
+static int
 __get_header_len()
 {
       return sizeof(struct crypto_buf_hdr);
@@ -190,12 +205,12 @@ __parse_header(struct nexus_crypto_buf * crypto_buf)
 
     memcpy(buf_hdr, crypto_buf->external_addr, __get_header_len());
 
-    if (buf_hdr->magic != NEXUS_MAGIC_V1) {
+    if (buf_hdr->buf_info.magic != NEXUS_MAGIC_V1) {
         log_error("invalid magic value in crypto_buffer\n");
         goto err;
     }
 
-    if (buf_hdr->size != (crypto_buf->external_size - __get_header_len())) {
+    if (buf_hdr->buf_info.size != (crypto_buf->external_size - __get_header_len())) {
         log_error("Size mismatch in crypto_buffer\n");
         goto err;
     }
@@ -254,8 +269,8 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
                                  crypto_buf->external_addr + __get_header_len(),
                                  crypto_buf->internal_addr,
                                  mac,
-                                 (uint8_t *)buf_hdr,
-                                 __get_header_len());
+                                 __get_buf_info(buf_hdr),
+                                 __get_buf_info_len());
 
         if (ret) {
             log_error("crypto_gcm_decrypt() FAILED\n");
@@ -264,7 +279,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     }
 
 
-    crypto_buf->version = buf_hdr->version;
+    crypto_buf->version = buf_hdr->buf_info.version;
 
     nexus_free(buf_hdr);
 
@@ -279,7 +294,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 }
 
 static int
-__serialize_gcm128_context(struct nexus_crypto_buf * crypto_buf,  struct crypto_buf_hdr   * buf_hdr)
+__serialize_gcm128_context(struct nexus_crypto_buf * crypto_buf, struct crypto_buf_hdr * buf_hdr)
 {
     struct nexus_crypto_ctx * crypto_ctx  = &(crypto_buf->crypto_ctx);
     struct nexus_key        * wrapped_key = NULL;
@@ -328,30 +343,36 @@ err:
     return -1;
 }
 
-/**
- * Writes the crypto_context + buf_info into external_addr
- */
 static struct crypto_buf_hdr *
-__serialize_header(struct nexus_crypto_buf * crypto_buf)
+__create_header(struct nexus_crypto_buf * crypto_buf)
 {
     struct crypto_buf_hdr * buf_hdr = NULL;
-    int ret = 0;
 
     buf_hdr = nexus_malloc(sizeof(struct crypto_buf_hdr));
 
-    buf_hdr->magic   = NEXUS_MAGIC_V1;
-    buf_hdr->version = crypto_buf->version;
-    buf_hdr->size    = crypto_buf->external_size;
+    buf_hdr->buf_info.magic   = NEXUS_MAGIC_V1;
+    buf_hdr->buf_info.version = crypto_buf->version;
+    buf_hdr->buf_info.size    = crypto_buf->external_size;
+
+    return buf_hdr;
+}
+
+/**
+ * Writes the crypto_context + buf_info into external_addr
+ */
+static int
+__serialize_header(struct nexus_crypto_buf * crypto_buf, struct crypto_buf_hdr * buf_hdr)
+{
+    int ret = -1;
 
     ret = __serialize_gcm128_context(crypto_buf, buf_hdr);
 
     if (ret == -1) {
 	log_error("Could not serialize GCM header\n");
-	nexus_free(buf_hdr);
-	return NULL;
+        return -1;
     }
 
-    return buf_hdr;
+    return 0;
 }
 
 int
@@ -366,24 +387,21 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
 
     // if we have no space allocated...
     if (crypto_buf->external_addr == NULL) {
-        struct nexus_uuid buf_uuid;
-
         crypto_buf->external_size = __get_header_len() + crypto_buf->internal_size;
-        crypto_buf->external_addr = buffer_layer_alloc(crypto_buf->external_size, &buf_uuid);
+        crypto_buf->external_addr = buffer_layer_alloc(crypto_buf->external_size,
+                                                       &crypto_buf->uuid);
 
         if (crypto_buf->external_addr == NULL) {
             log_error("buffer_layer_alloc FAILED\n");
             return -1;
         }
-
-        nexus_uuid_copy(&buf_uuid, &(crypto_buf->uuid));
     }
 
 
     crypto_buf->version += 1;
 
     /* Generate the header for the external buffer */
-    buf_hdr = __serialize_header(crypto_buf);
+    buf_hdr = __create_header(crypto_buf);
 
     if (buf_hdr == NULL) {
 	crypto_buf->version -= 1;
@@ -398,17 +416,36 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
                              crypto_buf->internal_addr,
                              crypto_buf->external_addr + __get_header_len(),
                              mac,
-                             (uint8_t *)buf_hdr,
-                             __get_header_len());
+                             __get_buf_info(buf_hdr),
+                             __get_buf_info_len());
 
+    if (ret != 0) {
+        log_error("crypto_gcm_encrypt FAILED\n");
+        goto out;
+    }
+
+    // serialize the updated crypto context(encryption generates new key,iv & mac)
+
+    ret = __serialize_header(crypto_buf, buf_hdr);
+    if (ret) {
+        log_error("serializing the header FAILED\n");
+        goto out;
+    }
 
 
     /* Finally copy the header out to the external buffer */
     memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
+
+
+
+    ret = 0;
+out:
     nexus_free(buf_hdr);
-
-
     buffer_layer_put(&crypto_buf->uuid);
 
-    return 0;
+    if (ret) {
+        crypto_buf->version -= 1;
+    }
+
+    return ret;
 }
