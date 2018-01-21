@@ -23,7 +23,8 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
 }
 
 void *
-buffer_layer_get(struct nexus_uuid * uuid, size_t * size) {
+buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
+{
     uint8_t * external_addr = NULL;
 
     int err = -1;

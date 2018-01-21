@@ -9,6 +9,9 @@ struct nexus_mac {
 };
 
 
+void
+nexus_mac_zeroize(struct nexus_mac * mac);
+
 /**
  * Compares two macs
  * @param mac1

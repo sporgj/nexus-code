@@ -64,13 +64,14 @@ objs := nexus_enclave_t.o \
 	crypto_buffer.o \
 	sealed_buffer.o \
 	raw_buffer.o \
+	crypto_context.o \
 	crypto.o \
 	dirnode.o \
 	supernode.o \
 	usertable.o \
 	metadata.o \
 	volume.o \
-	main.o 
+	main.o
 
 
 build = \

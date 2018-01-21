@@ -8,19 +8,6 @@
 #include <mbedtls/sha256.h>
 
 
-void
-nexus_crypto_ctx_free(struct nexus_crypto_ctx * crypto_ctx)
-{
-    if (crypto_ctx->key.key) {
-        nexus_free_key(&(crypto_ctx->key));
-    }
-
-    if (crypto_ctx->iv.key) {
-        nexus_free_key(&(crypto_ctx->iv));
-    }
-}
-
-
 int
 __crypto_aes_ecb_encrypt(struct nexus_key * key,
                          size_t             data_size,
@@ -153,10 +140,6 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
     int ret = -1;
 
 
-    // generate key and IV
-    nexus_generate_key(&(crypto_context->key), NEXUS_RAW_128_KEY);
-    nexus_generate_key(&(crypto_context->iv),  NEXUS_RAW_128_KEY);
-
     iv_copy = nexus_clone_key(&(crypto_context->iv));
 
 
@@ -224,8 +207,8 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
     int ret = -1;
 
-    iv_copy = nexus_clone_key(&(crypto_context->iv));
 
+    iv_copy = nexus_clone_key(&(crypto_context->iv));
 
     // intiialize the gcm context and perform the encryption
     {

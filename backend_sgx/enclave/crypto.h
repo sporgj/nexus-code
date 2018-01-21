@@ -6,19 +6,7 @@
 #include <nexus_key.h>
 #include <nexus_mac.h>
 
-
-struct nexus_crypto_ctx {
-    struct nexus_key key;
-    struct nexus_key iv; // let's leverage the IV as a 128-bit key
-    struct nexus_mac mac;
-} __attribute__((packed));
-
-
-
-void
-nexus_crypto_ctx_free(struct nexus_crypto_ctx * crypto_ctx);
-
-
+#include "crypto_context.h"
 
 
 
@@ -58,8 +46,8 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
 
 /**
- * Encrypts and seals buffer using the specified crypto_context 
- * @param crypto_context 
+ * Encrypts and seals buffer using the specified crypto_context
+ * @param crypto_context
  * @param input_len
  * @param ciphertext
  * @param plaintext
