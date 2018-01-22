@@ -59,41 +59,7 @@ enclave {
 
 
 
-
-        // ----------------- METADATA stuff ------------------------
-
-        struct raw_buffer *
-        ocall_metadata_get
-        (
-                    [in] struct nexus_uuid        * uuid,
-            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-            [user_check] void                     * backend_info
-        );
-
-        int ocall_metadata_set
-        (
-                    [in] struct nexus_uuid        * uuid,
-            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-                    [in] struct raw_buffer        * raw_buffer,
-            [user_check] void                     * backend_info
-        );
-
-        int ocall_metadata_delete
-        (
-                    [in] struct nexus_uuid        * uuid,
-            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-            [user_check] void                     * backend_info
-        );
-
-        int ocall_metadata_stat
-        (
-                    [in] struct nexus_uuid        * uuid,
-            [user_check] struct nexus_uuid_path   * uuid_path_untrusted,
-            [user_check] struct nexus_stat_buffer * stat_buffer_untrusted,
-            [user_check] void                     * backend_info
-        );
-
-
+        // ---------------------- utilities ---------------------
 
         /* allocates a buffer in untrusted memory */
         void * ocall_calloc(size_t size);

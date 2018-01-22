@@ -16,11 +16,12 @@
 #include "nexus_enclave_u.h"
 
 #include "sgx_backend_common.h"
+#include "buffer_manager.h"
 
 struct sgx_backend_info {
     sgx_enclave_id_t enclave_id;
-    
-    struct nexus_volume * volume; 
+
+    struct nexus_volume * volume;
 };
 
 

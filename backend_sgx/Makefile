@@ -15,13 +15,13 @@ endif
 
 
 INCLUDES := -I../libnexus \
-	    -I$(SGX_SDK)/include \
-	    -I../mbedtls-2.6.0/include
+            -I$(SGX_SDK)/include \
+            -I../mbedtls-2.6.0/include
 
 CFLAGS   := -W -Wall -Werror \
-	    -Wno-nonnull -Wno-unused-parameter -Wno-attributes \
-	    -D_GNU_SOURCE \
-	    -std=gnu11 -fPIC 
+            -Wno-nonnull -Wno-unused-parameter -Wno-attributes \
+            -D_GNU_SOURCE \
+            -std=gnu11 -fPIC
 
 # setup debug info
 ifeq ($(DEBUG), 1)
@@ -33,18 +33,19 @@ endif
 
 
 LDFLAGS  := -L$(SGX_SDK)/lib64  \
-	    -L../mbedtls-2.6.0/library
+            -L../mbedtls-2.6.0/library
 
-libs     :=   -l$(sgx_urts_lib) \
-	     -l$(sgx_uae_lib) \
-	     -lpthread
+libs     := -l$(sgx_urts_lib) \
+            -l$(sgx_uae_lib) \
+            -lpthread
 
 EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
 
 objs := nexus_enclave_u.o \
 	main.o \
 	volume_ops.o \
-	buffer_layer.o \
+	buffer_manager.o \
+	xxhash.o \
 	ocalls.o
 
 
@@ -76,7 +77,7 @@ nexus_enclave_u.c: $(edl_src)
 	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --untrusted --untrusted-dir ./ $(edl_src)
 
 
-$(static_lib):  $(objs) 
+$(static_lib):  $(objs)
 	$(call build,AR,$(AR) rcs $@ $(objs))
 
 

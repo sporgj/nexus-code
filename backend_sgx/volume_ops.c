@@ -3,6 +3,7 @@
 int
 sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
+#if 0
     struct sgx_backend_info * sgx_backend = NULL;
 
     char * public_key_str = NULL;
@@ -50,7 +51,6 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
         };
 
         sgx_backend->volume = volume;
-
 
         int err = ecall_create_volume(sgx_backend->enclave_id,
                                       &ret,
@@ -104,23 +104,15 @@ out:
     }
 
     return ret;
-}
+#endif
 
-static int
-sign_response(struct nexus_key      * user_privkey,
-              struct sealed_buffer  * sealed_volkey,
-              struct raw_buffer     * nonce,
-              struct crypto_buffer  * supernode_buffer,
-              uint8_t              ** p_signature,
-              size_t                * signature_len)
-{
-    // TODO
     return -1;
 }
 
 int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 {
+#if 0
     struct sgx_backend_info * sgx_backend = NULL;
 
     struct nexus_key     * user_prv_key   = NULL;
@@ -187,7 +179,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
     }
 
 
-    // read the supernode 
+    // read the supernode
     supernode_cryptobuf = ocall_metadata_get(&volume->supernode_uuid,
                                              NULL,
                                              sgx_backend);
@@ -213,7 +205,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     // send response to the enclave
     {
-        struct raw_buffer signature_rawbuf = { 
+        struct raw_buffer signature_rawbuf = {
             .size           = signature_len,
             .untrusted_addr = signature_buf
         };
@@ -253,4 +245,7 @@ out:
     }
 
     return ret;
+#endif
+
+    return -1;
 }
