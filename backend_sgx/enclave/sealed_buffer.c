@@ -46,6 +46,7 @@ nexus_sealed_buf_new(size_t size)
     sealed_buf = nexus_malloc(sizeof(struct nexus_sealed_buf));
 
     sealed_buf->internal_size = size;
+    sealed_buf->internal_addr = nexus_malloc(size);
 
     return sealed_buf;
 }

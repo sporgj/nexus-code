@@ -43,7 +43,8 @@ nexus_raw_buf_new(size_t size)
 
     raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
 
-    raw_buf->buffer_size = size;
+    raw_buf->buffer_size   = size;
+    raw_buf->internal_addr = nexus_malloc(size);
 
     return raw_buf;
 }
