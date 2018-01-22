@@ -49,19 +49,25 @@ dirnode_store(struct dirnode         * dirnode,
         goto out;
     }
 
-#if 0
-    ret = nexus_crypto_buf_put(crypto_buffer, serialized_buffer, mac);
+    // write to the buffer
+    {
+        uint8_t * output_buffer = NULL;
 
-    if (ret) {
-        log_error("nexus_crypto_buf_put FAILED\n");
-        goto out;
-    }
-#endif
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, NULL);
 
-    // write it to the datastore
-    ret = metadata_write(&dirnode->my_uuid, uuid_path, crypto_buffer);
-    if (ret) {
-        log_error("metadata_write failed\n");
+        if (output_buffer == NULL) {
+            log_error("could not get the crypto_bufffer buffer\n");
+            goto out;
+        }
+
+        memcpy(output_buffer, serialized_buffer, serialized_buflen);
+
+        ret = nexus_crypto_buf_put(crypto_buffer, mac);
+
+        if (ret) {
+            log_error("nexus_crypto_buf_put FAILED\n");
+            goto out;
+        }
     }
 
     ret = 0;
@@ -76,5 +82,5 @@ out:
 void
 dirnode_free(struct dirnode * dirnode)
 {
-    // TODO
+    nexus_free(dirnode);
 }
