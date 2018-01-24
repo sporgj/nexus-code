@@ -171,3 +171,11 @@ out:
 
     return ret;
 }
+
+int
+nexus_sealed_buf_flush(struct nexus_sealed_buf * sealed_buf, struct nexus_uuid * bufuuid_out)
+{
+    nexus_uuid_copy(&sealed_buf->uuid, bufuuid_out);
+
+    return 0;
+}

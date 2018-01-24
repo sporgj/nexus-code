@@ -26,7 +26,6 @@ dirnode_serialize(struct dirnode * dirnode, size_t * p_size)
 int
 dirnode_store(struct dirnode         * dirnode,
               struct nexus_uuid_path * uuid_path,
-              struct nexus_key       * volumekey,
               struct nexus_mac       * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;

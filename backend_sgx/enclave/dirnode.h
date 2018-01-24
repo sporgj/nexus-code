@@ -32,12 +32,13 @@ dirnode_create(struct nexus_uuid * root_uuid);
  * Writes dirnode to datastore
  *
  * @param dirnode
+ * @param uuid_path
+ * @param mac
  * @return 0 on success
  */
 int
 dirnode_store(struct dirnode         * dirnode,
               struct nexus_uuid_path * uuid_path,
-              struct nexus_key       * volumekey,
               struct nexus_mac       * mac);
 
 void

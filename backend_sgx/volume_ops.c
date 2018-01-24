@@ -1,14 +1,45 @@
 #include "internal.h"
 
+static char * __user_pubkey_str()
+{
+    char * public_key_str = NULL;
+
+    struct nexus_key  * user_prv_key = NULL;
+    struct nexus_key  * user_pub_key = NULL;
+
+
+    user_prv_key = nexus_get_user_key();
+
+    if (user_prv_key == NULL) {
+        log_error("Could not retrieve user key\n");
+        return NULL;
+    }
+
+    user_pub_key = nexus_derive_key(NEXUS_MBEDTLS_PUB_KEY, user_prv_key);
+
+    nexus_free_key(user_prv_key);
+
+
+    if (user_pub_key == NULL) {
+        log_error("Could not derive user public key\n");
+        return NULL;
+    }
+
+    public_key_str = nexus_key_to_str(user_pub_key);
+
+    nexus_free_key(user_pub_key);
+
+    return public_key_str;
+}
+
 int
 sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
-#if 0
     struct sgx_backend_info * sgx_backend = NULL;
 
     char * public_key_str = NULL;
 
-    struct sealed_buffer * sealed_volumekey = NULL;
+    struct nexus_uuid volkey_buffuuid;
 
     int ret = -1;
 
@@ -16,82 +47,32 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     sgx_backend = (struct sgx_backend_info *)priv_data;
 
     // derive the public key string
-    {
-        struct nexus_key  * user_prv_key = NULL;
-        struct nexus_key  * user_pub_key = NULL;
-
-        user_prv_key = nexus_get_user_key();
-
-        if (user_prv_key == NULL) {
-            log_error("Could not retrieve user key\n");
-            return -1;
-        }
-
-        user_pub_key = nexus_derive_key(NEXUS_MBEDTLS_PUB_KEY, user_prv_key);
-
-        nexus_free_key(user_prv_key);
-
-
-        if (user_pub_key == NULL) {
-            log_error("Could not derive user public key\n");
-            goto out;
-        }
-
-        public_key_str = nexus_key_to_str(user_pub_key);
-
-        nexus_free_key(user_pub_key);
+    public_key_str = __user_pubkey_str();
+    if (public_key_str == NULL) {
+        return -1;
     }
 
-
-    // call the enclave
     {
-        struct raw_buffer user_pubkey_rawbuf = {
-            .size           = strlen(public_key_str),
-            .untrusted_addr = public_key_str
-        };
-
+        // the enclave calls ocall_metadata_set, which needs a volume pointer
+        // to the backend info
         sgx_backend->volume = volume;
 
         int err = ecall_create_volume(sgx_backend->enclave_id,
                                       &ret,
-                                      &user_pubkey_rawbuf,
+                                      public_key_str,
                                       &volume->supernode_uuid,
-                                      &sealed_volumekey);
+                                      &volkey_buffuuid);
+
+        // restore the volume pointer
+        sgx_backend->volume = NULL;
 
         if (err || ret) {
             log_error("ecall_create_volume() FAILED\n");
             goto out;
         }
-
-        // restore the volume pointer
-        sgx_backend->volume = NULL;
     }
 
-
-#if 0
-    // assign the volumekey
-    {
-        struct nexus_key * vol_key = NULL;
-
-        size_t tsize = sealed_volumekey->size + sizeof(struct sealed_buffer);
-
-        // copy the whole sealed key struct into the nexus_key object
-        vol_key = nexus_key_from_binary(NEXUS_RAW_SEALED_KEY,
-                                        sealed_volumekey,
-                                        tsize);
-
-        if (vol_key == NULL) {
-            ret = -1;
-
-            log_error("allocating generic key FAILED\n");
-            goto out;
-        }
-
-
-        nexus_copy_key(vol_key, &volume->vol_key);
-        nexus_free_key(vol_key);
-    }
-#endif
+    // TODO get the volume buffer
 
     ret = 0;
 out:
@@ -99,14 +80,7 @@ out:
         nexus_free(public_key_str);
     }
 
-    if (sealed_volumekey) {
-        nexus_free(sealed_volumekey);
-    }
-
     return ret;
-#endif
-
-    return -1;
 }
 
 int

@@ -7,10 +7,10 @@
 #include <nexus_uuid.h>
 #include <nexus_key.h>
 
-// TODO JBD: remove this (note to self)
-struct raw_buffer {
+// raw pointer allows us to marshall arguments across the ecall boundary
+struct raw_pointer {
     size_t size;
-    void * untrusted_addr;
+    void * addr;
 };
 
 struct nexus_stat_buffer {

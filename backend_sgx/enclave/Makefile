@@ -55,22 +55,29 @@ nexus_trusted_objs := \
 	nexus_encode.o \
 	nexus_uuid.o
 
-trusted_objs := \
-	$(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
+trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
+
+
+nexus_ecall_objs := \
+	volume.o
+
+ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))
+
 
 objs := nexus_enclave_t.o \
 	$(trusted_objs) \
+	$(ecall_objs) \
 	buffer_layer.o \
 	crypto_buffer.o \
 	sealed_buffer.o \
 	raw_buffer.o \
 	crypto_context.o \
 	crypto.o \
+	volumekey.o \
 	dirnode.o \
 	supernode.o \
 	usertable.o \
 	metadata.o \
-	volume.o \
 	main.o
 
 

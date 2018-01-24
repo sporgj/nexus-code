@@ -1,7 +1,7 @@
 #include "internal.h"
 
 static struct supernode *
-supernode_new(struct raw_buffer * user_pubkey)
+supernode_new(char * user_pubkey)
 {
     struct supernode * supernode = NULL;
 
@@ -15,7 +15,7 @@ supernode_new(struct raw_buffer * user_pubkey)
 }
 
 struct supernode *
-supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey)
+supernode_create(char * user_pubkey)
 {
     struct supernode * supernode = NULL;
 
@@ -58,7 +58,7 @@ supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey)
 
         nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
 
-        ret = dirnode_store(root_dirnode, NULL, volumekey, NULL);
+        ret = dirnode_store(root_dirnode, NULL, NULL);
 
         dirnode_free(root_dirnode);
 
@@ -90,7 +90,6 @@ supernode_serialize(struct supernode * supernode, size_t * p_size)
 int
 supernode_store(struct supernode       * supernode,
                 struct nexus_uuid_path * uuid_path,
-                struct nexus_key       * volumekey,
                 struct nexus_mac       * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;

@@ -1,7 +1,5 @@
 #include "internal.h"
 
-struct nexus_key * global_volumekey = NULL;
-
 // the sealing key used in protecting volumekeys
 void * global_backend_ext  = NULL;
 

@@ -1,5 +1,4 @@
 enclave {
-    include "internal.h"
     include "sgx_backend_common.h"
 
     trusted {
@@ -22,13 +21,13 @@ enclave {
          *
          * @param user_pubkey_in
          * @param supernode_uuid_out
-         * @param sealed_volumekey_out
+         * @param volkey_buffer_uuid_out
          */
         public int ecall_create_volume
         (
-            [user_check] struct raw_buffer     * user_pubkey_in,
-            [user_check] struct nexus_uuid     * supernode_uuid_out,
-            [user_check] struct raw_buffer    ** sealed_volumekey_out
+            [in, string] char              * user_pubkey_in,
+            [user_check] struct nexus_uuid * supernode_uuid_out,
+            [user_check] struct nexus_uuid * volkey_buffer_uuid_out
         );
     };
 

@@ -43,3 +43,12 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf);
  */
 int
 nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * internal_addr);
+
+/**
+ * Writes the sealed buffer's buffer uuid to an external UUID pointer
+ * @param sealed_buf
+ * @param volkey_uuid
+ * @return NULL
+ */
+int
+nexus_sealed_buf_flush(struct nexus_sealed_buf * sealed_buf, struct nexus_uuid * bufuuid_out);

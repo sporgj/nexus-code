@@ -34,7 +34,7 @@ struct supernode {
  * @return NULL on failure
  */
 struct supernode *
-supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey);
+supernode_create(char * user_pubkey);
 
 /**
  * Writes the supernode to the backing store
@@ -44,7 +44,6 @@ supernode_create(struct raw_buffer * user_pubkey, struct nexus_key * volumekey);
 int
 supernode_store(struct supernode       * supernode,
                 struct nexus_uuid_path * uuid_path,
-                struct nexus_key       * volumekey,
                 struct nexus_mac       * mac);
 
 void
