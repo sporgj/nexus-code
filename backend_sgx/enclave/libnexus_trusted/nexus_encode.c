@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -11,26 +11,23 @@
 #include <string.h>
 
 #include "nexus_util.h"
+#include "nexus_log.h"
 
 #include "../nexus_enclave_t.h"
 
 /* Alternate Nexus alphabet for base64 encoding
- * Padding Character is '.' 
+ * Padding Character is '.'
  */
 static const char alt64_table[] = ("ABCDEFGHIJKLMNOPQRSTU"
-				   "VWXYZabcdefghijklmnop"
-				   "qrstuvwxyz0123456789-_");
+                                   "VWXYZabcdefghijklmnop"
+                                   "qrstuvwxyz0123456789-_");
 
 const char * base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const char * hex_table    = "0123456789abcdef";
 
 
-
-
 int
-nexus_alt64_decode(char      * alt64_str,
-		   uint8_t  ** dst,
-		   uint32_t  * dst_len)
+nexus_alt64_decode(char * alt64_str, uint8_t ** dst, uint32_t * dst_len)
 {
     uint8_t * out_buf = NULL;
     uint32_t  out_len = 0;
@@ -40,19 +37,19 @@ nexus_alt64_decode(char      * alt64_str,
     int i          = 0;
     int len        = 0;
 
-    
+
     if (alt64_str == 0) {
-	ocall_debug("Error: Could not parse empty String\n");
+	log_error("Error: Could not parse empty String\n");
         return -1;
     }
 
     len = strlen(alt64_str);
-    
+
     if (len % 4) {
-        ocall_debug("Invalid Alt64 Length\n");
+        log_error("Invalid Alt64 Length\n");
         return -1;
     }
-   
+
     num_chunks = len / 4;
 
     if (index(alt64_str, '.')) {
@@ -65,7 +62,7 @@ nexus_alt64_decode(char      * alt64_str,
     for (i = 0; i < num_chunks; i++) {
         char  * chunk   = (char *)alt64_str + (i * 4);
         uint8_t vals[4] = {0, 0, 0, 0};
-        
+
         vals[0] = index(alt64_table, (int)chunk[0]) - alt64_table;
         vals[1] = index(alt64_table, (int)chunk[1]) - alt64_table;
 
@@ -98,8 +95,7 @@ nexus_alt64_decode(char      * alt64_str,
 
 
 char *
-nexus_alt64_encode(uint8_t  * src_buf,
-		   uint32_t   src_len)
+nexus_alt64_encode(uint8_t  * src_buf, uint32_t   src_len)
 {
     char    * alt64_str  = NULL;
     uint32_t  num_chunks = (src_len / 3);
@@ -114,7 +110,7 @@ nexus_alt64_encode(uint8_t  * src_buf,
     alt64_str = nexus_malloc((num_chunks * 4) + 1);
 
     if (alt64_str == NULL) {
-	ocall_debug("Could not allocate alt64 string\n");
+	log_error("Could not allocate alt64 string\n");
 	return NULL;
     }
 
@@ -131,7 +127,6 @@ nexus_alt64_encode(uint8_t  * src_buf,
         if ((i * 3) + 2 < src_len ) {
             chunk[2] = src_buf[(i * 3) + 2];
         }
-        
 
         for (j = 0; j < 4; j++) {
             uint8_t val = 0;
@@ -146,7 +141,6 @@ nexus_alt64_encode(uint8_t  * src_buf,
             } else {
                 val = chunk[2] & 0x3f;
             }
-            
 
             c = alt64_table[val];
 
@@ -157,7 +151,7 @@ nexus_alt64_encode(uint8_t  * src_buf,
                 }
             }
 
-	    alt64_str[(i * 4) + j] = c;
+            alt64_str[(i * 4) + j] = c;
         }
     }
 
@@ -165,14 +159,8 @@ nexus_alt64_encode(uint8_t  * src_buf,
 
 }
 
-
-
-
-
 int
-nexus_base64_decode(char      * base64_str,
-		    uint8_t  ** dst,
-		    uint32_t  * dst_len)
+nexus_base64_decode(char * base64_str, uint8_t ** dst, uint32_t * dst_len)
 {
     uint8_t * out_buf = NULL;
     uint32_t  out_len = 0;
@@ -182,19 +170,18 @@ nexus_base64_decode(char      * base64_str,
     int i          = 0;
     int len        = 0;
 
-    
     if (base64_str == 0) {
-	ocall_debug("Error: Could not parse empty String\n");
+	log_error("Error: Could not parse empty String\n");
         return -1;
     }
-    
+
     len = strlen(base64_str);
 
     if (len % 4) {
-        ocall_debug("Invalid Base64 Length\n");
+        log_error("Invalid Base64 Length\n");
         return -1;
     }
-   
+
     num_chunks = len / 4;
 
     if (index(base64_str, '=')) {
@@ -207,7 +194,7 @@ nexus_base64_decode(char      * base64_str,
     for (i = 0; i < num_chunks; i++) {
         char  * chunk   = (char *)base64_str + (i * 4);
         uint8_t vals[4] = {0, 0, 0, 0};
-        
+
         vals[0] = index(base64_table, (int)chunk[0]) - base64_table;
         vals[1] = index(base64_table, (int)chunk[1]) - base64_table;
 
@@ -238,10 +225,8 @@ nexus_base64_decode(char      * base64_str,
     return 0;
 }
 
-
 char *
-nexus_base64_encode(uint8_t  * src_buf,
-		    uint32_t   src_len)
+nexus_base64_encode(uint8_t * src_buf, uint32_t src_len)
 {
     char    * base64_str  = NULL;
     uint32_t  num_chunks = (src_len / 3);
@@ -256,7 +241,7 @@ nexus_base64_encode(uint8_t  * src_buf,
     base64_str = calloc(1, (num_chunks * 4) + 1);
 
     if (base64_str == NULL) {
-	ocall_debug("Could not allocate base64 string\n");
+	log_error("Could not allocate base64 string\n");
 	return NULL;
     }
 
@@ -273,7 +258,6 @@ nexus_base64_encode(uint8_t  * src_buf,
         if ((i * 3) + 2 < src_len ) {
             chunk[2] = src_buf[(i * 3) + 2];
         }
-        
 
         for (j = 0; j < 4; j++) {
             uint8_t val = 0;
@@ -288,7 +272,6 @@ nexus_base64_encode(uint8_t  * src_buf,
             } else {
                 val = chunk[2] & 0x3f;
             }
-            
 
             c = base64_table[val];
 
@@ -299,7 +282,7 @@ nexus_base64_encode(uint8_t  * src_buf,
                 }
             }
 
-	    base64_str[(i * 4) + j] = c;
+            base64_str[(i * 4) + j] = c;
         }
     }
 

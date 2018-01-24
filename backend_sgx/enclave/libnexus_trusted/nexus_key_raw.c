@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -22,7 +22,7 @@ __raw_key_bits(struct nexus_key * key)
 	case NEXUS_RAW_128_KEY:    return 128;
 	default:                   return -1;
     }
-    
+
     return -1;
 }
 
@@ -34,7 +34,7 @@ __raw_key_bytes(struct nexus_key * key)
 	case NEXUS_RAW_128_KEY:    return (128 / 8);
 	default:                   return -1;
     }
-    
+
     return -1;
 }
 
@@ -44,26 +44,25 @@ __raw_create_key(struct nexus_key * key)
 {
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context  entropy;
-    
+
     uint32_t key_len = __raw_key_bytes(key);
     int      ret     = 0;
-    
-    
+
+
     key->key = nexus_malloc(key_len);
 
 
     sgx_read_rand((uint8_t *) key->key, key_len);
-    
+
     return 0;
 }
 
 
 static int
-__raw_copy_key(struct nexus_key * src_key,
-	       struct nexus_key * dst_key)
+__raw_copy_key(struct nexus_key * src_key, struct nexus_key * dst_key)
 {
     uint32_t key_len = __raw_key_bytes(src_key);
-    
+
     assert(key_len > 0);
 
     dst_key->key = nexus_malloc(key_len);
@@ -73,23 +72,20 @@ __raw_copy_key(struct nexus_key * src_key,
     return 0;
 }
 
-
-
-
 static uint8_t *
-__raw_key_to_buf(struct nexus_key * key,
-		 uint8_t          * dst_buf,
-		 size_t             dst_size)
+__raw_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
 {
     size_t    key_len = __raw_key_bytes(key);
     uint8_t * tgt_buf = NULL;
-    
+
     if (dst_buf == NULL) {
-	tgt_buf = nexus_malloc(key_len);	
+	tgt_buf = nexus_malloc(key_len);
     } else {
 	if (key_len > dst_size) {
-	    log_error("destination buffer too small (key_size = %lu) (dst_size = %lu)\n", key_len, dst_size);
-	    return NULL;
+            log_error("destination buffer too small (key_size = %lu) (dst_size = %lu)\n",
+                      key_len,
+                      dst_size);
+            return NULL;
 	}
 
 	tgt_buf = dst_buf;
@@ -101,9 +97,7 @@ __raw_key_to_buf(struct nexus_key * key,
 }
 
 static int
-__raw_key_from_buf(struct nexus_key * key,
-		   uint8_t          * src_buf,
-		   size_t             src_size)
+__raw_key_from_buf(struct nexus_key * key, uint8_t * src_buf, size_t src_size)
 {
     size_t key_len = __raw_key_bytes(key);
 
@@ -132,10 +126,8 @@ __raw_key_to_str(struct nexus_key * key)
     return key_str;
 }
 
-
 static int
-__raw_key_from_str(struct nexus_key * key,
-		   char             * key_str)
+__raw_key_from_str(struct nexus_key * key, char * key_str)
 {
     uint32_t key_len = __raw_key_bytes(key);
     uint32_t dec_len = 0;
@@ -145,12 +137,12 @@ __raw_key_from_str(struct nexus_key * key,
     ret = nexus_base64_decode(key_str, (uint8_t **)&(key->key), &dec_len);
 
     if (ret == -1) {
-	ocall_debug("Could not decode raw key from base64\n");
+	log_error("Could not decode raw key from base64\n");
 	return -1;
     }
-	
+
     if (dec_len != key_len) {
-        ocall_debug("Invalid Key length\n");
+        log_error("Invalid Key length\n");
         return -1;
     }
 

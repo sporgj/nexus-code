@@ -72,7 +72,7 @@ __mbedtls_pub_key_from_str(struct nexus_key * key, char * key_str)
     ctx = calloc(sizeof(mbedtls_pk_context), 1);
 
     if (ctx == NULL) {
-        ocall_debug("Could not allocate key context\n");
+        log_error("Could not allocate key context\n");
         return -1;
     }
 
@@ -82,7 +82,7 @@ __mbedtls_pub_key_from_str(struct nexus_key * key, char * key_str)
         ctx, (uint8_t *)key_str, strlen(key_str) + 1);
 
     if (ret != 0) {
-        ocall_debug("Could not parse public key string");
+        log_error("Could not parse public key string\n");
         goto err;
     }
 
