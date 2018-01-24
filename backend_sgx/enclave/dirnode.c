@@ -70,6 +70,13 @@ dirnode_store(struct dirnode         * dirnode,
         }
     }
 
+    // flush the buffer to the backend
+    ret = metadata_write(&dirnode->my_uuid, uuid_path, crypto_buffer);
+    if (ret) {
+        log_error("metadata_write FAILED\n");
+        goto out;
+    }
+
     ret = 0;
 out:
     if (crypto_buffer) {

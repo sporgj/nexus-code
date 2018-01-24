@@ -46,3 +46,71 @@ ocall_buffer_free(struct nexus_uuid * buffer_uuid)
 {
     buffer_manager_free(buffer_uuid);
 }
+
+
+// ---------------- metadata management -----------------------
+
+struct nexus_uuid *
+ocall_metadata_get(struct nexus_uuid      * metadata_uuid,
+                   struct nexus_uuid_path * uuid_path,
+                   void                   * backend_info)
+{
+    struct sgx_backend_info * sgx_backend = NULL;
+
+    uint8_t * buffer_addr = NULL;
+    size_t    buffer_size = NULL;
+
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend_info *)backend_info;
+
+    ret = nexus_datastore_get_uuid(sgx_backend->volume->metadata_store,
+                                   metadata_uuid,
+                                   NULL,
+                                   &buffer_addr,
+                                   (uint32_t *)&buffer_size);
+
+    if (ret) {
+        log_error("nexus_datastore_get_uuid FAILED\n");
+        return NULL;
+    }
+
+    return buffer_manager_create(buffer_addr, buffer_size);
+}
+
+int
+ocall_metadata_set(struct nexus_uuid      * metadata_uuid,
+                   struct nexus_uuid_path * uuid_path,
+                   struct nexus_uuid      * buffer_uuid,
+                   void                   * backend_info)
+{
+    struct sgx_backend_info * sgx_backend = NULL;
+
+    uint8_t * buffer_addr = NULL;
+    size_t    buffer_size = NULL;
+
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend_info *)backend_info;
+
+    buffer_addr = buffer_manager_get(buffer_uuid, &buffer_size);
+    if (buffer_addr == NULL) {
+        log_error("buffer_manager_get returned NULL\n");
+        return -1;
+    }
+
+    ret = nexus_datastore_put_uuid(sgx_backend->volume->metadata_store,
+                                   metadata_uuid,
+                                   NULL,
+                                   buffer_addr,
+                                   buffer_size);
+
+    if (ret) {
+        log_error("nexus_datastore_put_uuid FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}

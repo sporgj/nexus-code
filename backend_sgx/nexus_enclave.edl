@@ -34,6 +34,39 @@ enclave {
 
 
     untrusted {
+        // ---------------- metadata management --------------------------
+
+        /**
+         * Fetches a metadata file from the backing store and returns the
+         * uuid pointing to the buffer
+         *
+         * @param metadata_uuid
+         * @param uuid_path
+         * @param backend_info
+         * @return uuid of the buffer
+         */
+        struct nexus_uuid *
+        ocall_metadata_get([in]         struct nexus_uuid      * metadata_uuid,
+                           [user_check] struct nexus_uuid_path * uuid_path,
+                           [user_check] void                   * backend_info);
+
+
+        /**
+         * Writes the contents of an untrusted buffer to the metadata store
+         *
+         * @param metadata_uuid
+         * @param uuid_path
+         * @param buffer
+         * @param buflen
+         * @param backend_info
+         * @return 0 on success
+         */
+        int
+        ocall_metadata_set([in]         struct nexus_uuid      * metadata_uuid,
+                           [user_check] struct nexus_uuid_path * uuid_path,
+                           [in]         struct nexus_uuid      * buffer_uuid,
+                           [user_check] void                   * backend_info);
+
 
         // ---------------- untrusted buffer management --------------------
 
@@ -49,7 +82,8 @@ enclave {
          * @param buffer_uuid
          * @return NULL on failure
          */
-        uint8_t * ocall_buffer_get([in] struct nexus_uuid * buffer_uuid, [out] size_t * buffer_size);
+        uint8_t * ocall_buffer_get([in]  struct nexus_uuid * buffer_uuid,
+                                   [out] size_t            * buffer_size);
 
         /**
          * Frees an allocated buffer

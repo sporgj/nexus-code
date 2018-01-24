@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "sgx_backend_common.h"
+
 #include "nexus_mac.h"
 
 // represents an encrypted metadata object
@@ -44,3 +46,17 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
                      struct nexus_mac        * mac);
+
+/**
+ * Writes the encrypted contents of the crypto buf into the buffer
+ * @param buf
+ * @param metadata_uuid
+ * @param uuid_path
+ *
+ * @return 0 on success
+ */
+int
+nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
+                       struct nexus_uuid       * metadata_uuid,
+                       struct nexus_uuid_path  * uuid_path);
+

@@ -134,7 +134,13 @@ supernode_store(struct supernode       * supernode,
         }
     }
 
-    // TODO write it to the datastore
+    // flush the buffer to the backend
+    ret = metadata_write(&supernode->my_uuid, uuid_path, crypto_buffer);
+    if (ret) {
+        log_error("metadata_write FAILED\n");
+        goto out;
+    }
+
 
     ret = 0;
 out:

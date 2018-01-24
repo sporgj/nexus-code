@@ -443,3 +443,32 @@ out:
 
     return ret;
 }
+
+
+
+int
+nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
+                       struct nexus_uuid       * metadata_uuid,
+                       struct nexus_uuid_path  * uuid_path)
+{
+    int err = -1;
+    int ret = -1;
+
+    if (buf->external_addr == NULL) {
+        log_error("crypto_buf has no external allocations\n");
+        return -1;
+    }
+
+    err = ocall_metadata_set(&ret,
+                             metadata_uuid,
+                             uuid_path,
+                             &buf->uuid,
+                             global_backend_ext);
+
+    if (err || ret) {
+        log_error("ocall_metadata_set FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
