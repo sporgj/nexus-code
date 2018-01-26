@@ -18,7 +18,7 @@
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
 
-struct sgx_backend_info {
+struct sgx_backend {
     sgx_enclave_id_t enclave_id;
 
     struct buffer_manager * buf_manager;

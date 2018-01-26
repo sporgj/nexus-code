@@ -35,7 +35,7 @@ static char * __user_pubkey_str()
 int
 sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
-    struct sgx_backend_info * sgx_backend = NULL;
+    struct sgx_backend * sgx_backend = NULL;
 
     char * public_key_str = NULL;
 
@@ -44,7 +44,7 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     int ret = -1;
 
 
-    sgx_backend = (struct sgx_backend_info *)priv_data;
+    sgx_backend = (struct sgx_backend *)priv_data;
 
     // derive the public key string
     public_key_str = __user_pubkey_str();
@@ -87,7 +87,7 @@ int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 {
 #if 0
-    struct sgx_backend_info * sgx_backend = NULL;
+    struct sgx_backend * sgx_backend = NULL;
 
     struct nexus_key     * user_prv_key   = NULL;
 
@@ -104,7 +104,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
     int ret = -1;
 
 
-    sgx_backend = (struct sgx_backend_info *)priv_data;
+    sgx_backend = (struct sgx_backend *)priv_data;
 
     // get the necessary keys
     {

@@ -34,8 +34,8 @@ exit_enclave(sgx_enclave_id_t enclave_id)
     return ret;
 }
 
-static void
-sgx_backend_exit(struct sgx_backend_info * sgx_backend)
+static int
+sgx_backend_exit(struct sgx_backend * sgx_backend)
 {
     if (sgx_backend->enclave_id) {
         exit_enclave(sgx_backend->enclave_id);
@@ -46,12 +46,14 @@ sgx_backend_exit(struct sgx_backend_info * sgx_backend)
     }
 
     nexus_free(sgx_backend);
+
+    return 0;
 }
 
 static void *
 sgx_backend_init(nexus_json_obj_t backend_cfg)
 {
-    struct sgx_backend_info * sgx_backend = NULL;
+    struct sgx_backend * sgx_backend = NULL;
 
     char * enclave_path = NULL;
 
@@ -65,7 +67,7 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
     }
 
 
-    sgx_backend = nexus_malloc(sizeof(struct sgx_backend_info));
+    sgx_backend = nexus_malloc(sizeof(struct sgx_backend));
 
     if (init_enclave(enclave_path, &sgx_backend->enclave_id)) {
         nexus_free(sgx_backend);
@@ -110,6 +112,7 @@ out:
 static struct nexus_backend_impl sgx_backend_impl = {
     .name            = "SGX",
     .init            = sgx_backend_init,
+    .deinit          = sgx_backend_exit,
     .volume_init     = sgx_backend_create_volume,
     .volume_open     = sgx_backend_open_volume
 };
