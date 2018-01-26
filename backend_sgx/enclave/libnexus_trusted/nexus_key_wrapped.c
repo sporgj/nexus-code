@@ -1,4 +1,4 @@
-/* 
+/**
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -26,7 +26,7 @@ __wrapped_key_bits(struct nexus_key * key)
 	case NEXUS_WRAPPED_128_KEY:    return 128;
 	default:                   return -1;
     }
-    
+
     return -1;
 }
 
@@ -38,37 +38,41 @@ __wrapped_key_bytes(struct nexus_key * key)
 	case NEXUS_WRAPPED_128_KEY:    return (128 / 8);
 	default:                   return -1;
     }
-    
+
     return -1;
 }
 
 static int
 __wrap_key(struct nexus_key * sealed_key, struct nexus_key * unsealed_key)
 {
-    sealed_key->key = crypto_aes_ecb_encrypt(global_volumekey,
-					     unsealed_key->key,
-					     __wrapped_key_bytes(unsealed_key));
-    
+    size_t key_size = __raw_key_bytes(unsealed_key);
+
+    assert(key_size > 0);
+
+    sealed_key->key = crypto_aes_ecb_encrypt(global_volumekey, unsealed_key->key, key_size);
+
     if (sealed_key->key == NULL) {
 	log_error("Could not wrap key\n");
 	return -1;
     }
-	
+
     return 0;
 }
 
 static int
 __unwrap_key(struct nexus_key * unsealed_key, struct nexus_key * sealed_key)
 {
-    unsealed_key->key = crypto_aes_ecb_decrypt(global_volumekey,
-					       sealed_key->key,
-					       __wrapped_key_bytes(sealed_key));
-    
+    size_t key_size = __wrapped_key_bytes(sealed_key);
+
+    assert(key_size > 0);
+
+    unsealed_key->key = crypto_aes_ecb_decrypt(global_volumekey, sealed_key->key, key_size);
+
     if (unsealed_key->key == NULL) {
 	log_error("Could not unwrap key\n");
 	return -1;
     }
-	
+
     return 0;
 }
 
@@ -76,7 +80,7 @@ static int
 __wrapped_copy_key(struct nexus_key * src_key, struct nexus_key * dst_key)
 {
     uint32_t key_len = __wrapped_key_bytes(src_key);
-    
+
     assert(key_len > 0);
 
     dst_key->key = nexus_malloc(key_len);
@@ -96,7 +100,7 @@ __wrapped_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
     if (dst_buf == NULL) {
 
 	tgt_buf = nexus_malloc(key_len);
-	
+
     } else {
 	if (key_len > dst_size) {
             log_error(
@@ -105,13 +109,13 @@ __wrapped_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
                 dst_size);
             return NULL;
 	}
-	
+
 	tgt_buf = dst_buf;
     }
 
     memcpy(tgt_buf, &key->key, key_len);
 
-    return 0;
+    return tgt_buf;
 }
 
 static int
@@ -160,7 +164,7 @@ __wrapped_key_from_str(struct nexus_key * key, char * key_str)
 	log_error("Could not decode raw key from base64\n");
 	return -1;
     }
-	
+
     if (dec_len != key_len) {
         log_error("Invalid Key length\n");
         return -1;

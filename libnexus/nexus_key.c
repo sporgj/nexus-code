@@ -145,9 +145,7 @@ nexus_clone_key(struct nexus_key * src_key)
     
     key = nexus_malloc(sizeof(struct nexus_key));
 
-    key->type = src_key->type;
-
-    ret = nexus_copy_key(key, src_key);
+    ret = nexus_copy_key(src_key, key);
 
     if (ret == -1) {
 	log_error("Could not clone key\n");
