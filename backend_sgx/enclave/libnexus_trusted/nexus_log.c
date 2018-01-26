@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -22,27 +22,29 @@ nexus_printf(char * fmt, ...)
     int    ret     = 0;
 
     va_list args;
-    
+
 
     va_start(args, fmt);
-    size = vsnprintf(NULL, 0, fmt, args);
+    size = vsnprintf(NULL, 0, fmt, args) + 1;
+    va_end(args);
+
     if (size < 0) {
 	abort();
     }
 
     log_str = nexus_malloc(size);
 
+    va_start(args, fmt);
     ret = vsnprintf(log_str, size, fmt, args);
     va_end(args);
 
     if (ret == -1) {
 	abort();
     }
-    
+
     ocall_print(log_str);
     nexus_free(log_str);
 
     return;
 }
-    
 
