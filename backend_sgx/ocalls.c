@@ -23,6 +23,7 @@ void
 ocall_print(char * str)
 {
     printf("%s", str);
+    fflush(stdout);
 }
 
 
@@ -30,21 +31,27 @@ ocall_print(char * str)
 // ------------------- Buffer Management ---------------------------
 
 uint8_t *
-ocall_buffer_alloc(size_t size, struct nexus_uuid * dest_buffer_uuid)
+ocall_buffer_alloc(size_t size, struct nexus_uuid * dest_buffer_uuid, void * backend_info)
 {
-    return buffer_manager_alloc(size, dest_buffer_uuid);
+    struct sgx_backend_info * sgx_backend = (struct sgx_backend_info *)backend_info;
+
+    return buffer_manager_alloc(sgx_backend->buf_manager, size, dest_buffer_uuid);
 }
 
 uint8_t *
-ocall_buffer_get(struct nexus_uuid * buffer_uuid, size_t * p_buffer_size)
+ocall_buffer_get(struct nexus_uuid * buffer_uuid, size_t * p_buffer_size, void * backend_info)
 {
-    return buffer_manager_get(buffer_uuid, p_buffer_size);
+    struct sgx_backend_info * sgx_backend = (struct sgx_backend_info *)backend_info;
+
+    return buffer_manager_get(sgx_backend->buf_manager, buffer_uuid, p_buffer_size);
 }
 
 void
-ocall_buffer_free(struct nexus_uuid * buffer_uuid)
+ocall_buffer_free(struct nexus_uuid * buffer_uuid, void * backend_info)
 {
-    buffer_manager_free(buffer_uuid);
+    struct sgx_backend_info * sgx_backend = (struct sgx_backend_info *)backend_info;
+
+    buffer_manager_delete(sgx_backend->buf_manager, buffer_uuid);
 }
 
 
@@ -76,7 +83,7 @@ ocall_metadata_get(struct nexus_uuid      * metadata_uuid,
         return NULL;
     }
 
-    return buffer_manager_create(buffer_addr, buffer_size);
+    return buffer_manager_add(sgx_backend->buf_manager, buffer_addr, buffer_size);
 }
 
 int
@@ -95,7 +102,7 @@ ocall_metadata_set(struct nexus_uuid      * metadata_uuid,
 
     sgx_backend = (struct sgx_backend_info *)backend_info;
 
-    buffer_addr = buffer_manager_get(buffer_uuid, &buffer_size);
+    buffer_addr = buffer_manager_get(sgx_backend->buf_manager, buffer_uuid, &buffer_size);
     if (buffer_addr == NULL) {
         log_error("buffer_manager_get returned NULL\n");
         return -1;

@@ -74,23 +74,25 @@ enclave {
          * @param size is the size of the new buffer
          * @param uuid [out] the uuid of the new allocation
          */
-        uint8_t * ocall_buffer_alloc(size_t size, [out] struct nexus_uuid * uuid);
+        uint8_t * ocall_buffer_alloc(             size_t              size,
+                                     [out]        struct nexus_uuid * uuid,
+                                     [user_check] void              * backend_info);
 
         /**
          * Returns the untrusted pointer to the buffer
          * @param buffer_uuid
          * @return NULL on failure
          */
-        uint8_t * ocall_buffer_get([in]  struct nexus_uuid * buffer_uuid,
-                                   [out] size_t            * buffer_size);
+        uint8_t * ocall_buffer_get(        [in] struct nexus_uuid * buffer_uuid,
+                                          [out] size_t            * buffer_size,
+                                   [user_check] void              * backend_info);
 
         /**
          * Frees an allocated buffer
          * @param buffer_uuid
          */
-        void ocall_buffer_free([in] struct nexus_uuid * buffer_uuid);
-
-
+        void ocall_buffer_free([in]         struct nexus_uuid * buffer_uuid,
+                               [user_check] void              * backend_info);
 
         // ---------------------- utilities ---------------------
 

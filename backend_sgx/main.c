@@ -34,6 +34,19 @@ exit_enclave(sgx_enclave_id_t enclave_id)
     return ret;
 }
 
+static void
+sgx_backend_exit(struct sgx_backend_info * sgx_backend)
+{
+    if (sgx_backend->enclave_id) {
+        exit_enclave(sgx_backend->enclave_id);
+    }
+
+    if (sgx_backend->buf_manager) {
+        free_buffer_manager(sgx_backend->buf_manager);
+    }
+
+    nexus_free(sgx_backend);
+}
 
 static void *
 sgx_backend_init(nexus_json_obj_t backend_cfg)
@@ -68,16 +81,29 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 
         if (err || ret) {
             log_error("ecall_init_enclave() FAILED\n");
-
-            exit_enclave(sgx_backend->enclave_id);
-
-            nexus_free(sgx_backend);
-
-            return NULL;
+            goto out;
         }
     }
 
+    // create the buffer_table
+    {
+        struct buffer_manager * buf_manager = new_buffer_manager();
+
+        if (buf_manager == NULL) {
+            log_error("could not create a new buf manager\n");
+            goto out;
+        }
+
+        sgx_backend->buf_manager = buf_manager;
+    }
+
     return sgx_backend;
+out:
+    if (sgx_backend) {
+        sgx_backend_exit(sgx_backend);
+    }
+
+    return NULL;
 }
 
 

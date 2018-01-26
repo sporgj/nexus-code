@@ -13,7 +13,7 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
         return NULL;
     }
 
-    err = ocall_buffer_alloc(&external_addr, total_size, uuid);
+    err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_backend_ext);
     if (err) {
         log_error("could not allocate space for crypto_buffer\n");
         return NULL;
@@ -30,7 +30,7 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
     int err = -1;
 
 
-    err = ocall_buffer_get(&external_addr, uuid, size);
+    err = ocall_buffer_get(&external_addr, uuid, size, global_backend_ext);
 
     if (err || external_addr == NULL) {
         log_error("ocall_buffer_get FAILED\n");
@@ -44,7 +44,7 @@ int
 buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
     // XXX for now, the put just frees the external buffer
-    ocall_buffer_free(buffer_uuid);
+    ocall_buffer_free(buffer_uuid, global_backend_ext);
 
     return 0;
 }

@@ -4,6 +4,15 @@
 
 #pragma once
 
+struct buffer_manager;
+
+struct buffer_manager *
+new_buffer_manager();
+
+void
+free_buffer_manager(struct buffer_manager * buf_manager);
+
+
 /**
  * Allocates a new buffer with specified size
  * @param size
@@ -11,7 +20,9 @@
  * @return address of the newly allocated buffer
  */
 uint8_t *
-buffer_manager_alloc(size_t size, struct nexus_uuid * dest_uuid);
+buffer_manager_alloc(struct buffer_manager * buffer_manager,
+                     size_t                  size,
+                     struct nexus_uuid     * dest_uuid);
 
 /**
  * Creates a new buffer from the address and size. The buffer keeps a reference
@@ -21,7 +32,7 @@ buffer_manager_alloc(size_t size, struct nexus_uuid * dest_uuid);
  * @return uuid
  */
 struct nexus_uuid *
-buffer_manager_create(uint8_t * addr, size_t size);
+buffer_manager_add(struct buffer_manager * buffer_manager, uint8_t * addr, size_t size);
 
 /**
  * Returns the address stored at uuid
@@ -30,11 +41,13 @@ buffer_manager_create(uint8_t * addr, size_t size);
  * @return the buffer address. NULL on failure
  */
 uint8_t *
-buffer_manager_get(struct nexus_uuid * uuid, size_t * p_buffer_size);
+buffer_manager_get(struct buffer_manager * buffer_manager,
+                   struct nexus_uuid     * uuid,
+                   size_t                * p_buffer_size);
 
 /**
  * Frees buffer with specified uuid
  * @param uuid
  */
 void
-buffer_manager_free(struct nexus_uuid * uuid);
+buffer_manager_delete(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);

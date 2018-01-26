@@ -10,7 +10,7 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
     // this indirectly creates and stores the root dirnode
     supernode = supernode_create(user_pubkey);
     if (!supernode) {
-        log_error("supernode_create FAILED");
+        log_error("supernode_create FAILED\n");
         goto out;
     }
 
@@ -57,7 +57,7 @@ ecall_create_volume(char              * user_pubkey_in,
 
         sealed_volkey = enclave_volumekey_serialize();
 
-        if (sealed_volkey) {
+        if (sealed_volkey == NULL) {
             log_error("could not serialize volumekey\n");
             goto out;
         }

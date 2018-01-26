@@ -435,7 +435,6 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     ret = 0;
 out:
     nexus_free(buf_hdr);
-    buffer_layer_put(&crypto_buf->uuid);
 
     if (ret) {
         crypto_buf->version -= 1;

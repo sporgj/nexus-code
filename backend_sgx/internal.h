@@ -21,6 +21,8 @@
 struct sgx_backend_info {
     sgx_enclave_id_t enclave_id;
 
+    struct buffer_manager * buf_manager;
+
     struct nexus_volume * volume;
 };
 

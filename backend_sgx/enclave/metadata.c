@@ -27,7 +27,7 @@ metadata_open(struct nexus_uuid       * uuid,
     return crypto_buf;
 cleanup:
     if (buffer_uuid) {
-        ocall_buffer_free(buffer_uuid);
+        ocall_buffer_free(buffer_uuid, global_backend_ext);
     }
 
     return NULL;
