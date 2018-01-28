@@ -39,4 +39,4 @@ nexus_raw_buf_get(struct nexus_raw_buf * raw_buf);
  * @param trusted_buffer
  */
 int
-nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * trusted_addr);
+nexus_raw_buf_put(struct nexus_raw_buf * raw_buf);

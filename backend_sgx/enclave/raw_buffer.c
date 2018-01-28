@@ -83,7 +83,7 @@ nexus_raw_buf_get(struct nexus_raw_buf * raw_buf)
 }
 
 int
-nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * internal_addr)
+nexus_raw_buf_put(struct nexus_raw_buf * raw_buf)
 {
     if (raw_buf->external_addr == NULL) {
         raw_buf->external_addr = buffer_layer_alloc(raw_buf->buffer_size, &raw_buf->uuid);
@@ -94,7 +94,7 @@ nexus_raw_buf_put(struct nexus_raw_buf * raw_buf, uint8_t * internal_addr)
         }
     }
 
-    memcpy(internal_addr, raw_buf->external_addr, raw_buf->buffer_size);
+    memcpy(raw_buf->external_addr, raw_buf->internal_addr, raw_buf->buffer_size);
 
     return 0;
 }

@@ -39,10 +39,9 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf);
 /**
  * Copies data into uninternal memory
  * @param sealed_buf
- * @param internal_buffer
  */
 int
-nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * internal_addr);
+nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf);
 
 /**
  * Writes the sealed buffer's buffer uuid to an external UUID pointer

@@ -126,7 +126,7 @@ out:
  * @param internal_buffer
  */
 int
-nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * internal_addr)
+nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf)
 {
     sgx_sealed_data_t * sealed_data = NULL;
 
@@ -151,7 +151,7 @@ nexus_sealed_buf_put(struct nexus_sealed_buf * sealed_buf, uint8_t * internal_ad
     ret = sgx_seal_data(0,
                         NULL,
                         sealed_buf->internal_size,
-                        internal_addr,
+                        sealed_buf->internal_addr,
                         sealed_buf->external_size,
                         sealed_data);
 
