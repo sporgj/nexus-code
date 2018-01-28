@@ -40,6 +40,7 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
  */
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
+                     size_t                  * buffer_size,
                      struct nexus_mac        * mac);
 
 

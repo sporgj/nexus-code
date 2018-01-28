@@ -230,6 +230,7 @@ __parse_header(struct nexus_crypto_buf * crypto_buf)
 
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
+                     size_t                  * buffer_size,
                      struct nexus_mac        * mac)
 {
     struct crypto_buf_hdr * buf_hdr = NULL;
@@ -237,6 +238,8 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 
     /* Internal buffer already exists */
     if (crypto_buf->internal_addr != NULL) {
+        *buffer_size = crypto_buf->internal_size;
+
         return crypto_buf->internal_addr;
     }
 
@@ -282,6 +285,8 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     crypto_buf->version = buf_hdr->version;
 
     nexus_free(buf_hdr);
+
+    *buffer_size = crypto_buf->internal_size;
 
     return crypto_buf->internal_addr;
 

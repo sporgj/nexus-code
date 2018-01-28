@@ -11,6 +11,8 @@ supernode_new(char * user_pubkey)
     nexus_uuid_gen(&supernode->root_uuid);
     nexus_uuid_gen(&supernode->user_list_uuid);
 
+    nexus_hash_generate(&supernode->owner_pubkey, user_pubkey, strlen(user_pubkey));
+
     return supernode;
 }
 
@@ -116,7 +118,10 @@ supernode_store(struct supernode       * supernode,
     {
         uint8_t * output_buffer = NULL;
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, NULL);
+        size_t    buffer_size   = 0;
+
+
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
 
         if (output_buffer == NULL) {
             log_error("could not get the crypto_bufffer buffer\n");

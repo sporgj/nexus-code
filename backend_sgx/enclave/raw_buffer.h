@@ -32,7 +32,7 @@ nexus_raw_buf_free(struct nexus_raw_buf * raw_buf);
  * Copies the buffer into enclave memory and returns the pointer
  */
 uint8_t *
-nexus_raw_buf_get(struct nexus_raw_buf * raw_buf);
+nexus_raw_buf_get(struct nexus_raw_buf * raw_buf, size_t * buffer_size);
 
 /**
  * Copies data into untrusted memory

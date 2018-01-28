@@ -66,7 +66,7 @@ nexus_sealed_buf_free(struct nexus_sealed_buf * sealed_buf)
 }
 
 uint8_t *
-nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf)
+nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf, size_t * buffer_size)
 {
     sgx_sealed_data_t * sealed_data = NULL;
 
@@ -106,6 +106,8 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf)
         log_error("sgx_unseal_data FAILED \n");
         goto out;
     }
+
+    *buffer_size = payload_size;
 
     ret = 0;
 out:

@@ -52,7 +52,10 @@ dirnode_store(struct dirnode         * dirnode,
     {
         uint8_t * output_buffer = NULL;
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, NULL);
+        size_t    buffer_size   = 0;
+
+
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
 
         if (output_buffer == NULL) {
             log_error("could not get the crypto_bufffer buffer\n");

@@ -32,9 +32,11 @@ nexus_sealed_buf_free(struct nexus_sealed_buf * sealed_buf);
 /**
  * Copies the buffer into enclave memory and returns the pointer
  * @param sealed_buf
+ * @param buffer_size is the size of the returned buffer
+ * @return the unsealed buffer contents
  */
 uint8_t *
-nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf);
+nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf, size_t * buffer_size);
 
 /**
  * Copies data into uninternal memory
