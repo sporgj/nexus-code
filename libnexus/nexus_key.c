@@ -16,6 +16,7 @@
 
 #include "nexus_key_mbedtls.c"
 #include "nexus_key_raw.c"
+#include "nexus_key_volkey.c"
 
 
 void
@@ -173,6 +174,9 @@ nexus_copy_key(struct nexus_key * src_key,
 	    ret = __raw_copy_key(src_key, dst_key);
 	    break;
 
+	case NEXUS_SEALED_VOLUME_KEY:
+	    ret = __vol_key_copy_key(src_key, dst_key);
+	    break;
 	    
 	case NEXUS_MBEDTLS_PUB_KEY:
 	case NEXUS_MBEDTLS_PRV_KEY:
@@ -203,6 +207,9 @@ nexus_key_to_str(struct nexus_key * key)
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
 	    str = __raw_key_to_str(key);
+	    break;
+	case NEXUS_SEALED_VOLUME_KEY:
+	    str = __vol_key_to_str(key);
 	    break;
 	default:
 	    log_error("Invalid key type (type = %d)\n", key->type);
@@ -238,6 +245,9 @@ __nexus_key_from_str(struct nexus_key * key,
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_from_str(key, key_str);
+	    break;
+	case NEXUS_SEALED_VOLUME_KEY:
+	    ret = __vol_key_from_str(key, key_str);
 	    break;
 	default:
 	    log_error("Invalid key type: %d\n", key_type);
@@ -296,6 +306,9 @@ nexus_key_to_file(struct nexus_key * key,
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_to_file(key, file_path);
 	    break;
+	case NEXUS_SEALED_VOLUME_KEY:
+	    ret = __vol_key_to_file(key, file_path);
+	    break;
 	default:
 	    log_error("Invalid key type (type = %d)\n", key->type);
 	    return -1;
@@ -329,6 +342,9 @@ __nexus_key_from_file(struct nexus_key * key,
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_from_file(key, key_path);
+	    break;
+	case NEXUS_SEALED_VOLUME_KEY:
+	    ret = __vol_key_from_file(key, key_path);
 	    break;
 	default:
 	    log_error("Invalid key type: %d\n", key_type);
@@ -381,6 +397,7 @@ struct nexus_key_desc nexus_key_descriptors[] = {
     { NEXUS_MBEDTLS_PRV_KEY, "NEXUS_MBEDTLS_PRV_KEY" },
     { NEXUS_RAW_128_KEY, "NEXUS_RAW_128_KEY" },
     { NEXUS_RAW_256_KEY, "NEXUS_RAW_256_KEY" },
+    { NEXUS_SEALED_VOLUME_KEY, "NEXUS_SEALED_VOLUME_KEY" },
     { NEXUS_INVALID_KEY, "NEXUS_INVALID_KEY_TYPE" }
 };
 

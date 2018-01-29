@@ -11,11 +11,12 @@
 #include <stdio.h>
 
 typedef enum {
-    NEXUS_INVALID_KEY      = 0,
-    NEXUS_MBEDTLS_PUB_KEY  = 1,
-    NEXUS_MBEDTLS_PRV_KEY  = 2,
-    NEXUS_RAW_128_KEY      = 3,
-    NEXUS_RAW_256_KEY      = 4
+    NEXUS_INVALID_KEY        = 0,
+    NEXUS_MBEDTLS_PUB_KEY    = 1,
+    NEXUS_MBEDTLS_PRV_KEY    = 2,
+    NEXUS_RAW_128_KEY        = 3,
+    NEXUS_RAW_256_KEY        = 4,
+    NEXUS_SEALED_VOLUME_KEY  = 5
     /*
     NEXUS_SEALED_128_KEY   = 5,
     NEXUS_SEALED_256_KEY   = 6
@@ -34,6 +35,9 @@ struct nexus_key {
 struct nexus_key *
 nexus_create_key(nexus_key_type_t key_type);
 
+/* Creates a new volume key from data */
+struct nexus_key *
+vol_key_create_key(uint8_t * data, int len);
 
 /* Initializes 'key' with a random key */
 int
