@@ -29,6 +29,20 @@ enclave {
             [user_check] struct nexus_uuid * supernode_uuid_out,
             [user_check] struct nexus_uuid * volkey_buffer_uuid_out
         );
+
+        public int ecall_authentication_challenge
+        (
+            [in, string] char                   * user_pubkey_in,
+            [user_check] struct nexus_uuid      * volkey_bufuuid_in,
+            [user_check] struct nonce_challenge * challenge_out
+        );
+
+        public int ecall_authentication_response
+        (
+            [user_check] struct nexus_uuid * supernode_bufuuid_in,
+            [user_check] struct nexus_uuid * signature_bufuuid_in,
+                         size_t              signature_len
+        );
     };
 
 
@@ -83,16 +97,18 @@ enclave {
          * @param buffer_uuid
          * @return NULL on failure
          */
-        uint8_t * ocall_buffer_get(        [in] struct nexus_uuid * buffer_uuid,
-                                          [out] size_t            * buffer_size,
-                                   [user_check] void              * backend_info);
+        uint8_t *
+        ocall_buffer_get(        [in] struct nexus_uuid * buffer_uuid,
+                                [out] size_t            * buffer_size,
+                         [user_check] void              * backend_info);
 
         /**
          * Frees an allocated buffer
          * @param buffer_uuid
          */
-        void ocall_buffer_free([in]         struct nexus_uuid * buffer_uuid,
-                               [user_check] void              * backend_info);
+        void
+        ocall_buffer_put(        [in] struct nexus_uuid * buffer_uuid,
+                         [user_check] void              * backend_info);
 
         // ---------------------- utilities ---------------------
 

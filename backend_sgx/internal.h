@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <nexus_backend.h>
+#include <nexus_key.h>
 #include <nexus_log.h>
 #include <nexus_uuid.h>
 #include <nexus_util.h>

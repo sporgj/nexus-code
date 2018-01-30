@@ -47,11 +47,11 @@ ocall_buffer_get(struct nexus_uuid * buffer_uuid, size_t * p_buffer_size, void *
 }
 
 void
-ocall_buffer_free(struct nexus_uuid * buffer_uuid, void * backend_info)
+ocall_buffer_put(struct nexus_uuid * buffer_uuid, void * backend_info)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)backend_info;
 
-    buffer_manager_delete(sgx_backend->buf_manager, buffer_uuid);
+    buffer_manager_put(sgx_backend->buf_manager, buffer_uuid);
 }
 
 

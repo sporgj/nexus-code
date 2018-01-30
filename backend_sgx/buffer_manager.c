@@ -7,6 +7,8 @@
 struct __buf {
     struct nexus_uuid uuid;
 
+    int refcount; // TODO consider switching to atomic.h
+
     uint8_t * addr;
     size_t    size;
 };
@@ -17,6 +19,7 @@ struct __buf {
 
 struct buffer_manager {
     struct nexus_hashtable * buffer_table;
+
     size_t                   table_size;
 
     // TODO it may be helpful to have the total size occupied by the buffers
@@ -35,6 +38,22 @@ static int
 equal_func(uintptr_t key1, uintptr_t key2)
 {
     return nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0;
+}
+
+static bool
+conditional_remove_func(uintptr_t value)
+{
+    struct __buf * buf = (struct __buf *)value;
+
+    buf->refcount -= 1;
+
+    if (buf->refcount < 0) {
+        // XXX
+        log_error("refcount on buffer is < 0\n");
+        return false;
+    }
+
+    return buf->refcount == 0;
 }
 
 struct buffer_manager *
@@ -76,7 +95,6 @@ __alloc_buf(struct buffer_manager * buf_manager, uint8_t * addr, size_t size)
     buf->addr = addr;
     buf->size = size;
 
-
     uuid = &buf->uuid;
     nexus_uuid_gen(uuid);
 
@@ -93,6 +111,8 @@ __alloc_buf(struct buffer_manager * buf_manager, uint8_t * addr, size_t size)
             goto cleanup;
         }
     }
+
+    buf->refcount = 1;
 
     buf_manager->table_size += 1;
 
@@ -142,6 +162,18 @@ buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t s
     return NULL;
 }
 
+struct nexus_uuid *
+buffer_manager_add_explicit(struct buffer_manager * buf_manager, uint8_t * addr, size_t size)
+{
+    uint8_t * buffer_copy = NULL;
+
+    buffer_copy = nexus_malloc(size);
+
+    memcpy(buffer_copy, addr, size);
+
+    return buffer_manager_add(buf_manager, buffer_copy, size);
+}
+
 uint8_t *
 buffer_manager_get(struct buffer_manager * buf_manager,
                    struct nexus_uuid     * uuid,
@@ -154,17 +186,23 @@ buffer_manager_get(struct buffer_manager * buf_manager,
         return NULL;
     }
 
+    buf->refcount += 1;
+
     *p_buffer_size = buf->size;
 
     return buf->addr;
 }
 
 void
-buffer_manager_delete(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
+buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {
     struct __buf * buf = NULL;
 
-    buf = (struct __buf *)nexus_htable_remove(buf_manager->buffer_table, (uintptr_t)uuid, 0);
+    buf = (struct __buf *)nexus_htable_cond_remove(buf_manager->buffer_table,
+                                                   (uintptr_t)uuid,
+                                                   0,
+                                                   conditional_remove_func);
+
     if (buf == NULL) {
         return;
     }
