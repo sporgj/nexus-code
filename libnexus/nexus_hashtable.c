@@ -452,21 +452,22 @@ nexus_htable_search(struct nexus_hashtable * htable,
 
 
 /* returns value associated with key */
-uintptr_t 
-nexus_htable_remove(struct nexus_hashtable * htable, 
-		    uintptr_t                key, 
-		    int                      free_key) 
+uintptr_t
+nexus_htable_cond_remove(struct nexus_hashtable * htable,
+                         uintptr_t                key,
+                         int                      free_key,
+                         bool (*cond_func)(uintptr_t value))
 {
     /* TODO: consider compacting the table when the load factor drops enough,
      *       or provide a 'compact' method. */
-  
+
     struct hash_entry  * cursor    = NULL;
     struct hash_entry ** entry_ptr = NULL;
 
     uintptr_t value       = 0;
     uint32_t  hash_value  = 0;
     uint32_t  index       = 0;
-  
+
     hash_value = do_hash(htable, key);
     index      = indexFor(htable->table_length, hash_value);
     entry_ptr  = &(htable->table[index]);
@@ -475,21 +476,23 @@ nexus_htable_remove(struct nexus_hashtable * htable,
     while (cursor != NULL) {
 
 	/* Check hash value to short circuit heavier comparison */
-	if ( (hash_value == cursor->hash) && 
-	     (htable->eq_fn(key, cursor->key)) ) {
-     
-	    *entry_ptr           = cursor->next;
-	    htable->entry_count -= 1;
-	    value                = cursor->value;
-      
-	    if (free_key) {
-		freekey((void *)(cursor->key));
-	    }
+        if ((hash_value == cursor->hash) && (htable->eq_fn(key, cursor->key))) {
+            if (cond_func != NULL && cond_func(cursor->value) != true) {
+                return (uintptr_t)NULL;
+            }
 
-	    free(cursor);
-      
-	    return value;
-	}
+            *entry_ptr = cursor->next;
+            htable->entry_count -= 1;
+            value = cursor->value;
+
+            if (free_key) {
+                freekey((void *)(cursor->key));
+            }
+
+            free(cursor);
+
+            return value;
+        }
 
 	entry_ptr = &(cursor->next);
 	cursor    = cursor->next;
@@ -498,6 +501,13 @@ nexus_htable_remove(struct nexus_hashtable * htable,
     return (uintptr_t)NULL;
 }
 
+uintptr_t
+nexus_htable_remove(struct nexus_hashtable * htable,
+                    uintptr_t                key,
+                    int                      free_key)
+{
+    return nexus_htable_cond_remove(htable, key, freekey, NULL);
+}
 
 /* destroy */
 void 

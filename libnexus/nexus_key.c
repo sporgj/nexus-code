@@ -28,6 +28,9 @@ nexus_free_key(struct nexus_key * key)
 	case NEXUS_RAW_256_KEY: 
 	    nexus_free(key->key);
 	    break;
+	case NEXUS_SEALED_VOLUME_KEY:
+	    __vol_key_free(key);
+	    break;
 	case NEXUS_MBEDTLS_PUB_KEY:
 	case NEXUS_MBEDTLS_PRV_KEY:
 	    __mbedtls_free_key(key);

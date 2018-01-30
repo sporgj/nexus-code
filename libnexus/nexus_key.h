@@ -39,6 +39,20 @@ nexus_create_key(nexus_key_type_t key_type);
 struct nexus_key *
 vol_key_create_key(uint8_t * data, int len);
 
+// XXX: review API function
+int
+__vol_key_create_key(struct nexus_key * key, uint8_t * data, int len);
+
+// returns the size of the volumekey
+int
+__vol_key_bytes(struct nexus_key * key);
+
+// XXX: review API function
+// returns the raw contents of the volumekey
+uint8_t *
+__vol_key_data(struct nexus_key * key);
+
+
 /* Initializes 'key' with a random key */
 int
 nexus_generate_key(struct nexus_key * key,

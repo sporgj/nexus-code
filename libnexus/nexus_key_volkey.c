@@ -15,7 +15,7 @@ struct __volkey {
     uint8_t * data;
 };
 
-static inline int
+int
 __vol_key_bytes(struct nexus_key * key)
 {
     struct __volkey * vkey = (struct __volkey *)key->key;
@@ -25,6 +25,18 @@ __vol_key_bytes(struct nexus_key * key)
     }
 
     return -1;
+}
+
+uint8_t *
+__vol_key_data(struct nexus_key * key)
+{
+    struct __volkey * vkey = (struct __volkey *)key->key;
+
+    if (key->type == NEXUS_SEALED_VOLUME_KEY && vkey != NULL) {
+	return vkey->data;
+    }
+
+    return NULL;
 }
 
 static struct __volkey *
@@ -39,21 +51,41 @@ __alloc_volkey(int len) {
     return vkey;
 }
 
-struct nexus_key *
-vol_key_create_key(uint8_t * data, int len)
+int
+__vol_key_create_key(struct nexus_key * key, uint8_t * data, int len)
 {
-    struct nexus_key * key  = NULL;
     struct __volkey  * vkey = NULL;
 
     vkey = __alloc_volkey(len);
 
     memcpy(vkey->data, data, len);
 
-    key       = nexus_malloc(sizeof(struct nexus_key));
     key->key  = vkey;
     key->type = NEXUS_SEALED_VOLUME_KEY;
 
+    return 0;
+}
+
+struct nexus_key *
+vol_key_create_key(uint8_t * data, int len)
+{
+    struct nexus_key * key  = NULL;
+
+    key = nexus_malloc(sizeof(struct nexus_key));
+
+    __vol_key_create_key(key, data, len);
+
     return key;
+}
+
+
+void
+__vol_key_free(struct nexus_key * key)
+{
+    struct __volkey * vkey = (struct __volkey *)key->key;
+
+    nexus_free(vkey->data);
+    nexus_free(vkey);
 }
 
 static int

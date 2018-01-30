@@ -111,6 +111,13 @@ void * nexus_htable_search(struct nexus_hashtable * htable, uintptr_t key);
 // returns the value associated with the key, or NULL if none found
 uintptr_t nexus_htable_remove(struct nexus_hashtable * htable, uintptr_t key, int free_key);
 
+// special case of remove that runs a conditional on the value before removing
+uintptr_t
+nexus_htable_cond_remove(struct nexus_hashtable * htable,
+                         uintptr_t                key,
+                         int                      free_key,
+                         bool (*cond_func)(uintptr_t value));
+
 uint32_t nexus_htable_count(struct nexus_hashtable * htable);
 
 // Specialty functions for a counting hashtable 
