@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 
 
@@ -125,6 +125,20 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
     nexus_free(crypto_buf);
 }
 
+int
+nexus_crypto_buf_sha256_exterior(struct nexus_crypto_buf * crypto_buf,
+                                 mbedtls_sha256_context  * sha_context)
+{
+    if (crypto_buf->external_addr == NULL) {
+        log_error("crypto_buf has no external address\n");
+        return -1;
+    }
+
+    mbedtls_sha256_update(sha_context, crypto_buf->external_addr, crypto_buf->external_size);
+
+    return 0;
+}
+
 static int
 __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
                        struct crypto_buf_hdr    * buf_hdr)
@@ -135,7 +149,13 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 
     int ret = -1;
 
-    ret = __nexus_key_from_buf(&wrapped_key, NEXUS_WRAPPED_128_KEY, buf_hdr->gcm_hdr.key, GCM128_KEY_SIZE);
+
+    nexus_init_key(&wrapped_key, NEXUS_WRAPPED_128_KEY);
+
+    ret = __nexus_key_from_buf(&wrapped_key,
+                               NEXUS_WRAPPED_128_KEY,
+                               buf_hdr->gcm_hdr.key,
+                               GCM128_KEY_SIZE);
 
     if (ret == -1) {
         log_error("Error retrieving wrapped key from GCM header\n");
@@ -304,7 +324,6 @@ __serialize_gcm128_context(struct nexus_crypto_buf * crypto_buf, struct crypto_b
     struct nexus_crypto_ctx * crypto_ctx  = &(crypto_buf->crypto_ctx);
     struct nexus_key        * wrapped_key = NULL;
 
-    int       ret = -1;
     uint8_t * ret_ptr = NULL;
 
 

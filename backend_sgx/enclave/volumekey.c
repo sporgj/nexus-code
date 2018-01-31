@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "../enclave_internal.h"
 
 struct nexus_key * global_volumekey = NULL;
 
@@ -62,10 +62,14 @@ enclave_volumekey_serialize()
 
 
         trusted_ptr = nexus_sealed_buf_get(sealed_buf, &buf_size);
+        if (trusted_ptr == NULL) {
+            log_error("nexus_sealed_buf_get FAILED\n");
+            goto out;
+        }
 
         output_ptr = nexus_key_to_buf(global_volumekey, trusted_ptr, buf_size);
         if (output_ptr == NULL) {
-            log_error("could not key into trusted ptr\n");
+            log_error("could not copy key into trusted ptr\n");
             goto out;
         }
 
@@ -95,16 +99,22 @@ enclave_volumekey_init(struct nexus_sealed_buf * sealed_buf)
 {
     struct nexus_key * unsealed_volumekey = NULL;
 
-    size_t buf_size = 0;
+    uint8_t * buffer = 0;
+    size_t    buflen = 0;
 
-    unsealed_volumekey = (struct nexus_key *)nexus_sealed_buf_get(sealed_buf, &buf_size);
-    if (unsealed_volumekey == NULL) {
+    buffer = nexus_sealed_buf_get(sealed_buf, &buflen);
+    if (buffer == NULL) {
         log_error("nexus_sealed_buf_get FAILED\n");
         return -1;
     }
 
-    // we clone because the sealed buffer "owns" the unsealed_volumkey buffer
-    __set_volumekey(nexus_clone_key(unsealed_volumekey));
+    unsealed_volumekey = nexus_key_from_buf(NEXUS_RAW_128_KEY, buffer, buflen);
+    if (unsealed_volumekey == NULL) {
+        log_error("could not extract volume key\n");
+        return -1;
+    }
+
+    __set_volumekey(unsealed_volumekey);
 
     return 0;
 }

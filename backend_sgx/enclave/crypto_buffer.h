@@ -31,6 +31,16 @@ nexus_crypto_buf_new(size_t size);
 void
 nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
 
+/**
+ * Allows you to compute the sha256 of the external buffer
+ * @param crypto_buf
+ * @param sha_context
+ *
+ * return -1 on FAILURE
+ */
+int
+nexus_crypto_buf_sha256_exterior(struct nexus_crypto_buf * crypto_buf,
+                                 mbedtls_sha256_context  * sha_context);
 
 /**
  * Returns a pointer to trusted memory containing the buffer's data

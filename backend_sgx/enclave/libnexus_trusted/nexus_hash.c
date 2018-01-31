@@ -9,6 +9,12 @@
 
 
 void
+nexus_hash_clear(struct nexus_hash * hash)
+{
+    memset(hash, 0, sizeof(struct nexus_hash));
+}
+
+void
 nexus_hash_generate(struct nexus_hash * hash, void * buffer, size_t buflen)
 {
     mbedtls_sha256(buffer, buflen, (uint8_t *)&hash->bytes, 0);
@@ -25,9 +31,9 @@ nexus_hash_compute(void * buffer, size_t buflen)
 }
 
 int
-nexus_hash_equals(struct nexus_hash * hash1, struct nexus_hash * hash2)
+nexus_hash_compare(struct nexus_hash * hash1, struct nexus_hash * hash2)
 {
-    return (memcmp(hash1, hash2, sizeof(struct nexus_hash)) == 0);
+    return memcmp(hash1, hash2, sizeof(struct nexus_hash));
 }
 
 void

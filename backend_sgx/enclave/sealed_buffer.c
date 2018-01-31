@@ -1,6 +1,6 @@
 #include <sgx_tseal.h>
 
-#include "internal.h"
+#include "enclave_internal.h"
 
 
 struct nexus_sealed_buf {
@@ -76,6 +76,8 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf, size_t * buffer_size)
 
 
     if (sealed_buf->internal_addr != NULL) {
+        *buffer_size = sealed_buf->internal_size;
+
         return sealed_buf->internal_addr;
     }
 
@@ -107,7 +109,7 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf, size_t * buffer_size)
         goto out;
     }
 
-    *buffer_size = payload_size;
+    *buffer_size = sealed_buf->internal_size;
 
     ret = 0;
 out:

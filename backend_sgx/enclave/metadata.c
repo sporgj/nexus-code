@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 struct nexus_crypto_buf *
 metadata_open(struct nexus_uuid       * uuid,

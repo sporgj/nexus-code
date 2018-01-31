@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 void
 nexus_crypto_ctx_init(struct nexus_crypto_ctx * crypto_ctx)

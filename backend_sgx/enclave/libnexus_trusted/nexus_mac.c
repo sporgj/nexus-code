@@ -6,7 +6,7 @@
 void
 nexus_mac_zeroize(struct nexus_mac * mac)
 {
-    memset_s(mac, sizeof(struct nexus_mac), 0, 1);
+    memset(mac, 0, sizeof(struct nexus_mac));
 }
 
 int
@@ -43,16 +43,15 @@ struct nexus_mac *
 nexus_mac_from_buf(uint8_t * buf)
 {
     struct nexus_mac * new_mac = NULL;
-    int ret = 0;
+    int                ret     = 0;
 
     new_mac = nexus_malloc(sizeof(struct nexus_mac));
 
     ret = __nexus_mac_from_buf(new_mac, buf);
 
-
     if (ret == -1) {
-	nexus_free(new_mac);
-	return NULL;
+        nexus_free(new_mac);
+        return NULL;
     }
 
     return new_mac;

@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -9,12 +9,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "nexus_uuid.h"
-
+#include "../enclave_internal.h"
 
 int
 nexus_uuid_gen(struct nexus_uuid * uuid)
-{    
+{
     sgx_read_rand(uuid->raw, NEXUS_UUID_SIZE);
 
     return 0;
@@ -45,16 +44,16 @@ nexus_uuid_copy(struct nexus_uuid * src_uuid,
     return 0;
 }
 
-int
+bool
 nexus_uuid_is_valid(struct nexus_uuid * uuid)
-{    
+{
     int i = 0;
 
     for (i = 0; i < NEXUS_UUID_SIZE; i++) {
-	if (uuid->raw[i] != 0) {
-	    return 1;
-	}
+        if (uuid->raw[i] != 0) {
+            return true;
+        }
     }
 
-    return 0;
+    return false;
 }

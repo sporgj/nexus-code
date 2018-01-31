@@ -27,7 +27,9 @@ INCLUDE := -I$(SGX_SDK)/include \
 	-Ilibnexus_trusted \
 	-I..
 
-CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector
+CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector\
+           -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
+
 
 
 

@@ -6,7 +6,6 @@
  * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
  */
 
-
 #include <assert.h>
 
 #include <nexus_encode.h>
@@ -22,9 +21,12 @@ static inline int
 __wrapped_key_bits(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_WRAPPED_256_KEY:    return 256;
-	case NEXUS_WRAPPED_128_KEY:    return 128;
-	default:                   return -1;
+    case NEXUS_WRAPPED_256_KEY:
+        return (256);
+    case NEXUS_WRAPPED_128_KEY:
+        return (128);
+    default:
+        return -1;
     }
 
     return -1;
@@ -34,9 +36,12 @@ static inline int
 __wrapped_key_bytes(struct nexus_key * key)
 {
     switch (key->type) {
-	case NEXUS_WRAPPED_256_KEY:    return (256 / 8);
-	case NEXUS_WRAPPED_128_KEY:    return (128 / 8);
-	default:                   return -1;
+    case NEXUS_WRAPPED_256_KEY:
+        return (256 / 8);
+    case NEXUS_WRAPPED_128_KEY:
+        return (128 / 8);
+    default:
+        return -1;
     }
 
     return -1;
@@ -52,8 +57,8 @@ __wrap_key(struct nexus_key * sealed_key, struct nexus_key * unsealed_key)
     sealed_key->key = crypto_aes_ecb_encrypt(global_volumekey, unsealed_key->key, key_size);
 
     if (sealed_key->key == NULL) {
-	log_error("Could not wrap key\n");
-	return -1;
+        log_error("Could not wrap key\n");
+        return -1;
     }
 
     return 0;
@@ -69,8 +74,8 @@ __unwrap_key(struct nexus_key * unsealed_key, struct nexus_key * sealed_key)
     unsealed_key->key = crypto_aes_ecb_decrypt(global_volumekey, sealed_key->key, key_size);
 
     if (unsealed_key->key == NULL) {
-	log_error("Could not unwrap key\n");
-	return -1;
+        log_error("Could not unwrap key\n");
+        return -1;
     }
 
     return 0;
@@ -96,43 +101,42 @@ __wrapped_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
     size_t    key_len = __wrapped_key_bytes(key);
     uint8_t * tgt_buf = NULL;
 
-
     if (dst_buf == NULL) {
-
-	tgt_buf = nexus_malloc(key_len);
-
+        tgt_buf = nexus_malloc(key_len);
     } else {
-	if (key_len > dst_size) {
-            log_error(
-                "destination buffer too small (key_size = %lu) (dst_size = %lu)\n",
-                key_len,
-                dst_size);
+        if (key_len > dst_size) {
+            log_error("destination buffer too small (key_size = %lu) (dst_size = %lu)\n",
+                      key_len,
+                      dst_size);
             return NULL;
-	}
+        }
 
-	tgt_buf = dst_buf;
+        tgt_buf = dst_buf;
     }
 
-    memcpy(tgt_buf, &key->key, key_len);
+    memcpy(tgt_buf, key->key, key_len);
 
     return tgt_buf;
 }
 
 static int
-__wrapped_key_from_buf(struct nexus_key * key,
-                       uint8_t          * src_buf,
-                       size_t             src_size)
+__wrapped_key_from_buf(struct nexus_key * key, uint8_t * src_buf, size_t src_size)
 {
     size_t key_len = __wrapped_key_bytes(key);
 
-    // in case the key exists
-    if (key->key) {
-	nexus_free(key->key);
+    if (key_len > src_size) {
+        log_error("buffer is too small for wrapped key (min=%zu, act=%zu)\n", key_len, src_size);
+        return -1;
     }
 
-    key->key = nexus_malloc(src_size);
+    // in case the key exists
+    if (key->key) {
+        nexus_free(key->key);
+    }
 
-    memcpy(&key->key, src_buf, src_size);
+    key->key = nexus_malloc(key_len);
+
+    memcpy(key->key, src_buf, key_len);
 
     return 0;
 }
@@ -140,7 +144,7 @@ __wrapped_key_from_buf(struct nexus_key * key,
 static char *
 __wrapped_key_to_str(struct nexus_key * key)
 {
-    char   * key_str = NULL;
+    char *   key_str = NULL;
     uint32_t key_len = __wrapped_key_bytes(key);
 
     assert(key_len > 0);
@@ -161,8 +165,8 @@ __wrapped_key_from_str(struct nexus_key * key, char * key_str)
     ret = nexus_base64_decode(key_str, (uint8_t **)&(key->key), &dec_len);
 
     if (ret == -1) {
-	log_error("Could not decode raw key from base64\n");
-	return -1;
+        log_error("Could not decode raw key from base64\n");
+        return -1;
     }
 
     if (dec_len != key_len) {

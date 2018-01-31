@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 struct nexus_raw_buf {
     struct nexus_uuid uuid;

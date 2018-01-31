@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 
 struct dirnode *

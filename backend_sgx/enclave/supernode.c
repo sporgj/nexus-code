@@ -1,4 +1,34 @@
-#include "internal.h"
+#include "enclave_internal.h"
+
+// TODO naive implementation that just reads the buffer
+struct supernode *
+supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf)
+{
+    struct supernode * supernode = NULL;
+
+    uint8_t * buffer = NULL;
+    size_t    buflen = 0;
+
+
+    buffer = nexus_crypto_buf_get(crypto_buf, &buflen, NULL);
+    if (buffer == NULL) {
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return NULL;
+    }
+
+    supernode = nexus_malloc(buflen);
+
+    memcpy(supernode, buffer, buflen);
+
+    return supernode;
+}
+
+int
+supernode_check_user_pubkey(struct supernode * supernode, struct nexus_hash * user_pubkey_hash)
+{
+    // TODO add code that iterates through user names in the supernode's usertable
+    return nexus_hash_compare(&supernode->owner_pubkey_hash, user_pubkey_hash);
+}
 
 static struct supernode *
 supernode_new(char * user_pubkey)
@@ -11,7 +41,7 @@ supernode_new(char * user_pubkey)
     nexus_uuid_gen(&supernode->root_uuid);
     nexus_uuid_gen(&supernode->user_list_uuid);
 
-    nexus_hash_generate(&supernode->owner_pubkey, user_pubkey, strlen(user_pubkey));
+    nexus_hash_generate(&supernode->owner_pubkey_hash, user_pubkey, strlen(user_pubkey));
 
     return supernode;
 }

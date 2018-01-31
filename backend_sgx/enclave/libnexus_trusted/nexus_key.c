@@ -9,9 +9,7 @@
 #include <string.h>
 
 
-#include "nexus_key.h"
-#include "nexus_util.h"
-#include "nexus_log.h"
+#include "../enclave_internal.h"
 
 #include "nexus_key_mbedtls.c"
 #include "nexus_key_raw.c"
@@ -74,30 +72,28 @@ nexus_generate_key(struct nexus_key * key,
     return ret;
 }
 
-struct nexus_key * 
+struct nexus_key *
 nexus_create_key(nexus_key_type_t key_type)
 {
     struct nexus_key * key = NULL;
-    
+
     int ret = -1;
 
     key = nexus_malloc(sizeof(struct nexus_key));
 
-    ret = nexus_generate_key(key, key_type);    
-    
+    ret = nexus_generate_key(key, key_type);
+
     if (ret == -1) {
-	log_error("Could not create key");
-	goto err;
+        log_error("Could not create ke\ny");
+        goto err;
     }
 
-    
     return key;
 
- err:
+err:
     nexus_free(key);
     return NULL;
 }
-
 
 int
 __nexus_derive_key(struct nexus_key * new_key,
@@ -151,7 +147,7 @@ __nexus_derive_key(struct nexus_key * new_key,
 	    
 
 	default:
-	    log_error("Invalid key type");
+	    log_error("Invalid key type\n");
 	    goto err;
     }
 
@@ -176,7 +172,7 @@ nexus_derive_key(nexus_key_type_t   key_type,
     ret = __nexus_derive_key(key, key_type, src_key);
     
     if (ret == -1) {
-	log_error("Could not create key");
+	log_error("Could not create key\n");
 	goto err;
     }
 
@@ -233,7 +229,7 @@ nexus_copy_key(struct nexus_key * src_key,
 	case NEXUS_MBEDTLS_PUB_KEY:
 	case NEXUS_MBEDTLS_PRV_KEY:
 	default:
-	    log_error("Could not copy key for invalid key type");
+	    log_error("Could not copy key for invalid key type\n");
 	    return -1;	
     }
     
@@ -401,6 +397,10 @@ nexus_key_to_str(struct nexus_key * key)
 	case NEXUS_RAW_256_KEY:
 	    str = __raw_key_to_str(key);
 	    break;
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    str = __wrapped_key_to_str(key);
+	    break;
 	default:
 	    log_error("Invalid key type\n");
 	    return NULL;
@@ -434,6 +434,10 @@ __nexus_key_from_str(struct nexus_key * key,
 	case NEXUS_RAW_128_KEY:
 	case NEXUS_RAW_256_KEY:
 	    ret = __raw_key_from_str(key, key_str);
+	    break;
+	case NEXUS_WRAPPED_128_KEY:
+	case NEXUS_WRAPPED_256_KEY:
+	    ret = __wrapped_key_from_str(key, key_str);
 	    break;
 	default:
 	    log_error("Invalid key type");
@@ -471,26 +475,50 @@ nexus_key_from_str(nexus_key_type_t   key_type,
 }
 
 
+
+struct nexus_key_desc {
+    nexus_key_type_t type;
+    char *           desc;
+};
+
+struct nexus_key_desc nexus_key_descriptors[] = {
+    { NEXUS_MBEDTLS_PUB_KEY, "NEXUS_MBEDTLS_PUB_KEY" },
+    { NEXUS_MBEDTLS_PRV_KEY, "NEXUS_MBEDTLS_PRV_KEY" },
+    { NEXUS_RAW_128_KEY, "NEXUS_RAW_128_KEY" },
+    { NEXUS_RAW_256_KEY, "NEXUS_RAW_256_KEY" },
+    { NEXUS_WRAPPED_128_KEY, "NEXUS_WRAPPED_128_KEY" },
+    { NEXUS_WRAPPED_256_KEY, "NEXUS_WRAPPED_256_KEY" },
+    { NEXUS_INVALID_KEY, "NEXUS_INVALID_KEY_TYPE" }
+};
+
+
 char *
 nexus_key_type_to_str(nexus_key_type_t type)
 {
-    switch (type) {
-	case NEXUS_MBEDTLS_PUB_KEY: return "NEXUS_MBEDTLS_PUB_KEY";
-	case NEXUS_MBEDTLS_PRV_KEY: return "NEXUS_MBEDTLS_PRV_KEY";
-	case NEXUS_RAW_128_KEY:     return "NEXUS_RAW_128_KEY";
-	case NEXUS_RAW_256_KEY:     return "NEXUS_RAW_256_KEY";
-	default:                    return "NEXUS_INVALID_KEY_TYPE";
+    size_t count = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
+
+    for (size_t i = 0; i < count; i++) {
+	if (type == nexus_key_descriptors[i].type) {
+            return nexus_key_descriptors[i].desc;
+        }
     }
+
+    return "NEXUS_INVALID_KEY_TYPE";
 }
 
 
 nexus_key_type_t
 nexus_key_type_from_str(char * type_str)
 {
-    if (strncmp(type_str, "NEXUS_MBEDTLS_PUB_KEY", strlen("NEXUS_MBDTLS_PUB_KEY"))  == 0)  return NEXUS_MBEDTLS_PUB_KEY;
-    if (strncmp(type_str, "NEXUS_MBEDTLS_PRV_KEY", strlen("NEXUS_MBDTLS_PRV_KEY"))  == 0)  return NEXUS_MBEDTLS_PRV_KEY;
-    if (strncmp(type_str, "NEXUS_RAW_128_KEY",     strlen("NEXUS_RAW_128_KEY"))     == 0)  return NEXUS_RAW_128_KEY;
-    if (strncmp(type_str, "NEXUS_RAW_256_KEY",     strlen("NEXUS_RAW_256_KEY"))     == 0)  return NEXUS_RAW_256_KEY;
+    size_t count = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
+
+    for (size_t i = 0; i < count; i++) {
+	char * desc = nexus_key_descriptors[i].desc;
+
+	if (strncmp(type_str, desc, strlen(desc)) == 0) {
+            return nexus_key_descriptors[i].type;
+        }
+    }
 
     return NEXUS_INVALID_KEY;
 }

@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -151,7 +151,7 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&(crypto_context->key.key),
+                           crypto_context->key.key,
                            nexus_key_bits(&(crypto_context->key)));
 
         mbedtls_gcm_starts(&gcm_context,
@@ -218,7 +218,7 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
         mbedtls_gcm_setkey(&gcm_context,
                            MBEDTLS_CIPHER_ID_AES,
-                           (uint8_t *)&(crypto_context->key.key),
+                           crypto_context->key.key,
                            nexus_key_bits(&(crypto_context->key)));
 
         mbedtls_gcm_starts(&gcm_context,
@@ -229,7 +229,7 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
                            aad_len);
 
 
-        ret = mbedtls_gcm_update(&gcm_context, input_len, plaintext, ciphertext);
+        ret = mbedtls_gcm_update(&gcm_context, input_len, ciphertext, plaintext);
         if (ret) {
             mbedtls_gcm_free(&gcm_context);
             goto out;

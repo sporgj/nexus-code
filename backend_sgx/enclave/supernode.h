@@ -8,6 +8,7 @@
 #pragma once
 
 #include "crypto.h"
+#include "crypto_buffer.h"
 
 #include "nexus_uuid.h"
 #include "nexus_key.h"
@@ -23,9 +24,11 @@ struct supernode {
 
     struct nexus_mac  volume_userlist_mac;
 
-    struct nexus_hash owner_pubkey;
+    struct nexus_hash owner_pubkey_hash;
 };
 
+struct supernode *
+supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf);
 
 /**
  * Instantiates a new supernode and generates both its uuid and the root uuid

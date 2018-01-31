@@ -42,15 +42,9 @@ __raw_key_bytes(struct nexus_key * key)
 static int
 __raw_create_key(struct nexus_key * key)
 {
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context  entropy;
-
     uint32_t key_len = __raw_key_bytes(key);
-    int      ret     = 0;
-
 
     key->key = nexus_malloc(key_len);
-
 
     sgx_read_rand((uint8_t *) key->key, key_len);
 
@@ -91,7 +85,7 @@ __raw_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
 	tgt_buf = dst_buf;
     }
 
-    memcpy(tgt_buf, &key->key, key_len);
+    memcpy(tgt_buf, key->key, key_len);
 
     return tgt_buf;
 }
@@ -99,16 +93,21 @@ __raw_key_to_buf(struct nexus_key * key, uint8_t * dst_buf, size_t dst_size)
 static int
 __raw_key_from_buf(struct nexus_key * key, uint8_t * src_buf, size_t src_size)
 {
-    size_t key_len = __raw_key_bytes(key);
+    uint32_t key_len = __raw_key_bytes(key);
+
+    if (key_len > src_size) {
+	log_error("buffer too small (min=%zu, act=%zu)\n", key_len, src_size);
+	return -1;
+    }
 
     // in case the key exists
     if (key->key) {
 	nexus_free(key->key);
     }
 
-    key->key = nexus_malloc(src_size);
+    key->key = nexus_malloc(key_len);
 
-    memcpy(&key->key, src_buf, src_size);
+    memcpy(key->key, src_buf, key_len);
 
     return 0;
 }

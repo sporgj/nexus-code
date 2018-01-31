@@ -25,23 +25,23 @@ enclave {
          */
         public int ecall_create_volume
         (
-            [in, string] char              * user_pubkey_in,
+            [in, string] char              * user_pubkey_IN,
             [user_check] struct nexus_uuid * supernode_uuid_out,
             [user_check] struct nexus_uuid * volkey_buffer_uuid_out
         );
 
         public int ecall_authentication_challenge
         (
-            [in, string] char                   * user_pubkey_in,
-            [user_check] struct nexus_uuid      * volkey_bufuuid_in,
+            [in, string] char                   * user_pubkey_IN,
+            [in]         struct nexus_uuid      * volkey_bufuuid_in,
             [user_check] struct nonce_challenge * challenge_out
         );
 
         public int ecall_authentication_response
         (
-            [user_check] struct nexus_uuid * supernode_bufuuid_in,
-            [user_check] struct nexus_uuid * signature_bufuuid_in,
-                         size_t              signature_len
+            [in] struct nexus_uuid * supernode_bufuuid_in,
+            [in] struct nexus_uuid * signature_bufuuid_in,
+                            size_t   signature_len
         );
     };
 

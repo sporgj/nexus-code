@@ -1,4 +1,4 @@
-#include "internal.h"
+#include "enclave_internal.h"
 
 void *
 buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)

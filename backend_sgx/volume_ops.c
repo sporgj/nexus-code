@@ -284,6 +284,8 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    sgx_backend->volume = volume;
+
     // get the user's publick key and the volume key
     public_key_str = __user_pubkey_str(&user_prv_key);
     if (public_key_str == NULL) {
@@ -387,6 +389,10 @@ out:
     if (supernode_bufuuid) {
         buffer_manager_put(sgx_backend->buf_manager, supernode_bufuuid);
         nexus_free(supernode_bufuuid);
+    }
+
+    if (ret) {
+        sgx_backend->volume = NULL;
     }
 
     return ret;
