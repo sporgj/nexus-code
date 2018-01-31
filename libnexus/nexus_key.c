@@ -408,13 +408,12 @@ struct nexus_key_desc nexus_key_descriptors[] = {
 char *
 nexus_key_type_to_str(nexus_key_type_t type)
 {
-    size_t count
-        = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
+    size_t count = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
 
     for (size_t i = 0; i < count; i++) {
 	if (type == nexus_key_descriptors[i].type) {
-	    return nexus_key_descriptors[i].desc;
-	}
+            return nexus_key_descriptors[i].desc;
+        }
     }
 
     return "NEXUS_INVALID_KEY_TYPE";
@@ -424,15 +423,14 @@ nexus_key_type_to_str(nexus_key_type_t type)
 nexus_key_type_t
 nexus_key_type_from_str(char * type_str)
 {
-    size_t count
-        = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
+    size_t count = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
 
     for (size_t i = 0; i < count; i++) {
 	char * desc = nexus_key_descriptors[i].desc;
 
 	if (strncmp(type_str, desc, strlen(desc)) == 0) {
-	    return nexus_key_descriptors[i].type;
-	}
+            return nexus_key_descriptors[i].type;
+        }
     }
 
     return NEXUS_INVALID_KEY;

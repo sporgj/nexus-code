@@ -127,7 +127,9 @@ __vol_key_to_str(struct nexus_key * key)
 static int
 __vol_key_from_str(struct nexus_key * key, char * key_str)
 {
-    struct __volkey * volkey  = (struct __volkey *)(key->key);
+    struct __volkey * volkey  = NULL;
+
+    volkey = nexus_malloc(sizeof(struct __volkey));
 
     int ret = 0;
 
@@ -137,6 +139,8 @@ __vol_key_from_str(struct nexus_key * key, char * key_str)
         log_error("Could not decode raw key from base64\n");
         return -1;
     }
+
+    key->key = volkey;
 
     return 0;
 }

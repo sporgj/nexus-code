@@ -41,6 +41,7 @@ extern "C" {
 
 
 #include <stdint.h>
+#include <stdbool.h>
 
 struct nexus_hashtable;
 

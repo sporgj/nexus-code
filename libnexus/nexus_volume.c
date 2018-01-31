@@ -64,6 +64,8 @@ nexus_create_volume(char * volume_path,
 		    char * config_str)
 {
     struct nexus_volume * vol = NULL;
+
+    char * temp_cwd = NULL;
     
     nexus_json_obj_t vol_config;
 
@@ -83,12 +85,7 @@ nexus_create_volume(char * volume_path,
     }
     
     // Create Volume
-    vol = calloc(sizeof(struct nexus_volume), 1);
-
-    if (vol == NULL) {
-	log_error("Could not allocate nexus volume\n");
-	return NULL;
-    }
+    vol = nexus_malloc(sizeof(struct nexus_volume));
 
     
     /* Init Volume uuid */
@@ -102,6 +99,12 @@ nexus_create_volume(char * volume_path,
 	nexus_json_add_string(vol_config, "volume_uuid", uuid_alt64);
 
 	nexus_free(uuid_alt64);
+    }
+
+    temp_cwd = get_current_dir_name();
+    if (temp_cwd == NULL) {
+	log_error("get_current_dir_name() FAILED (err=%s)\n", strerror(errno));
+	return NULL;
     }
 
     ret = chdir(volume_path);
@@ -229,6 +232,14 @@ nexus_create_volume(char * volume_path,
 	}
     }
     
+    // restore the current directory
+    ret = chdir(temp_cwd);
+
+    if (ret == -1) {
+	log_error("Could not chdir to (%s)\n", temp_cwd);
+	goto err;
+    }
+
     /* Write config */
     {
 	char * cfg_filename = NULL;
@@ -256,7 +267,12 @@ err:
     /* TODO: 
      *  Lots of free/deinits need to happen here....
      */
-    
+    if (temp_cwd) {
+	chdir(temp_cwd);
+
+	nexus_free(temp_cwd);
+    }
+
     nexus_free(vol);
     return NULL;
 }

@@ -78,8 +78,6 @@ void
 nexus_free_key(struct nexus_key * key);
 
 
-
-
 struct nexus_key *
 nexus_key_from_file(nexus_key_type_t   key_type,
 		    char             * key_path);

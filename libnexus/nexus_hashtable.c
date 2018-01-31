@@ -506,7 +506,7 @@ nexus_htable_remove(struct nexus_hashtable * htable,
                     uintptr_t                key,
                     int                      free_key)
 {
-    return nexus_htable_cond_remove(htable, key, freekey, NULL);
+    return nexus_htable_cond_remove(htable, key, free_key, NULL);
 }
 
 /* destroy */
