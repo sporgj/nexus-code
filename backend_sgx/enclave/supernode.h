@@ -27,8 +27,9 @@ struct supernode {
     struct nexus_hash owner_pubkey_hash;
 };
 
+
 struct supernode *
-supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf);
+supernode_from_buffer(uint8_t * buffer, size_t buflen);
 
 /**
  * Instantiates a new supernode and generates both its uuid and the root uuid

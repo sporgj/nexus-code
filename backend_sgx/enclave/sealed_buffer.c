@@ -86,8 +86,8 @@ nexus_sealed_buf_get(struct nexus_sealed_buf * sealed_buf, size_t * buffer_size)
         return NULL;
     }
 
-    // XXX copy the buffer into internal memory
     sealed_data = nexus_malloc(sealed_buf->external_size);
+
     memcpy(sealed_data, sealed_buf->external_addr, sealed_buf->external_size);
 
 
@@ -179,7 +179,7 @@ out:
 int
 nexus_sealed_buf_flush(struct nexus_sealed_buf * sealed_buf, struct nexus_uuid * bufuuid_out)
 {
-    nexus_uuid_copy(&sealed_buf->uuid, bufuuid_out);
+    buffer_layer_copy(&sealed_buf->uuid, bufuuid_out);
 
     return 0;
 }

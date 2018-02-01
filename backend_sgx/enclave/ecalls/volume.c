@@ -1,4 +1,4 @@
-#include "../internal.h"
+#include "../enclave_internal.h"
 
 #include "nexus_key.h"
 
@@ -47,7 +47,7 @@ ecall_create_volume(char              * user_pubkey_IN,
     int ret = -1;
 
 
-    if (enclave_volumekey_gen()) {
+    if (nexus_enclave_volumekey_generate()) {
         log_error("could not generate volumekey\n");
         return -1;
     }
@@ -64,13 +64,17 @@ ecall_create_volume(char              * user_pubkey_IN,
 
         ret = -1;
 
-        sealed_volkey = enclave_volumekey_serialize();
+        sealed_volkey = nexus_enclave_volumekey_serialize();
 
         if (sealed_volkey == NULL) {
             log_error("could not serialize volumekey\n");
             goto out;
         }
 
+        /**
+         * this transfers the buffer UUID of the sealed_volkey's external
+         * pointer into volkey_bufuuid_out
+         */
         ret = nexus_sealed_buf_flush(sealed_volkey, volkey_bufuuid_out);
         if (ret) {
             nexus_sealed_buf_free(sealed_volkey);
@@ -78,12 +82,12 @@ ecall_create_volume(char              * user_pubkey_IN,
             goto out;
         }
 
-        // TODO call nexus_sealed_buf_release
+        nexus_sealed_buf_free(sealed_volkey);
     }
 
     ret = 0;
 out:
-    enclave_volumekey_clear();
+    nexus_enclave_volumekey_clear();
 
     return ret;
 }
@@ -126,7 +130,7 @@ generate_auth_challenge(struct nonce_challenge * challenge_out)
 int
 ecall_authentication_challenge(char                   * user_pubkey_IN,
                                struct nexus_uuid      * volkey_bufuuid_in,
-                               struct nonce_challenge * challenge_out)
+                               struct nonce_challenge * challenge_OUT)
 {
     struct nexus_sealed_buf * volkey_sealed_buf = NULL;
 
@@ -150,14 +154,14 @@ ecall_authentication_challenge(char                   * user_pubkey_IN,
             goto err;
         }
 
-        ret = enclave_volumekey_init(volkey_sealed_buf);
+        ret = nexus_enclave_volumekey_init(volkey_sealed_buf);
         if (ret != 0) {
             log_error("could not extract volumekey\n");
             goto err;
         }
     }
 
-    generate_auth_challenge(challenge_out);
+    generate_auth_challenge(challenge_OUT);
 
     nexus_sealed_buf_free(volkey_sealed_buf);
 
@@ -253,15 +257,15 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
 
     // verify the supernode & user membership
     {
-        global_supernode = supernode_from_crypto_buf(supernode_crypto_buf);
-        if (global_supernode == NULL) {
+        ret = nexus_vfs_init(supernode_crypto_buf);
+        if (ret != 0) {
             log_error("invalid supernode\n");
             goto out;
         }
 
-        ret = supernode_check_user_pubkey(global_supernode, &user_pubkey_hash);
+        ret = nexus_vfs_verfiy_pubkey(&user_pubkey_hash);
         if (ret != 0) {
-            supernode_free(global_supernode);
+            nexus_vfs_exit();
             log_error("could not verify the user's public key\n");
             goto out;
         }
@@ -275,6 +279,11 @@ out:
 
     if (supernode_crypto_buf) {
         nexus_crypto_buf_free(supernode_crypto_buf);
+    }
+
+    if (ret != 0) {
+        // on error, clear the loaded volumekey
+        nexus_enclave_volumekey_clear();
     }
 
     clear_auth_pubkey();

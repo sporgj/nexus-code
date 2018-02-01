@@ -117,10 +117,7 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
     }
 
     // free the crypto context
-    {
-        struct nexus_crypto_ctx * crypto_context = &(crypto_buf->crypto_ctx);
-        nexus_crypto_ctx_free(crypto_context);
-    }
+    nexus_crypto_ctx_free(&(crypto_buf->crypto_ctx));
 
     nexus_free(crypto_buf);
 }
@@ -200,18 +197,6 @@ __get_header_len()
       return sizeof(struct crypto_buf_hdr);
 }
 
-static void
-__clear_header_mac(struct crypto_buf_hdr * hdr)
-{
-    memset(hdr->gcm_hdr.mac, 0, NEXUS_MAC_SIZE);
-}
-
-static void
-__set_header_mac(struct crypto_buf_hdr * hdr, struct nexus_mac * mac)
-{
-    nexus_mac_to_buf(mac, hdr->gcm_hdr.mac);
-}
-
 static struct crypto_buf_hdr *
 __parse_header(struct nexus_crypto_buf * crypto_buf)
 {
@@ -285,7 +270,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 
     /* Decrypt the buffer */
     {
-        __clear_header_mac(buf_hdr);
+        memset(buf_hdr->gcm_hdr.mac, 0, NEXUS_MAC_SIZE);
 
         ret = crypto_gcm_decrypt(&(crypto_buf->crypto_ctx),
                                  crypto_buf->internal_size,
@@ -432,7 +417,7 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
 
     /* Encrypt the data with the buf_hdr as AAD for authentication*/
     {
-        __clear_header_mac(buf_hdr);
+        memset(buf_hdr->gcm_hdr.mac, 0, NEXUS_MAC_SIZE);
 
         ret = crypto_gcm_encrypt(&(crypto_buf->crypto_ctx),
                                  crypto_buf->internal_size,
@@ -448,7 +433,7 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
         }
     }
 
-    __set_header_mac(buf_hdr, &(crypto_buf->crypto_ctx.mac));
+    nexus_mac_to_buf(mac, buf_hdr->gcm_hdr.mac);
 
 
     /* Finally copy the header out to the external buffer */

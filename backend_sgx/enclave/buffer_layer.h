@@ -27,3 +27,14 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size);
  */
 int
 buffer_layer_put(struct nexus_uuid * buffer_uuid);
+
+/**
+ * Copies the buffer. It does this by acquiring a reference to from_uuid's
+ * buffer.
+ * @param from_uuid
+ * @param to_uuid
+ *
+ * @return 0 on success.
+ */
+int
+buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid);

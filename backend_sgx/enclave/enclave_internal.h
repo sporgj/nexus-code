@@ -23,6 +23,7 @@
 #include "sealed_buffer.h"
 #include "raw_buffer.h"
 
+#include "vfs.h"
 #include "volumekey.h"
 #include "crypto.h"
 #include "supernode.h"

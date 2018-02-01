@@ -14,7 +14,7 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
     }
 
     err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_backend_ext);
-    if (err) {
+    if (err || external_addr == NULL) {
         log_error("could not allocate space for crypto_buffer\n");
         return NULL;
     }
@@ -45,6 +45,25 @@ buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
     // XXX for now, the put just frees the external buffer
     ocall_buffer_put(buffer_uuid, global_backend_ext);
+
+    return 0;
+}
+
+int
+buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
+{
+    // get a reference and copy the uuid
+    void * buffer = NULL;
+    size_t buflen = 0;
+
+    buffer = buffer_layer_get(from_uuid, &buflen);
+
+    if (buffer == NULL) {
+        log_error("could not acquire reference to buffer\n");
+        return -1;
+    }
+
+    nexus_uuid_copy(from_uuid, to_uuid);
 
     return 0;
 }

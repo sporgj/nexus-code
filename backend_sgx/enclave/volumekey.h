@@ -11,20 +11,20 @@
  * @return 0 on success
  */
 int
-enclave_volumekey_gen();
+nexus_enclave_volumekey_generate();
 
 /**
  * Clears the enclave volumekey
  */
 void
-enclave_volumekey_clear();
+nexus_enclave_volumekey_clear();
 
 /**
  * Returns a sealed_buffer of the volumekey
  * @return NULL on failure
  */
 struct nexus_sealed_buf *
-enclave_volumekey_serialize();
+nexus_enclave_volumekey_serialize();
 
 
 /**
@@ -33,4 +33,4 @@ enclave_volumekey_serialize();
  * @return 0 on success
  */
 int
-enclave_volumekey_init(struct nexus_sealed_buf * sealed_buf);
+nexus_enclave_volumekey_init(struct nexus_sealed_buf * sealed_buf);

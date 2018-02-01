@@ -73,6 +73,7 @@ objs := nexus_enclave_t.o \
 	crypto_buffer.o \
 	sealed_buffer.o \
 	raw_buffer.o \
+	vfs.o \
 	crypto_context.o \
 	crypto.o \
 	volumekey.o \

@@ -14,7 +14,7 @@ __set_volumekey(struct nexus_key * volumekey)
 }
 
 int
-enclave_volumekey_gen()
+nexus_enclave_volumekey_generate()
 {
     struct nexus_key * volumekey = NULL;
 
@@ -31,13 +31,13 @@ enclave_volumekey_gen()
 }
 
 void
-enclave_volumekey_clear()
+nexus_enclave_volumekey_clear()
 {
     __set_volumekey(NULL);
 }
 
 struct nexus_sealed_buf *
-enclave_volumekey_serialize()
+nexus_enclave_volumekey_serialize()
 {
     struct nexus_sealed_buf * sealed_buf = NULL;
 
@@ -95,7 +95,7 @@ out:
  * @return 0 on success
  */
 int
-enclave_volumekey_init(struct nexus_sealed_buf * sealed_buf)
+nexus_enclave_volumekey_init(struct nexus_sealed_buf * sealed_buf)
 {
     struct nexus_key * unsealed_volumekey = NULL;
 
