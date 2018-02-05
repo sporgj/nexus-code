@@ -64,7 +64,7 @@ supernode_create(char * user_pubkey)
 
     // dirnode
     {
-        struct dirnode * root_dirnode = dirnode_create(&supernode->root_uuid);
+        struct nexus_dirnode * root_dirnode = dirnode_create(&supernode->root_uuid);
         if (root_dirnode == NULL) {
             ret = -1;
             goto out;

@@ -50,6 +50,7 @@ crypto_lib := mbedtls/library/libmbedcrypto.a
 nexus_trusted_objs := \
 	nexus_log.o \
 	nexus_hash.o \
+	nexus_list.o \
 	nexus_mac.o \
 	nexus_util.o \
 	nexus_hash.o \
