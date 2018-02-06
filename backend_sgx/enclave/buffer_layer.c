@@ -15,7 +15,7 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
 
     err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_backend_ext);
     if (err || external_addr == NULL) {
-        log_error("could not allocate space for crypto_buffer\n");
+        log_error("could not allocate space for crypto_buffer (err=%d)\n", err);
         return NULL;
     }
 
@@ -33,7 +33,7 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
     err = ocall_buffer_get(&external_addr, uuid, size, global_backend_ext);
 
     if (err || external_addr == NULL) {
-        log_error("ocall_buffer_get FAILED\n");
+        log_error("ocall_buffer_get FAILED (err=%d)\n", err);
         return NULL;
     }
 

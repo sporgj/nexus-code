@@ -1,6 +1,5 @@
 #include "../enclave_internal.h"
 
-#include "nexus_key.h"
 
 static struct nexus_hash      user_pubkey_hash;
 
@@ -257,7 +256,7 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
 
     // verify the supernode & user membership
     {
-        ret = nexus_vfs_init(supernode_crypto_buf);
+        ret = nexus_vfs_mount(supernode_crypto_buf);
         if (ret != 0) {
             log_error("invalid supernode\n");
             goto out;
@@ -265,7 +264,7 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
 
         ret = nexus_vfs_verfiy_pubkey(&user_pubkey_hash);
         if (ret != 0) {
-            nexus_vfs_exit();
+            nexus_vfs_deinit();
             log_error("could not verify the user's public key\n");
             goto out;
         }

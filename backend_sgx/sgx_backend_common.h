@@ -6,6 +6,7 @@
 
 #include <nexus_uuid.h>
 #include <nexus_key.h>
+#include <nexus_fs.h>
 
 #define NONCE_SIZE 64
 

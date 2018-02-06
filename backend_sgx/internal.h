@@ -33,3 +33,10 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data);
 
 int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data);
+
+int
+sgx_backend_fs_create(struct nexus_volume * volume,
+                      char                * path,
+                      nexus_dirent_type_t   type,
+                      struct nexus_stat   * stat,
+                      void                * priv_data);

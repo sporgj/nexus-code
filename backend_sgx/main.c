@@ -114,7 +114,8 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .init            = sgx_backend_init,
     .deinit          = sgx_backend_exit,
     .volume_init     = sgx_backend_create_volume,
-    .volume_open     = sgx_backend_open_volume
+    .volume_open     = sgx_backend_open_volume,
+    .fs_create       = sgx_backend_fs_create
 };
 
 

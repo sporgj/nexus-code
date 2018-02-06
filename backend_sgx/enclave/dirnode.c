@@ -271,3 +271,34 @@ dirnode_dir_entry_deallocator(void * el)
 
     nexus_free(dir_entry);
 }
+
+int
+dirnode_add(struct nexus_dirnode * dirnode,
+            char                 * filename,
+            nexus_dirent_type_t    type,
+            struct nexus_uuid    * entry_uuid)
+{
+    struct dir_entry_s * new_dir_entry = NULL;
+
+    size_t name_len  = 0;
+    size_t total_len = 0;
+
+    name_len  = strlen(filename);
+    total_len = sizeof(struct dir_entry_s) + name_len + 1;
+
+    new_dir_entry = nexus_malloc(total_len);
+
+    new_dir_entry->total_len = total_len;
+    new_dir_entry->name_len  = name_len;
+    new_dir_entry->type      = type;
+
+    memcpy(new_dir_entry->name, filename, name_len);
+
+    nexus_uuid_gen(&new_dir_entry->uuid);
+    nexus_uuid_copy(&new_dir_entry->uuid, entry_uuid);
+
+    dirnode->dir_entry_count += 1;
+    dirnode->dir_entry_buflen += total_len;
+
+    return 0;
+}

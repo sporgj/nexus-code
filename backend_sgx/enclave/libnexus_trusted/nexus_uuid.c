@@ -30,7 +30,7 @@ nexus_uuid_clone(struct nexus_uuid * uuid)
 	return NULL;
     }
 
-    memcpy(uuid->raw, new_uuid->raw, NEXUS_UUID_SIZE);
+    memcpy(new_uuid->raw, uuid->raw, NEXUS_UUID_SIZE);
 
     return new_uuid;
 }

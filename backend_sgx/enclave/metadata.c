@@ -1,36 +1,41 @@
 #include "enclave_internal.h"
 
 struct nexus_crypto_buf *
-metadata_open(struct nexus_uuid       * uuid,
+metadata_read(struct nexus_uuid       * uuid,
               struct nexus_uuid_path  * uuid_path)
 {
-    struct nexus_crypto_buf * crypto_buf         = NULL;
+    struct nexus_crypto_buf * crypto_buf           = NULL;
 
-    struct nexus_uuid       * buffer_uuid        = NULL;
+    struct nexus_uuid       * buffer_uuid          = NULL;
+    struct nexus_uuid       * buffer_uuid_internal = NULL;
 
     int err = -1;
 
 
     err = ocall_metadata_get(&buffer_uuid, uuid, NULL, global_backend_ext);
     if (err || buffer_uuid == NULL) {
-        log_error("ocall_metadata_get FAILED\n");
+        log_error("ocall_metadata_get FAILED (err=%d)\n", err);
         return NULL;
     }
 
-    // create the crypto buf and return to the user
-    crypto_buf = nexus_crypto_buf_create(buffer_uuid);
+    // without copying this within the enclave, every ocall using this
+    // pointer will fail pointer checks.
+    buffer_uuid_internal = nexus_uuid_clone(buffer_uuid);
+
+    crypto_buf = nexus_crypto_buf_create(buffer_uuid_internal);
+
+
     if (crypto_buf == NULL) {
+        ocall_buffer_put(buffer_uuid_internal, global_backend_ext);
+        nexus_free(buffer_uuid_internal);
+
         log_error("nexus_crypto_buf_create FAILED\n");
-        goto cleanup;
+        return NULL;
     }
+
+    nexus_free(buffer_uuid_internal);
 
     return crypto_buf;
-cleanup:
-    if (buffer_uuid) {
-        ocall_buffer_put(buffer_uuid, global_backend_ext);
-    }
-
-    return NULL;
 }
 
 int

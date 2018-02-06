@@ -62,6 +62,7 @@ trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 
 nexus_ecall_objs := \
+	dirs.o \
 	volume.o
 
 ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))

@@ -8,16 +8,9 @@
 #pragma once
 #include "sgx_backend_common.h"
 
+#include <nexus_fs.h>
 #include <nexus_uuid.h>
-
 #include <nexus_list.h>
-
-typedef enum {
-    NEXUS_FILE = 1,
-    NEXUS_DIR  = 2,
-    NEXUS_LINK = 3
-} nexus_dirent_type_t;
-
 
 struct nexus_dirnode {
     struct nexus_uuid my_uuid;
@@ -62,3 +55,18 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen);
 
 void
 dirnode_free(struct nexus_dirnode * dirnode);
+
+/**
+ * adds a new directory entry to the dirnode
+ *
+ * @param dirnode
+ * @param filename
+ * @param type
+ * @param entry_uuid will contain the UUID of the new entry
+ * @return 0 on success
+ */
+int
+dirnode_add(struct nexus_dirnode * dirnode,
+            char                 * filename,
+            nexus_dirent_type_t    type,
+            struct nexus_uuid    * entry_uuid);

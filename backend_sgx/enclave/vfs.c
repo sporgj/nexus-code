@@ -102,3 +102,25 @@ nexus_vfs_put_dirnode(struct nexus_dirnode * dirnode)
     // TODO dirnode_list management here
     dirnode_free(dirnode);
 }
+
+// TODO for now, this just loads the root dirnode
+struct nexus_dirnode *
+nexus_vfs_find_dirnode(char * dirpath)
+{
+    struct nexus_dirnode * dirnode = NULL;
+
+    struct nexus_crypto_buf * crypto_buf = NULL;
+
+
+    crypto_buf = metadata_read(&global_supernode->root_uuid, NULL);
+    if (crypto_buf == NULL) {
+        log_error("metadata_read FAILED\n");
+        return NULL;
+    }
+
+    dirnode = nexus_vfs_get_dirnode(crypto_buf);
+
+    nexus_crypto_buf_free(crypto_buf);
+
+    return dirnode;
+}

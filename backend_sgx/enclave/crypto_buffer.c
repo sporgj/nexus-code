@@ -433,7 +433,7 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
         }
     }
 
-    nexus_mac_to_buf(mac, buf_hdr->gcm_hdr.mac);
+    nexus_mac_to_buf(&(crypto_buf->crypto_ctx.mac), buf_hdr->gcm_hdr.mac);
 
 
     /* Finally copy the header out to the external buffer */
@@ -474,7 +474,7 @@ nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
                              global_backend_ext);
 
     if (err || ret) {
-        log_error("ocall_metadata_set FAILED\n");
+        log_error("ocall_metadata_set FAILED (err=%d, ret=%d)\n", err, ret);
         return -1;
     }
 

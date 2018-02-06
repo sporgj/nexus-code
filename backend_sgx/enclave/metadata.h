@@ -12,14 +12,14 @@
 
 
 /**
- * Reads the metadata from untrusted memory and decrypts it into the
- * 
+ * Reads metadata content from untrusted memory and returns a crypto_buffer
+ *
  * @param uuid is the uuid the user wishes to read
  * @param uuid_path
  *
  * @return NULL on failure
  */
-struct raw_buffer *
+struct nexus_crypto_buf *
 metadata_read(struct nexus_uuid       * uuid,
               struct nexus_uuid_path  * uuid_path);
 

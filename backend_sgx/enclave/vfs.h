@@ -18,3 +18,15 @@ nexus_vfs_verfiy_pubkey(struct nexus_hash * user_pubkey_hash);
 
 void
 nexus_vfs_exit();
+
+
+/**
+ * Loads the dirnode from a directory path
+ * @param dirpath
+ * @return dirnode
+ */
+struct nexus_dirnode *
+nexus_vfs_find_dirnode(char * dirpath);
+
+void
+nexus_vfs_put_dirnode(struct nexus_dirnode * dirnode);
