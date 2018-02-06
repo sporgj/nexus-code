@@ -23,6 +23,7 @@ __nxs_fs_create(char                * dirpath_IN,
     if (ret != 0) {
         nexus_vfs_put_dirnode(dirnode);
         log_error("dirnode_add() FAILED\n");
+        return -1;
     }
 
     nexus_uuid_copy(&entry_uuid, uuid_out);

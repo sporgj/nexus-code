@@ -19,6 +19,12 @@ nexus_uuid_gen(struct nexus_uuid * uuid)
     return 0;
 }
 
+int
+nexus_uuid_compare(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid)
+{
+    return memcmp(src_uuid, dst_uuid, sizeof(struct nexus_uuid));
+}
+
 struct nexus_uuid *
 nexus_uuid_clone(struct nexus_uuid * uuid)
 {

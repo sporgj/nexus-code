@@ -70,3 +70,9 @@ dirnode_add(struct nexus_dirnode * dirnode,
             char                 * filename,
             nexus_dirent_type_t    type,
             struct nexus_uuid    * entry_uuid);
+
+int
+dirnode_remove(struct nexus_dirnode * dirnode,
+               char *                 filename,
+               nexus_dirent_type_t    type,
+               struct nexus_uuid *    entry_uuid);

@@ -21,41 +21,45 @@ struct dir_entry_s {
 } __attribute__((packed));
 
 
-
-
 /**
  * Would be called as directory entries are freed
  * @param el
  */
 static void
-dirnode_dir_entry_deallocator(void * el);
+__dir_entry_deallocator(void * el);
 
 // falls in style with the src->dst argument positions in libnexus
-void
+static inline void
 __copy_dir_entry(struct dir_entry_s * src_dir_entry, struct dir_entry_s * dst_dir_entry)
 {
     memcpy(dst_dir_entry, src_dir_entry, src_dir_entry->total_len);
 }
 
-struct dir_entry_s *
-clone_dir_entry(struct dir_entry_s * input_dir_entry)
-{
-    struct dir_entry_s * new_dir_entry = NULL;
-
-    new_dir_entry = nexus_malloc(input_dir_entry->total_len);
-
-    __copy_dir_entry(input_dir_entry, new_dir_entry);
-
-    return new_dir_entry;
-}
-
+/**
+ * Iniitalizes the dirnode dir_entry list
+ */
 static void
 initialize_dirnode_dir_entries(struct nexus_dirnode * dirnode)
 {
     struct nexus_list * dir_entry_list = &dirnode->dir_entry_list;
 
-    list_init(dir_entry_list);
-    list_attributes_deallocator(dir_entry_list, dirnode_dir_entry_deallocator);
+    nexus_list_init(dir_entry_list);
+    nexus_list_set_deallocator(dir_entry_list, __dir_entry_deallocator);
+}
+
+static uint8_t *
+__parse_dir_entry(struct dir_entry_s ** dir_entry, uint8_t * in_buffer)
+{
+    struct dir_entry_s * new_dir_entry = NULL;
+    struct dir_entry_s * tmp_dir_entry = NULL;
+
+    tmp_dir_entry = (struct dir_entry_s *)in_buffer;
+
+    new_dir_entry = nexus_malloc(tmp_dir_entry->total_len);
+
+    __copy_dir_entry(tmp_dir_entry, new_dir_entry);
+
+    return (in_buffer + tmp_dir_entry->total_len);
 }
 
 static uint8_t *
@@ -102,15 +106,10 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
 
     for (size_t i = 0; i < dirnode->dir_entry_count; i++) {
         struct dir_entry_s * new_dir_entry   = NULL;
-        struct dir_entry_s * input_dir_entry = NULL;
 
-        input_dir_entry = (struct dir_entry_s *)input_dir_entry_ptr;
+        input_dir_entry_ptr = __parse_dir_entry(&new_dir_entry, input_dir_entry_ptr);
 
-        new_dir_entry = clone_dir_entry(input_dir_entry);
-
-        list_append(&dirnode->dir_entry_list, new_dir_entry);
-
-        input_dir_entry_ptr += input_dir_entry->total_len;
+        nexus_list_append(&dirnode->dir_entry_list, new_dir_entry);
     }
 
     return dirnode;
@@ -120,6 +119,14 @@ static size_t
 __get_total_size(struct nexus_dirnode * dirnode)
 {
     return sizeof(struct __dirnode_hdr) + dirnode->dir_entry_buflen;
+}
+
+static uint8_t *
+__serialize_dir_entry(struct dir_entry_s * dir_entry, uint8_t * out_buffer)
+{
+    __copy_dir_entry(dir_entry, (struct dir_entry_s *) out_buffer);
+
+    return (out_buffer + dir_entry->total_len);
 }
 
 uint8_t *
@@ -148,31 +155,21 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
         return -1;
     }
 
+    // iterate through the dir entries and write to the buffer
     {
-        struct nexus_list * dir_entry_list = &dirnode->dir_entry_list;
+        struct nexus_list_iterator * iter = NULL;
 
-        int ret = -1;
+        iter = list_iterator_new(&dirnode->dir_entry_list);
 
+        while (list_iterator_is_valid(iter)) {
+            struct dir_entry_s * dir_entry = list_iterator_get(iter);
 
-        ret = list_iterator_start(dir_entry_list); // returns 1 on success
+            output_ptr = __serialize_dir_entry(dir_entry, output_ptr);
 
-        if (ret != 1) {
-            log_error("could not start iterator\n");
-            return -1;
+            list_iterator_next(iter);
         }
 
-        // iterate through the dir entries and write to the buffer
-        while (list_iterator_hasnext(dir_entry_list)) {
-            struct dir_entry_s * dir_entry = list_iterator_next(dir_entry_list);
-
-            size_t size = dir_entry->total_len;
-
-            memcpy(output_ptr, dir_entry, size);
-
-            output_ptr += size;
-        }
-
-        list_iterator_stop(dir_entry_list);
+        list_iterator_free(iter);
     }
 
     return 0;
@@ -259,13 +256,13 @@ out:
 void
 dirnode_free(struct nexus_dirnode * dirnode)
 {
-    list_destroy(&dirnode->dir_entry_list);
+    nexus_list_destroy(&dirnode->dir_entry_list);
     nexus_free(dirnode);
 }
 
 // this will be called on list_destroy, list_remove
 static void
-dirnode_dir_entry_deallocator(void * el)
+__dir_entry_deallocator(void * el)
 {
     struct dir_entry_s * dir_entry = (struct dir_entry_s *)el;
 
@@ -297,8 +294,144 @@ dirnode_add(struct nexus_dirnode * dirnode,
     nexus_uuid_gen(&new_dir_entry->uuid);
     nexus_uuid_copy(&new_dir_entry->uuid, entry_uuid);
 
+
+    nexus_list_append(&dirnode->dir_entry_list, new_dir_entry);
+
     dirnode->dir_entry_count += 1;
     dirnode->dir_entry_buflen += total_len;
+
+    return 0;
+}
+
+static struct nexus_list_iterator *
+__find_by_uuid(struct nexus_dirnode * dirnode, struct nexus_uuid * uuid)
+{
+    struct dir_entry_s * dir_entry = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+    iter = list_iterator_new(&dirnode->dir_entry_list);
+
+    while (list_iterator_is_valid(iter)) {
+        dir_entry = list_iterator_get(iter);
+
+        if (nexus_uuid_compare(&dir_entry->uuid, uuid) == 0) {
+            return iter;
+        }
+
+        list_iterator_next(iter);
+    }
+
+    list_iterator_free(iter);
+
+    return NULL;
+}
+
+int
+dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
+                     struct nexus_uuid    * uuid,
+                     nexus_dirent_type_t  * p_type,
+                     const char          ** p_fname,
+                     size_t               * p_fname_len)
+{
+    struct dir_entry_s * dir_entry = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+    iter = __find_by_uuid(dirnode, uuid);
+
+    if (iter == NULL) {
+        return -1;
+    }
+
+
+    dir_entry = list_iterator_get(iter);
+
+    *p_type      = dir_entry->type;
+    *p_fname     = dir_entry->name;
+    *p_fname_len = dir_entry->name_len;
+
+    list_iterator_free(iter);
+
+    return 0;
+}
+
+static struct nexus_list_iterator *
+__find_by_name(struct nexus_dirnode * dirnode, const char * fname)
+{
+    struct dir_entry_s * dir_entry = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+    iter = list_iterator_new(&dirnode->dir_entry_list);
+
+    while (list_iterator_is_valid(iter)) {
+        dir_entry = list_iterator_get(iter);
+
+        if (strncmp(dir_entry->name, fname, dir_entry->name_len) == 0) {
+            return iter;
+        }
+
+        list_iterator_next(iter);
+    }
+
+    list_iterator_free(iter);
+
+    return NULL;
+}
+
+int
+dirnode_find_by_name(struct nexus_dirnode * dirnode,
+                     char                 * filename,
+                     nexus_dirent_type_t    type,
+                     struct nexus_uuid    * entry_uuid)
+{
+    struct dir_entry_s * dir_entry = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+
+    iter = __find_by_name(dirnode, filename);
+
+    if (iter == NULL) {
+        return -1;
+    }
+
+    dir_entry = list_iterator_get(iter);
+
+    nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
+
+    return 0;
+}
+
+int
+dirnode_remove(struct nexus_dirnode * dirnode,
+               char                 * filename,
+               nexus_dirent_type_t    type,
+               struct nexus_uuid    * entry_uuid)
+{
+    struct dir_entry_s * dir_entry = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+
+    iter = __find_by_name(dirnode, filename);
+
+    if (iter == NULL) {
+        return -1;
+    }
+
+    dir_entry = list_iterator_get(iter);
+
+    // adjust the dirnode
+    dirnode->dir_entry_count  -= 1;
+    dirnode->dir_entry_buflen -= dir_entry->total_len;
+
+    nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
+
+    // remove from the list
+    list_iterator_del(iter);
+    list_iterator_free(iter);
 
     return 0;
 }

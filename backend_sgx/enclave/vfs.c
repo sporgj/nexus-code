@@ -12,7 +12,7 @@ nexus_vfs_init()
 
     vfs_dirnode_list = nexus_malloc(sizeof(struct nexus_list));
 
-    list_init(vfs_dirnode_list);
+    nexus_list_init(vfs_dirnode_list);
 
     vfs_dirnode_list_size = 0;
 
@@ -22,7 +22,7 @@ nexus_vfs_init()
 void
 nexus_vfs_deinit()
 {
-    list_destroy(vfs_dirnode_list);
+    nexus_list_destroy(vfs_dirnode_list);
     nexus_free(vfs_dirnode_list);
 
     if (global_supernode) {
