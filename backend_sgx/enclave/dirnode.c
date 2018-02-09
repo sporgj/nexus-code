@@ -28,23 +28,14 @@ struct dir_entry_s {
 static void
 __dir_entry_deallocator(void * el);
 
+static void
+dirnode_init(struct nexus_dirnode * dirnode);
+
 // falls in style with the src->dst argument positions in libnexus
 static inline void
 __copy_dir_entry(struct dir_entry_s * src_dir_entry, struct dir_entry_s * dst_dir_entry)
 {
     memcpy(dst_dir_entry, src_dir_entry, src_dir_entry->total_len);
-}
-
-/**
- * Iniitalizes the dirnode dir_entry list
- */
-static void
-initialize_dirnode_dir_entries(struct nexus_dirnode * dirnode)
-{
-    struct nexus_list * dir_entry_list = &dirnode->dir_entry_list;
-
-    nexus_list_init(dir_entry_list);
-    nexus_list_set_deallocator(dir_entry_list, __dir_entry_deallocator);
 }
 
 static uint8_t *
@@ -63,7 +54,10 @@ __parse_dir_entry(struct dir_entry_s ** dir_entry, uint8_t * in_buffer)
 }
 
 static uint8_t *
-__parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t buflen)
+__parse_dirnode_header(struct nexus_dirnode * dirnode,
+                       uint8_t              * buffer,
+                       size_t                 buflen,
+                       size_t               * bytes_left)
 {
     struct __dirnode_hdr * header = NULL;
 
@@ -80,6 +74,8 @@ __parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t 
     dirnode->dir_entry_count  = header->dir_entry_count;
     dirnode->dir_entry_buflen = header->dir_entry_buflen;
 
+    *bytes_left = (buflen - sizeof(struct __dirnode_hdr));
+
     return buffer + sizeof(struct __dirnode_hdr);
 }
 
@@ -88,26 +84,41 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
 {
     struct nexus_dirnode  * dirnode    = NULL;
 
-    uint8_t * input_dir_entry_ptr = NULL;
+    size_t bytes_left = 0;
+
+    uint8_t * input_ptr = NULL;
 
 
     dirnode = nexus_malloc(sizeof(struct nexus_dirnode));
 
-    input_dir_entry_ptr = __parse_dirnode_header(dirnode, buffer, buflen);
+    input_ptr = __parse_dirnode_header(dirnode, buffer, buflen, &bytes_left);
 
-    if (input_dir_entry_ptr == NULL) {
+    if (input_ptr == NULL) {
         nexus_free(dirnode);
 
         log_error("__parse_dirnode_header FAILED\n");
         return NULL;
     }
 
-    initialize_dirnode_dir_entries(dirnode);
+    dirnode_init(dirnode);
+
+    {
+        int ret = __nexus_acl_from_buffer(&dirnode->dir_acl, input_ptr, bytes_left);
+
+        if (ret != 0) {
+            dirnode_free(dirnode);
+
+            log_error("__nexus_acl_from_buffer() FAILED\n");
+            return NULL;
+        }
+
+        input_ptr += nexus_acl_size(&dirnode->dir_acl);
+    }
 
     for (size_t i = 0; i < dirnode->dir_entry_count; i++) {
         struct dir_entry_s * new_dir_entry   = NULL;
 
-        input_dir_entry_ptr = __parse_dir_entry(&new_dir_entry, input_dir_entry_ptr);
+        input_ptr = __parse_dir_entry(&new_dir_entry, input_ptr);
 
         nexus_list_append(&dirnode->dir_entry_list, new_dir_entry);
     }
@@ -118,7 +129,8 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
 static size_t
 __get_total_size(struct nexus_dirnode * dirnode)
 {
-    return sizeof(struct __dirnode_hdr) + dirnode->dir_entry_buflen;
+    return sizeof(struct __dirnode_hdr) + dirnode->dir_entry_buflen
+           + nexus_acl_size(&dirnode->dir_acl);
 }
 
 static uint8_t *
@@ -129,7 +141,7 @@ __serialize_dir_entry(struct dir_entry_s * dir_entry, uint8_t * out_buffer)
     return (out_buffer + dir_entry->total_len);
 }
 
-uint8_t *
+static uint8_t *
 __serialize_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer)
 {
     struct __dirnode_hdr * header = (struct __dirnode_hdr *)buffer;
@@ -155,6 +167,19 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
         return -1;
     }
 
+    // serialize the directory ACLS
+    {
+        int ret = nexus_acl_to_buffer(&dirnode->dir_acl, output_ptr);
+
+        if (ret != 0) {
+            log_error("nexus_acl_to_buffer() FAILED\n");
+            return -1;
+        }
+
+        output_ptr += nexus_acl_size(&dirnode->dir_acl);
+    }
+
+
     // iterate through the dir entries and write to the buffer
     {
         struct nexus_list_iterator * iter = NULL;
@@ -176,6 +201,17 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
 }
 
 
+static void
+dirnode_init(struct nexus_dirnode * dirnode)
+{
+    struct nexus_list * dir_entry_list = &dirnode->dir_entry_list;
+
+    nexus_list_init(dir_entry_list);
+    nexus_list_set_deallocator(dir_entry_list, __dir_entry_deallocator);
+
+    nexus_acl_init(&dirnode->dir_acl);
+}
+
 struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid)
 {
@@ -186,7 +222,7 @@ dirnode_create(struct nexus_uuid * root_uuid)
     nexus_uuid_gen(&dirnode->my_uuid);
     nexus_uuid_copy(root_uuid, &dirnode->root_uuid);
 
-    initialize_dirnode_dir_entries(dirnode);
+    dirnode_init(dirnode);
 
     return dirnode;
 }

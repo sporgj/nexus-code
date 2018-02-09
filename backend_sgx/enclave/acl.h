@@ -38,6 +38,9 @@ struct nexus_acl_entry {
 struct nexus_acl *
 nexus_acl_from_buffer(uint8_t * buffer, size_t buflen);
 
+int
+__nexus_acl_from_buffer(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t buflen);
+
 /**
  * Serializes the ACL unto a buffer
  * @param nexus_acl

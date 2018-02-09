@@ -49,5 +49,7 @@ extern struct nexus_key * global_volumekey;
 
 extern struct supernode * global_supernode;
 
+extern nexus_uid_t        global_user_id;
+
 // pointer to the backend info. Used in ocalls;
 void * global_backend_ext;

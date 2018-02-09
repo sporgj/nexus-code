@@ -8,6 +8,8 @@
 #pragma once
 #include "sgx_backend_common.h"
 
+#include "acl.h"
+
 #include <nexus_fs.h>
 #include <nexus_uuid.h>
 #include <nexus_list.h>
@@ -18,6 +20,8 @@ struct nexus_dirnode {
 
     uint32_t dir_entry_count;
     uint32_t dir_entry_buflen;
+
+    struct nexus_acl dir_acl;
 
     struct nexus_list dir_entry_list;
 };

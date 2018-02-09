@@ -5,7 +5,7 @@
 /**
  * this will be serialized unto a buffer
  */
-struct nexus_acl_header {
+struct __acl_header {
     uint16_t version;
 
     uint32_t count;
@@ -43,35 +43,35 @@ __serialize_acl_entry(struct nexus_acl_entry * acl_entry, uint8_t * out_buffer)
 }
 
 static uint8_t *
-__parse_acl_header(uint8_t * buffer, size_t buflen, size_t * count)
+__parse_acl_header(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t buflen)
 {
-    struct nexus_acl_header * header = NULL;
+    struct __acl_header * header = NULL;
 
-    if (buflen < sizeof(struct nexus_acl_header)) {
+    if (buflen < sizeof(struct __acl_header)) {
         log_error("the acl buffer is too small\n");
         return NULL;
     }
 
-    header = (struct nexus_acl_header *)buffer;
+    header = (struct __acl_header *)buffer;
 
-    *count = header->count;
+    nexus_acl->count = header->count;
 
-    return buffer + sizeof(struct nexus_acl_header);
+    return buffer + sizeof(struct __acl_header);
 }
 
 static uint8_t *
 __serialize_acl_header(struct nexus_acl * nexus_acl, uint8_t * buffer)
 {
-    struct nexus_acl_header header;
+    struct __acl_header header;
 
-    memset(&header, 0, sizeof(struct nexus_acl_header));
+    memset(&header, 0, sizeof(struct __acl_header));
 
     header.version = NEXUS_ACL_VERSION;
     header.count   = nexus_acl->count;
 
-    memcpy(buffer, &header, sizeof(struct nexus_acl_header));
+    memcpy(buffer, &header, sizeof(struct __acl_header));
 
-    return buffer + sizeof(struct nexus_acl_header);
+    return buffer + sizeof(struct __acl_header);
 }
 
 struct nexus_acl *
@@ -79,22 +79,37 @@ nexus_acl_from_buffer(uint8_t * buffer, size_t buflen)
 {
     struct nexus_acl * nexus_acl = NULL;
 
-    uint8_t * input_ptr = NULL;
+    int ret = -1;
 
-    size_t count = 0;
-
-
-    input_ptr = __parse_acl_header(buffer, buflen, &count);
-    if (input_ptr == NULL) {
-        log_error("could not parse ACL header\n");
-        return NULL;
-    }
 
     nexus_acl = nexus_malloc(sizeof(struct nexus_acl));
 
+    ret = __nexus_acl_from_buffer(nexus_acl, buffer, buflen);
+
+    if (ret != 0) {
+        nexus_free(nexus_acl);
+        return NULL;
+    }
+
+    return nexus_acl;
+}
+
+int
+__nexus_acl_from_buffer(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t buflen)
+{
+    uint8_t * input_ptr = NULL;
+
+
     nexus_acl_init(nexus_acl);
 
-    for (size_t i = 0; i < count; i++) {
+    input_ptr = __parse_acl_header(nexus_acl, buffer, buflen);
+
+    if (input_ptr == NULL) {
+        log_error("could not parse ACL header\n");
+        return -1;
+    }
+
+    for (size_t i = 0; i < nexus_acl->count; i++) {
         struct nexus_acl_entry * acl_entry = NULL;
 
         input_ptr = __parse_acl_entry(&acl_entry, input_ptr);
@@ -102,9 +117,7 @@ nexus_acl_from_buffer(uint8_t * buffer, size_t buflen)
         nexus_list_append(&nexus_acl->acls, acl_entry);
     }
 
-    nexus_acl->count = count;
-
-    return nexus_acl;
+    return 0;
 }
 
 int
@@ -165,7 +178,7 @@ nexus_acl_free(struct nexus_acl * nexus_acl)
 size_t
 nexus_acl_size(struct nexus_acl * nexus_acl)
 {
-    return sizeof(struct nexus_acl_header) + (nexus_acl->count * sizeof(struct nexus_acl_entry));
+    return sizeof(struct __acl_header) + (nexus_acl->count * sizeof(struct nexus_acl_entry));
 }
 
 bool
