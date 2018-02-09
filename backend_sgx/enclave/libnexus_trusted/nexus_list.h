@@ -6,6 +6,8 @@
  *
  * This is free software. You are permitted to use, redistribute, and modify it.
  */
+#pragma once
+
 #include <stdint.h>
 #include <stdbool.h>
 

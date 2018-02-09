@@ -24,6 +24,7 @@
 #include "sealed_buffer.h"
 #include "raw_buffer.h"
 
+#include "acl.h"
 #include "vfs.h"
 #include "volumekey.h"
 #include "crypto.h"
@@ -38,6 +39,7 @@
 #include "nexus_uuid.h"
 #include "nexus_util.h"
 #include "nexus_key.h"
+#include "nexus_list.h"
 
 #define ocall_debug(str) \
     ocall_print("enclave> " str "\n")
