@@ -177,7 +177,7 @@ err:
 
 int
 ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
-                              struct nexus_uuid * signature_bufuuid_in,
+                              uint8_t           * signature_buffer_in,
                               size_t              signature_len)
 {
     struct nexus_crypto_buf * supernode_crypto_buf = NULL;
@@ -205,7 +205,7 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
         ret = -1;
 
 
-        signature_raw_buf = nexus_raw_buf_create(signature_bufuuid_in);
+        signature_raw_buf = nexus_raw_buf_create(signature_buffer_in, signature_len);
 
         // use the signature buffer loaded in the raw_buf
         signature_buffer = nexus_raw_buf_get(signature_raw_buf, &signature_buflen);

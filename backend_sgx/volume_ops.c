@@ -320,23 +320,9 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     // generate the response
     {
-        uint8_t * signature_buffer = NULL;
+        uint8_t signature_buffer[MBEDTLS_MPI_MAX_SIZE] = { 0 };
 
         ret = -1;
-
-
-        signature_bufuuid = nexus_malloc(sizeof(struct nexus_uuid));
-
-        // allocate the signature buffer
-        signature_buffer  = buffer_manager_alloc(sgx_backend->buf_manager,
-                                                 MBEDTLS_MPI_MAX_SIZE,
-                                                 signature_bufuuid);
-
-        if (signature_buffer == NULL) {
-            nexus_free(signature_bufuuid);
-            log_error("could not allocate the signature buffer\n");
-            goto out;
-        }
 
 
         supernode_bufuuid = __sign_response(sgx_backend,
@@ -358,7 +344,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         err = ecall_authentication_response(sgx_backend->enclave_id,
                                             &ret,
                                             supernode_bufuuid,
-                                            signature_bufuuid,
+                                            signature_buffer,
                                             signature_len);
 
         if (err || ret) {

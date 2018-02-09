@@ -23,6 +23,6 @@ nexus_malloc(size_t size)
     if (ptr == NULL) {
 	abort();
     }
-    
+
     return ptr;
 }

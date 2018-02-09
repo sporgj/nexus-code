@@ -72,6 +72,7 @@ objs := nexus_enclave_t.o \
 	$(trusted_objs) \
 	$(ecall_objs) \
 	buffer_layer.o \
+	data_buffer.o \
 	crypto_buffer.o \
 	sealed_buffer.o \
 	raw_buffer.o \

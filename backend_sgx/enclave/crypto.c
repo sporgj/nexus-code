@@ -137,6 +137,14 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 {
     struct nexus_key * iv_copy = NULL;
 
+    mbedtls_gcm_context gcm_context;
+
+    uint8_t input_buffer[CRYPTO_BUFFER_SIZE]  = { 0 }; // XXX: is zeroing really necessary?
+    uint8_t output_buffer[CRYPTO_BUFFER_SIZE] = { 0 };
+
+    int bytes_left = 0;
+    int size       = 0;
+
     int ret = -1;
 
 
@@ -144,45 +152,50 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
 
     // intiialize the gcm context and perform the encryption
-    {
-        mbedtls_gcm_context gcm_context;
+    mbedtls_gcm_init(&gcm_context);
 
-        mbedtls_gcm_init(&gcm_context);
+    mbedtls_gcm_setkey(&gcm_context,
+                       MBEDTLS_CIPHER_ID_AES,
+                       crypto_context->key.key,
+                       nexus_key_bits(&(crypto_context->key)));
 
-        mbedtls_gcm_setkey(&gcm_context,
-                           MBEDTLS_CIPHER_ID_AES,
-                           crypto_context->key.key,
-                           nexus_key_bits(&(crypto_context->key)));
-
-        mbedtls_gcm_starts(&gcm_context,
-                           MBEDTLS_GCM_ENCRYPT,
-                           iv_copy->key,
-                           nexus_key_bytes(iv_copy),
-                           (uint8_t *) aad, // AAD used for integrity
-                           aad_len);
+    mbedtls_gcm_starts(&gcm_context,
+                       MBEDTLS_GCM_ENCRYPT,
+                       iv_copy->key,
+                       nexus_key_bytes(iv_copy),
+                       (uint8_t *) aad, // AAD used for integrity
+                       aad_len);
 
 
-        ret = mbedtls_gcm_update(&gcm_context, input_len, plaintext, ciphertext);
-        if (ret) {
-            mbedtls_gcm_free(&gcm_context);
+    bytes_left = input_len;
+
+    while (bytes_left > 0) {
+        size = min(bytes_left, CRYPTO_BUFFER_SIZE);
+
+        memcpy(input_buffer, plaintext, size);
+
+        ret = mbedtls_gcm_update(&gcm_context, size, input_buffer, output_buffer);
+        if (ret != 0) {
+            log_error("mbedtls_gcm_update() FAILED\n");
             goto out;
         }
 
+        memcpy(ciphertext, output_buffer, size);
 
-        mbedtls_gcm_finish(&gcm_context,
-                           (uint8_t *)&(crypto_context->mac),
-                           sizeof(struct nexus_mac));
-
-        mbedtls_gcm_free(&gcm_context);
+        bytes_left -= size;
     }
 
+    mbedtls_gcm_finish(&gcm_context, (uint8_t *)&(crypto_context->mac), sizeof(struct nexus_mac));
+
     // if the mac is needed
-    if (mac) {
+    if (mac != NULL) {
         nexus_mac_copy(&(crypto_context->mac), mac);
     }
 
     ret = 0;
 out:
+    mbedtls_gcm_free(&gcm_context);
+
     if (iv_copy) {
         nexus_free_key(iv_copy);
         nexus_free(iv_copy);
@@ -203,7 +216,15 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 {
     struct nexus_key * iv_copy = NULL;
 
+    mbedtls_gcm_context gcm_context;
+
+    uint8_t input_buffer[CRYPTO_BUFFER_SIZE]  = { 0 }; // XXX: is zeroing really necessary?
+    uint8_t output_buffer[CRYPTO_BUFFER_SIZE] = { 0 };
+
     struct nexus_mac computed_mac;
+
+    int bytes_left = 0;
+    int size       = 0;
 
     int ret = -1;
 
@@ -211,48 +232,53 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
     iv_copy = nexus_clone_key(&(crypto_context->iv));
 
     // intiialize the gcm context and perform the encryption
-    {
-        mbedtls_gcm_context gcm_context;
+    mbedtls_gcm_init(&gcm_context);
 
-        mbedtls_gcm_init(&gcm_context);
+    mbedtls_gcm_setkey(&gcm_context,
+                       MBEDTLS_CIPHER_ID_AES,
+                       crypto_context->key.key,
+                       nexus_key_bits(&(crypto_context->key)));
 
-        mbedtls_gcm_setkey(&gcm_context,
-                           MBEDTLS_CIPHER_ID_AES,
-                           crypto_context->key.key,
-                           nexus_key_bits(&(crypto_context->key)));
+    mbedtls_gcm_starts(&gcm_context,
+                       MBEDTLS_GCM_DECRYPT,
+                       iv_copy->key,
+                       nexus_key_bytes(iv_copy),
+                       (uint8_t *) aad, // AAD used for integrity
+                       aad_len);
 
-        mbedtls_gcm_starts(&gcm_context,
-                           MBEDTLS_GCM_DECRYPT,
-                           iv_copy->key,
-                           nexus_key_bytes(iv_copy),
-                           (uint8_t *) aad, // AAD used for integrity
-                           aad_len);
+    while (bytes_left > 0) {
+        size = min(bytes_left, CRYPTO_BUFFER_SIZE);
+
+        memcpy(input_buffer, ciphertext, size);
 
 
-        ret = mbedtls_gcm_update(&gcm_context, input_len, ciphertext, plaintext);
-        if (ret) {
-            mbedtls_gcm_free(&gcm_context);
+        ret = mbedtls_gcm_update(&gcm_context, size, input_buffer, output_buffer);
+        if (ret != 0) {
+            log_error("mbedtls_gcm_update FAILED\n");
             goto out;
         }
 
-        mbedtls_gcm_finish(&gcm_context,
-                           (uint8_t *)&computed_mac,
-                           sizeof(struct nexus_mac));
+        memcpy(plaintext, output_buffer, size);
 
-        mbedtls_gcm_free(&gcm_context);
+        bytes_left -= size;
     }
 
+    mbedtls_gcm_finish(&gcm_context, (uint8_t *)&computed_mac, sizeof(struct nexus_mac));
+
     if (nexus_mac_compare(&computed_mac, &(crypto_context->mac)) != 0) {
+        log_error("nexus_mac_compare() FAILED\n");
         ret = -1;
         goto out;
     }
 
-    if (mac) {
+    if (mac != NULL) {
         nexus_mac_copy(&computed_mac, mac);
     }
 
     ret = 0;
 out:
+    mbedtls_gcm_free(&gcm_context);
+
     if (iv_copy) {
         nexus_free_key(iv_copy);
         nexus_free(iv_copy);

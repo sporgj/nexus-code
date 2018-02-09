@@ -28,3 +28,10 @@ nexus_crypto_ctx_free(struct nexus_crypto_ctx * crypto_ctx)
         nexus_free_key(&(crypto_ctx->iv));
     }
 }
+
+void
+nexus_crypto_ctx_copy(struct nexus_crypto_ctx * src_crypto_ctx,
+                      struct nexus_crypto_ctx * dst_crypto_ctx)
+{
+    memcpy(dst_crypto_ctx, src_crypto_ctx, sizeof(struct nexus_crypto_ctx));
+}

@@ -39,8 +39,8 @@ enclave {
 
         public int ecall_authentication_response
         (
-            [in] struct nexus_uuid * supernode_bufuuid_in,
-            [in] struct nexus_uuid * signature_bufuuid_in,
+            [in] struct nexus_uuid * supernode_buffer_in,
+            [user_check]   uint8_t * signature_buffer_in,
                             size_t   signature_len
         );
 

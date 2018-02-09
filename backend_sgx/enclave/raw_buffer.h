@@ -11,15 +11,7 @@ struct nexus_raw_buf;
  * @return a sealed_buffer
  */
 struct nexus_raw_buf *
-nexus_raw_buf_create(struct nexus_uuid * uuid);
-
-/**
- * Allocates new raw_buf of specified size
- * @param size
- * @return raw_buffer
- */
-struct nexus_raw_buf *
-nexus_raw_buf_new(size_t size);
+nexus_raw_buf_create(uint8_t * external_addr, size_t external_size);
 
 /**
  * Frees raw_buf with its allocated resources
@@ -33,10 +25,3 @@ nexus_raw_buf_free(struct nexus_raw_buf * raw_buf);
  */
 uint8_t *
 nexus_raw_buf_get(struct nexus_raw_buf * raw_buf, size_t * buffer_size);
-
-/**
- * Copies data into untrusted memory
- * @param trusted_buffer
- */
-int
-nexus_raw_buf_put(struct nexus_raw_buf * raw_buf);

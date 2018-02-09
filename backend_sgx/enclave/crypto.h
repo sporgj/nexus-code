@@ -8,7 +8,7 @@
 
 #include "crypto_context.h"
 
-
+#define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
 
 uint8_t *
 crypto_aes_ecb_encrypt(struct nexus_key * key,
