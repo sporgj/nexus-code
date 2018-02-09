@@ -120,6 +120,10 @@ static inline void list_splice(struct list_head *add, struct list_head *head)
 #define list_first_entry(ptr, type, member) \
 	list_entry((ptr)->next, type, member)
 
+/* Get last entry from a list. */
+#define list_last_entry(ptr, type, member) \
+	list_entry((ptr)->prev, type, member)
+
 /* Iterate forward over the elements of the list. */
 #define list_for_each(pos, head) \
 	for (pos = (head)->next; pos != (head); pos = pos->next)

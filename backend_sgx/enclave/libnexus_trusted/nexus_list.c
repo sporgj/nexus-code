@@ -47,27 +47,49 @@ nexus_list_destroy(struct nexus_list * list)
 
 void *
 nexus_list_get(struct nexus_list * list, size_t pos) {
-    struct list_head * curr = NULL;
+    struct list_head * head = &list->list;
+    struct list_head * curr = &head->next;
+    struct list_node * node = NULL;
 
-    size_t i = 0;
+    if (list_empty(head)) {
+        return NULL;
+    }
 
-    list_for_each(curr, &list->list)
-    {
-        if (i == pos) {
-            break;
+    for (size_t i = 0; i < pos; i++) {
+        if (curr == head) {
+            return NULL;
         }
 
-        i++;
+        curr = curr->next;
     }
 
-    // if we are not at the end of the list
-    if (curr != &list->list) {
-        struct list_node * node = list_entry(curr, struct list_node, node);
+    node = list_entry(curr, struct list_node, node);
 
-        return node->data;
+    return node->data;
+}
+
+void *
+nexus_list_pop(struct nexus_list * list)
+{
+    void * result = NULL;
+
+    struct list_node * last_node = NULL;
+
+    struct list_head * list_head = &list->list;
+
+    if (list_empty(list_head)) {
+        return NULL;
     }
 
-    return NULL;
+
+    last_node = list_last_entry(list_head, struct list_node, node);
+    list_del(&last_node->node);
+
+    result = last_node->data;
+
+    nexus_free(last_node);
+
+    return result;
 }
 
 void

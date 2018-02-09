@@ -49,6 +49,16 @@ void *
 nexus_list_get(struct nexus_list * list, size_t pos);
 
 /**
+ * Removes the last element from list and returns to caller. It is the caller's responsibility
+ * to free the returned element.
+ *
+ * @param list
+ * @return element, NULL if is empty
+ */
+void *
+nexus_list_pop(struct nexus_list * list);
+
+/**
  * Sets the deallocator function of the list. Called whenever an element is removed
  * @param list
  * @param deallocator

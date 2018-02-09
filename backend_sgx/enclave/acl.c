@@ -9,7 +9,7 @@ struct __acl_header {
     uint16_t version;
 
     uint32_t count;
-};
+} __attribute__((packed));
 
 static void
 init_nexus_acl_list(struct nexus_acl * nexus_acl);
