@@ -10,9 +10,11 @@
 #include "crypto.h"
 #include "crypto_buffer.h"
 
-#include "nexus_uuid.h"
-#include "nexus_key.h"
-#include "nexus_hash.h"
+#include <nexus_uuid.h>
+#include <nexus_key.h>
+#include <nexus_hash.h>
+
+#include "user.h"
 
 #include "sgx_backend_common.h"
 

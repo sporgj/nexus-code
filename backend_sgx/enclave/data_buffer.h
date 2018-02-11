@@ -7,13 +7,15 @@
 struct data_buffer;
 
 /**
- * Creates a new data_buffer from an external address
+ * Creates a new data_buffer from an external address. A data buffer can only encrypt a
+ * chunk at a time.
+ *
  * @param external_addr
- * @param external_size
- * @return nexus_data_buffer
+ * @param chunk_offset
+ * @return chunk_size
  */
 struct nexus_data_buffer *
-nexus_data_buffer_create(uint8_t * external_addr, size_t external_size);
+nexus_data_buffer_create(uint8_t * external_addr, size_t chunk_offset, size_t chunk_size);
 
 /**
  * Encrypts the data buffer in external memory

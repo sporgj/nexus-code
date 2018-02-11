@@ -3,9 +3,16 @@
 struct nexus_data_buffer {
     size_t    external_size;
 
+    size_t    curr_offset;
+
+    size_t    chunk_size;
+
     uint8_t * external_addr;
+
+    mbedtls_aes_context aes_context;
 };
 
+/*
 struct nexus_data_buffer *
 nexus_data_buffer_create(uint8_t * external_addr, size_t external_size)
 {
@@ -17,6 +24,31 @@ nexus_data_buffer_create(uint8_t * external_addr, size_t external_size)
     data_buffer->external_size = external_size;
 
     return data_buffer;
+}
+*/
+
+struct nexus_data_buffer *
+nexus_data_buffer_create(uint8_t * external_addr, size_t chunk_offset, size_t chunk_size)
+{
+    struct nexus_data_buffer * data_buffer = NULL;
+
+    data_buffer = nexus_malloc(sizeof(struct nexus_data_buffer));
+
+    data_buffer->curr_offset   = curr_offset;
+    data_buffer->chunk_size    = chunk_size;
+    data_buffer->external_addr = external_addr;
+
+    mbedtls_aes_init(&data_buffer->aes_context);
+
+    return data_buffer;
+}
+
+int
+nexus_data_buffer_update(struct nexus_data_buffer * data_buffer,
+                         size_t                     buflen,
+                         size_t                   * left_over)
+{
+
 }
 
 int

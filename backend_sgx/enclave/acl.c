@@ -74,26 +74,6 @@ __serialize_acl_header(struct nexus_acl * nexus_acl, uint8_t * buffer)
     return buffer + sizeof(struct __acl_header);
 }
 
-struct nexus_acl *
-nexus_acl_from_buffer(uint8_t * buffer, size_t buflen)
-{
-    struct nexus_acl * nexus_acl = NULL;
-
-    int ret = -1;
-
-
-    nexus_acl = nexus_malloc(sizeof(struct nexus_acl));
-
-    ret = __nexus_acl_from_buffer(nexus_acl, buffer, buflen);
-
-    if (ret != 0) {
-        nexus_free(nexus_acl);
-        return NULL;
-    }
-
-    return nexus_acl;
-}
-
 int
 __nexus_acl_from_buffer(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t buflen)
 {

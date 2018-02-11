@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "user.h"
+
 #include <nexus_list.h>
 
 struct nexus_acl {
@@ -19,8 +21,6 @@ typedef enum {
     NEXUS_PERM_ADMIN  = 0x0020
 } nexus_perm_t;
 
-typedef uint32_t nexus_uid_t;
-
 /**
  * an ACL entry associates a user id to a permission
  */
@@ -28,15 +28,6 @@ struct nexus_acl_entry {
     nexus_perm_t perm;
     nexus_uid_t  uid;
 };
-
-/**
- * Parses a buffer containing ACL entries
- * @param buffer
- * @param buflen
- * @return nexus_acl
- */
-struct nexus_acl *
-nexus_acl_from_buffer(uint8_t * buffer, size_t buflen);
 
 int
 __nexus_acl_from_buffer(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t buflen);
@@ -58,7 +49,7 @@ void
 nexus_acl_init(struct nexus_acl * nexus_acl);
 
 /**
- * Frees resources allocated in the ACL
+ * Frees resources allocated in the ACL. Calls free(nexus_acl)
  * @param nexus_acl
  */
 void
