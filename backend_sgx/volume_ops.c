@@ -274,8 +274,8 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     struct nexus_uuid  * supernode_bufuuid = NULL;
 
-    struct nexus_uuid  * signature_bufuuid = { 0 };
-    size_t               signature_len     = 0;
+    uint8_t signature_buffer[MBEDTLS_MPI_MAX_SIZE] = { 0 };
+    size_t  signature_len                          = 0;
 
     struct nonce_challenge nonce;
 
@@ -320,8 +320,6 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     // generate the response
     {
-        uint8_t signature_buffer[MBEDTLS_MPI_MAX_SIZE] = { 0 };
-
         ret = -1;
 
 
@@ -365,11 +363,6 @@ out:
     if (volkey_bufuuid) {
         buffer_manager_put(sgx_backend->buf_manager, volkey_bufuuid);
         nexus_free(volkey_bufuuid);
-    }
-
-    if (signature_bufuuid) {
-        buffer_manager_put(sgx_backend->buf_manager, signature_bufuuid);
-        nexus_free(signature_bufuuid);
     }
 
     if (supernode_bufuuid) {

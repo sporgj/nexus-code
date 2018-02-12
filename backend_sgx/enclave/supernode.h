@@ -19,7 +19,7 @@
 #include "sgx_backend_common.h"
 
 
-struct supernode {
+struct nexus_supernode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 
@@ -36,7 +36,7 @@ struct supernode {
  * @param crypto_buffer
  * @return NULL on failure
  */
-struct supernode *
+struct nexus_supernode *
 supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer);
 
 /**
@@ -44,7 +44,7 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer);
  * @param uuid
  * @return supernode
  */
-struct supernode *
+struct nexus_supernode *
 supernode_load(struct nexus_uuid * uuid);
 
 /**
@@ -53,7 +53,7 @@ supernode_load(struct nexus_uuid * uuid);
  * @param volumekey
  * @return NULL on failure
  */
-struct supernode *
+struct nexus_supernode *
 supernode_create(char * user_pubkey);
 
 /**
@@ -62,9 +62,7 @@ supernode_create(char * user_pubkey);
  * @return 0 on success
  */
 int
-supernode_store(struct supernode       * supernode,
-                struct nexus_uuid_path * uuid_path,
-                struct nexus_mac       * mac);
+supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac);
 
 void
-supernode_free(struct supernode * supernode);
+supernode_free(struct nexus_supernode * supernode);

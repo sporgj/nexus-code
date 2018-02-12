@@ -58,6 +58,12 @@ nexus_usertable_buflen(struct nexus_usertable * usertable)
     return sizeof(struct __table_hdr) + (usertable->user_count * sizeof(struct __user));
 }
 
+void
+nexus_usertable_copy_uuid(struct nexus_usertable * usertable, struct nexus_uuid * dest_uuid)
+{
+    nexus_uuid_copy(&usertable->my_uuid, dest_uuid);
+}
+
 struct nexus_usertable *
 nexus_usertable_create(char * user_pubkey)
 {
@@ -159,14 +165,10 @@ __parse_usertable(struct nexus_usertable * usertable, uint8_t * buffer, size_t b
 {
     uint8_t * input_ptr = NULL;
 
-    usertable = nexus_malloc(sizeof(struct nexus_usertable));
-
     /// parse the buffers here
     input_ptr = __parse_usertable_header(usertable, buffer, buflen);
 
     if (input_ptr == NULL) {
-        nexus_free(usertable);
-
         log_error("parsing the header failed\n");
         return -1;
     }
@@ -206,7 +208,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, mac);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
@@ -215,6 +217,8 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
         return NULL;
     }
 
+
+    usertable = nexus_malloc(sizeof(struct nexus_usertable));
 
     ret = __parse_usertable(usertable, buffer, buflen);
 
@@ -347,13 +351,97 @@ out:
 struct nexus_user *
 nexus_usertable_find_name(struct nexus_usertable * usertable, char * name)
 {
-    // TODO
+    struct nexus_list_iterator * iter = NULL;
+
+    iter = list_iterator_new(&usertable->userlist);
+
+    while (list_iterator_is_valid(iter)) {
+        struct nexus_user * user = list_iterator_get(iter);
+
+        if (strncmp(user->name, name, NEXUS_MAX_NAMELEN) == 0) {
+            list_iterator_free(iter);
+            return user;
+        }
+
+        list_iterator_next(iter);
+    }
+
+    list_iterator_free(iter);
+
     return NULL;
 }
 
 struct nexus_user *
-nexus_usertable_find_pubkey(struct nexus_usertable * usertable, pubkey_hash_t * pubkey)
+nexus_usertable_find_pubkey(struct nexus_usertable * usertable, pubkey_hash_t * pubkey_hash)
 {
-    // TODO
+    struct nexus_list_iterator * iter = NULL;
+
+    // let's see if it matches the owner
+    if (nexus_hash_compare(&usertable->owner.pubkey_hash, pubkey_hash) == 0) {
+        return &usertable->owner;
+    }
+
+    iter = list_iterator_new(&usertable->userlist);
+
+    while (list_iterator_is_valid(iter)) {
+        struct nexus_user * user = list_iterator_get(iter);
+
+        if (nexus_hash_compare(&user->pubkey_hash, pubkey_hash) == 0) {
+            list_iterator_free(iter);
+            return user;
+        }
+
+        list_iterator_next(iter);
+    }
+
+    list_iterator_free(iter);
+
     return NULL;
+}
+
+int
+nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str)
+{
+    struct nexus_user * new_user = NULL;
+
+    struct nexus_list * userlist = &usertable->userlist;
+
+    pubkey_hash_t pubkey_hash;
+
+
+    nexus_hash_generate(&pubkey_hash, pubkey_str, strlen(pubkey_str));
+
+    // check if anyone has the same name or public key
+    {
+        struct nexus_user * existing_user = NULL;
+
+        existing_user = nexus_usertable_find_name(usertable, name);
+
+        if (existing_user != NULL) {
+            log_error("user '%s' already in database\n", name);
+            return -1;
+        }
+
+
+        existing_user = nexus_usertable_find_pubkey(usertable, &pubkey_hash);
+
+        if (existing_user != NULL) {
+            log_error("user already with specified public key already in database\n");
+            return -1;
+        }
+    }
+
+    usertable->auto_increment += 1;
+    usertable->user_count     += 1;
+
+    new_user = nexus_malloc(sizeof(struct nexus_user));
+
+    new_user->user_id = usertable->auto_increment;
+    new_user->name = strndup(name, NEXUS_MAX_NAMELEN);
+
+    nexus_hash_copy(&pubkey_hash, &new_user->pubkey_hash);
+
+    nexus_list_append(userlist, new_user);
+
+    return 0;
 }

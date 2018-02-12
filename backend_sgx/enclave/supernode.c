@@ -10,7 +10,7 @@ struct __supernode_hdr {
 
 
 int
-__parse_supernode(struct supernode * supernode, uint8_t * buffer, size_t buflen)
+__parse_supernode(struct nexus_supernode * supernode, uint8_t * buffer, size_t buflen)
 {
     struct __supernode_hdr * header = (struct __supernode_hdr *)buffer;
 
@@ -29,7 +29,7 @@ __parse_supernode(struct supernode * supernode, uint8_t * buffer, size_t buflen)
 }
 
 int
-__serialize_supernode(struct supernode * supernode, uint8_t * buffer)
+__serialize_supernode(struct nexus_supernode * supernode, uint8_t * buffer)
 {
     struct __supernode_hdr * header = (struct __supernode_hdr *)buffer;
 
@@ -43,15 +43,15 @@ __serialize_supernode(struct supernode * supernode, uint8_t * buffer)
 }
 
 static size_t
-__supernode_buflen(struct supernode * supernode)
+__supernode_buflen(struct nexus_supernode * supernode)
 {
     return sizeof(struct __supernode_hdr);
 }
 
-struct supernode *
+struct nexus_supernode *
 supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
 {
-    struct supernode * supernode = NULL;
+    struct nexus_supernode * supernode = NULL;
 
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
@@ -67,7 +67,7 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
     }
 
 
-    supernode = nexus_malloc(sizeof(supernode));
+    supernode = nexus_malloc(sizeof(struct nexus_supernode));
 
     ret = __parse_supernode(supernode, buffer, buflen);
 
@@ -78,13 +78,36 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
         return NULL;
     }
 
+    // get the usertable
+    {
+        struct nexus_mac usertable_mac;
+
+        supernode->usertable = nexus_usertable_load(&supernode->usertable_uuid, &usertable_mac);
+
+        if (supernode->usertable == NULL) {
+            log_error("could not load usertable\n");
+            goto err;
+        }
+
+        if (nexus_mac_compare(&usertable_mac, &supernode->usertable_mac)) {
+            log_error("the version of the usertable does not match\n");
+            goto err;
+        }
+    }
+
     return supernode;
+err:
+    if (supernode) {
+        supernode_free(supernode);
+    }
+
+    return NULL;
 }
 
-struct supernode *
+struct nexus_supernode *
 supernode_load(struct nexus_uuid * uuid)
 {
-    struct supernode * supernode = NULL;
+    struct nexus_supernode * supernode = NULL;
 
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -100,15 +123,20 @@ supernode_load(struct nexus_uuid * uuid)
 
     nexus_crypto_buf_free(crypto_buffer);
 
+    if (supernode == NULL) {
+        log_error("parsing the supernode failed\n");
+        return NULL;
+    }
+
     return supernode;
 }
 
-static struct supernode *
-supernode_new(char * user_pubkey)
+struct nexus_supernode *
+supernode_create(char * user_pubkey)
 {
-    struct supernode * supernode = NULL;
+    struct nexus_supernode * supernode = NULL;
 
-    supernode = nexus_malloc(sizeof(struct supernode));
+    supernode = nexus_malloc(sizeof(struct nexus_supernode));
 
     nexus_uuid_gen(&supernode->my_uuid);
     nexus_uuid_gen(&supernode->root_uuid);
@@ -121,85 +149,29 @@ supernode_new(char * user_pubkey)
         return NULL;
     }
 
-    return supernode;
-}
-
-struct supernode *
-supernode_create(char * user_pubkey)
-{
-    struct supernode * supernode = NULL;
-
-    int ret = -1;
-
-
-    supernode = supernode_new(user_pubkey);
-    if (supernode == NULL) {
-        return NULL;
-    }
-
-    // user table
-#if 0
-    {
-        struct volume_usertable * usertable = NULL;
-
-        usertable = volume_usertable_create(&supernode->user_list_uuid);
-        if (usertable == NULL) {
-            goto out;
-        }
-
-        ret = volume_usertable_store(usertable, &supernode->user_list_mac);
-
-        volume_usertable_free(usertable);
-
-        if (ret != 0) {
-            ocall_debug("volume_usertable_store FAILED");
-            goto out;
-        }
-    }
-#endif
-
-    // dirnode
-    {
-        struct nexus_dirnode * root_dirnode = dirnode_create(&supernode->root_uuid);
-        if (root_dirnode == NULL) {
-            ret = -1;
-            goto out;
-        }
-
-        nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
-
-        ret = dirnode_store(root_dirnode, NULL, NULL);
-
-        dirnode_free(root_dirnode);
-
-        if (ret != 0) {
-            log_error("dirnode_store FAILED\n");
-            goto out;
-        }
-    }
-
-    ret = 0;
-out:
-    if (ret) {
-        supernode_free(supernode);
-        return NULL;
-    }
+    nexus_usertable_copy_uuid(supernode->usertable, &supernode->usertable_uuid);
 
     return supernode;
 }
 
 int
-supernode_store(struct supernode       * supernode,
-                struct nexus_uuid_path * uuid_path,
+supernode_store(struct nexus_supernode       * supernode,
                 struct nexus_mac       * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
-    uint8_t * serialized_buffer = NULL;
     size_t    serialized_buflen = 0;
 
     int ret = -1;
 
+
+    // first write out the usertable
+    ret = nexus_usertable_store(supernode->usertable, &supernode->usertable_mac);
+
+    if (ret != 0) {
+        log_error("writing usertable FAILED\n");
+        return -1;
+    }
 
     serialized_buflen = __supernode_buflen(supernode);
 
@@ -217,24 +189,26 @@ supernode_store(struct supernode       * supernode,
 
 
         output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
-
         if (output_buffer == NULL) {
             log_error("could not get the crypto_bufffer buffer\n");
             goto out;
         }
 
-        memcpy(output_buffer, serialized_buffer, serialized_buflen);
+        ret = __serialize_supernode(supernode, output_buffer);
+        if (ret != 0) {
+            log_error("serializing supernode FAILED\n");
+            goto out;
+        }
 
         ret = nexus_crypto_buf_put(crypto_buffer, mac);
-
-        if (ret) {
+        if (ret != 0) {
             log_error("nexus_crypto_buf_put FAILED\n");
             goto out;
         }
     }
 
     // flush the buffer to the backend
-    ret = metadata_write(&supernode->my_uuid, uuid_path, crypto_buffer);
+    ret = metadata_write(&supernode->my_uuid, NULL, crypto_buffer);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;
@@ -251,7 +225,8 @@ out:
 }
 
 void
-supernode_free(struct supernode * supernode)
+supernode_free(struct nexus_supernode * supernode)
 {
+    nexus_usertable_free(supernode->usertable);
     nexus_free(supernode);
 }

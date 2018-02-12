@@ -1,6 +1,6 @@
 #include "enclave_internal.h"
 
-struct supernode         * global_supernode      = NULL;
+struct nexus_supernode   * global_supernode      = NULL;
 
 static struct nexus_list * vfs_dirnode_list      = NULL;
 static size_t              vfs_dirnode_list_size = 0;
@@ -53,8 +53,15 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
 int
 nexus_vfs_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
 {
-    // XXX here will be code that goes through the user_table list
-    return -1;
+    struct nexus_user * user = NULL;
+
+    user = nexus_usertable_find_pubkey(global_supernode->usertable, user_pubkey_hash);
+
+    if (user == NULL) {
+        return -1;
+    }
+
+    return 0;
 }
 
 // for now, this is just a wrapper for dirnode_from_buffer

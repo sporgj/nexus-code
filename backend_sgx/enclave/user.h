@@ -41,6 +41,9 @@ nexus_usertable_create(char * user_pubkey);
 void
 nexus_usertable_free(struct nexus_usertable * usertable);
 
+void
+nexus_usertable_copy_uuid(struct nexus_usertable * usertable, struct nexus_uuid * dest_uuid);
+
 /**
  * Parses usertable from a buffer
  *

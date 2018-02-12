@@ -11,20 +11,47 @@ static struct nonce_challenge authentication_nonce;
 static int
 nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
 {
-    struct supernode * supernode = NULL;
+    struct nexus_supernode * supernode    = NULL;
+
+    struct nexus_dirnode   * root_dirnode = NULL;
 
     int ret = -1;
 
-    // this indirectly creates and stores the root dirnode
-    supernode = supernode_create(user_pubkey);
-    if (!supernode) {
-        log_error("supernode_create FAILED\n");
-        goto out;
+    // creates the supernode & its accompanying usertable
+    {
+        ret = -1;
+
+        supernode = supernode_create(user_pubkey);
+        if (!supernode) {
+            log_error("supernode_create FAILED\n");
+            goto out;
+        }
+
+        ret = supernode_store(supernode, NULL);
+        if (ret) {
+            log_error("storing the supernode FAILED\n");
+            goto out;
+        }
     }
 
-    ret = supernode_store(supernode, NULL, NULL);
-    if (ret) {
-        goto out;
+    // root dirnode
+    {
+        ret = -1;
+
+        root_dirnode = dirnode_create(&supernode->root_uuid);
+        if (root_dirnode == NULL) {
+            goto out;
+        }
+
+        // make the dirnode's uuid the root uuid
+        nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
+
+        ret = dirnode_store(root_dirnode, NULL, NULL);
+
+        if (ret != 0) {
+            log_error("dirnode_store FAILED\n");
+            goto out;
+        }
     }
 
     nexus_uuid_copy(&supernode->my_uuid, supernode_uuid_out);
@@ -33,6 +60,10 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
 out:
     if (supernode) {
         supernode_free(supernode);
+    }
+
+    if (root_dirnode) {
+        dirnode_free(root_dirnode);
     }
 
     return ret;

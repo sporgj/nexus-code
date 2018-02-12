@@ -246,6 +246,8 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
                        (uint8_t *) aad, // AAD used for integrity
                        aad_len);
 
+    bytes_left = input_len;
+
     while (bytes_left > 0) {
         size = min(bytes_left, CRYPTO_BUFFER_SIZE);
 

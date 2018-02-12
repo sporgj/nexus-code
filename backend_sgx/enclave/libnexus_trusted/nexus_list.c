@@ -37,11 +37,10 @@ nexus_list_init(struct nexus_list * list)
 void
 nexus_list_destroy(struct nexus_list * list)
 {
-    struct list_node * node = list_first_entry(&list->list, struct list_node, node);
+    while (!list_empty(&list->list)) {
+        struct list_node * node = list_first_entry(&list->list, struct list_node, node);
 
-    while (node != NULL) {
         free_list_node(list, node);
-        node = list_first_entry(&list->list, struct list_node, node);
     }
 }
 
@@ -107,7 +106,7 @@ nexus_list_append(struct nexus_list * list, void * element)
 
     node->data = element;
 
-    list_add_tail(&list->list, &node->node);
+    list_add_tail(&node->node, &list->list);
 
     return 0;
 }
