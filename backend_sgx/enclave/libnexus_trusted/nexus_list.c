@@ -48,7 +48,7 @@ nexus_list_destroy(struct nexus_list * list)
 void *
 nexus_list_get(struct nexus_list * list, size_t pos) {
     struct list_head * head = &list->list;
-    struct list_head * curr = &head->next;
+    struct list_head * curr = head->next;
     struct list_node * node = NULL;
 
     if (list_empty(head)) {

@@ -62,14 +62,12 @@ __parse_acl_header(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t buflen
 static uint8_t *
 __serialize_acl_header(struct nexus_acl * nexus_acl, uint8_t * buffer)
 {
-    struct __acl_header header;
+    struct __acl_header * header = (struct __acl_header *) buffer;
 
-    memset(&header, 0, sizeof(struct __acl_header));
+    memset(header, 0, sizeof(struct __acl_header));
 
-    header.version = NEXUS_ACL_VERSION;
-    header.count   = nexus_acl->count;
-
-    memcpy(buffer, &header, sizeof(struct __acl_header));
+    header->version = NEXUS_ACL_VERSION;
+    header->count   = nexus_acl->count;
 
     return buffer + sizeof(struct __acl_header);
 }

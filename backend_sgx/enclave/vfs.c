@@ -35,22 +35,12 @@ nexus_vfs_deinit()
 int
 nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
 {
-    uint8_t * buffer = NULL;
-    size_t    buflen = 0;
-
-    buffer = nexus_crypto_buf_get(supernode_crypto_buf, &buflen, NULL);
-
-    if (buffer == NULL) {
-        log_error("nexus_crypto_buf_get() FAILED\n");
-        return -1;
-    }
-
     // if we are doing a remount
     if (global_supernode) {
         supernode_free(global_supernode);
     }
 
-    global_supernode = supernode_from_buffer(buffer, buflen);
+    global_supernode = supernode_from_crypto_buffer(supernode_crypto_buf);
 
     if (global_supernode == NULL) {
         log_error("supernode_from_buffer FAILED\n");
@@ -64,7 +54,7 @@ int
 nexus_vfs_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
 {
     // XXX here will be code that goes through the user_table list
-    return nexus_hash_compare(&global_supernode->owner_pubkey_hash, user_pubkey_hash);
+    return -1;
 }
 
 // for now, this is just a wrapper for dirnode_from_buffer

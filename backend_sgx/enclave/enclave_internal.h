@@ -29,7 +29,7 @@
 #include "volumekey.h"
 #include "crypto.h"
 #include "supernode.h"
-#include "usertable.h"
+#include "user.h"
 #include "dirnode.h"
 #include "metadata.h"
 

@@ -103,9 +103,9 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
     dirnode_init(dirnode);
 
     {
-        dirnode->dir_acl = nexus_acl_from_buffer(input_ptr, bytes_left);
+        int ret = __nexus_acl_from_buffer(&dirnode->dir_acl, input_ptr, bytes_left);
 
-        if (dirnode->dir_acl == NULL) {
+        if (ret != 0) {
             dirnode_free(dirnode);
 
             log_error("__nexus_acl_from_buffer() FAILED\n");

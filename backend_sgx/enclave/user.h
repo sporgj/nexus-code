@@ -2,26 +2,27 @@
 
 #include <stdint.h>
 
+#include <nexus_hash.h>
+
 #define NEXUS_MAX_NAMELEN 25
 
 
-typedef uint32_t nexus_uid_t;
+typedef uint64_t nexus_uid_t;
 
-typedef struct nexus_mac pubkey_hash_t;
+typedef struct nexus_hash pubkey_hash_t;
 
 typedef uint32_t nexus_user_flags_t;
+
 
 struct nexus_user {
     char * name;
 
     nexus_user_flags_t flags;
 
-    pubkey_hash_t pubkey;
+    nexus_uid_t user_id;
+
+    pubkey_hash_t pubkey_hash;
 };
-
-
-struct nexus_usertable;
-
 
 /**
  * Allocates a usertable.
@@ -30,7 +31,7 @@ struct nexus_usertable;
  * @return a nexus_usertable
  */
 struct nexus_usertable *
-nexus_usertable_create(struct nexus_uuid * supernode_uuid);
+nexus_usertable_create(char * user_pubkey);
 
 /**
  * Frees an allocated usertable
@@ -47,18 +48,11 @@ nexus_usertable_free(struct nexus_usertable * usertable);
  * @param buflen
  * @return usertable
  */
-struct nexus_usertable * usertable
-nexus_usertable_from_buffer(uint8_t * buffer, size_t buflen);
+struct nexus_usertable *
+nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac);
 
-/**
- * Serializes the usertable to a buffer
- * @param usertable
- * @param buffer
- * @return 0 on success
- */
 int
-nexus_usertable_to_buffer(struct nexus_usertable * usertable, uint8_t * buffer);
-
+nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac);
 
 /**
  * Returns user information
@@ -66,12 +60,19 @@ nexus_usertable_to_buffer(struct nexus_usertable * usertable, uint8_t * buffer);
  * @return NULL if not found
  */
 struct nexus_user *
-nexus_usertable_get(char * name);
+nexus_usertable_find_name(struct nexus_usertable * usertable, char * name);
+
+/**
+ * Finds a pubkey in user table
+ * @param usertable
+ * @param pubkey
+ * @return nexus_user
+ */
+struct nexus_user *
+nexus_usertable_find_pubkey(struct nexus_usertable * usertable, pubkey_hash_t * pubkey);
 
 /**
  * Adds a user to the usertable
  */
 int
 nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str);
-
-

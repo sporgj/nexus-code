@@ -22,16 +22,30 @@
 struct supernode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
-    struct nexus_uuid user_list_uuid;
 
-    struct nexus_mac  volume_userlist_mac;
+    // the user table will be stored in a separate metadata file
+    struct nexus_uuid usertable_uuid;
+    struct nexus_mac  usertable_mac;
 
-    struct nexus_hash owner_pubkey_hash;
+    struct nexus_usertable * usertable;
 };
 
 
+/**
+ * Reads crypto_buffer
+ * @param crypto_buffer
+ * @return NULL on failure
+ */
 struct supernode *
-supernode_from_buffer(uint8_t * buffer, size_t buflen);
+supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer);
+
+/**
+ * Loads a supernode from UUID
+ * @param uuid
+ * @return supernode
+ */
+struct supernode *
+supernode_load(struct nexus_uuid * uuid);
 
 /**
  * Instantiates a new supernode and generates both its uuid and the root uuid
