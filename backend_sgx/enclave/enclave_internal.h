@@ -23,6 +23,7 @@
 #include "crypto_buffer.h"
 #include "sealed_buffer.h"
 #include "raw_buffer.h"
+#include "key_layer.h"
 
 #include "acl.h"
 #include "vfs.h"

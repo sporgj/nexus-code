@@ -43,6 +43,7 @@ EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
 
 objs := nexus_enclave_u.o \
 	main.o \
+	keybuf.o \
 	volume_ops.o \
 	dir_ops.o \
 	buffer_manager.o \

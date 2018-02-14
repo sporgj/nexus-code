@@ -40,3 +40,17 @@ sgx_backend_fs_create(struct nexus_volume * volume,
                       nexus_dirent_type_t   type,
                       struct nexus_stat   * stat,
                       void                * priv_data);
+
+
+
+void
+key_buffer_init(struct nexus_key_buffer * key_buffer);
+
+int
+key_buffer_put(struct nexus_key_buffer * key_buffer, struct nexus_key * key);
+
+void
+key_buffer_free(struct nexus_key_buffer * key_buffer);
+
+int
+key_buffer_derive(struct nexus_key_buffer * key_buffer, struct nexus_key * key);

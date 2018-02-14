@@ -5,6 +5,8 @@
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
 
+// TODO refactor this
+//
 static char *
 __user_pubkey_str(struct nexus_key ** optional_privkey)
 {
@@ -46,42 +48,19 @@ __user_pubkey_str(struct nexus_key ** optional_privkey)
     return public_key_str;
 }
 
-static struct nexus_uuid *
-__user_volkey_bufuuid(struct sgx_backend * sgx_backend)
-{
-    struct nexus_uuid * volkey_bufuuid = NULL;
-    struct nexus_key  * sealed_volkey  = NULL;
-
-    sealed_volkey = &(sgx_backend->volume->vol_key);
-
-    if (sealed_volkey == NULL) {
-        log_error("could not clone volumekey\n");
-        return NULL;
-    }
-
-    volkey_bufuuid = buffer_manager_add_explicit(sgx_backend->buf_manager,
-                                                 __vol_key_data(sealed_volkey),
-                                                 __vol_key_bytes(sealed_volkey));
-
-    if (volkey_bufuuid == NULL) {
-        log_error("could not copy volkey into buffer_manager\n");
-        return NULL;
-    }
-
-    return volkey_bufuuid;
-}
-
 int
 sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
-    struct sgx_backend * sgx_backend = NULL;
+    struct sgx_backend      * sgx_backend    = NULL;
 
-    char * public_key_str = NULL;
+    char                    * public_key_str = NULL;
 
-    struct nexus_uuid * volkey_bufuuid = NULL;
+    struct nexus_key_buffer   volkey_keybuf;
 
     int ret = -1;
 
+
+    key_buffer_init(&volkey_keybuf);
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
@@ -96,20 +75,16 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
         // to the backend info
         sgx_backend->volume = volume;
 
-        volkey_bufuuid = nexus_malloc(sizeof(struct nexus_key));
-
         int err = ecall_create_volume(sgx_backend->enclave_id,
                                       &ret,
                                       public_key_str,
                                       &volume->supernode_uuid,
-                                      volkey_bufuuid);
+                                      &volkey_keybuf);
 
         // restore the volume pointer
         sgx_backend->volume = NULL;
 
         if (err || ret) {
-            nexus_free(volkey_bufuuid);
-
             log_error("ecall_create_volume() FAILED\n");
             goto out;
         }
@@ -117,26 +92,12 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 
     // copy the volumekey from the buffer_manager
     {
-        uint8_t * volkey_buffer = NULL;
-        size_t    volkey_buflen = 0;
+        ret = key_buffer_derive(&volkey_keybuf, &volume->vol_key);
 
-        ret = -1;
+        key_buffer_free(&volkey_keybuf);
 
-
-        volkey_buffer  = buffer_manager_get(sgx_backend->buf_manager,
-                                            volkey_bufuuid,
-                                            &volkey_buflen); // refcount = 2
-
-        if (volkey_buffer == NULL) {
-            log_error("buffer_manager_get() FAILED\n");
-            goto out;
-        }
-
-        buffer_manager_put(sgx_backend->buf_manager, volkey_bufuuid); // refcount = 1
-
-        ret = __vol_key_create_key(&volume->vol_key, volkey_buffer, volkey_buflen);
         if (ret != 0) {
-            log_error("__vol_key_create_key() FAILED\n");
+            log_error("key_buffer_derive() FAILED\n");
             goto out;
         }
     }
@@ -145,11 +106,6 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 out:
     if (public_key_str) {
         nexus_free(public_key_str);
-    }
-
-    if (volkey_bufuuid) {
-        buffer_manager_put(sgx_backend->buf_manager, volkey_bufuuid); // refcount = 0, deleted
-        nexus_free(volkey_bufuuid);
     }
 
     return ret;
@@ -267,7 +223,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 {
     struct sgx_backend * sgx_backend       = NULL;
 
-    struct nexus_uuid  * volkey_bufuuid    = NULL;
+    struct nexus_key_buffer volkey_buffer;
 
     struct nexus_key   * user_prv_key      = NULL;
     char               * public_key_str    = NULL;
@@ -279,6 +235,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     struct nonce_challenge nonce;
 
+    int err = -1;
     int ret = -1;
 
 
@@ -286,28 +243,28 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     sgx_backend->volume = volume;
 
-    // get the user's publick key and the volume key
+    // get the user's public key and the volume key
     public_key_str = __user_pubkey_str(&user_prv_key);
     if (public_key_str == NULL) {
         log_error("could not get user's public key\n");
         return -1;
     }
 
-    volkey_bufuuid = __user_volkey_bufuuid(sgx_backend);
-    if (volkey_bufuuid == NULL) {
+    key_buffer_init(&volkey_buffer);
+
+    ret = key_buffer_put(&volkey_buffer, &volume->vol_key);
+
+    if (ret != 0) {
         nexus_free(public_key_str);
-        log_error("could not retrieve user volumekey\n");
         return -1;
     }
 
     // request a challenge from the enclave
     {
-        int err = -1;
-
         err = ecall_authentication_challenge(sgx_backend->enclave_id,
                                              &ret,
                                              public_key_str,
-                                             volkey_bufuuid,
+                                             &volkey_buffer,
                                              &nonce);
 
         if (err || ret) {
@@ -337,8 +294,6 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     // respond to the challenge
     {
-        int err = -1;
-
         err = ecall_authentication_response(sgx_backend->enclave_id,
                                             &ret,
                                             supernode_bufuuid,
@@ -360,10 +315,7 @@ out:
 
     nexus_free(public_key_str);
 
-    if (volkey_bufuuid) {
-        buffer_manager_put(sgx_backend->buf_manager, volkey_bufuuid);
-        nexus_free(volkey_bufuuid);
-    }
+    key_buffer_free(&volkey_buffer);
 
     if (supernode_bufuuid) {
         buffer_manager_put(sgx_backend->buf_manager, supernode_bufuuid);

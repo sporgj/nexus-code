@@ -70,9 +70,9 @@ out:
 }
 
 int
-ecall_create_volume(char              * user_pubkey_IN,
-                    struct nexus_uuid * supernode_uuid_out,
-                    struct nexus_uuid * volkey_bufuuid_out)
+ecall_create_volume(char                    * user_pubkey_IN,
+                    struct nexus_uuid       * supernode_uuid_out,
+                    struct nexus_key_buffer * sealed_volkey_keybuf_out)
 {
     int ret = -1;
 
@@ -90,29 +90,20 @@ ecall_create_volume(char              * user_pubkey_IN,
 
     // write out the volumekey
     {
-        struct nexus_sealed_buf * sealed_volkey = NULL;
+        struct nexus_key_buffer * key_buffer = NULL;
 
         ret = -1;
 
-        sealed_volkey = nexus_enclave_volumekey_serialize();
+        key_buffer = nexus_enclave_volumekey_serialize();
 
-        if (sealed_volkey == NULL) {
+        if (key_buffer == NULL) {
             log_error("could not serialize volumekey\n");
             goto out;
         }
 
-        /**
-         * this transfers the buffer UUID of the sealed_volkey's external
-         * pointer into volkey_bufuuid_out
-         */
-        ret = nexus_sealed_buf_flush(sealed_volkey, volkey_bufuuid_out);
-        if (ret) {
-            nexus_sealed_buf_free(sealed_volkey);
-            log_error("could not flush volkey uuid\n");
-            goto out;
-        }
+        key_buffer_copy(key_buffer, sealed_volkey_keybuf_out);
 
-        nexus_sealed_buf_free(sealed_volkey);
+        key_buffer_free(key_buffer);
     }
 
     ret = 0;
@@ -158,12 +149,10 @@ generate_auth_challenge(struct nonce_challenge * challenge_out)
 }
 
 int
-ecall_authentication_challenge(char                   * user_pubkey_IN,
-                               struct nexus_uuid      * volkey_bufuuid_in,
-                               struct nonce_challenge * challenge_OUT)
+ecall_authentication_challenge(char                    * user_pubkey_IN,
+                               struct nexus_key_buffer * sealed_volkey_keybuf_out,
+                               struct nonce_challenge  * challenge_OUT)
 {
-    struct nexus_sealed_buf * volkey_sealed_buf = NULL;
-
     int ret = -1;
 
 
@@ -177,31 +166,17 @@ ecall_authentication_challenge(char                   * user_pubkey_IN,
     }
 
     // get the volume key
-    {
-        volkey_sealed_buf = nexus_sealed_buf_create(volkey_bufuuid_in);
-        if (volkey_sealed_buf == NULL) {
-            log_error("nexus_sealed_buf_create() FAILED\n");
-            goto err;
-        }
-
-        ret = nexus_enclave_volumekey_init(volkey_sealed_buf);
-        if (ret != 0) {
-            log_error("could not extract volumekey\n");
-            goto err;
-        }
+    ret = nexus_enclave_volumekey_init(sealed_volkey_keybuf_out);
+    if (ret != 0) {
+        log_error("could not extract volumekey\n");
+        goto err;
     }
 
     generate_auth_challenge(challenge_OUT);
 
-    nexus_sealed_buf_free(volkey_sealed_buf);
-
     return 0;
 err:
     clear_auth_pubkey();
-
-    if (volkey_sealed_buf) {
-        nexus_sealed_buf_free(volkey_sealed_buf);
-    }
 
     return -1;
 }

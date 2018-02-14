@@ -48,15 +48,15 @@ __wrapped_key_bytes(struct nexus_key * key)
 }
 
 static int
-__wrap_key(struct nexus_key * sealed_key, struct nexus_key * unsealed_key)
+__wrap_key(struct nexus_key * wrapped_key, struct nexus_key * unwrapped_key)
 {
-    size_t key_size = __raw_key_bytes(unsealed_key);
+    size_t key_size = __raw_key_bytes(unwrapped_key);
 
     assert(key_size > 0);
 
-    sealed_key->key = crypto_aes_ecb_encrypt(global_volumekey, unsealed_key->key, key_size);
+    wrapped_key->key = crypto_aes_ecb_encrypt(global_volumekey, unwrapped_key->key, key_size);
 
-    if (sealed_key->key == NULL) {
+    if (wrapped_key->key == NULL) {
         log_error("Could not wrap key\n");
         return -1;
     }
@@ -65,15 +65,15 @@ __wrap_key(struct nexus_key * sealed_key, struct nexus_key * unsealed_key)
 }
 
 static int
-__unwrap_key(struct nexus_key * unsealed_key, struct nexus_key * sealed_key)
+__unwrap_key(struct nexus_key * unwrapped_key, struct nexus_key * wrapped_key)
 {
-    size_t key_size = __wrapped_key_bytes(sealed_key);
+    size_t key_size = __wrapped_key_bytes(wrapped_key);
 
     assert(key_size > 0);
 
-    unsealed_key->key = crypto_aes_ecb_decrypt(global_volumekey, sealed_key->key, key_size);
+    unwrapped_key->key = crypto_aes_ecb_decrypt(global_volumekey, wrapped_key->key, key_size);
 
-    if (unsealed_key->key == NULL) {
+    if (unwrapped_key->key == NULL) {
         log_error("Could not unwrap key\n");
         return -1;
     }

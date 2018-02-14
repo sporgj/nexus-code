@@ -6,6 +6,8 @@
 #include "nexus_key.h"
 #include "sealed_buffer.h"
 
+#include <sgx_backend_common.h>
+
 /**
  * Generates a new enclave volumekey
  * @return 0 on success
@@ -23,7 +25,7 @@ nexus_enclave_volumekey_clear();
  * Returns a sealed_buffer of the volumekey
  * @return NULL on failure
  */
-struct nexus_sealed_buf *
+struct nexus_key_buffer *
 nexus_enclave_volumekey_serialize();
 
 
@@ -33,4 +35,4 @@ nexus_enclave_volumekey_serialize();
  * @return 0 on success
  */
 int
-nexus_enclave_volumekey_init(struct nexus_sealed_buf * sealed_buf);
+nexus_enclave_volumekey_init(struct nexus_key_buffer * key_buffer);
