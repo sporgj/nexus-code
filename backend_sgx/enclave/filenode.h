@@ -29,7 +29,7 @@ struct nexus_filenode {
  * @return filenode
  */
 struct nexus_filenode *
-filenode_create(struct nexus_uuid * root_uuid);
+filenode_create(struct nexus_uuid * root_uuid, size_t log2chunksize);
 
 int
 filenode_store(struct nexus_filenode  * filenode,

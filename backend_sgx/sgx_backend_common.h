@@ -10,6 +10,10 @@
 
 #define NONCE_SIZE 64
 
+// XXX this is temporary
+#define NEXUS_CHUNK_SIZE_LOG    20
+#define NEXUS_CHUNK_SIZE        (1 << NEXUS_CHUNK_SIZE_LOG)
+
 // raw pointer allows us to marshall arguments across the ecall boundary
 struct raw_pointer {
     size_t size;

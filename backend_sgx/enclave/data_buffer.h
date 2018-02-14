@@ -1,8 +1,9 @@
 #pragma once
 
 #include "crypto_context.h"
+#include "transfer_layer.h"
 
-#include "libnexus_trusted/nexus_mac.h"
+#include <nexus_mac.h>
 
 struct data_buffer;
 
@@ -14,34 +15,43 @@ struct data_buffer;
  * @param chunk_offset
  * @return chunk_size
  */
-struct nexus_data_buffer *
-nexus_data_buffer_create(uint8_t * external_addr, size_t chunk_offset, size_t chunk_size);
+struct nexus_data_buf *
+nexus_data_buf_create(size_t chunk_size);
 
 /**
- * Encrypts the data buffer in external memory
+ * Start the cryptographic process
  * @param data_buffer
- * @param crypto_ctx_dest_ptr
+ * @param crypto_context
+ * @param encrypt (true to encrypt)
+ */
+void
+nexus_data_buf_start(struct nexus_data_buf   * data_buffer,
+                     struct nexus_crypto_ctx * crypto_context,
+                     xfer_op_t                 mode);
+
+/**
+ * Completes the data_buffer
+ * @param data_buffer
  * @param mac
  */
-int
-nexus_data_buffer_put(struct nexus_data_buffer * data_buffer,
-                      struct nexus_crypto_ctx  * crypto_ctx_dest_ptr,
-                      struct nexus_mac         * mac);
+void
+nexus_data_buf_finish(struct nexus_data_buf * data_buffer, struct nexus_mac * mac);
 
 /**
- * Decrypts the data buffer in external memory
+ * Continue with the encryption/decryption
  * @param data_buffer
- * @param crypto_ctx
- * @param mac
+ * @param buflen
+ * @param left_over
  */
 int
-nexus_data_buffer_get(struct nexus_data_buffer * data_buffer,
-                      struct nexus_crypto_ctx  * crypto_ctx,
-                      struct nexus_mac         * mac);
+nexus_data_buf_update(struct nexus_data_buf * data_buffer,
+                      uint8_t               * external_addr,
+                      size_t                  buflen,
+                      size_t                * left_over);
 
 /**
- * Frees the nexus_data_buffer
+ * Frees the nexus_data_buf
  * @param data_buffer
  */
 void
-nexus_data_buffer_free(struct nexus_data_buffer * data_buffer);
+nexus_data_buf_free(struct nexus_data_buf * data_buffer);

@@ -13,17 +13,17 @@ struct chunk_entry_s {
 
 
 static inline size_t
-get_chunk_number(struct nexus_filebox * filebox, size_t offset)
+get_chunk_number(struct nexus_filenode * filenode, size_t offset)
 {
-    return ((offset < filebox->chunksize)
+    return ((offset < filenode->chunksize)
                 ? 0
-                : 1 + ((offset - (size_t)filebox->chunksize) >> filebox->log2chunksize));
+                : 1 + ((offset - (size_t)filenode->chunksize) >> filenode->log2chunksize));
 }
 
 static inline size_t
-get_chunk_count(size_t file_size)
+get_chunk_count(struct nexus_filenode * filenode, size_t file_size)
 {
-    return get_chunk_number(file_size) + 1;
+    return get_chunk_number(filenode, file_size) + 1;
 }
 
 
@@ -91,6 +91,7 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
 {
     struct nexus_filenode * filenode = NULL;
 
+    struct chunk_entry_s * new_chunk_entry = NULL;
     struct chunk_entry_s * tmp_chunk_entry = NULL;
 
     uint8_t * input_ptr = NULL;
@@ -109,7 +110,7 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
     tmp_chunk_entry = (struct chunk_entry_s *) input_ptr;
 
     for (size_t i = 0; i < filenode->nchunks; i++) {
-        struct chunk_entry_s * new_chunk_entry = nexus_malloc(sizeof(struct chunk_entry_s));
+        new_chunk_entry = nexus_malloc(sizeof(struct chunk_entry_s));
 
         memcpy(new_chunk_entry, tmp_chunk_entry, sizeof(struct chunk_entry_s));
 
@@ -125,12 +126,6 @@ static uint8_t *
 __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
 {
     struct __filenode_hdr * header = NULL;
-
-    if (buflen < sizeof(struct __filenode_hdr)) {
-        log_error("buffer is too small to fit a filenode\n");
-        return NULL;
-    }
-
 
     header = (struct __filenode_hdr *)buffer;
 
@@ -148,14 +143,15 @@ filenode_to_buffer(uint8_t * buffer, size_t buflen)
 {
     struct nexus_filenode * filenode = NULL;
 
-    struct chunk_entry_s * tmp_chunk_entry = NULL;
+    struct chunk_entry_s * curr_chunk_entry = NULL;
+    struct chunk_entry_s * tmp_chunk_entry  = NULL;
 
     uint8_t * output_ptr = NULL;
 
 
     filenode = nexus_malloc(sizeof(struct nexus_filenode));
 
-    output_ptr = __serialize_filenode_header(filenode, buffer, buflen);
+    output_ptr = __serialize_filenode_header(filenode, buffer);
 
     if (output_ptr == NULL) {
         nexus_free(filenode);
@@ -166,9 +162,9 @@ filenode_to_buffer(uint8_t * buffer, size_t buflen)
     tmp_chunk_entry = (struct chunk_entry_s *) output_ptr;
 
     for (size_t i = 0; i < filenode->nchunks; i++) {
-        struct chunk_entry_s * curr_chunk_entry = nexus_list_get(i);
+        curr_chunk_entry = nexus_list_get(&filenode->chunk_list, i);
 
-        memcpy(tmp_chunk_entry, new_chunk_entry, sizeof(struct chunk_entry_s));
+        memcpy(tmp_chunk_entry, curr_chunk_entry, sizeof(struct chunk_entry_s));
 
         tmp_chunk_entry++;
     }
@@ -199,7 +195,7 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
 
     // if the file got smaller, we need to pop off some entries
     while (difference < 0) {
-        struct chunk_entry_s * chunk_entry = nexus_list_pop(&filnode->chunk_list);
+        struct chunk_entry_s * chunk_entry = nexus_list_pop(&filenode->chunk_list);
 
         __free_chunk_entry(chunk_entry);
 
@@ -209,7 +205,7 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
     while (difference > 0) {
         struct chunk_entry_s * chunk_entry = nexus_malloc(sizeof(struct chunk_entry_s));
 
-        nexus_list_append(&filnode->chunk_list, chunk_entry);
+        nexus_list_append(&filenode->chunk_list, chunk_entry);
 
         difference--;
     }

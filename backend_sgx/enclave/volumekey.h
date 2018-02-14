@@ -4,7 +4,6 @@
  */
 
 #include "nexus_key.h"
-#include "sealed_buffer.h"
 
 #include <sgx_backend_common.h>
 

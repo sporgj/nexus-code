@@ -74,6 +74,7 @@ objs := nexus_enclave_t.o \
 	buffer_layer.o \
 	data_buffer.o \
 	crypto_buffer.o \
+	transfer_layer.o \
 	key_layer.o \
 	raw_buffer.o \
 	user.o \
@@ -83,6 +84,7 @@ objs := nexus_enclave_t.o \
 	crypto.o \
 	volumekey.o \
 	dirnode.o \
+	filenode.o \
 	supernode.o \
 	metadata.o \
 	main.o
