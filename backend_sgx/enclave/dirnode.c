@@ -241,7 +241,7 @@ dirnode_store(struct nexus_dirnode   * dirnode,
 
     serialized_buflen = __get_total_size(dirnode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &dirnode->my_uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -272,9 +272,7 @@ dirnode_store(struct nexus_dirnode   * dirnode,
         }
     }
 
-    // flush the buffer to the backend
-    // XXX: maybe change API to crypto_buf_flush(...)
-    ret = metadata_write(&dirnode->my_uuid, uuid_path, crypto_buffer);
+    ret = nexus_crypto_buf_flush(crypto_buffer, uuid_path);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

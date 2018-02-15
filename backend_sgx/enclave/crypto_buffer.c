@@ -65,7 +65,7 @@ struct nexus_crypto_buf {
 
 
 struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size)
+nexus_crypto_buf_new(size_t size, struct nexus_uuid * uuid)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
@@ -73,6 +73,8 @@ nexus_crypto_buf_new(size_t size)
 
     crypto_buf->internal_addr = nexus_malloc(size);
     crypto_buf->internal_size = size;
+
+    nexus_uuid_copy(uuid, &crypto_buf->uuid);
 
     return crypto_buf;
 }
@@ -456,7 +458,6 @@ out:
 
 int
 nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
-                       struct nexus_uuid       * metadata_uuid,
                        struct nexus_uuid_path  * uuid_path)
 {
     int err = -1;
@@ -467,11 +468,7 @@ nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
         return -1;
     }
 
-    err = ocall_metadata_set(&ret,
-                             metadata_uuid,
-                             uuid_path,
-                             &buf->uuid,
-                             global_backend_ext);
+    err = ocall_metadata_set(&ret, &buf->uuid, uuid_path, global_backend_ext);
 
     if (err || ret) {
         log_error("ocall_metadata_set FAILED (err=%d, ret=%d)\n", err, ret);

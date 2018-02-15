@@ -39,9 +39,9 @@ enclave {
 
         public int ecall_authentication_response
         (
-            [in] struct nexus_uuid * supernode_buffer_in,
-            [user_check]   uint8_t * signature_buffer_in,
-                            size_t   signature_len
+            [in]         struct nexus_uuid * supernode_buffer_in,
+            [user_check] uint8_t           * signature_buffer_in,
+                         size_t              signature_len
         );
 
 
@@ -68,10 +68,13 @@ enclave {
          * @param backend_info
          * @return uuid of the buffer
          */
-        struct nexus_uuid *
-        ocall_metadata_get([in]         struct nexus_uuid      * metadata_uuid,
-                           [user_check] struct nexus_uuid_path * uuid_path,
-                           [user_check] void                   * backend_info);
+        int
+        ocall_metadata_get
+        (
+            [in]         struct nexus_uuid      * metadata_uuid,
+            [user_check] struct nexus_uuid_path * uuid_path,
+            [user_check] void                   * backend_info
+        );
 
 
         /**
@@ -85,10 +88,12 @@ enclave {
          * @return 0 on success
          */
         int
-        ocall_metadata_set([in]         struct nexus_uuid      * metadata_uuid,
-                           [user_check] struct nexus_uuid_path * uuid_path,
-                           [in]         struct nexus_uuid      * buffer_uuid,
-                           [user_check] void                   * backend_info);
+        ocall_metadata_set
+        (
+            [in]         struct nexus_uuid      * metadata_uuid,
+            [user_check] struct nexus_uuid_path * uuid_path,
+            [user_check] void                   * backend_info
+        );
 
 
         // ---------------- untrusted buffer management --------------------
@@ -99,9 +104,12 @@ enclave {
          * @param uuid [out] the uuid of the new allocation
          */
         uint8_t *
-        ocall_buffer_alloc(             size_t              size,
-                           [out]        struct nexus_uuid * uuid,
-                           [user_check] void              * backend_info);
+        ocall_buffer_alloc
+        (
+                         size_t              size,
+            [in]         struct nexus_uuid * metadata_uuid,
+            [user_check] void              * backend_info
+        );
 
         /**
          * Returns the untrusted pointer to the buffer
@@ -109,17 +117,23 @@ enclave {
          * @return NULL on failure
          */
         uint8_t *
-        ocall_buffer_get(        [in] struct nexus_uuid * buffer_uuid,
-                                [out] size_t            * buffer_size,
-                         [user_check] void              * backend_info);
+        ocall_buffer_get
+        (
+            [in]         struct nexus_uuid * metadata_uuid,
+            [out]        size_t            * buffer_size,
+            [user_check] void              * backend_info
+        );
 
         /**
          * Frees an allocated buffer
          * @param buffer_uuid
          */
         void
-        ocall_buffer_put(        [in] struct nexus_uuid * buffer_uuid,
-                         [user_check] void              * backend_info);
+        ocall_buffer_put
+        (
+            [in]         struct nexus_uuid * buffer_uuid,
+            [user_check] void              * backend_info
+        );
 
         // ---------------------- utilities ---------------------
 

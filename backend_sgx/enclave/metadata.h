@@ -6,9 +6,31 @@
  * as specified in the file "PETLAB_LICENSE".
  */
 #pragma once
+#include <stdbool.h>
 
-#include "nexus_uuid.h"
-#include "sgx_backend_common.h"
+#include <nexus_uuid.h>
+#include <sgx_backend_common.h>
+
+
+typedef enum {
+    NEXUS_DIRNODE,
+    NEXUS_FILENODE
+} nexus_metadata_type_t;
+
+struct nexus_metadata {
+    struct nexus_uuid uuid;
+
+    uint32_t version;
+
+    nexus_metadata_type_t type;
+
+    bool is_dirty;
+
+    union {
+        struct nexus_dirnode  * dirnode;
+        struct nexus_filenode * filenode;
+    };
+};
 
 
 /**

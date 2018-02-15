@@ -20,9 +20,7 @@ free_buffer_manager(struct buffer_manager * buf_manager);
  * @return address of the newly allocated buffer
  */
 uint8_t *
-buffer_manager_alloc(struct buffer_manager * buffer_manager,
-                     size_t                  size,
-                     struct nexus_uuid     * dest_uuid);
+buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct nexus_uuid * buf_uuid);
 
 /**
  * Creates a new buffer from the address and size. The buffer keeps a reference
@@ -31,14 +29,8 @@ buffer_manager_alloc(struct buffer_manager * buffer_manager,
  * @param size
  * @return uuid
  */
-struct nexus_uuid *
-buffer_manager_add(struct buffer_manager * buffer_manager, uint8_t * addr, size_t size);
-
-/**
- * Same as buffer_manager_add, except the buffer gets cloned before it's added.
- */
-struct nexus_uuid *
-buffer_manager_add_explicit(struct buffer_manager * buf_manager, uint8_t * addr, size_t size);
+int
+buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid);
 
 /**
  * Returns the address stored at uuid

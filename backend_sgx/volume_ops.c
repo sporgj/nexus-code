@@ -118,7 +118,7 @@ __sign_response(struct sgx_backend      * sgx_backend,
                 uint8_t                 * signature_buf,
                 size_t                  * signature_len)
 {
-    struct nexus_uuid * supernode_bufuuid = NULL;
+    struct nexus_uuid * supernode_uuid = NULL;
     uint8_t           * supernode_buffer  = NULL;
     size_t              supernode_buflen  = 0;
 
@@ -129,8 +129,10 @@ __sign_response(struct sgx_backend      * sgx_backend,
 
     /* 1 - Read the supernode from the backend */
     {
+        supernode_uuid = &(sgx_backend->volume->supernode_uuid);
+
         ret = nexus_datastore_get_uuid(sgx_backend->volume->metadata_store,
-                                       &(sgx_backend->volume->supernode_uuid),
+                                       supernode_uuid,
                                        NULL,
                                        &supernode_buffer,
                                        (uint32_t *)&supernode_buflen);
@@ -140,11 +142,12 @@ __sign_response(struct sgx_backend      * sgx_backend,
             return NULL;
         }
 
-        supernode_bufuuid = buffer_manager_add(sgx_backend->buf_manager,
-                                               supernode_buffer,
-                                               supernode_buflen);
+        ret = buffer_manager_add(sgx_backend->buf_manager,
+                                 supernode_buffer,
+                                 supernode_buflen,
+                                 supernode_uuid);
 
-        if (supernode_bufuuid == NULL) {
+        if (supernode_uuid == NULL) {
             nexus_free(supernode_buffer);
             log_error("could not read the supernode\n");
             return NULL;
@@ -209,13 +212,13 @@ __sign_response(struct sgx_backend      * sgx_backend,
     ret = 0;
 out:
     if (ret) {
-        buffer_manager_put(sgx_backend->buf_manager, supernode_bufuuid);
-        nexus_free(supernode_bufuuid);
+        buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
+        nexus_free(supernode_uuid);
 
         return NULL;
     }
 
-    return supernode_bufuuid;
+    return supernode_uuid;
 }
 
 int
@@ -228,7 +231,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
     struct nexus_key   * user_prv_key      = NULL;
     char               * public_key_str    = NULL;
 
-    struct nexus_uuid  * supernode_bufuuid = NULL;
+    struct nexus_uuid  * supernode_uuid = NULL;
 
     uint8_t signature_buffer[MBEDTLS_MPI_MAX_SIZE] = { 0 };
     size_t  signature_len                          = 0;
@@ -280,13 +283,13 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         ret = -1;
 
 
-        supernode_bufuuid = __sign_response(sgx_backend,
+        supernode_uuid = __sign_response(sgx_backend,
                                             &nonce,
                                             user_prv_key,
                                             signature_buffer,
                                             &signature_len);
 
-        if (supernode_bufuuid == NULL) {
+        if (supernode_uuid == NULL) {
             log_error("could not generate response\n");
             goto out;
         }
@@ -296,7 +299,7 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
     {
         err = ecall_authentication_response(sgx_backend->enclave_id,
                                             &ret,
-                                            supernode_bufuuid,
+                                            supernode_uuid,
                                             signature_buffer,
                                             signature_len);
 
@@ -317,9 +320,9 @@ out:
 
     key_buffer_free(&volkey_buffer);
 
-    if (supernode_bufuuid) {
-        buffer_manager_put(sgx_backend->buf_manager, supernode_bufuuid);
-        nexus_free(supernode_bufuuid);
+    if (supernode_uuid) {
+        buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
+        nexus_free(supernode_uuid);
     }
 
     if (ret) {

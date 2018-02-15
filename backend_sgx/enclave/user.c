@@ -298,7 +298,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 
     serialized_buflen = nexus_usertable_buflen(usertable);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &usertable->my_uuid);
 
     if (!crypto_buffer) {
         log_error("could not initialize crypto buffer\n");
@@ -333,7 +333,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
     }
 
     // flush the buffer to the backend
-    ret = metadata_write(&usertable->my_uuid, NULL, crypto_buffer);
+    ret = nexus_crypto_buf_flush(crypto_buffer, NULL);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

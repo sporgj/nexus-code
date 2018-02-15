@@ -176,7 +176,7 @@ supernode_store(struct nexus_supernode       * supernode,
     serialized_buflen = __supernode_buflen(supernode);
 
     // allocates the crypto buffer
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &supernode->my_uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -208,7 +208,7 @@ supernode_store(struct nexus_supernode       * supernode,
     }
 
     // flush the buffer to the backend
-    ret = metadata_write(&supernode->my_uuid, NULL, crypto_buffer);
+    ret = nexus_crypto_buf_flush(crypto_buffer, NULL);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

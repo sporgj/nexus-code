@@ -26,7 +26,7 @@ nexus_crypto_buf_create(struct nexus_uuid * uuid);
  * @return crypto_buf
  */
 struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size);
+nexus_crypto_buf_new(size_t size, struct nexus_uuid * uuid);
 
 void
 nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
@@ -68,6 +68,5 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
  */
 int
 nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
-                       struct nexus_uuid       * metadata_uuid,
                        struct nexus_uuid_path  * uuid_path);
 

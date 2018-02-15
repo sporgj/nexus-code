@@ -31,33 +31,33 @@ ocall_print(char * str)
 // ------------------- Buffer Management ---------------------------
 
 uint8_t *
-ocall_buffer_alloc(size_t size, struct nexus_uuid * dest_buffer_uuid, void * backend_info)
+ocall_buffer_alloc(size_t size, struct nexus_uuid * uuid, void * backend_info)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)backend_info;
 
-    return buffer_manager_alloc(sgx_backend->buf_manager, size, dest_buffer_uuid);
+    return buffer_manager_alloc(sgx_backend->buf_manager, size, uuid);
 }
 
 uint8_t *
-ocall_buffer_get(struct nexus_uuid * buffer_uuid, size_t * p_buffer_size, void * backend_info)
+ocall_buffer_get(struct nexus_uuid * uuid, size_t * p_buffer_size, void * backend_info)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)backend_info;
 
-    return buffer_manager_get(sgx_backend->buf_manager, buffer_uuid, p_buffer_size);
+    return buffer_manager_get(sgx_backend->buf_manager, uuid, p_buffer_size);
 }
 
 void
-ocall_buffer_put(struct nexus_uuid * buffer_uuid, void * backend_info)
+ocall_buffer_put(struct nexus_uuid * uuid, void * backend_info)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)backend_info;
 
-    buffer_manager_put(sgx_backend->buf_manager, buffer_uuid);
+    buffer_manager_put(sgx_backend->buf_manager, uuid);
 }
 
 
 // ---------------- metadata management -----------------------
 
-struct nexus_uuid *
+int
 ocall_metadata_get(struct nexus_uuid      * metadata_uuid,
                    struct nexus_uuid_path * uuid_path,
                    void                   * backend_info)
@@ -72,6 +72,8 @@ ocall_metadata_get(struct nexus_uuid      * metadata_uuid,
 
     sgx_backend = (struct sgx_backend *)backend_info;
 
+    // TODO add code for checking buffer_manager entry here
+
     ret = nexus_datastore_get_uuid(sgx_backend->volume->metadata_store,
                                    metadata_uuid,
                                    NULL,
@@ -80,16 +82,22 @@ ocall_metadata_get(struct nexus_uuid      * metadata_uuid,
 
     if (ret) {
         log_error("nexus_datastore_get_uuid FAILED\n");
-        return NULL;
+        return -1;
     }
 
-    return buffer_manager_add(sgx_backend->buf_manager, buffer_addr, buffer_size);
+    ret = buffer_manager_add(sgx_backend->buf_manager, buffer_addr, buffer_size, metadata_uuid);
+    if (ret != 0) {
+        nexus_free(buffer_addr);
+        log_error("buffer_manager_add FAILED\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 int
 ocall_metadata_set(struct nexus_uuid      * metadata_uuid,
                    struct nexus_uuid_path * uuid_path,
-                   struct nexus_uuid      * buffer_uuid,
                    void                   * backend_info)
 {
     struct sgx_backend * sgx_backend = NULL;
@@ -102,7 +110,8 @@ ocall_metadata_set(struct nexus_uuid      * metadata_uuid,
 
     sgx_backend = (struct sgx_backend *)backend_info;
 
-    buffer_addr = buffer_manager_get(sgx_backend->buf_manager, buffer_uuid, &buffer_size);
+    buffer_addr = buffer_manager_get(sgx_backend->buf_manager, metadata_uuid, &buffer_size);
+
     if (buffer_addr == NULL) {
         log_error("buffer_manager_get returned NULL\n");
         return -1;
