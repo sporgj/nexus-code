@@ -43,7 +43,6 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
 int
 buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
-    // XXX for now, the put just frees the external buffer
     ocall_buffer_put(buffer_uuid, global_backend_ext);
 
     return 0;

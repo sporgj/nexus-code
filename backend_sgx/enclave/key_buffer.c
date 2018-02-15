@@ -26,7 +26,7 @@ key_buffer_free(struct nexus_key_buffer * key_buffer)
 }
 
 struct nexus_key *
-key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t key_type)
+key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t raw_key_type)
 {
     struct nexus_key * raw_key = NULL;
 
@@ -46,7 +46,7 @@ key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t key_type)
     }
 
     // derive raw key and return
-    raw_key = nexus_derive_key(key_type, protected_key);
+    raw_key = nexus_derive_key(raw_key_type, protected_key);
 
     nexus_free_key(protected_key);
     nexus_free(protected_key);
@@ -56,13 +56,13 @@ key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t key_type)
 }
 
 struct nexus_key_buffer *
-key_buffer_put(struct nexus_key * key, nexus_key_type_t key_type)
+key_buffer_put(struct nexus_key * key, nexus_key_type_t protected_key_type)
 {
     struct nexus_key_buffer * key_buffer = NULL;
 
-    struct nexus_key * derived_key = NULL;
-    char             * derived_str = NULL;
-    size_t             derived_len = 0;
+    struct nexus_key * protected_key = NULL;
+    char             * protected_str = NULL;
+    size_t             protected_len = 0;
 
     int ret = -1;
 
@@ -71,16 +71,16 @@ key_buffer_put(struct nexus_key * key, nexus_key_type_t key_type)
     {
         ret = -1;
 
-        derived_key = nexus_derive_key(key_type, key);
+        protected_key = nexus_derive_key(protected_key_type, key);
 
-        if (derived_key == NULL) {
+        if (protected_key == NULL) {
             log_error("could not derive the wrapped or sealed key\n");
             return NULL;
         }
 
-        derived_str = nexus_key_to_str(derived_key);
+        protected_str = nexus_key_to_str(protected_key);
 
-        if (derived_str == NULL) {
+        if (protected_str == NULL) {
             log_error("could not write key to buffer\n");
             goto out;
         }
@@ -90,11 +90,11 @@ key_buffer_put(struct nexus_key * key, nexus_key_type_t key_type)
     {
         key_buffer = nexus_malloc(sizeof(struct nexus_key_buffer));
 
-        key_buffer->key_type = key_type;
+        key_buffer->key_type = protected_key_type;
 
-        derived_len = strlen(derived_str);
+        protected_len = strlen(protected_str);
 
-        ret = ocall_calloc((void **) &key_buffer->key_str, derived_len + 1);
+        ret = ocall_calloc((void **) &key_buffer->key_str, protected_len + 1);
 
         if (ret != 0 || key_buffer->key_str == NULL) {
             log_error("ocall_calloc FAILED (err=%d)\n", ret);
@@ -102,18 +102,18 @@ key_buffer_put(struct nexus_key * key, nexus_key_type_t key_type)
         }
 
         // copy out the sealed/wrapped key
-        strncpy(key_buffer->key_str, derived_str, derived_len + 1);
+        strncpy(key_buffer->key_str, protected_str, protected_len);
     }
 
     ret = 0;
 out:
-    if (derived_key) {
-        nexus_free_key(derived_key);
-        nexus_free(derived_key);
+    if (protected_key) {
+        nexus_free_key(protected_key);
+        nexus_free(protected_key);
     }
 
-    if (derived_str) {
-        nexus_free(derived_str);
+    if (protected_str) {
+        nexus_free(protected_str);
     }
 
     if (ret) {
@@ -124,5 +124,5 @@ out:
         return NULL;
     }
 
-    return key_buffer;;
+    return key_buffer;
 }

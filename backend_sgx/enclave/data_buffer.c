@@ -67,11 +67,11 @@ nexus_data_buf_update(struct nexus_data_buf * data_buffer,
 
     int ret = -1;
 
-    /* we can only process up to one chunk at a time */
-    bytes_left = data_buffer->chunk_size - data_buffer->completed;
 
     *processed_bytes = 0;
 
+    // a data buffer can only process a chunk-length of data
+    bytes_left = data_buffer->chunk_size - data_buffer->completed;
     if (bytes_left <= 0) {
         return 0;
     }

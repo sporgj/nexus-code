@@ -22,7 +22,7 @@ struct xfer_context {
 
 static struct nexus_list xfer_list;
 
-static size_t xfer_list_size = 0;
+static size_t xfer_id_counter = 0;
 
 
 static void
@@ -70,8 +70,6 @@ transfer_layer_init()
 {
     nexus_list_init(&xfer_list);
     nexus_list_set_deallocator(&xfer_list, free_xfer_context);
-
-    xfer_list_size = 0;
 }
 
 void
@@ -94,13 +92,13 @@ transfer_layer_new(size_t offset, struct nexus_filenode * filenode)
 
     xfer_ctx = nexus_malloc(sizeof(struct xfer_context));
 
-    xfer_ctx->xfer_id       = xfer_list_size;
+    xfer_ctx->xfer_id       = xfer_id_counter;
     xfer_ctx->start_offset  = offset;
     xfer_ctx->curr_offset   = offset;
     xfer_ctx->chunksize     = filenode->chunksize;
     xfer_ctx->filenode      = filenode;
 
-    xfer_list_size += 1;
+    xfer_id_counter += 1;
 
     nexus_list_append(&xfer_list, xfer_ctx);
 
@@ -140,6 +138,10 @@ generate_data_buffer(struct xfer_context * xfer_ctx)
     return 0;
 }
 
+/**
+ * When at a chunk boundary, this fetches the necessary crypto_ctx and creates a new
+ * data buffer
+ */
 static int
 prepare_data_buffer(struct xfer_context * xfer_ctx)
 {
@@ -162,6 +164,8 @@ postprocess_data_buffer(struct xfer_context * xfer_ctx)
     struct nexus_mac   computed_mac;
     struct nexus_mac * stored_mac = NULL;
 
+    int ret = 0;
+
     // if we are not at a chunk boundary, we can keep using the same data buffer
     if (xfer_ctx->curr_offset % xfer_ctx->chunksize) {
         return 0;
@@ -171,25 +175,30 @@ postprocess_data_buffer(struct xfer_context * xfer_ctx)
 
     if (xfer_ctx->mode == XFER_ENCRYPT) {
         nexus_data_buf_finish(xfer_ctx->data_buffer, stored_mac);
-        return 0;
+        goto out;
     }
 
     // XFER_DECRYPT
     nexus_data_buf_finish(xfer_ctx->data_buffer, &computed_mac);
+    nexus_data_buf_free(xfer_ctx->data_buffer);
 
     if (nexus_mac_compare(stored_mac, &computed_mac)) {
+        ret = -1;
         log_error("mac comparison FAILED\n");
-        return -1;
+        goto out;
     }
+out:
+    nexus_data_buf_free(xfer_ctx->data_buffer);
 
-    return 0;
+    xfer_ctx->data_buffer = NULL;
+    xfer_ctx->filenode_crypto_ctx_ptr = NULL;
+
+    return ret;
 }
 
 int
 transfer_layer_process(int xfer_id, uint8_t * external_addr, size_t buflen)
 {
-    struct nexus_list_iterator * iter = NULL;
-
     struct xfer_context * xfer_ctx = NULL;
 
     uint8_t * external_ptr = NULL;
@@ -200,14 +209,20 @@ transfer_layer_process(int xfer_id, uint8_t * external_addr, size_t buflen)
     int ret = -1;
 
 
-    iter = find_xfer_context(xfer_id);
-    if (iter == NULL) {
-        log_error("could not find xfer context (xfer_id=%d)\n", xfer_id);
-        return -1;
-    }
+    // get the xfer_ctx
+    {
+        struct nexus_list_iterator * iter = NULL;
 
-    xfer_ctx = list_iterator_get(iter);
-    list_iterator_free(iter);
+        iter = find_xfer_context(xfer_id);
+        if (iter == NULL) {
+            log_error("could not find xfer context (xfer_id=%d)\n", xfer_id);
+            return -1;
+        }
+
+        xfer_ctx = list_iterator_get(iter);
+
+        list_iterator_free(iter);
+    }
 
     external_ptr = external_addr;
 
