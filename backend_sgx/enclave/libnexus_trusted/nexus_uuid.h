@@ -19,6 +19,11 @@ struct nexus_uuid {
     uint8_t raw[NEXUS_UUID_SIZE];
 };
 
+struct nexus_uuid_path {
+    size_t count;
+    struct nexus_uuid uuids[0];
+};
+
 
 int nexus_uuid_gen(struct nexus_uuid * uuid);
 

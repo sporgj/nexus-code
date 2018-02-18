@@ -29,12 +29,10 @@ int
 buffer_layer_put(struct nexus_uuid * buffer_uuid);
 
 /**
- * Copies the buffer. It does this by acquiring a reference to from_uuid's
- * buffer.
- * @param from_uuid
- * @param to_uuid
- *
- * @return 0 on success.
+ * Loads the metadata straight from the datastore
+ * @param uuid
+ * @param uuid_path
+ * @return crypto_buffer
  */
-int
-buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid);
+struct nexus_crypto_buf *
+buffer_layer_read_datastore(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path);

@@ -5,6 +5,8 @@ struct nexus_supernode  * global_supernode = NULL;
 static struct nexus_list  metadata_objects_list;
 static size_t             metadata_objects_count;
 
+static struct nexus_dentry root_dentry;
+
 int
 nexus_vfs_init()
 {
@@ -45,6 +47,13 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
         return -1;
     }
 
+    // initialize the root nexus dentry
+    memset(&root_dentry, 0, sizeof(struct nexus_dentry));
+    INIT_LIST_HEAD(&root_dentry.children);
+    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.uuid);
+
+    root_dentry.metadata_type = NEXUS_DIRNODE;
+
     return 0;
 }
 
@@ -82,9 +91,19 @@ nexus_vfs_flush(struct nexus_metadata * metadata)
     return -1;
 }
 
-struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid * metadata_uuid, struct nexus_uuid_path * uuid_path)
+int
+nexus_vfs_revalidate(struct nexus_metadata * metadata)
 {
     // TODO
-    return NULL;
+    return -1;
+}
+
+struct nexus_metadata *
+nexus_vfs_load(struct nexus_uuid * metadata_uuid, struct nexus_uuid_path * uuid_path, nexus_metadata_type_t metadata_type)
+{
+    struct nexus_metadata * metadata = NULL;
+
+    // TODO
+
+    return metadata;
 }

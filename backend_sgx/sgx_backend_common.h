@@ -28,12 +28,6 @@ struct nexus_stat_buffer {
     // TODO
 };
 
-// TEMPORARY
-struct nexus_uuid_path {
-    int count;
-    struct nexus_uuid uuids[0];
-};
-
 // this will be used to transport keys across the enclave boundary
 struct nexus_key_buffer {
     nexus_key_type_t key_type;

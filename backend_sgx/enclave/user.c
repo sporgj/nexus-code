@@ -201,7 +201,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
     int ret = -1;
 
 
-    crypto_buffer = metadata_read(uuid, NULL);
+    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");

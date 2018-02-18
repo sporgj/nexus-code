@@ -34,6 +34,13 @@ __free_chunk_entry(void * element)
     free(element);
 }
 
+
+static size_t
+__get_filenode_size(struct nexus_filenode * filenode)
+{
+    return sizeof(struct __filenode_hdr) + (filenode->nchunks * sizeof(struct chunk_entry_s));
+}
+
 static void
 filenode_set_chunksize(struct nexus_filenode * filenode, size_t log2chunksize)
 {
@@ -122,6 +129,45 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
     return filenode;
 }
 
+struct nexus_filenode *
+filenode_load(struct nexus_uuid * uuid)
+{
+    struct nexus_filenode * filenode = NULL;
+
+    struct nexus_crypto_buf * crypto_buffer = NULL;
+
+    uint8_t * buffer = NULL;
+    size_t    buflen = 0;
+
+
+    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
+
+    if (crypto_buffer == NULL) {
+        log_error("metadata_read FAILED\n");
+        return NULL;
+    }
+
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+
+    if (buffer == NULL) {
+        nexus_crypto_buf_free(crypto_buffer);
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return NULL;
+    }
+
+
+    filenode = filenode_from_buffer(buffer, buflen);
+
+    nexus_crypto_buf_free(crypto_buffer);
+
+    if (filenode == NULL) {
+        log_error("__parse_filenode FAILED\n");
+        return NULL;
+    }
+
+    return filenode;
+}
+
 static uint8_t *
 __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
 {
@@ -138,25 +184,20 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
     return (buffer + sizeof(struct __filenode_hdr));
 }
 
-struct nexus_filenode *
-filenode_to_buffer(uint8_t * buffer, size_t buflen)
+int
+filenode_serialize(struct nexus_filenode * filenode, uint8_t * buffer)
 {
-    struct nexus_filenode * filenode = NULL;
-
     struct chunk_entry_s * curr_chunk_entry = NULL;
     struct chunk_entry_s * tmp_chunk_entry  = NULL;
 
     uint8_t * output_ptr = NULL;
 
 
-    filenode = nexus_malloc(sizeof(struct nexus_filenode));
-
     output_ptr = __serialize_filenode_header(filenode, buffer);
 
     if (output_ptr == NULL) {
-        nexus_free(filenode);
         log_error("could not parse filenode header\n");
-        return NULL;
+        return -1;
     }
 
     tmp_chunk_entry = (struct chunk_entry_s *) output_ptr;
@@ -169,7 +210,67 @@ filenode_to_buffer(uint8_t * buffer, size_t buflen)
         tmp_chunk_entry++;
     }
 
-    return filenode;
+    return 0;
+}
+
+int
+filenode_store(struct nexus_filenode  * filenode,
+               struct nexus_uuid_path * uuid_path,
+               struct nexus_mac       * mac)
+{
+    struct nexus_crypto_buf * crypto_buffer = NULL;
+
+    size_t    serialized_buflen = 0;
+
+    int ret = -1;
+
+
+    serialized_buflen = __get_filenode_size(filenode);
+
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &filenode->my_uuid);
+    if (!crypto_buffer) {
+        goto out;
+    }
+
+    // write to the buffer
+    {
+        uint8_t * output_buffer = NULL;
+
+        size_t    buffer_size   = 0;
+
+
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
+        if (output_buffer == NULL) {
+            log_error("could not get the crypto_buffer buffer\n");
+            goto out;
+        }
+
+        ret = filenode_serialize(filenode, output_buffer);
+        if (ret != 0) {
+            log_error("filenode_serialize() FAILED\n");
+            goto out;
+        }
+
+        ret = nexus_crypto_buf_put(crypto_buffer, mac);
+        if (ret != 0) {
+            log_error("nexus_crypto_buf_put FAILED\n");
+            goto out;
+        }
+    }
+
+    ret = nexus_crypto_buf_flush(crypto_buffer, uuid_path);
+    if (ret) {
+        log_error("metadata_write FAILED\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    if (crypto_buffer) {
+        nexus_crypto_buf_free(crypto_buffer);
+    }
+
+    return ret;
 }
 
 void

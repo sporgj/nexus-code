@@ -126,6 +126,45 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
     return dirnode;
 }
 
+struct nexus_dirnode *
+dirnode_load(struct nexus_uuid * uuid)
+{
+    struct nexus_dirnode * dirnode = NULL;
+
+    struct nexus_crypto_buf * crypto_buffer = NULL;
+
+    uint8_t * buffer = NULL;
+    size_t    buflen = 0;
+
+
+    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
+
+    if (crypto_buffer == NULL) {
+        log_error("metadata_read FAILED\n");
+        return NULL;
+    }
+
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+
+    if (buffer == NULL) {
+        nexus_crypto_buf_free(crypto_buffer);
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return NULL;
+    }
+
+
+    dirnode = dirnode_from_buffer(buffer, buflen);
+
+    nexus_crypto_buf_free(crypto_buffer);
+
+    if (dirnode == NULL) {
+        log_error("__parse_dirnode FAILED\n");
+        return NULL;
+    }
+
+    return dirnode;
+}
+
 static size_t
 __get_total_size(struct nexus_dirnode * dirnode)
 {
@@ -420,7 +459,7 @@ __find_by_name(struct nexus_dirnode * dirnode, const char * fname)
 int
 dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      char                 * filename,
-                     nexus_dirent_type_t    type,
+                     nexus_dirent_type_t  * type,
                      struct nexus_uuid    * entry_uuid)
 {
     struct dir_entry_s * dir_entry = NULL;
@@ -437,6 +476,7 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
     dir_entry = list_iterator_get(iter);
 
     nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
+    *type = dir_entry->type;
 
     return 0;
 }
@@ -444,7 +484,7 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
 int
 dirnode_remove(struct nexus_dirnode * dirnode,
                char                 * filename,
-               nexus_dirent_type_t    type,
+               nexus_dirent_type_t  * type,
                struct nexus_uuid    * entry_uuid)
 {
     struct dir_entry_s * dir_entry = NULL;
@@ -465,6 +505,7 @@ dirnode_remove(struct nexus_dirnode * dirnode,
     dirnode->dir_entry_buflen -= dir_entry->total_len;
 
     nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
+    *type = dir_entry->type;
 
     // remove from the list
     list_iterator_del(iter);

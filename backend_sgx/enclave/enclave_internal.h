@@ -33,7 +33,6 @@
 #include "user.h"
 #include "dirnode.h"
 #include "filenode.h"
-#include "metadata.h"
 
 #include "nexus_log.h"
 #include "nexus_mac.h"
