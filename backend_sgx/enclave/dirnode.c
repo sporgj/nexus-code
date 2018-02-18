@@ -127,7 +127,7 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
 }
 
 struct nexus_dirnode *
-dirnode_load(struct nexus_uuid * uuid)
+dirnode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
 {
     struct nexus_dirnode * dirnode = NULL;
 

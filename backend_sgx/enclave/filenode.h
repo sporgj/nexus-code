@@ -31,6 +31,14 @@ struct nexus_filenode {
 struct nexus_filenode *
 filenode_create(struct nexus_uuid * root_uuid, size_t log2chunksize);
 
+/**
+ * loads the filenode
+ * @param uuid
+ * @return
+ */
+struct nexus_filenode *
+filenode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path);
+
 int
 filenode_store(struct nexus_filenode  * filenode,
                struct nexus_uuid_path * uuid_path,

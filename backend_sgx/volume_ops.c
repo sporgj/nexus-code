@@ -111,16 +111,16 @@ out:
     return ret;
 }
 
-static struct nexus_uuid *
+static int
 __sign_response(struct sgx_backend      * sgx_backend,
                 struct nonce_challenge  * nonce,
                 struct nexus_key        * user_prv_key,
                 uint8_t                 * signature_buf,
                 size_t                  * signature_len)
 {
-    struct nexus_uuid * supernode_uuid = NULL;
-    uint8_t           * supernode_buffer  = NULL;
-    size_t              supernode_buflen  = 0;
+    struct nexus_uuid * supernode_uuid   = NULL;
+    uint8_t           * supernode_buffer = NULL;
+    size_t              supernode_buflen = 0;
 
     uint8_t hash[32] = { 0 };
 
@@ -139,7 +139,7 @@ __sign_response(struct sgx_backend      * sgx_backend,
 
         if (ret) {
             log_error("nexus_datastore_get_uuid FAILED\n");
-            return NULL;
+            return -1;
         }
 
         ret = buffer_manager_add(sgx_backend->buf_manager,
@@ -147,10 +147,10 @@ __sign_response(struct sgx_backend      * sgx_backend,
                                  supernode_buflen,
                                  supernode_uuid);
 
-        if (supernode_uuid == NULL) {
+        if (ret != 0) {
             nexus_free(supernode_buffer);
             log_error("could not read the supernode\n");
-            return NULL;
+            return -1;
         }
     }
 
@@ -182,7 +182,7 @@ __sign_response(struct sgx_backend      * sgx_backend,
         mbedtls_entropy_init(&entropy);
         mbedtls_ctr_drbg_init(&ctr_drbg);
 
-        ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+        ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
         if (ret != 0) {
             log_error("mbedtls_ctr_drbg_seed FAILED (ret=-0x%04x)\n", ret);
             goto out;
@@ -213,12 +213,11 @@ __sign_response(struct sgx_backend      * sgx_backend,
 out:
     if (ret) {
         buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
-        nexus_free(supernode_uuid);
 
-        return NULL;
+        return -1;
     }
 
-    return supernode_uuid;
+    return 0;
 }
 
 int
@@ -280,20 +279,15 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     // generate the response
     {
-        ret = -1;
+        ret = __sign_response(sgx_backend, &nonce, user_prv_key, signature_buffer, &signature_len);
 
-
-        supernode_uuid = __sign_response(sgx_backend,
-                                            &nonce,
-                                            user_prv_key,
-                                            signature_buffer,
-                                            &signature_len);
-
-        if (supernode_uuid == NULL) {
+        if (ret != 0) {
             log_error("could not generate response\n");
             goto out;
         }
     }
+
+    supernode_uuid = &(sgx_backend->volume->supernode_uuid);
 
     // respond to the challenge
     {
@@ -322,7 +316,6 @@ out:
 
     if (supernode_uuid) {
         buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
-        nexus_free(supernode_uuid);
     }
 
     if (ret) {

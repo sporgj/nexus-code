@@ -130,7 +130,7 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
 }
 
 struct nexus_filenode *
-filenode_load(struct nexus_uuid * uuid)
+filenode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
 {
     struct nexus_filenode * filenode = NULL;
 
@@ -140,7 +140,7 @@ filenode_load(struct nexus_uuid * uuid)
     size_t    buflen = 0;
 
 
-    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
+    crypto_buffer = buffer_layer_read_datastore(uuid, uuid_path);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");

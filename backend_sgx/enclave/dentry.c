@@ -76,9 +76,9 @@ revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
 
     dentry->metadata = nexus_vfs_load(&dentry->uuid, uuid_path, dentry->metadata_type);
 
-    nexus_free(uuid_path);
-
     if (dentry->metadata == NULL) {
+        nexus_free(uuid_path);
+
         log_error("could not load metadata\n");
         return -1;
     }
@@ -170,6 +170,11 @@ dentry_lookup(struct nexus_dentry * root_dentry, char * path)
 
 
     path_builder_init(&builder);
+
+    if (path == NULL) {
+        log_error("path cannot be null\n");
+        return NULL;
+    }
 
     if (path[0] == '\0') {
         dentry = root_dentry;

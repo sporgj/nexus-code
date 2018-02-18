@@ -62,3 +62,58 @@ out:
 
     return ret;
 }
+
+inline static int
+__nxs_fs_delete(struct nexus_metadata * metadata, char * filename_IN, struct nexus_uuid * uuid_OUT)
+{
+    struct nexus_dirnode * dirnode = metadata->dirnode;
+
+    nexus_dirent_type_t type;
+
+    if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT)) {
+        log_error("dirnode_remove() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+ecall_fs_delete(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_out)
+{
+    struct nexus_metadata * metadata = NULL;
+
+    struct nexus_uuid entry_uuid;
+
+    int ret = -1;
+
+
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+    // perform the create operation
+    ret = __nxs_fs_delete(metadata, filename_IN, &entry_uuid);
+    if (ret != 0) {
+        log_error("__nxs_fs_delete() FAILED\n");
+        goto out;
+    }
+
+    ret = nexus_vfs_flush(metadata);
+    if (ret != 0) {
+        log_error("flushing metadata FAILED\n");
+        goto out;
+    }
+
+    // copy out the UUID of the new entry
+    nexus_uuid_copy(&entry_uuid, uuid_out);
+
+    ret = 0;
+out:
+    nexus_vfs_put(metadata);
+
+    return ret;
+}

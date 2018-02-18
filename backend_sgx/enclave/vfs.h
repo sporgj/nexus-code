@@ -33,6 +33,8 @@ struct nexus_dentry {
 struct nexus_metadata {
     struct nexus_uuid uuid;
 
+    struct nexus_uuid_path * uuid_path;
+
     uint32_t version;
 
     nexus_metadata_type_t type;
@@ -113,4 +115,15 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata);
  * @param uuid_path
  */
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid * metadata_uuid, struct nexus_uuid_path * uuid_path, nexus_metadata_type_t metadata_type);
+nexus_vfs_load(struct nexus_uuid *      metadata_uuid,
+               struct nexus_uuid_path * uuid_path,
+               nexus_metadata_type_t    metadata_type);
+
+
+/**
+ * Performs a dentry lookups
+ * @param root_dentry
+ * @param path
+ */
+struct nexus_dentry *
+dentry_lookup(struct nexus_dentry * root_dentry, char * path);

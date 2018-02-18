@@ -1,4 +1,4 @@
-/* 
+/**
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -20,7 +20,7 @@ struct nexus_uuid {
 };
 
 struct nexus_uuid_path {
-    size_t count;
+    uint32_t          count;
     struct nexus_uuid uuids[0];
 };
 

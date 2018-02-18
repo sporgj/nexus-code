@@ -104,12 +104,12 @@ __alloc_buf(struct buffer_manager * buf_manager,
         int ret = -1;
 
         // XXX, for now, we remove the old and add the new
-        old_buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, (uintptr_t)uuid, 0);
+        old_buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, (uintptr_t)&buf->uuid, 0);
         if (old_buf) {
             nexus_free(old_buf);
         }
 
-        ret = nexus_htable_insert(buf_manager->buffers_table, (uintptr_t)uuid, (uintptr_t)buf);
+        ret = nexus_htable_insert(buf_manager->buffers_table, (uintptr_t)&buf->uuid, (uintptr_t)buf);
         if (ret == 0) {
             log_error("nexus_htable_insert FAILED\n");
             goto cleanup;
@@ -188,6 +188,5 @@ buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
         return;
     }
 
-    buf_manager->table_size -= 1;
     nexus_free(buf);
 }

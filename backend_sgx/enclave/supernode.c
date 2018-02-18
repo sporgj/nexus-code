@@ -155,8 +155,7 @@ supernode_create(char * user_pubkey)
 }
 
 int
-supernode_store(struct nexus_supernode       * supernode,
-                struct nexus_mac       * mac)
+supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 

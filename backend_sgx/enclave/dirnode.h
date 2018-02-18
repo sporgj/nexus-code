@@ -36,6 +36,14 @@ struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid);
 
 /**
+ * Loads the dirnode at specified address
+ * @param uuid
+ * @return
+ */
+struct nexus_dirnode *
+dirnode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path);
+
+/**
  * Writes dirnode to datastore
  *
  * @param dirnode

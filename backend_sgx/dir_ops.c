@@ -1,5 +1,22 @@
 #include "internal.h"
 
+static void
+split_path(char * filepath, char ** dirpath, char ** filename)
+{
+    char * fname = NULL;
+
+    fname = strrchr(filepath, '/');
+
+    if (fname == NULL) {
+        *filename = filepath;
+        *dirpath = ".";
+    } else {
+        *filename = fname;
+        *dirpath = filepath;
+    }
+}
+
+
 int
 sgx_backend_fs_create(struct nexus_volume * volume,
                       char                * path,
@@ -12,10 +29,13 @@ sgx_backend_fs_create(struct nexus_volume * volume,
     struct nexus_uuid uuid;
 
     char * dirpath = NULL;
-    char * filename = "foo.txt"; // TODO
+    char * filename = NULL;
 
     int err = -1;
     int ret = -1;
+
+
+    split_path(path, &dirpath, &filename);
 
 
     sgx_backend = (struct sgx_backend *)priv_data;
