@@ -16,6 +16,7 @@ AR = ar
 
 
 exec_objs :=	main.o \
+		handler.o \
 		fs.o
 
 execs := nexus-fuse
@@ -55,7 +56,7 @@ frontend_fuse.a: $(exec_objs)
 	$(call build,AR,$(AR) rcs $@ $^)
 	@cp $@ $(buildpath)
 
-nexus-fuse: $(exec_objs)
+nexus-fuse: $(exec_objs) ../libnexus.a
 	$(call build,CC,$(CC) $(CFLAGS) $^ $(LDFLAGS) $(libs) -o $@)
 
 

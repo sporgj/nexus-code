@@ -50,7 +50,32 @@ nexus_backend_fs_create(struct nexus_volume * volume,
 			char                * path,
 			nexus_dirent_type_t   type,
 			struct nexus_stat   * stat);
-			
+
+
+int
+nexus_backend_fs_touch(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       char                 * plain_name,
+                       nexus_dirent_type_t    type,
+                       char                ** nexus_name);
+
+int
+nexus_backend_fs_remove(struct nexus_volume * volume,
+                        char                * dirpath,
+                        char                * plain_name,
+                        char               ** nexus_name);
+
+int
+nexus_backend_fs_lookup(struct nexus_volume * volume,
+                        char                * dirpath,
+                        char                * plain_name,
+                        char               ** nexus_name);
+
+int
+nexus_backend_fs_filldir(struct nexus_volume * volume,
+                         char                * dirpath,
+                         char                * nexus_name,
+                         char               ** plain_name);
 
 
 
@@ -60,34 +85,52 @@ struct nexus_backend_impl {
     void * (*init)(nexus_json_obj_t backend_cfg);
     int    (*deinit)();
 
-    int (*volume_init)(struct nexus_volume * volume,
-		       void                * priv_data);
-    
-    int (*volume_open)(struct nexus_volume * volume,
-		       void                * priv_data);
-   
+    int (*volume_init)(struct nexus_volume * volume, void * priv_data);
+
+    int (*volume_open)(struct nexus_volume * volume, void * priv_data);
+
     int (*volume_close)(struct nexus_uuid * uuid);
 
-    
-
-
-    
     int (*user_add)(struct nexus_uuid * vol_uuid,
-		    struct nexus_key  * user_pub_key,
-		    char              * user_name);
+                    struct nexus_key  * user_pub_key,
+                    char              * user_name);
 
-    int (*user_del)(struct nexus_uuid * vol_uuid,
-		    struct nexus_key  * user_name);
+    int (*user_del)(struct nexus_uuid * vol_uuid, struct nexus_key * user_name);
 
-
-
-
+    /**
+     * Creates a new file
+     */
     int (*fs_create)(struct nexus_volume * volume,
-		     char                * path,
-		     nexus_dirent_type_t   type,
-		     struct nexus_stat   * stat,
-		     void                * priv_data);
-    
+                     char                * path,
+                     nexus_dirent_type_t   type,
+                     struct nexus_stat   * stat,
+                     void                * priv_data);
+
+
+    int (*fs_touch)(struct nexus_volume  * volume,
+                    char                 * dirpath,
+                    char                 * plain_name,
+                    nexus_dirent_type_t    type,
+                    char                ** nexus_name,
+                    void                 * priv_data);
+
+    int (*fs_remove)(struct nexus_volume  * volume,
+                     char                 * dirpath,
+                     char                 * plain_name,
+                     char                ** nexus_name,
+                     void                 * priv_data);
+
+    int (*fs_lookup)(struct nexus_volume  * volume,
+                     char                 * dirpath,
+                     char                 * plain_name,
+                     char                ** nexus_name,
+                     void                 * priv_data);
+
+    int (*fs_filldir)(struct nexus_volume  * volume,
+                      char                 * dirpath,
+                      char                 * nexus_name,
+                      char                ** plain_name,
+                      void                 * priv_data);
 };
 
 

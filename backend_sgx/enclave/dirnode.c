@@ -50,6 +50,8 @@ __parse_dir_entry(struct dir_entry_s ** dir_entry, uint8_t * in_buffer)
 
     __copy_dir_entry(tmp_dir_entry, new_dir_entry);
 
+    *dir_entry = new_dir_entry;
+
     return (in_buffer + tmp_dir_entry->total_len);
 }
 

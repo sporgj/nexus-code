@@ -84,6 +84,13 @@ dirnode_add(struct nexus_dirnode * dirnode,
             struct nexus_uuid    * entry_uuid);
 
 int
+dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
+                     struct nexus_uuid    * uuid,
+                     nexus_dirent_type_t  * p_type,
+                     const char          ** p_fname,
+                     size_t               * p_fname_len);
+
+int
 dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      char                 * filename,
                      nexus_dirent_type_t  * type,

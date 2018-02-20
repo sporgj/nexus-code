@@ -290,6 +290,8 @@ xmp_mkdir(const char * path, mode_t mode)
 {
     int res;
 
+    handle_create(path, NEXUS_DIR);
+
     char * fullpath = __get_fullpath(path);
 
     res = mkdir(fullpath, mode);
@@ -478,6 +480,13 @@ static int
 xmp_create(const char * path, mode_t mode, struct fuse_file_info * fi)
 {
     int fd;
+    int ret = -1;
+
+    // get the path
+    ret = handle_create(path, NEXUS_REG);
+    if (ret != 0) {
+        // TODO
+    }
 
     char * fullpath = __get_fullpath(path);
 

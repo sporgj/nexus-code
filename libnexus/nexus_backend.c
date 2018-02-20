@@ -136,7 +136,7 @@ int
 nexus_backend_open_volume(struct nexus_volume * volume)
 {
     struct nexus_backend * backend = volume->backend;
-    
+
     return backend->impl->volume_open(volume, backend->priv_data);
 }
 
@@ -160,4 +160,70 @@ nexus_backend_fs_create(struct nexus_volume * volume,
     return backend->impl->fs_create(volume, path, type, stat, backend->priv_data);
 }
 
-			
+
+
+
+int
+nexus_backend_fs_touch(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       char                 * plain_name,
+                       nexus_dirent_type_t    type,
+                       char                ** nexus_name)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_touch == NULL) {
+	log_error("fs_touch NOT Implemented for %s backend\n", backend->impl->name);
+	return -1;
+    }
+
+    return backend->impl->fs_touch(volume, dirpath, plain_name, type, nexus_name, backend->priv_data);
+}
+
+int
+nexus_backend_fs_remove(struct nexus_volume * volume,
+                        char                * dirpath,
+                        char                * plain_name,
+                        char               ** nexus_name)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_remove == NULL) {
+	log_error("fs_remove NOT Implemented for %s backend\n", backend->impl->name);
+	return -1;
+    }
+
+    return backend->impl->fs_remove(volume, dirpath, plain_name, nexus_name, backend->priv_data);
+}
+
+int
+nexus_backend_fs_lookup(struct nexus_volume * volume,
+                        char                * dirpath,
+                        char                * plain_name,
+                        char               ** nexus_name)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_lookup == NULL) {
+	log_error("fs_lookup NOT Implemented for %s backend\n", backend->impl->name);
+	return -1;
+    }
+
+    return backend->impl->fs_lookup(volume, dirpath, plain_name, nexus_name, backend->priv_data);
+}
+
+int
+nexus_backend_fs_filldir(struct nexus_volume * volume,
+                         char                * dirpath,
+                         char                * nexus_name,
+                         char               ** plain_name)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_filldir == NULL) {
+	log_error("fs_filldir NOT Implemented for %s backend\n", backend->impl->name);
+	return -1;
+    }
+
+    return backend->impl->fs_filldir(volume, dirpath, nexus_name, plain_name, backend->priv_data);
+}

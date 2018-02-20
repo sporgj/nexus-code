@@ -115,7 +115,10 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .deinit          = sgx_backend_exit,
     .volume_init     = sgx_backend_create_volume,
     .volume_open     = sgx_backend_open_volume,
-    .fs_create       = sgx_backend_fs_create
+    .fs_touch        = sgx_backend_fs_create,
+    .fs_remove       = sgx_backend_fs_remove,
+    .fs_lookup       = sgx_backend_fs_lookup,
+    .fs_filldir      = sgx_backend_fs_filldir
 };
 
 

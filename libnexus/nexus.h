@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -26,10 +26,7 @@ int nexus_setup(void);
 
 // volume management
 struct nexus_volume *
-nexus_create_volume(char * volume_path, 
-		    char * config_str);
-
-
+nexus_create_volume(char * volume_path, char * config_str);
 
 #if 0
 

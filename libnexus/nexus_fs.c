@@ -31,3 +31,43 @@ nexus_fs_create(struct nexus_volume * volume,
 {
     return nexus_backend_fs_create(volume, path, type, stat);
 }
+
+
+
+int
+nexus_fs_touch(struct nexus_volume  * volume,
+               char                 * dirpath,
+               char                 * plain_name,
+               nexus_dirent_type_t    type,
+               char                ** nexus_name)
+{
+    return nexus_backend_fs_touch(volume, dirpath, plain_name, type, nexus_name);
+}
+
+int
+nexus_fs_remove(struct nexus_volume  * volume,
+                char                 * dirpath,
+                char                 * plain_name,
+                char                ** nexus_name)
+{
+    return nexus_backend_fs_remove(volume, dirpath, plain_name, nexus_name);
+}
+
+int
+nexus_fs_lookup(struct nexus_volume  * volume,
+                char                 * dirpath,
+                char                 * plain_name,
+                char                ** nexus_name)
+{
+    return nexus_backend_fs_lookup(volume, dirpath, plain_name, nexus_name);
+}
+
+int
+nexus_fs_filldir(struct nexus_volume  * volume,
+                 char                 * dirpath,
+                 char                 * nexus_name,
+                 char                ** plain_name)
+{
+    return nexus_backend_fs_filldir(volume, dirpath, nexus_name, plain_name);
+}
+

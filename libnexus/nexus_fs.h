@@ -40,7 +40,34 @@ struct nexus_stat {
     
 };
 
+/**
+ * Creates a new file/dir
+ * @param parent
+ */
+int
+nexus_fs_touch(struct nexus_volume  * volume,
+               char                 * parent_dir,
+               char                 * plain_name,
+               nexus_dirent_type_t    type,
+               char                ** nexus_name);
 
+int
+nexus_fs_remove(struct nexus_volume  * volume,
+                char                 * parent_dir,
+                char                 * plain_name,
+                char                ** nexus_name);
+
+int
+nexus_fs_lookup(struct nexus_volume  * volume,
+                char                 * parent_dir,
+                char                 * plain_name,
+                char                ** nexus_name);
+
+int
+nexus_fs_filldir(struct nexus_volume  * volume,
+                 char                 * dirpath,
+                 char                 * nexus_name,
+                 char                ** plain_name);
 
 int
 nexus_fs_readdir(struct nexus_volume *  volume,

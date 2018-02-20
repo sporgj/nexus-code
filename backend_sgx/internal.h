@@ -34,13 +34,35 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data);
 int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data);
 
-int
-sgx_backend_fs_create(struct nexus_volume * volume,
-                      char                * path,
-                      nexus_dirent_type_t   type,
-                      struct nexus_stat   * stat,
-                      void                * priv_data);
 
+int
+sgx_backend_fs_create(struct nexus_volume  * volume,
+                      char                 * dirpath,
+                      char                 * plain_name,
+                      nexus_dirent_type_t    type,
+                      char                ** nexus_name,
+                      void                 * priv_data);
+
+int
+sgx_backend_fs_remove(struct nexus_volume  * volume,
+                      char                 * dirpath,
+                      char                 * plain_name,
+                      char                ** nexus_name,
+                      void                 * priv_data);
+
+int
+sgx_backend_fs_lookup(struct nexus_volume  * volume,
+                      char                 * dirpath,
+                      char                 * plain_name,
+                      char                ** nexus_name,
+                      void                 * priv_data);
+
+int
+sgx_backend_fs_filldir(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       char                 * nexus_name,
+                       char                ** plain_name,
+                       void                 * priv_data);
 
 
 void

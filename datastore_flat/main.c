@@ -138,6 +138,8 @@ flat_open(nexus_json_obj_t cfg)
 {
     struct flat_datastore * datastore = NULL;
 
+    char * volume_path = NULL;
+
     char * root_path = NULL;
     int    ret = 0;
 
@@ -159,8 +161,13 @@ flat_open(nexus_json_obj_t cfg)
 	log_error("Could not allocate datastore state\n");
 	return NULL;
     }
-    
-    datastore->root_path = strndup(root_path, PATH_MAX);
+
+    // the volume path is the cwd
+    volume_path = get_current_dir_name();
+
+    asprintf(&datastore->root_path, "%s/%s", volume_path, root_path);
+
+    nexus_free(volume_path);
 
     return datastore;
 }
