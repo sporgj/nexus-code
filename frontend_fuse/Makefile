@@ -1,5 +1,11 @@
+include ../build.mk
 
 buildpath = ../build
+
+libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid\
+	-lpthread -Lfuse/build/lib -lfuse3
+
+LDFLAGS := -L$(SGX_SDK)/lib64
 
 INCLUDES := -I../libnexus -Ifuse/include
 CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11\
@@ -15,7 +21,14 @@ exec_objs :=	main.o \
 execs := nexus-fuse
 
 
-libs := ../libnexus/libnexus.a -lpthread -Lfuse/build/lib -lfuse3
+ifeq ($(SGX_MODE), SIM)
+	libs += -lsgx_urts_sim -lsgx_uae_service_sim
+else ifeq ($(SGX_MODE), HW)
+	libs += -lsgx_urts -lsgx_uae_service
+else
+        $(error Invalid SGX MODE)
+endif
+
 
 build = \
         @if [ -z "$V" ]; then \
@@ -43,7 +56,7 @@ frontend_fuse.a: $(exec_objs)
 	@cp $@ $(buildpath)
 
 nexus-fuse: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
+	$(call build,CC,$(CC) $(CFLAGS) $^ $(LDFLAGS) $(libs) -o $@)
 
 
 

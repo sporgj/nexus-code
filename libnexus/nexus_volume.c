@@ -421,6 +421,8 @@ struct nexus_volume *
 nexus_mount_volume(char * volume_path)
 {
 
+    char * temp_cwd = NULL;
+
     struct nexus_volume  * volume  = NULL;
     struct nexus_backend * backend = NULL;
     
@@ -469,6 +471,12 @@ nexus_mount_volume(char * volume_path)
 	    log_error("Could not find volume key for volume (%s)\n", volume_id_str);
 	    goto err;
 	}
+    }
+
+    temp_cwd = get_current_dir_name();
+    if (temp_cwd == NULL) {
+	log_error("get_current_dir_name() FAILED (err=%s)\n", strerror(errno));
+	return NULL;
     }
 
     ret = chdir(volume_path);
@@ -601,6 +609,15 @@ nexus_mount_volume(char * volume_path)
 	goto err;
     }
     
+    // restore the current directory
+    ret = chdir(temp_cwd);
+
+    if (ret == -1) {
+	nexus_free(temp_cwd);
+	log_error("Could not chdir to (%s)\n", temp_cwd);
+	goto err;
+    }
+    
     return volume;
 
  err:
@@ -608,6 +625,10 @@ nexus_mount_volume(char * volume_path)
     if (backend)   nexus_backend_shutdown(backend);
     if (volume)    nexus_free(volume);
     
+
+    if (temp_cwd) {
+	nexus_free(temp_cwd);
+    }
 
     
     return NULL;

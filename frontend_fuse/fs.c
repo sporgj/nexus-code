@@ -63,7 +63,7 @@ __get_fullpath(const char * path)
 
     int ret = -1;
 
-    ret = snprintf(fullpath, PATH_MAX, "%s/%s", volume_path, path);
+    ret = snprintf(fullpath, PATH_MAX, "%s/%s", datastore_path, path);
 
     if (ret <= 0) {
         nexus_free(fullpath);
