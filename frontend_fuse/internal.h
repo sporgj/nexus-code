@@ -21,4 +21,13 @@ start_fuse(struct fuse_args * args);
 // handler.c
 
 int
-handle_create(const char * fullpath, nexus_dirent_type_t type);
+handle_create(const char * path, nexus_dirent_type_t type, char ** nexus_fullpath);
+
+int
+handle_delete(const char * path, char ** nexus_fullpath);
+
+int
+handle_lookup(const char * path, char ** nexus_fullpath);
+
+int
+handle_filldir(const char * path, const char * name, char ** nexus_name);

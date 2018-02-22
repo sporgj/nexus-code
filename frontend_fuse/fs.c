@@ -59,14 +59,13 @@
 static char *
 __get_fullpath(const char * path)
 {
-    char * fullpath = nexus_malloc(PATH_MAX);
+    char * fullpath = NULL;
 
     int ret = -1;
 
-    ret = snprintf(fullpath, PATH_MAX, "%s/%s", datastore_path, path);
+    ret = asprintf(&fullpath, "%s/%s", datastore_path, path);
 
     if (ret <= 0) {
-        nexus_free(fullpath);
         log_error("error encoding path (%s)\n", path);
         abort();
     }
@@ -98,18 +97,31 @@ xmp_init(struct fuse_conn_info * conn, struct fuse_config * cfg)
 static int
 xmp_getattr(const char * path, struct stat * stbuf, struct fuse_file_info * fi)
 {
+    char * nexus_fullpath = NULL;
+
     int res;
 
     (void)path;
 
-    char * fullpath = __get_fullpath(path);
-
     if (fi)
         res = fstat(fi->fh, stbuf);
-    else
-        res = lstat(fullpath, stbuf);
+    else if (path[0] == '/' && path[1] == '\0') {
+        nexus_fullpath = __get_fullpath(path);
 
-    nexus_free(fullpath);
+        res = lstat(nexus_fullpath, stbuf);
+
+        printf("--> lstat (%s)\n", strerror(errno));
+    } else {
+        res = handle_lookup(path, &nexus_fullpath);
+        if (res != 0) {
+            // we default to the plain path when nexus can't find it
+            nexus_fullpath = __get_fullpath(path);
+        }
+
+        res = lstat(nexus_fullpath, stbuf);
+    }
+
+    nexus_free(nexus_fullpath);
 
     if (res == -1)
         return -errno;
@@ -120,13 +132,22 @@ xmp_getattr(const char * path, struct stat * stbuf, struct fuse_file_info * fi)
 static int
 xmp_access(const char * path, int mask)
 {
+    char * nexus_fullpath = NULL;
+
     int res;
 
-    char * fullpath = __get_fullpath(path);
+    if (path[0] == '/' && path[1] == '\0') {
+        nexus_fullpath = __get_fullpath(path);
+    } else {
+        res = handle_lookup(path, &nexus_fullpath);
+        if (res != 0) {
+            return -ENOENT;
+        }
+    }
 
-    res = access(fullpath, mask);
+    res = access(nexus_fullpath, mask);
 
-    nexus_free(fullpath);
+    nexus_free(nexus_fullpath);
 
     if (res == -1)
         return -errno;
@@ -153,9 +174,10 @@ xmp_readlink(const char * path, char * buf, size_t size)
 }
 
 struct xmp_dirp {
-    DIR *           dp;
+    DIR           * dp;
     struct dirent * entry;
     off_t           offset;
+    char          * path;
 };
 
 static int
@@ -180,6 +202,7 @@ xmp_opendir(const char * path, struct fuse_file_info * fi)
     }
     d->offset = 0;
     d->entry  = NULL;
+    d->path   = strndup(path, PATH_MAX);
 
     fi->fh = (unsigned long)d;
     return 0;
@@ -200,6 +223,11 @@ xmp_readdir(const char *            path,
             enum fuse_readdir_flags flags)
 {
     struct xmp_dirp * d = get_dirp(fi);
+
+    char * d_name = NULL;
+
+    int    nexus_ret  = -1;
+    char * nexus_name = NULL;
 
     (void)path;
     if (offset != d->offset) {
@@ -245,8 +273,28 @@ xmp_readdir(const char *            path,
            everything by one. */
         nextoff++;
 #endif
-        if (filler(buf, d->entry->d_name, &st, nextoff, fill_flags))
+
+        d_name = d->entry->d_name;
+
+        if (d_name[0] == '.' && (d_name[1] == '\0' || (d_name[1] == '.' || d_name[2] == '\0'))) {
+            goto skip_nexus;
+        }
+
+        nexus_ret = handle_filldir(d->path, d->entry->d_name, &nexus_name);
+
+        if (nexus_ret == 0) {
+            d_name = nexus_name;
+        }
+
+skip_nexus:
+        if (filler(buf, d_name, &st, nextoff, fill_flags))
             break;
+
+        if (nexus_name) {
+            nexus_free(nexus_name);
+        }
+
+        nexus_name = NULL;
 
         d->entry  = NULL;
         d->offset = nextoff;
@@ -261,6 +309,7 @@ xmp_releasedir(const char * path, struct fuse_file_info * fi)
     struct xmp_dirp * d = get_dirp(fi);
     (void)path;
     closedir(d->dp);
+    free(d->path);
     free(d);
     return 0;
 }
@@ -288,15 +337,21 @@ xmp_mknod(const char * path, mode_t mode, dev_t rdev)
 static int
 xmp_mkdir(const char * path, mode_t mode)
 {
+    char * nexus_fullpath = NULL;
+
     int res;
 
-    handle_create(path, NEXUS_DIR);
 
-    char * fullpath = __get_fullpath(path);
+    res = handle_create(path, NEXUS_DIR, &nexus_fullpath);
 
-    res = mkdir(fullpath, mode);
+    if (res != 0) {
+        log_error("handle_create() FAILED\n");
+        return -1;
+    }
 
-    nexus_free(fullpath);
+    res = mkdir(nexus_fullpath, mode);
+
+    nexus_free(nexus_fullpath);
 
     if (res == -1)
         return -errno;
@@ -307,13 +362,20 @@ xmp_mkdir(const char * path, mode_t mode)
 static int
 xmp_unlink(const char * path)
 {
+    char * nexus_fullpath = NULL;
+
     int res;
 
-    char * fullpath = __get_fullpath(path);
 
-    res = unlink(fullpath);
+    res = handle_delete(path, &nexus_fullpath);
 
-    nexus_free(fullpath);
+    if (res != 0) {
+        return -1;
+    }
+
+    res = unlink(nexus_fullpath);
+
+    nexus_free(nexus_fullpath);
 
     if (res == -1)
         return -errno;
@@ -324,13 +386,20 @@ xmp_unlink(const char * path)
 static int
 xmp_rmdir(const char * path)
 {
+    char * nexus_fullpath = NULL;
+
     int res;
 
-    char * fullpath = __get_fullpath(path);
 
-    res = rmdir(fullpath);
+    res = handle_delete(path, &nexus_fullpath);
 
-    nexus_free(fullpath);
+    if (res != 0) {
+        return -1;
+    }
+
+    res = rmdir(nexus_fullpath);
+
+    nexus_free(nexus_fullpath);
 
     if (res == -1)
         return -errno;
@@ -479,20 +548,21 @@ xmp_utimens(const char * path, const struct timespec ts[2], struct fuse_file_inf
 static int
 xmp_create(const char * path, mode_t mode, struct fuse_file_info * fi)
 {
+    char * nexus_fullpath = NULL;
+
     int fd;
     int ret = -1;
 
-    // get the path
-    ret = handle_create(path, NEXUS_REG);
+    ret = handle_create(path, NEXUS_DIR, &nexus_fullpath);
+
     if (ret != 0) {
-        // TODO
+        log_error("handle_create() FAILED\n");
+        return -1;
     }
 
-    char * fullpath = __get_fullpath(path);
+    fd = open(nexus_fullpath, fi->flags, mode);
 
-    fd = open(fullpath, fi->flags, mode);
-
-    nexus_free(fullpath);
+    nexus_free(nexus_fullpath);
 
     if (fd == -1)
         return -errno;
@@ -592,6 +662,8 @@ xmp_statfs(const char * path, struct statvfs * stbuf)
     int res;
 
     char * fullpath = __get_fullpath(path);
+
+    printf("stat call: %s\n", path);
 
     res = statvfs(fullpath, stbuf);
 

@@ -126,7 +126,6 @@ __nxs_fs_lookup(struct nexus_metadata * metadata, char * filename_IN, struct nex
     nexus_dirent_type_t type;
 
     if (dirnode_find_by_name(dirnode, filename_IN, &type, uuid_OUT)) {
-        log_error("dirnode_find_by_name() FAILED\n");
         return -1;
     }
 
@@ -153,7 +152,6 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
     // perform the create operation
     ret = __nxs_fs_lookup(metadata, filename_IN, &entry_uuid);
     if (ret != 0) {
-        log_error("__nxs_fs_delete() FAILED\n");
         goto out;
     }
 
@@ -179,7 +177,6 @@ __nxs_fs_filldir(struct nexus_metadata * metadata,
     nexus_dirent_type_t type;
 
     if (dirnode_find_by_uuid(dirnode, uuid, &type, name_ptr, name_len)) {
-        log_error("dirnode_find_by_uuid() FAILED\n");
         return -1;
     }
 
@@ -207,7 +204,6 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
     // perform the create operation
     ret = __nxs_fs_filldir(metadata, dirpath_IN, uuid, &name_ptr, &name_len);
     if (ret != 0) {
-        log_error("__nxs_fs_filldir() FAILED\n");
         goto out;
     }
 

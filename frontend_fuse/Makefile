@@ -56,7 +56,7 @@ frontend_fuse.a: $(exec_objs)
 	$(call build,AR,$(AR) rcs $@ $^)
 	@cp $@ $(buildpath)
 
-nexus-fuse: $(exec_objs) ../libnexus.a
+nexus-fuse: $(exec_objs)
 	$(call build,CC,$(CC) $(CFLAGS) $^ $(LDFLAGS) $(libs) -o $@)
 
 
