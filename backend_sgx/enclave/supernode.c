@@ -112,7 +112,7 @@ supernode_load(struct nexus_uuid * uuid)
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
 
-    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
+    crypto_buffer = nexus_crypto_buf_create(uuid);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
@@ -207,7 +207,7 @@ supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
     }
 
     // flush the buffer to the backend
-    ret = nexus_crypto_buf_flush(crypto_buffer, NULL);
+    ret = nexus_crypto_buf_flush(crypto_buffer);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

@@ -29,10 +29,17 @@ int
 buffer_layer_put(struct nexus_uuid * buffer_uuid);
 
 /**
- * Loads the metadata straight from the datastore
+ * Flushes the buffer layer to the metadata
  * @param uuid
- * @param uuid_path
- * @return crypto_buffer
+ * @return 0 on success
  */
-struct nexus_crypto_buf *
-buffer_layer_read_datastore(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path);
+int
+buffer_layer_flush(struct nexus_uuid * uuid);
+
+/**
+ * Deletes a metadata buffer
+ * @param uuid
+ */
+void
+buffer_layer_delete(struct nexus_uuid * uuid);
+

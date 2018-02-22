@@ -98,6 +98,20 @@ nexus_list_set_deallocator(struct nexus_list * list, list_deallocator deallocato
 }
 
 int
+nexus_list_prepend(struct nexus_list * list, void * element)
+{
+    struct list_node * node = NULL;
+
+    node = nexus_malloc(sizeof(struct list_node));
+
+    node->data = element;
+
+    list_add(&node->node, &list->list);
+
+    return 0;
+}
+
+int
 nexus_list_append(struct nexus_list * list, void * element)
 {
     struct list_node * node = NULL;

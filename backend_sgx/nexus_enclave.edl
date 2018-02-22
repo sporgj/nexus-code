@@ -81,45 +81,6 @@ enclave {
         // ---------------- metadata management --------------------------
 
         /**
-         * Fetches a metadata file from the backing store and returns the
-         * uuid pointing to the buffer
-         *
-         * @param metadata_uuid
-         * @param uuid_path
-         * @param backend_info
-         * @return uuid of the buffer
-         */
-        int
-        ocall_metadata_get
-        (
-            [in]         struct nexus_uuid      * metadata_uuid,
-            [user_check] struct nexus_uuid_path * uuid_path,
-            [user_check] void                   * backend_info
-        );
-
-
-        /**
-         * Writes the contents of an untrusted buffer to the metadata store
-         *
-         * @param metadata_uuid
-         * @param uuid_path
-         * @param buffer
-         * @param buflen
-         * @param backend_info
-         * @return 0 on success
-         */
-        int
-        ocall_metadata_set
-        (
-            [in]         struct nexus_uuid      * metadata_uuid,
-            [user_check] struct nexus_uuid_path * uuid_path,
-            [user_check] void                   * backend_info
-        );
-
-
-        // ---------------- untrusted buffer management --------------------
-
-        /**
          * Creates a new untrusted buffer
          * @param size is the size of the new buffer
          * @param uuid [out] the uuid of the new allocation
@@ -146,15 +107,34 @@ enclave {
         );
 
         /**
+         * Writes back the content of the modified buffer
+         * @return 0 on success
+         */
+        int
+        ocall_buffer_flush
+        (
+            [in]         struct nexus_uuid * metadata_uuid,
+            [user_check] void              * backend_info
+        );
+
+        /**
          * Frees an allocated buffer
          * @param buffer_uuid
          */
         void
         ocall_buffer_put
         (
-            [in]         struct nexus_uuid * buffer_uuid,
+            [in]         struct nexus_uuid * metadata_uuid,
             [user_check] void              * backend_info
         );
+
+        int
+        ocall_buffer_del
+        (
+            [in]         struct nexus_uuid * metadata_uuid,
+            [user_check] void              * backend_info
+        );
+
 
         // ---------------------- utilities ---------------------
 

@@ -155,6 +155,7 @@ buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t s
     return __alloc_buf(buf_manager, addr, size, uuid);
 }
 
+
 uint8_t *
 buffer_manager_get(struct buffer_manager * buf_manager,
                    struct nexus_uuid     * uuid,
@@ -183,6 +184,20 @@ buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
                                                    (uintptr_t)uuid,
                                                    0,
                                                    conditional_remove_func);
+
+    if (buf == NULL) {
+        return;
+    }
+
+    nexus_free(buf);
+}
+
+void
+buffer_manager_del(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
+{
+    struct __buf * buf = NULL;
+
+    buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, (uintptr_t)uuid, 0);
 
     if (buf == NULL) {
         return;

@@ -57,8 +57,6 @@ d_lookup(struct nexus_dentry * parent, const char * name)
 static int
 revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
 {
-    struct nexus_uuid_path * uuid_path = NULL;
-
     int ret = -1;
 
 
@@ -72,13 +70,9 @@ revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
     }
 
     // dentry->metadata = NULL
-    uuid_path = path_builder_get_path(builder);
-
-    dentry->metadata = nexus_vfs_load(&dentry->uuid, uuid_path, dentry->metadata_type);
+    dentry->metadata = nexus_vfs_load(&dentry->uuid, dentry->metadata_type);
 
     if (dentry->metadata == NULL) {
-        nexus_free(uuid_path);
-
         log_error("could not load metadata\n");
         return -1;
     }
@@ -192,4 +186,30 @@ dentry_lookup(struct nexus_dentry * root_dentry, char * path)
     path_builder_free(&builder);
 
     return dentry;
+}
+
+struct nexus_uuid_path *
+dentry_uuid_path(struct nexus_dentry * dentry)
+{
+#if 0
+    struct nexus_uuid_path * uuid_path = NULL;
+
+    struct path_builder builder;
+
+
+    path_builder_init(&builder);
+
+    while (dentry != NULL) {
+        path_builder_prepend(&builder, dentry);
+        dentry = dentry->parent;
+    }
+
+    uuid_path = path_builder_get_path(&builder);
+
+    path_builder_free(&builder);
+
+    return uuid_path;
+#endif
+
+    return NULL;
 }

@@ -129,7 +129,7 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
 }
 
 struct nexus_dirnode *
-dirnode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
+dirnode_load(struct nexus_uuid * uuid)
 {
     struct nexus_dirnode * dirnode = NULL;
 
@@ -139,7 +139,7 @@ dirnode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
     size_t    buflen = 0;
 
 
-    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
+    crypto_buffer = nexus_crypto_buf_create(uuid);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
@@ -254,14 +254,14 @@ dirnode_init(struct nexus_dirnode * dirnode)
 }
 
 struct nexus_dirnode *
-dirnode_create(struct nexus_uuid * root_uuid)
+dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
     struct nexus_dirnode * dirnode = NULL;
 
     dirnode = nexus_malloc(sizeof(struct nexus_dirnode));
 
-    nexus_uuid_gen(&dirnode->my_uuid);
     nexus_uuid_copy(root_uuid, &dirnode->root_uuid);
+    nexus_uuid_copy(my_uuid, &dirnode->my_uuid);
 
     dirnode_init(dirnode);
 
@@ -269,9 +269,7 @@ dirnode_create(struct nexus_uuid * root_uuid)
 }
 
 int
-dirnode_store(struct nexus_dirnode   * dirnode,
-              struct nexus_uuid_path * uuid_path,
-              struct nexus_mac       * mac)
+dirnode_store(struct nexus_dirnode * dirnode, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -313,7 +311,7 @@ dirnode_store(struct nexus_dirnode   * dirnode,
         }
     }
 
-    ret = nexus_crypto_buf_flush(crypto_buffer, uuid_path);
+    ret = nexus_crypto_buf_flush(crypto_buffer);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

@@ -30,10 +30,11 @@ struct nexus_dirnode {
  * Creates a new dirnode
  *
  * @param root_uuid
+ * @param my_uuid
  * @return NULL on failure
  */
 struct nexus_dirnode *
-dirnode_create(struct nexus_uuid * root_uuid);
+dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
 
 /**
  * Loads the dirnode at specified address
@@ -41,20 +42,17 @@ dirnode_create(struct nexus_uuid * root_uuid);
  * @return
  */
 struct nexus_dirnode *
-dirnode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path);
+dirnode_load(struct nexus_uuid * uuid);
 
 /**
  * Writes dirnode to datastore
  *
  * @param dirnode
- * @param uuid_path
  * @param mac
  * @return 0 on success
  */
 int
-dirnode_store(struct nexus_dirnode   * dirnode,
-              struct nexus_uuid_path * uuid_path,
-              struct nexus_mac       * mac);
+dirnode_store(struct nexus_dirnode * dirnode, struct nexus_mac * mac);
 
 /**
  * Creates a nexus_dirnode from a buffer

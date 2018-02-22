@@ -2,6 +2,7 @@
 
 inline static int
 __nxs_fs_create(struct nexus_metadata * metadata,
+                struct nexus_dentry   * dentry,
                 char                  * filename_IN,
                 nexus_dirent_type_t     type_IN,
                 struct nexus_uuid     * uuid_OUT)
@@ -10,6 +11,30 @@ __nxs_fs_create(struct nexus_metadata * metadata,
 
     int ret = -1;
 
+    // create the new metadata
+    {
+        struct nexus_metadata * new_metadata = NULL;
+
+        nexus_metadata_type_t metadata_type = (type_IN == NEXUS_DIR) ? NEXUS_DIRNODE : NEXUS_FILENODE;
+
+        new_metadata = nexus_vfs_create(dentry, metadata_type);
+
+        if (new_metadata == NULL) {
+            log_error("could not create metadata\n");
+            return -1;
+        }
+
+        ret = nexus_vfs_flush(new_metadata);
+
+        nexus_vfs_put(new_metadata);
+
+        if (ret != 0) {
+            log_error("could not flush metadata\n");
+            return -1;
+        }
+    }
+
+    // update the parent dirnode
     ret = dirnode_add(dirnode, filename_IN, type_IN, uuid_OUT);
 
     if (ret != 0) {
@@ -28,12 +53,14 @@ ecall_fs_create(char                * dirpath_IN,
 {
     struct nexus_metadata * metadata = NULL;
 
+    struct nexus_dentry * dentry = NULL;
+
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -41,7 +68,7 @@ ecall_fs_create(char                * dirpath_IN,
     }
 
     // perform the create operation
-    ret = __nxs_fs_create(metadata, filename_IN, type_IN, &entry_uuid);
+    ret = __nxs_fs_create(metadata, dentry, filename_IN, type_IN, &entry_uuid);
     if (ret != 0) {
         log_error("__nxs_fs_create() FAILED\n");
         goto out;
@@ -75,6 +102,8 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
         return -1;
     }
 
+    nexus_vfs_delete(uuid_OUT);
+
     return 0;
 }
 
@@ -83,12 +112,14 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 {
     struct nexus_metadata * metadata = NULL;
 
+    struct nexus_dentry * dentry = NULL;
+
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -137,12 +168,14 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 {
     struct nexus_metadata * metadata = NULL;
 
+    struct nexus_dentry * dentry = NULL;
+
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -188,13 +221,15 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
 {
     struct nexus_metadata * metadata = NULL;
 
+    struct nexus_dentry * dentry = NULL;
+
     const char * name_ptr = NULL;
     size_t name_len;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");

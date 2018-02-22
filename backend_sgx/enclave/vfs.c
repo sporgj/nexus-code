@@ -72,10 +72,42 @@ nexus_vfs_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
 }
 
 struct nexus_metadata *
-nexus_vfs_get(char * filepath, nexus_metadata_type_t type)
+nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type)
+{
+    struct nexus_metadata * metadata = NULL;
+
+
+    // XXX: the parent dentry could be used to inform the metadata store about the
+    // path to this new metadata object;
+    (void)parent_dentry;
+
+    metadata = nexus_malloc(sizeof(struct nexus_metadata));
+
+    metadata->type = type;
+
+    nexus_uuid_gen(&metadata->uuid);
+
+    if (type == NEXUS_DIRNODE) {
+        metadata->dirnode = dirnode_create(&global_supernode->my_uuid, &metadata->uuid);
+
+        if (metadata->dirnode == NULL) {
+            log_error("creating dirnode FAILED\n");
+        }
+    } else {
+        metadata->filenode = filenode_create(&global_supernode->my_uuid, &metadata->uuid);
+
+        if (metadata->filenode == NULL) {
+            log_error("creating filenode FAILED\n");
+        }
+    }
+
+    return metadata;
+}
+
+struct nexus_metadata *
+nexus_vfs_get(char * filepath, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry)
 {
     struct nexus_dentry * dentry = NULL;
-
 
     dentry = dentry_lookup(&root_dentry, filepath);
 
@@ -83,6 +115,8 @@ nexus_vfs_get(char * filepath, nexus_metadata_type_t type)
         log_error("dentry_lookup FAILED\n");
         return NULL;
     }
+
+    *path_dentry = dentry;
 
     return dentry->metadata;
 }
@@ -99,11 +133,7 @@ free_metadata(struct nexus_metadata * metadata)
         break;
     }
 
-    if (metadata->uuid_path) {
-        nexus_free(metadata->uuid_path);
-    }
-
-    // update the dentry that the metadata doesn't exist
+    // update the dentry
     metadata->dentry->metadata = NULL;
 
     nexus_free(metadata);
@@ -121,9 +151,9 @@ nexus_vfs_flush(struct nexus_metadata * metadata)
 {
     switch (metadata->type) {
     case NEXUS_DIRNODE:
-        return dirnode_store(metadata->dirnode, metadata->uuid_path, NULL);
+        return dirnode_store(metadata->dirnode, NULL);
     case NEXUS_FILENODE:
-        return filenode_store(metadata->filenode, metadata->uuid_path, NULL);
+        return filenode_store(metadata->filenode, NULL);
     default:
         log_error("Flush operation for metadata not implemented\n");
         return -1;
@@ -140,17 +170,15 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata)
 }
 
 static struct nexus_metadata *
-create_metadata(struct nexus_uuid      * metadata_uuid,
-                struct nexus_uuid_path * uuid_path,
-                void                   * metadata_obj,
-                nexus_metadata_type_t    metadata_type)
+create_metadata(struct nexus_uuid     * metadata_uuid,
+                void                  * metadata_obj,
+                nexus_metadata_type_t   metadata_type)
 {
     struct nexus_metadata * metadata = NULL;
 
     metadata = nexus_malloc(sizeof(struct nexus_metadata));
 
     metadata->type      = metadata_type;
-    metadata->uuid_path = uuid_path;
 
     nexus_uuid_copy(metadata_uuid, &metadata->uuid);
 
@@ -164,35 +192,42 @@ create_metadata(struct nexus_uuid      * metadata_uuid,
 }
 
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid      * metadata_uuid,
-               struct nexus_uuid_path * uuid_path,
-               nexus_metadata_type_t    metadata_type)
+nexus_vfs_load(struct nexus_uuid * metadata_uuid, nexus_metadata_type_t metadata_type)
 {
     struct nexus_dirnode  * dirnode  = NULL;
     struct nexus_filenode * filenode = NULL;
 
     switch (metadata_type) {
     case NEXUS_DIRNODE:
-        dirnode = dirnode_load(metadata_uuid, uuid_path);
+        dirnode = dirnode_load(metadata_uuid);
 
         if (dirnode == NULL) {
             log_error("loading dirnode in VFS failed\n");
             return NULL;
         }
 
-        return create_metadata(metadata_uuid, uuid_path, dirnode, NEXUS_DIRNODE);
+        return create_metadata(metadata_uuid, dirnode, NEXUS_DIRNODE);
 
     case NEXUS_FILENODE:
-        filenode = filenode_load(metadata_uuid, uuid_path);
+        filenode = filenode_load(metadata_uuid);
 
         if (filenode == NULL) {
             log_error("loading filenode in VFS failed\n");
             return NULL;
         }
 
-        return create_metadata(metadata_uuid, uuid_path, filenode, NEXUS_FILENODE);
+        return create_metadata(metadata_uuid, filenode, NEXUS_FILENODE);
     }
 
     log_error("incorrect metadata type (%d)\n", metadata_type);
     return NULL;
+}
+
+void
+nexus_vfs_delete(struct nexus_uuid * uuid)
+{
+    // TODO delete from the metadata cache,
+    // remove all pointing dentries
+
+    buffer_layer_delete(uuid);
 }

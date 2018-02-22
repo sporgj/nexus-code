@@ -58,16 +58,16 @@ filenode_init(struct nexus_filenode * filenode, size_t log2chunksize)
 }
 
 struct nexus_filenode *
-filenode_create(struct nexus_uuid * root_uuid, size_t log2chunksize)
+filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
     struct nexus_filenode * filenode = NULL;
 
     filenode = nexus_malloc(sizeof(struct nexus_filenode));
 
-    nexus_uuid_gen(&filenode->my_uuid);
     nexus_uuid_copy(root_uuid, &filenode->root_uuid);
+    nexus_uuid_copy(my_uuid, &filenode->my_uuid);
 
-    filenode_init(filenode, log2chunksize);
+    filenode_init(filenode, 0);
 
     return filenode;
 }
@@ -130,7 +130,7 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
 }
 
 struct nexus_filenode *
-filenode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
+filenode_load(struct nexus_uuid * uuid)
 {
     struct nexus_filenode * filenode = NULL;
 
@@ -140,7 +140,7 @@ filenode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
     size_t    buflen = 0;
 
 
-    crypto_buffer = buffer_layer_read_datastore(uuid, uuid_path);
+    crypto_buffer = nexus_crypto_buf_create(uuid);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
@@ -154,7 +154,6 @@ filenode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
         log_error("nexus_crypto_buf_get() FAILED\n");
         return NULL;
     }
-
 
     filenode = filenode_from_buffer(buffer, buflen);
 
@@ -214,9 +213,7 @@ filenode_serialize(struct nexus_filenode * filenode, uint8_t * buffer)
 }
 
 int
-filenode_store(struct nexus_filenode  * filenode,
-               struct nexus_uuid_path * uuid_path,
-               struct nexus_mac       * mac)
+filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -258,7 +255,7 @@ filenode_store(struct nexus_filenode  * filenode,
         }
     }
 
-    ret = nexus_crypto_buf_flush(crypto_buffer, uuid_path);
+    ret = nexus_crypto_buf_flush(crypto_buffer);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

@@ -48,6 +48,19 @@ buffer_layer_put(struct nexus_uuid * buffer_uuid)
     return 0;
 }
 
+void
+buffer_layer_delete(struct nexus_uuid * uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_del(&ret, uuid, global_backend_ext);
+
+    // XXX: what do to about err?
+    (void) err;
+    (void) ret;
+}
+
 int
 buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
 {
@@ -67,26 +80,18 @@ buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
     return 0;
 }
 
-struct nexus_crypto_buf *
-buffer_layer_read_datastore(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path)
+int
+buffer_layer_flush(struct nexus_uuid * uuid)
 {
-    struct nexus_crypto_buf * crypto_buf = NULL;
-
     int err = -1;
     int ret = -1;
 
+    err = ocall_buffer_flush(&ret, uuid, global_backend_ext);
 
-    err = ocall_metadata_get(&ret, uuid, NULL, global_backend_ext);
     if (err || ret) {
-        log_error("ocall_metadata_get FAILED (err=%d, ret=%d)\n", err, ret);
-        return NULL;
+        log_error("ocall_metadata_set FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
     }
 
-    crypto_buf = nexus_crypto_buf_create(uuid);
-    if (crypto_buf == NULL) {
-        log_error("nexus_crypto_buf_create FAILED\n");
-        return NULL;
-    }
-
-    return crypto_buf;
+    return 0;
 }

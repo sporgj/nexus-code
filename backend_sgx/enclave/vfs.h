@@ -33,10 +33,6 @@ struct nexus_dentry {
 struct nexus_metadata {
     struct nexus_uuid uuid;
 
-    struct nexus_uuid_path * uuid_path;
-
-    uint32_t version;
-
     nexus_metadata_type_t type;
 
     bool is_dirty;
@@ -76,14 +72,23 @@ int
 nexus_vfs_verfiy_pubkey(struct nexus_hash * user_pubkey_hash);
 
 
+/**
+ * Creates a new metadata object
+ * @param parent_dentry
+ * @param type of metadata
+ */
+struct nexus_metadata *
+nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type);
 
 /**
  * Converts a path into a metadata object
  * @param path
+ * @param type the metadata type
+ * @param dentry is the dentry corresponding to this path
  * @return metadata
  */
 struct nexus_metadata *
-nexus_vfs_get(char * path, nexus_metadata_type_t type);
+nexus_vfs_get(char * path, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry);
 
 /**
  * Returns a path onto the VFS
@@ -115,10 +120,19 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata);
  * @param uuid_path
  */
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid *      metadata_uuid,
-               struct nexus_uuid_path * uuid_path,
-               nexus_metadata_type_t    metadata_type);
+nexus_vfs_load(struct nexus_uuid * metadata_uuid, nexus_metadata_type_t metadata_type);
 
+void
+nexus_vfs_delete(struct nexus_uuid * metadata_uuid);
+
+// metadata functions
+void
+metadata_set_dirty(struct nexus_metadata * metadata, bool dirty);
+
+
+
+
+// dentry functions
 
 /**
  * Performs a dentry lookups

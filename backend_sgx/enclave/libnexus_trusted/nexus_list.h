@@ -67,6 +67,15 @@ void
 nexus_list_set_deallocator(struct nexus_list * list, list_deallocator deallocator);
 
 /**
+ * Prepends element to the list
+ * @param list
+ * @param element
+ * @return 0 on success
+ */
+int
+nexus_list_prepend(struct nexus_list * list, void * element);
+
+/**
  * Appends an element to the list
  * @param list
  * @param element

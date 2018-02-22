@@ -27,7 +27,8 @@ buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct ne
  * to addr.
  * @param addr is the malloced address
  * @param size
- * @return uuid
+ * @param uuid
+ * @return 0 on success
  */
 int
 buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid);
@@ -49,3 +50,12 @@ buffer_manager_get(struct buffer_manager * buffer_manager,
  */
 void
 buffer_manager_put(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);
+
+/**
+ * Deletes a file from the buffer manager
+ * @param buffer_manager
+ * @param uuid
+ */
+void
+buffer_manager_del(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);
+

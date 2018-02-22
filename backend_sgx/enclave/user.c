@@ -201,7 +201,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
     int ret = -1;
 
 
-    crypto_buffer = buffer_layer_read_datastore(uuid, NULL);
+    crypto_buffer = nexus_crypto_buf_create(uuid);
 
     if (crypto_buffer == NULL) {
         log_error("buffer_layer_read_datastore FAILED\n");
@@ -333,7 +333,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
     }
 
     // flush the buffer to the backend
-    ret = nexus_crypto_buf_flush(crypto_buffer, NULL);
+    ret = nexus_crypto_buf_flush(crypto_buffer);
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;

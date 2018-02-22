@@ -67,6 +67,5 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
  * @return 0 on success
  */
 int
-nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
-                       struct nexus_uuid_path  * uuid_path);
+nexus_crypto_buf_flush(struct nexus_crypto_buf * buf);
 

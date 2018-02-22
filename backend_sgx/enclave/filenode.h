@@ -26,10 +26,11 @@ struct nexus_filenode {
 /**
  * Creates a new filenode with a given root_uuid
  * @param root_uuid
+ * @param my_uuid
  * @return filenode
  */
 struct nexus_filenode *
-filenode_create(struct nexus_uuid * root_uuid, size_t log2chunksize);
+filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
 
 /**
  * loads the filenode
@@ -37,12 +38,10 @@ filenode_create(struct nexus_uuid * root_uuid, size_t log2chunksize);
  * @return
  */
 struct nexus_filenode *
-filenode_load(struct nexus_uuid * uuid, struct nexus_uuid_path * uuid_path);
+filenode_load(struct nexus_uuid * uuid);
 
 int
-filenode_store(struct nexus_filenode  * filenode,
-               struct nexus_uuid_path * uuid_path,
-               struct nexus_mac       * mac);
+filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac);
 
 struct nexus_filenode *
 filenode_from_buffer(uint8_t * buffer, size_t buflen);

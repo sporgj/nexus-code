@@ -457,23 +457,12 @@ out:
 
 
 int
-nexus_crypto_buf_flush(struct nexus_crypto_buf * buf,
-                       struct nexus_uuid_path  * uuid_path)
+nexus_crypto_buf_flush(struct nexus_crypto_buf * buf)
 {
-    int err = -1;
-    int ret = -1;
-
     if (buf->external_addr == NULL) {
         log_error("crypto_buf has no external allocations\n");
         return -1;
     }
 
-    err = ocall_metadata_set(&ret, &buf->uuid, uuid_path, global_backend_ext);
-
-    if (err || ret) {
-        log_error("ocall_metadata_set FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    return 0;
+    return buffer_layer_flush(&buf->uuid);
 }
