@@ -17,7 +17,7 @@ struct nexus_list_iterator {
 static void
 free_list_node(struct nexus_list * list, struct list_node * node)
 {
-    if (list->attrs.deallocator == NULL) {
+    if (list->attrs.deallocator != NULL) {
         list->attrs.deallocator(node->data);
     }
 

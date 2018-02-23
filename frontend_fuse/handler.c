@@ -47,7 +47,6 @@ handle_create(const char * path, nexus_dirent_type_t type, char ** nexus_fullpat
 
     int ret = -1;
 
-
     split_path(path, &dirpath, &fname);
 
     ret = nexus_fs_touch(mounted_volume, dirpath, fname, type, &nexus_name);
@@ -117,6 +116,11 @@ handle_lookup(const char * path, char ** nexus_fullpath)
 
     int ret = -1;
 
+
+    if (path[0] == '/' && path[1] == '\0') {
+        *nexus_fullpath = __make_nexuspath("", "");
+        return 0;
+    }
 
     split_path(path, &dirpath, &fname);
 

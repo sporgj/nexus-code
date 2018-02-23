@@ -72,7 +72,7 @@ dirnode_free(struct nexus_dirnode * dirnode);
  * @param dirnode
  * @param filename
  * @param type
- * @param entry_uuid will contain the UUID of the new entry
+ * @param entry_uuid is the provided uuid
  * @return 0 on success
  */
 int

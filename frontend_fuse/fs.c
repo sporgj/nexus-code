@@ -97,31 +97,26 @@ xmp_init(struct fuse_conn_info * conn, struct fuse_config * cfg)
 static int
 xmp_getattr(const char * path, struct stat * stbuf, struct fuse_file_info * fi)
 {
-    char * nexus_fullpath = NULL;
-
     int res;
 
     (void)path;
 
     if (fi)
         res = fstat(fi->fh, stbuf);
-    else if (path[0] == '/' && path[1] == '\0') {
-        nexus_fullpath = __get_fullpath(path);
+    else {
+        char * nexus_fullpath = NULL;
 
-        res = lstat(nexus_fullpath, stbuf);
-
-        printf("--> lstat (%s)\n", strerror(errno));
-    } else {
         res = handle_lookup(path, &nexus_fullpath);
         if (res != 0) {
             // we default to the plain path when nexus can't find it
             nexus_fullpath = __get_fullpath(path);
         }
 
+        // TODO it seems this returns 0 even on non-existing files. Look into this
         res = lstat(nexus_fullpath, stbuf);
-    }
 
-    nexus_free(nexus_fullpath);
+        nexus_free(nexus_fullpath);
+    }
 
     if (res == -1)
         return -errno;
@@ -185,15 +180,24 @@ xmp_opendir(const char * path, struct fuse_file_info * fi)
 {
     int               res;
 
-    char * fullpath = __get_fullpath(path);
+    char * nexus_fullpath = NULL;
+
+    res = handle_lookup(path, &nexus_fullpath);
+
+    if (res != 0) {
+        log_error("lookup failed\n");
+        return -ENOENT;
+    }
 
     struct xmp_dirp * d = malloc(sizeof(struct xmp_dirp));
     if (d == NULL)
         return -ENOMEM;
 
-    d->dp = opendir(fullpath);
 
-    nexus_free(fullpath);
+
+    d->dp = opendir(nexus_fullpath);
+
+    nexus_free(nexus_fullpath);
 
     if (d->dp == NULL) {
         res = -errno;
@@ -576,11 +580,19 @@ xmp_open(const char * path, struct fuse_file_info * fi)
 {
     int fd;
 
-    char * fullpath = __get_fullpath(path);
+    char * nexus_fullpath = NULL;
 
-    fd = open(fullpath, fi->flags);
+    int ret = -1;
 
-    nexus_free(fullpath);
+
+    ret = handle_lookup(path, &nexus_fullpath);
+    if (ret != 0) {
+        return -ENOENT;
+    }
+
+    fd = open(nexus_fullpath, fi->flags);
+
+    nexus_free(nexus_fullpath);
 
     if (fd == -1)
         return -errno;

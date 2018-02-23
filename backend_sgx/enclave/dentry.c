@@ -137,7 +137,7 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
         // if the entry is not found, let's leave
         ret = dirnode_find_by_name(curr_dentry->metadata->dirnode, name, &atype, &uuid);
         if (ret != 0) {
-            log_error("nexus_dirnode_lookup() FAILED");
+            log_error("nexus_dirnode_lookup() FAILED\n");
             return NULL;
         }
 
@@ -179,7 +179,7 @@ dentry_lookup(struct nexus_dentry * root_dentry, char * path)
     // resolve the dentry and return
     if (dentry && revalidate_dentry(dentry, &builder) == -1) {
         path_builder_free(&builder);
-        log_error("revalidating dentry FAILED");
+        log_error("revalidating dentry FAILED\n");
         return NULL;
     }
 

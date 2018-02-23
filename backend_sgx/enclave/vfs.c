@@ -134,7 +134,9 @@ free_metadata(struct nexus_metadata * metadata)
     }
 
     // update the dentry
-    metadata->dentry->metadata = NULL;
+    if (metadata->dentry) {
+        metadata->dentry->metadata = NULL;
+    }
 
     nexus_free(metadata);
 }
@@ -165,8 +167,8 @@ nexus_vfs_flush(struct nexus_metadata * metadata)
 int
 nexus_vfs_revalidate(struct nexus_metadata * metadata)
 {
-    // TODO
-    return -1;
+    // TODO stat the metadata store and check if the metadata is old
+    return 0;
 }
 
 static struct nexus_metadata *

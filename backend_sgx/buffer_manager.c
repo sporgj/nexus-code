@@ -96,6 +96,8 @@ __alloc_buf(struct buffer_manager * buf_manager,
     buf->addr = addr;
     buf->size = size;
 
+    buf->refcount = 1;
+
     nexus_uuid_copy(uuid, &buf->uuid);
 
     // insert in the htable

@@ -31,7 +31,6 @@ __dir_entry_deallocator(void * el);
 static void
 dirnode_init(struct nexus_dirnode * dirnode);
 
-// falls in style with the src->dst argument positions in libnexus
 static inline void
 __copy_dir_entry(struct dir_entry_s * src_dir_entry, struct dir_entry_s * dst_dir_entry)
 {
@@ -339,8 +338,7 @@ dirnode_free(struct nexus_dirnode * dirnode)
 // this will be called on list_destroy, list_remove
 static void
 __dir_entry_deallocator(void * el)
-{
-    struct dir_entry_s * dir_entry = (struct dir_entry_s *)el;
+{ struct dir_entry_s * dir_entry = (struct dir_entry_s *)el;
 
     nexus_free(dir_entry);
 }
@@ -367,9 +365,7 @@ dirnode_add(struct nexus_dirnode * dirnode,
 
     memcpy(new_dir_entry->name, filename, name_len);
 
-    nexus_uuid_gen(&new_dir_entry->uuid);
-    nexus_uuid_copy(&new_dir_entry->uuid, entry_uuid);
-
+    nexus_uuid_copy(entry_uuid, &new_dir_entry->uuid);
 
     nexus_list_append(&dirnode->dir_entry_list, new_dir_entry);
 

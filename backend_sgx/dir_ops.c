@@ -96,12 +96,14 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
 
     err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, &uuid);
 
-    if (err || ret) {
+    if (err) {
         log_error("ecall_fs_lookup() FAILED. (err=0x%x, ret=%d)\n", err, ret);
         return -1;
     }
 
-    *nexus_name = nexus_uuid_to_alt64(&uuid);
+    if (ret == 0) {
+        *nexus_name = nexus_uuid_to_alt64(&uuid);
+    }
 
     return 0;
 }
