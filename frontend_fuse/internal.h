@@ -16,7 +16,7 @@ extern struct nexus_volume * mounted_volume;
 
 
 int
-start_fuse(struct fuse_args * args);
+start_fuse(int argc, char * argv[], char * datastore_path);
 
 // handler.c
 

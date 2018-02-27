@@ -3,22 +3,14 @@
 #include "internal.h"
 
 
+char * volume_path = NULL;
+
+/* this is where the raw data files will be served from */
 char * datastore_path = NULL;
 
+/* the currently running volume */
 struct nexus_volume * mounted_volume = NULL;
 
-static struct options {
-    int background_mode;
-    char * volume_path;
-} options;
-
-#define OPTION(t, p) { t, offsetof(struct options, p), 1 }
-
-static struct fuse_opt option_spec[] = {
-    OPTION("--vol %s", volume_path),
-    OPTION("--bg", background_mode),
-    FUSE_OPT_END
-};
 
 static void *
 fuse_datastore_open(nexus_json_obj_t cfg)
@@ -33,7 +25,7 @@ fuse_datastore_open(nexus_json_obj_t cfg)
         return NULL;
     }
 
-    asprintf(&datastore_path, "%s/%s", options.volume_path, root_path);
+    asprintf(&datastore_path, "%s/%s", volume_path, root_path);
 
     return datastore_path;
 }
@@ -50,25 +42,25 @@ fuse_datastore_close(void * priv_data)
 int
 main(int argc, char * argv[])
 {
-    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-
-    if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1) {
-        log_error("parsing options failed\n");
+    if (argc < 3) {
+        fprintf(stdout, "usage: %s <volume_path> [fuse options] <mountpath>\n", argv[0]);
+        fflush(stdout);
         return -1;
     }
 
-    if (options.volume_path == NULL) {
-        printf("usage: %s [fuse options] --vol <volume_path> <mount_path>\n", argv[0]);
-        fflush(stdout);
+
+    volume_path = strndup(argv[1], PATH_MAX);
+    if (volume_path == NULL) {
+        log_error("Could not get volume path\n");
         return -1;
     }
 
     nexus_init();
 
-    mounted_volume = nexus_mount_volume(options.volume_path);
+    mounted_volume = nexus_mount_volume(volume_path);
 
     if (mounted_volume == NULL) {
-        log_error("failed to mount '%s'\n", options.volume_path);
+        log_error("failed to mount '%s'\n", volume_path);
         return -1;
     }
 
@@ -78,15 +70,12 @@ main(int argc, char * argv[])
         return -1;
     }
 
-    printf("Starting nexus-fuse at [%s] (pid=%d)...\n",
-           datastore_path, (int) getpid());
+    printf("Starting nexus-fuse at [%s] (pid=%d)...\n", datastore_path, (int) getpid());
 
-    // if not
-    if (!options.background_mode) {
-        fuse_opt_add_arg(&args, "-f");
-    }
+    // TODO handle nexus_deinit properly
 
-    return start_fuse(&args);
+    argv[1] = argv[0];
+    return start_fuse(argc - 1, &argv[1], datastore_path);
 }
 
 static struct nexus_datastore_impl fuse_datastore = {
