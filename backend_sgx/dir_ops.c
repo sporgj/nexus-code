@@ -105,7 +105,7 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
         *nexus_name = nexus_uuid_to_alt64(&uuid);
     }
 
-    return 0;
+    return ret;
 }
 
 int
@@ -133,10 +133,40 @@ sgx_backend_fs_filldir(struct nexus_volume  * volume,
 
     err = ecall_fs_filldir(sgx_backend->enclave_id, &ret, dirpath, &uuid, plain_name);
 
-    if (err || ret) {
-        log_error("ecall_fs_filldir() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+    if (err) {
+        log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
         return -1;
     }
+
+    return ret;
+}
+
+int
+sgx_backend_fs_symlink(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       char                 * link_name,
+                       char                 * target_path,
+                       char                ** nexus_name,
+                       void                 * priv_data)
+{
+    struct sgx_backend * sgx_backend = NULL;
+
+    struct nexus_uuid uuid;
+
+    int err = -1;
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend *)priv_data;
+
+    err = ecall_fs_symlink(sgx_backend->enclave_id, &ret, dirpath, link_name, target_path, &uuid);
+
+    if (err || ret) {
+        log_error("ecall_fs_symlink() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    *nexus_name = nexus_uuid_to_alt64(&uuid);
 
     return 0;
 }

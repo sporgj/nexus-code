@@ -227,3 +227,25 @@ nexus_backend_fs_filldir(struct nexus_volume * volume,
 
     return backend->impl->fs_filldir(volume, dirpath, nexus_name, plain_name, backend->priv_data);
 }
+
+int
+nexus_backend_fs_symlink(struct nexus_volume * volume,
+                         char                * dirpath,
+                         char                * link_name,
+                         char                * target_path,
+                         char               ** nexus_name)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_symlink == NULL) {
+	log_error("fs_symlink NOT Implemented for %s backend\n", backend->impl->name);
+	return -1;
+    }
+
+    return backend->impl->fs_symlink(volume,
+                                     dirpath,
+                                     link_name,
+                                     target_path,
+                                     nexus_name,
+                                     backend->priv_data);
+}

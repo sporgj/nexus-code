@@ -12,11 +12,8 @@
 #include <nexus_util.h>
 #include <nexus_log.h>
 
-
 int
-nexus_fs_readdir(struct nexus_volume *  volume,
-		 char                *  path,
-		 struct nexus_dirent ** result)
+nexus_fs_readdir(struct nexus_volume * volume, char * path, struct nexus_dirent ** result)
 {
 
     return -1;
@@ -71,3 +68,12 @@ nexus_fs_filldir(struct nexus_volume  * volume,
     return nexus_backend_fs_filldir(volume, dirpath, nexus_name, plain_name);
 }
 
+int
+nexus_fs_symlink(struct nexus_volume * volume,
+                 char                * dirpath,
+                 char                * link_name,
+                 char                * target_path,
+                 char               ** nexus_name)
+{
+    return nexus_backend_fs_symlink(volume, dirpath, link_name, target_path, nexus_name);
+}

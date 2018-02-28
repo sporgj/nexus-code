@@ -269,3 +269,71 @@ out:
 
     return ret;
 }
+
+int
+__nxs_fs_symlink(struct nexus_metadata * metadata,
+                 char                  * dirpath_IN,
+                 char                  * link_name,
+                 char                  * target_path,
+                 struct nexus_uuid     * entry_uuid)
+{
+    struct nexus_dirnode * dirnode = metadata->dirnode;
+
+
+    nexus_uuid_gen(entry_uuid);
+
+    if (dirnode_add_link(dirnode, link_name, target_path, entry_uuid)) {
+        log_error("could not add link to dirnode\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+ecall_fs_symlink(char              * dirpath_IN,
+                 char              * linkname_IN,
+                 char              * targetpath_IN,
+                 struct nexus_uuid * uuid_out)
+{
+    struct nexus_metadata * metadata = NULL;
+
+    struct nexus_dentry * dentry = NULL;
+
+    struct nexus_uuid entry_uuid;
+
+    int ret = -1;
+
+
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+
+    ret = __nxs_fs_symlink(metadata, dirpath_IN, linkname_IN, targetpath_IN, &entry_uuid);
+
+    if (ret != 0) {
+        log_error("symlink operation failed\n");
+        goto out;
+    }
+
+
+    ret = nexus_vfs_flush(metadata);
+
+    if (ret != 0) {
+        log_error("flushing metadata FAILED\n");
+        goto out;
+    }
+
+
+    nexus_uuid_copy(&entry_uuid, uuid_out);
+
+    ret = 0;
+out:
+    nexus_vfs_put(metadata);
+
+    return ret;
+}

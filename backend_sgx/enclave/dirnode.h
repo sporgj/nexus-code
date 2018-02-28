@@ -18,10 +18,15 @@ struct nexus_dirnode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 
+    uint32_t symlink_count;
+    uint32_t symlink_buflen;
+
     uint32_t dir_entry_count;
     uint32_t dir_entry_buflen;
 
     struct nexus_acl dir_acl;
+
+    struct nexus_list symlink_list;
 
     struct nexus_list dir_entry_list;
 };
@@ -80,6 +85,28 @@ dirnode_add(struct nexus_dirnode * dirnode,
             char                 * filename,
             nexus_dirent_type_t    type,
             struct nexus_uuid    * entry_uuid);
+
+/**
+ * adds a new link
+ * @param dirnode
+ * @param link_name
+ * @param target_path
+ * @param entry_uuid
+ */
+int
+dirnode_add_link(struct nexus_dirnode * dirnode,
+                 char                 * link_name,
+                 char                 * target_path,
+                 struct nexus_uuid    * entry_uuid);
+
+/**
+ * gets the target path pointed by the symlink
+ * @param dirnode
+ * @param entry_uuid
+ * @return target_path
+ */
+char *
+dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid);
 
 int
 dirnode_find_by_uuid(struct nexus_dirnode * dirnode,

@@ -74,6 +74,14 @@ enclave {
                     [in] struct nexus_uuid   * uuid_IN,
             [user_check] char               ** filename_out
         );
+
+        public int ecall_fs_symlink
+        (
+            [in, string] char                * directory_IN,
+            [in, string] char                * linkname_IN,
+            [in, string] char                * targetpath_IN,
+                   [out] struct nexus_uuid   * uuid_out
+        );
     };
 
 

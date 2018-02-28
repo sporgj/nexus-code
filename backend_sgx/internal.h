@@ -63,6 +63,13 @@ sgx_backend_fs_filldir(struct nexus_volume  * volume,
                        char                 * nexus_name,
                        char                ** plain_name,
                        void                 * priv_data);
+int
+sgx_backend_fs_symlink(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       char                 * link_name,
+                       char                 * target_path,
+                       char                ** nexus_name,
+                       void                 * priv_data);
 
 
 void

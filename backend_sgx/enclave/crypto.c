@@ -183,6 +183,9 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
         memcpy(ciphertext, output_buffer, size);
 
         bytes_left -= size;
+
+        plaintext  += size;
+        ciphertext += size;
     }
 
     mbedtls_gcm_finish(&gcm_context, (uint8_t *)&(crypto_context->mac), sizeof(struct nexus_mac));
@@ -263,6 +266,9 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
         memcpy(plaintext, output_buffer, size);
 
         bytes_left -= size;
+
+        plaintext  += size;
+        ciphertext += size;
     }
 
     mbedtls_gcm_finish(&gcm_context, (uint8_t *)&computed_mac, sizeof(struct nexus_mac));

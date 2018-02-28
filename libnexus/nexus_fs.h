@@ -70,6 +70,22 @@ nexus_fs_filldir(struct nexus_volume  * volume,
                  char                ** plain_name);
 
 int
+nexus_fs_symlink(struct nexus_volume * volume,
+                 char                * dirpath,
+                 char                * link_name,
+                 char                * target_path,
+                 char               ** nexus_name);
+
+
+
+
+
+
+
+
+
+
+int
 nexus_fs_readdir(struct nexus_volume *  volume,
 		 char                *  path,
 		 struct nexus_dirent ** result);
