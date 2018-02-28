@@ -71,6 +71,15 @@ sgx_backend_fs_symlink(struct nexus_volume  * volume,
                        char                ** nexus_name,
                        void                 * priv_data);
 
+int
+sgx_backend_fs_hardlink(struct nexus_volume  * volume,
+                        char                 * link_dirpath,
+                        char                 * link_name,
+                        char                 * target_dirpath,
+                        char                 * target_name,
+                        char                ** nexus_name,
+                        void                 * priv_data);
+
 
 void
 key_buffer_init(struct nexus_key_buffer * key_buffer);

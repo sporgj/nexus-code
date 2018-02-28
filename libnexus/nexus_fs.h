@@ -76,6 +76,13 @@ nexus_fs_symlink(struct nexus_volume * volume,
                  char                * target_path,
                  char               ** nexus_name);
 
+int
+nexus_fs_hardlink(struct nexus_volume * volume,
+                  char                * link_dirpath,
+                  char                * link_name,
+                  char                * target_dirpath,
+                  char                * target_name,
+                  char               ** nexus_name);
 
 
 

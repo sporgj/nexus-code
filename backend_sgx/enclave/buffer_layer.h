@@ -43,3 +43,11 @@ buffer_layer_flush(struct nexus_uuid * uuid);
 void
 buffer_layer_delete(struct nexus_uuid * uuid);
 
+/**
+ * Hardlinks two metadata uuid
+ * @param link_uuid
+ * @param target_uuid
+ * @return 0 on success
+ */
+int
+buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_uuid);

@@ -389,6 +389,48 @@ flat_del_uuid(struct nexus_uuid * uuid,
     
 }
 
+static int
+flat_hardlink_uuid(struct nexus_uuid * link_uuid,
+                   char              * link_path,
+                   struct nexus_uuid * target_uuid,
+                   char              * target_path,
+                   void              * priv_data)
+{
+    struct flat_datastore * datastore = priv_data;
+
+    char * link_fullpath   = NULL;
+    char * target_fullpath = NULL;
+
+    int ret = -1;
+
+    link_fullpath   = __get_full_path(datastore, link_uuid);
+    target_fullpath = __get_full_path(datastore, target_uuid);
+
+    if (link_fullpath == NULL || target_fullpath == NULL) {
+	log_error("could not derive link/target path\n");
+	goto err_out;
+    }
+
+    ret = link(target_fullpath, link_fullpath);
+
+    if (ret != 0) {
+	log_error("harlink '%s' -> '%s' FAILED\n", target_fullpath, link_fullpath);
+	perror("error: ");
+	goto err_out;
+    }
+
+    ret = 0;
+err_out:
+    if (link_fullpath) {
+	nexus_free(link_fullpath);
+    }
+
+    if (target_fullpath) {
+	nexus_free(target_fullpath);
+    }
+
+    return ret;
+}
 
 
 
@@ -398,7 +440,7 @@ static struct nexus_datastore_impl flat_datastore = {
 
     .create      = flat_create,
     .delete      = flat_delete,
-    
+
     .open        = flat_open,
     .close       = flat_close,
 
@@ -406,7 +448,9 @@ static struct nexus_datastore_impl flat_datastore = {
     .put_uuid    = flat_put_uuid,
     .update_uuid = flat_update_uuid,
     .new_uuid    = flat_new_uuid,
-    .del_uuid    = flat_del_uuid
+    .del_uuid    = flat_del_uuid,
+
+    .hardlink_uuid = flat_hardlink_uuid
 };
 
 

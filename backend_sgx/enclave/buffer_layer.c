@@ -89,6 +89,22 @@ buffer_layer_flush(struct nexus_uuid * uuid)
     err = ocall_buffer_flush(&ret, uuid, global_backend_ext);
 
     if (err || ret) {
+        log_error("ocall_buffer_flush FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_hardlink(&ret, link_uuid, target_uuid, global_backend_ext);
+
+    if (err || ret) {
         log_error("ocall_metadata_set FAILED (err=%d, ret=%d)\n", err, ret);
         return -1;
     }

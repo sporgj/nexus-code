@@ -84,6 +84,13 @@ nexus_backend_fs_symlink(struct nexus_volume  * volume,
                          char                 * target_path,
                          char                ** nexus_name);
 
+int
+nexus_backend_fs_hardlink(struct nexus_volume  * volume,
+                          char                 * link_dirpath,
+                          char                 * link_name,
+                          char                 * target_dirpath,
+                          char                 * target_name,
+                          char                ** nexus_name);
 
 
 struct nexus_backend_impl {
@@ -145,6 +152,14 @@ struct nexus_backend_impl {
                       char                 * target_path,
                       char                ** nexus_name,
                       void                 * priv_data);
+
+    int (*fs_hardlink)(struct nexus_volume  * volume,
+                       char                 * link_dirpath,
+                       char                 * link_name,
+                       char                 * target_dirpath,
+                       char                 * target_name,
+                       char                ** nexus_name,
+                       void                 * priv_data);
 };
 
 

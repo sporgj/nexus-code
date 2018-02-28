@@ -82,6 +82,15 @@ enclave {
             [in, string] char                * targetpath_IN,
                    [out] struct nexus_uuid   * uuid_out
         );
+
+        public int ecall_fs_hardlink
+        (
+            [in, string] char                * link_dirpath_IN,
+            [in, string] char                * linkname_IN,
+            [in, string] char                * target_dirpath_IN,
+            [in, string] char                * targetname_IN,
+                   [out] struct nexus_uuid   * uuid_out
+        );
     };
 
 
@@ -140,6 +149,14 @@ enclave {
         ocall_buffer_del
         (
             [in]         struct nexus_uuid * metadata_uuid,
+            [user_check] void              * backend_info
+        );
+
+        int
+        ocall_buffer_hardlink
+        (
+            [in]         struct nexus_uuid * link_uuid,
+            [in]         struct nexus_uuid * target_uuid,
             [user_check] void              * backend_info
         );
 

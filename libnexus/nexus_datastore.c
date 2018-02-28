@@ -244,3 +244,22 @@ nexus_datastore_del_uuid(struct nexus_datastore * datastore,
 {
     return datastore->impl->del_uuid(uuid, path, datastore->priv_data);
 }
+
+int
+nexus_datastore_hardlink_uuid(struct nexus_datastore * datastore,
+                              struct nexus_uuid      * link_uuid,
+                              char                   * link_path,
+                              struct nexus_uuid      * target_uuid,
+                              char                   * target_path)
+{
+    if (datastore->impl->hardlink_uuid == NULL) {
+	log_error("hardlink_uuid not implemented for datastore: %s\n", datastore->impl->name);
+	return -1;
+    }
+
+    return datastore->impl->hardlink_uuid(link_uuid,
+                                          link_path,
+                                          target_uuid,
+                                          target_path,
+                                          datastore->priv_data);
+}

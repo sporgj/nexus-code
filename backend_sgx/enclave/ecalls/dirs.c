@@ -337,3 +337,116 @@ out:
 
     return ret;
 }
+
+int
+__nxs_fs_hardlink(struct nexus_dirnode * link_dirnode,
+                  char                 * link_name_IN,
+                  struct nexus_dirnode * target_dirnode,
+                  char                 * target_name_IN,
+                  struct nexus_uuid    * link_uuid)
+{
+    nexus_dirent_type_t target_type;
+
+    struct nexus_uuid target_uuid;
+
+    int ret = -1;
+
+
+    ret = dirnode_find_by_name(target_dirnode, target_name_IN, &target_type, &target_uuid);
+
+    if (ret != 0) {
+        log_error("dirnode_find_by_name(%s) FAILED\n", target_name_IN);
+        return -1;
+    }
+
+    if (target_type != NEXUS_REG) {
+        log_error("NEXUS only supports hardlinking files\n");
+        return -1;
+    }
+
+    // generate the uuid and add entry to dirnode
+    nexus_uuid_gen(link_uuid);
+
+    ret = buffer_layer_hardlink(&target_uuid, link_uuid);
+
+    if (ret != 0) {
+        log_error("buffer_layer_hardlink() FAILED\n");
+        return -1;
+    }
+
+    ret = dirnode_add(link_dirnode, link_name_IN, NEXUS_REG, link_uuid);
+
+    if (ret != 0) {
+        // TODO undo the hardlink
+
+        log_error("dirnode_find_by_name(%s) FAILED\n", target_name_IN);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+ecall_fs_hardlink(char              * link_dirpath_IN,
+                  char              * link_name_IN,
+                  char              * target_dirpath_IN,
+                  char              * target_name_IN,
+                  struct nexus_uuid * entry_uuid_out)
+{
+    struct nexus_metadata * link_metadata   = NULL;
+    struct nexus_metadata * target_metadata = NULL;
+
+    struct nexus_dentry * link_dentry   = NULL;
+    struct nexus_dentry * target_dentry = NULL;
+
+    struct nexus_uuid link_uuid;
+
+    int ret = -1;
+
+
+    (void)link_dentry;
+    (void)target_dentry;
+
+
+    link_metadata = nexus_vfs_get(link_dirpath_IN, NEXUS_DIRNODE, &link_dentry);
+
+    if (link_metadata == NULL) {
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+    target_metadata = nexus_vfs_get(target_dirpath_IN, NEXUS_DIRNODE, &target_dentry);
+
+    if (target_metadata == NULL) {
+        nexus_vfs_put(link_metadata);
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+    ret = __nxs_fs_hardlink(link_metadata->dirnode,
+                            link_name_IN,
+                            target_metadata->dirnode,
+                            target_name_IN,
+                            &link_uuid);
+
+    if (ret != 0) {
+        log_error("__nxs_fs_hardlink() FAILED\n");
+        goto out;
+    }
+
+    ret = nexus_vfs_flush(link_metadata);
+    if (ret != 0) {
+        log_error("flushing metadata FAILED\n");
+        goto out;
+    }
+
+    // copy out the UUID of the new entry
+    nexus_uuid_copy(&link_uuid, entry_uuid_out);
+
+    ret = 0;
+out:
+    nexus_vfs_put(link_metadata);
+    nexus_vfs_put(target_metadata);
+
+    return ret;
+}

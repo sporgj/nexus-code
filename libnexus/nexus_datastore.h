@@ -76,6 +76,12 @@ int nexus_datastore_del_uuid(struct nexus_datastore * datastore,
 			     char                   * path);
 
 
+int nexus_datastore_hardlink_uuid(struct nexus_datastore * datastore,
+                                  struct nexus_uuid      * link_uuid,
+                                  char                   * link_path,
+                                  struct nexus_uuid      * target_uuid,
+                                  char                   * target_path);
+
 
 
 
@@ -130,7 +136,11 @@ struct nexus_datastore_impl {
 		    char              * path,
 		    void              * priv_data);
 
-    
+    int (*hardlink_uuid)(struct nexus_uuid * link_uuid,
+                         char              * link_path,
+                         struct nexus_uuid * target_uuid,
+                         char              * target_path,
+                         void              * priv_data);
 };
 
 

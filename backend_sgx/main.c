@@ -119,7 +119,8 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .fs_remove       = sgx_backend_fs_remove,
     .fs_lookup       = sgx_backend_fs_lookup,
     .fs_filldir      = sgx_backend_fs_filldir,
-    .fs_symlink      = sgx_backend_fs_symlink
+    .fs_symlink      = sgx_backend_fs_symlink,
+    .fs_hardlink     = sgx_backend_fs_hardlink
 };
 
 

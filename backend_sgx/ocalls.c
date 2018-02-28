@@ -143,3 +143,20 @@ ocall_buffer_del(struct nexus_uuid * metadata_uuid, void * backend_info)
 
     return ret;
 }
+
+int
+ocall_buffer_hardlink(struct nexus_uuid * link_uuid,
+                      struct nexus_uuid * target_uuid,
+                      void              * backend_info)
+{
+    struct sgx_backend * sgx_backend = NULL;
+
+
+    sgx_backend = (struct sgx_backend *)backend_info;
+
+    return nexus_datastore_hardlink_uuid(sgx_backend->volume->metadata_store,
+                                         link_uuid,
+                                         NULL,
+                                         target_uuid,
+                                         NULL);
+}
