@@ -93,3 +93,21 @@ nexus_fs_hardlink(struct nexus_volume * volume,
                                      target_name,
                                      nexus_name);
 }
+
+int
+nexus_fs_rename(struct nexus_volume * volume,
+                char                * from_dirpath,
+                char                * oldname,
+                char                * to_dirpath,
+                char                * newname,
+                char               ** old_nexusname,
+                char               ** new_nexusname)
+{
+    return nexus_backend_fs_rename(volume,
+                                   from_dirpath,
+                                   oldname,
+                                   to_dirpath,
+                                   newname,
+                                   old_nexusname,
+                                   new_nexusname);
+}

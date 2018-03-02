@@ -92,6 +92,15 @@ nexus_backend_fs_hardlink(struct nexus_volume  * volume,
                           char                 * target_name,
                           char                ** nexus_name);
 
+int
+nexus_backend_fs_rename(struct nexus_volume  * volume,
+                        char                 * from_dirpath,
+                        char                 * oldname,
+                        char                 * to_dirpath,
+                        char                 * newname,
+                        char                ** old_nexusname,
+                        char                ** new_nexusname);
+
 
 struct nexus_backend_impl {
     char * name;
@@ -160,6 +169,14 @@ struct nexus_backend_impl {
                        char                 * target_name,
                        char                ** nexus_name,
                        void                 * priv_data);
+
+    int (*fs_rename)(struct nexus_volume  * volume,
+                     char                 * from_dirpath,
+                     char                 * oldname,
+                     char                 * to_dirpath,
+                     char                 * newname,
+                     char                ** old_nexusname,
+                     char                ** new_nexusname);
 };
 
 

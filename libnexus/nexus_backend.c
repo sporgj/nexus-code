@@ -273,3 +273,23 @@ nexus_backend_fs_hardlink(struct nexus_volume  * volume,
                                       nexus_name,
                                       backend->priv_data);
 }
+
+int
+nexus_backend_fs_rename(struct nexus_volume  * volume,
+                        char                 * from_dirpath,
+                        char                 * oldname,
+                        char                 * to_dirpath,
+                        char                 * newname,
+                        char                ** old_nexusname,
+                        char                ** new_nexusname)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_rename == NULL) {
+	log_error("fs_rename NOT Implemented for %s backend\n", backend->impl->name);
+	return -1;
+    }
+
+    // TODO
+    return -1;
+}
