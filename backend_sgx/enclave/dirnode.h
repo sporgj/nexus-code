@@ -59,6 +59,9 @@ dirnode_load(struct nexus_uuid * uuid);
 int
 dirnode_store(struct nexus_dirnode * dirnode, struct nexus_mac * mac);
 
+int
+dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode);
+
 /**
  * Creates a nexus_dirnode from a buffer
  * @param buffer
@@ -121,8 +124,17 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      nexus_dirent_type_t  * type,
                      struct nexus_uuid    * entry_uuid);
 
+/**
+ * Removes an entry from the dirnode
+ * @param dirnode
+ * @param filanem
+ * @param type. will contain the type of the entry
+ * @param entry_uuid will contain the entry's uuid
+ * @param symlink_target_path will contain the symlink path
+ */
 int
 dirnode_remove(struct nexus_dirnode * dirnode,
                char                 * filename,
                nexus_dirent_type_t  * type,
-               struct nexus_uuid    * entry_uuid);
+               struct nexus_uuid    * entry_uuid,
+               char                ** symlink_target_path);

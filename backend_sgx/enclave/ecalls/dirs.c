@@ -98,7 +98,7 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
 
     nexus_dirent_type_t type;
 
-    if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT)) {
+    if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT, NULL)) {
         log_error("dirnode_remove() FAILED\n");
         return -1;
     }
@@ -447,6 +447,150 @@ ecall_fs_hardlink(char              * link_dirpath_IN,
 out:
     nexus_vfs_put(link_metadata);
     nexus_vfs_put(target_metadata);
+
+    return ret;
+}
+
+int
+__nxs_fs_rename(struct nexus_dirnode * from_dirnode,
+                char                 * oldname,
+                struct nexus_dirnode * to_dirnode,
+                char                 * newname,
+                struct nexus_uuid    * old_uuid,
+                struct nexus_uuid    * new_uuid)
+{
+    int ret = -1;
+
+    nexus_dirent_type_t type;
+    nexus_dirent_type_t tmp_type;
+
+    char * target_path = NULL;
+
+    ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &target_path);
+
+    if (ret != 0) {
+        log_error("could not remove (%s) from directory\n", oldname);
+        return -1;
+    }
+
+
+    // for example if moving foo/bar.txt to cat/bar.txt, if bar.txt already exists, we need to remove it
+    ret = dirnode_remove(to_dirnode, oldname, &tmp_type, new_uuid, NULL);
+
+    if (ret == 0) {
+        // this means there was an existing entry in the dirnode
+        // TODO remove uuid from vfs_metadata cache
+        nexus_vfs_delete(new_uuid);
+    } else {
+        // we are adding a file to the destination dirnode
+        nexus_uuid_gen(new_uuid);
+        ret = 0;
+    }
+
+    if (type == NEXUS_LNK) {
+        ret = dirnode_add_link(to_dirnode, newname, target_path, new_uuid);
+
+        nexus_free(target_path);
+    } else {
+        ret = dirnode_add(to_dirnode, newname, type, new_uuid);
+    }
+
+    if (ret != 0) {
+        log_error("could not add entry to destination directory\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int
+ecall_fs_rename(char              * from_dirpath_IN,
+                char              * oldname_IN,
+                char              * to_dirpath_IN,
+                char              * newname_IN,
+                struct nexus_uuid * old_uuid_out,
+                struct nexus_uuid * new_uuid_out)
+{
+    struct nexus_metadata * from_metadata = NULL;
+    struct nexus_metadata * to_metadata   = NULL;
+    struct nexus_metadata * tmp_metadata  = NULL;
+
+    struct nexus_dentry * from_dentry = NULL;
+    struct nexus_dentry * to_dentry   = NULL;
+
+    struct nexus_uuid old_uuid;
+    struct nexus_uuid new_uuid;
+
+    int ret = -1;
+
+
+    // get the necessary metadata
+    from_metadata = nexus_vfs_get(from_dirpath_IN, NEXUS_DIRNODE, &from_dentry);
+
+    if (from_metadata == NULL) {
+      log_error("could not get metadata (%s)\n", from_dirpath_IN);
+      return -1;
+    }
+
+    to_metadata = nexus_vfs_get(to_dirpath_IN, NEXUS_DIRNODE, &to_dentry);
+
+    if (to_metadata == NULL) {
+      nexus_vfs_put(from_metadata);
+
+      log_error("could not get metadata (%s)\n", to_dirpath_IN);
+      return -1;
+    }
+
+    // if it's the same dirnode
+    if (dirnode_compare(from_metadata->dirnode, to_metadata->dirnode) == 0) {
+        nexus_vfs_put(to_metadata);
+
+        to_metadata = NULL;
+
+        tmp_metadata = from_metadata;
+    } else {
+        tmp_metadata = to_metadata;
+    }
+
+
+    ret = __nxs_fs_rename(from_metadata->dirnode,
+                          oldname_IN,
+                          tmp_metadata->dirnode,
+                          newname_IN,
+                          &old_uuid,
+                          &new_uuid);
+
+    if (ret != 0) {
+        log_error("rename operation failed\n");
+    }
+
+    // TODO call datastore for renaming
+
+    ret = nexus_vfs_flush(from_metadata);
+    if (ret != 0) {
+        log_error("could not flush source dirnode\n");
+        goto out;
+    }
+
+    if (to_metadata != NULL) {
+        ret = nexus_vfs_flush(to_metadata);
+        if (ret != 0) {
+            log_error("could not flush destination dirnode\n");
+            goto out;
+        }
+    }
+
+    nexus_uuid_copy(&old_uuid, old_uuid_out);
+    nexus_uuid_copy(&new_uuid, new_uuid_out);
+
+    ret = 0;
+out:
+    nexus_vfs_put(from_metadata);
+
+    if (to_metadata) {
+        nexus_vfs_put(to_metadata);
+    }
 
     return ret;
 }

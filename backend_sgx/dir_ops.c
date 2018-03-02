@@ -207,3 +207,43 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
 
     return 0;
 }
+
+int
+sgx_backend_fs_rename(struct nexus_volume  * volume,
+                      char                 * from_dirpath,
+                      char                 * oldname,
+                      char                 * to_dirpath,
+                      char                 * newname,
+                      char                ** old_nexusname,
+                      char                ** new_nexusname,
+                      void                 * priv_data)
+{
+    struct sgx_backend * sgx_backend = NULL;
+
+    struct nexus_uuid old_uuid;
+    struct nexus_uuid new_uuid;
+
+    int err = -1;
+    int ret = -1;
+
+    sgx_backend = (struct sgx_backend *)priv_data;
+
+    err = ecall_fs_rename(sgx_backend->enclave_id,
+                          &ret,
+                          from_dirpath,
+                          oldname,
+                          to_dirpath,
+                          newname,
+                          &old_uuid,
+                          &new_uuid);
+
+    if (err || ret) {
+        log_error("ecall_fs_rename() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    *old_nexusname = nexus_uuid_to_alt64(&old_uuid);
+    *new_nexusname = nexus_uuid_to_alt64(&new_uuid);
+
+    return 0;
+}

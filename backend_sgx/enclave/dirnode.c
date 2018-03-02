@@ -42,18 +42,95 @@ __find_by_name(struct nexus_dirnode * dirnode, const char * fname);
  * @param el
  */
 static void
-__dir_entry_deallocator(void * el);
+__free_dir_entry(void * el);
 
 static void
-__symlink_deallocator(void * el);
+__free_symlink_entry(void * el);
 
 static void
 dirnode_init(struct nexus_dirnode * dirnode);
 
-static inline void
-__copy_dir_entry(struct dir_entry_s * src_dir_entry, struct dir_entry_s * dst_dir_entry)
+
+
+// --------------------------- dir entry stuff -------------------------------
+
+static struct dir_entry_s *
+__new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char * filename)
 {
-    memcpy(dst_dir_entry, src_dir_entry, src_dir_entry->total_len);
+    struct dir_entry_s * new_dir_entry = NULL;
+
+    size_t name_len  = 0;
+    size_t total_len = 0;
+
+    name_len  = strlen(filename);
+    total_len = sizeof(struct dir_entry_s) + name_len + 1;
+
+    new_dir_entry = nexus_malloc(total_len);
+
+    new_dir_entry->total_len = total_len;
+    new_dir_entry->name_len  = name_len;
+    new_dir_entry->type      = type;
+
+    memcpy(new_dir_entry->name, filename, name_len);
+
+    nexus_uuid_copy(entry_uuid, &new_dir_entry->uuid);
+
+    return new_dir_entry;
+}
+
+static void
+__free_dir_entry(void * el)
+{
+    struct dir_entry_s * dir_entry = (struct dir_entry_s *)el;
+
+    nexus_free(dir_entry);
+}
+
+static inline struct dir_entry_s *
+__clone_dir_entry(struct dir_entry_s * src_dir_entry)
+{
+    struct dir_entry_s * new_dir_entry = NULL;
+
+    new_dir_entry = nexus_malloc(src_dir_entry->total_len);
+
+    memcpy(new_dir_entry, src_dir_entry, src_dir_entry->total_len);
+
+    return new_dir_entry;
+}
+
+static uint8_t *
+__parse_dir_entry(struct dir_entry_s ** dir_entry, uint8_t * in_buffer)
+{
+    struct dir_entry_s * new_dir_entry = NULL;
+    struct dir_entry_s * tmp_dir_entry = NULL;
+
+    tmp_dir_entry = (struct dir_entry_s *)in_buffer;
+
+    new_dir_entry = __clone_dir_entry(tmp_dir_entry);
+
+    *dir_entry = new_dir_entry;
+
+    return (in_buffer + new_dir_entry->total_len);
+}
+
+static uint8_t *
+__serialize_dir_entry(struct dir_entry_s * dir_entry, uint8_t * out_buffer)
+{
+    memcpy(out_buffer, dir_entry, dir_entry->total_len);
+
+    return (out_buffer + dir_entry->total_len);
+}
+
+
+
+// ------------------------- symlink stuff --------------------------
+
+static void
+__free_symlink_entry(void * el)
+{
+    struct symlink_entry_s * symlink = (struct symlink_entry_s *)el;
+
+    nexus_free(symlink);
 }
 
 static uint8_t *
@@ -75,21 +152,22 @@ __parse_symlink_entry(struct symlink_entry_s ** symlink_entry, uint8_t * in_buff
 }
 
 static uint8_t *
-__parse_dir_entry(struct dir_entry_s ** dir_entry, uint8_t * in_buffer)
+__serialize_symlink_entry(struct symlink_entry_s * symlink_entry, uint8_t * out_buffer)
 {
-    struct dir_entry_s * new_dir_entry = NULL;
-    struct dir_entry_s * tmp_dir_entry = NULL;
+    memcpy(out_buffer, symlink_entry, symlink_entry->total_len);
 
-    tmp_dir_entry = (struct dir_entry_s *)in_buffer;
-
-    new_dir_entry = nexus_malloc(tmp_dir_entry->total_len);
-
-    __copy_dir_entry(tmp_dir_entry, new_dir_entry);
-
-    *dir_entry = new_dir_entry;
-
-    return (in_buffer + tmp_dir_entry->total_len);
+    return (out_buffer + symlink_entry->total_len);
 }
+
+static size_t
+__get_total_size(struct nexus_dirnode * dirnode)
+{
+    return sizeof(struct __dirnode_hdr)
+           + dirnode->symlink_buflen
+           + dirnode->dir_entry_buflen
+           + nexus_acl_size(&dirnode->dir_acl);
+}
+
 
 static uint8_t *
 __parse_dirnode_header(struct nexus_dirnode * dirnode,
@@ -175,6 +253,12 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
     return dirnode;
 }
 
+int
+dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode)
+{
+    return nexus_uuid_compare(&src_dirnode->my_uuid, &dst_dirnode->my_uuid);
+}
+
 struct nexus_dirnode *
 dirnode_load(struct nexus_uuid * uuid)
 {
@@ -212,31 +296,6 @@ dirnode_load(struct nexus_uuid * uuid)
     }
 
     return dirnode;
-}
-
-static size_t
-__get_total_size(struct nexus_dirnode * dirnode)
-{
-    return sizeof(struct __dirnode_hdr)
-           + dirnode->symlink_buflen
-           + dirnode->dir_entry_buflen
-           + nexus_acl_size(&dirnode->dir_acl);
-}
-
-static uint8_t *
-__serialize_dir_entry(struct dir_entry_s * dir_entry, uint8_t * out_buffer)
-{
-    __copy_dir_entry(dir_entry, (struct dir_entry_s *) out_buffer);
-
-    return (out_buffer + dir_entry->total_len);
-}
-
-static uint8_t *
-__serialize_symlink_entry(struct symlink_entry_s * symlink_entry, uint8_t * out_buffer)
-{
-    memcpy(out_buffer, symlink_entry, symlink_entry->total_len);
-
-    return (out_buffer + symlink_entry->total_len);
 }
 
 static uint8_t *
@@ -322,10 +381,10 @@ static void
 dirnode_init(struct nexus_dirnode * dirnode)
 {
     nexus_list_init(&dirnode->dir_entry_list);
-    nexus_list_set_deallocator(&dirnode->dir_entry_list, __dir_entry_deallocator);
+    nexus_list_set_deallocator(&dirnode->dir_entry_list, __free_dir_entry);
 
     nexus_list_init(&dirnode->symlink_list);
-    nexus_list_set_deallocator(&dirnode->symlink_list, __symlink_deallocator);
+    nexus_list_set_deallocator(&dirnode->symlink_list, __free_symlink_entry);
 
     nexus_acl_init(&dirnode->dir_acl);
 }
@@ -413,23 +472,6 @@ dirnode_free(struct nexus_dirnode * dirnode)
     nexus_free(dirnode);
 }
 
-// this will be called on list_destroy, list_remove
-static void
-__dir_entry_deallocator(void * el)
-{
-    struct dir_entry_s * dir_entry = (struct dir_entry_s *)el;
-
-    nexus_free(dir_entry);
-}
-
-static void
-__symlink_deallocator(void * el)
-{
-    struct symlink_entry_s * symlink = (struct symlink_entry_s *)el;
-
-    nexus_free(symlink);
-}
-
 int
 dirnode_add(struct nexus_dirnode * dirnode,
             char                 * filename,
@@ -453,26 +495,12 @@ dirnode_add(struct nexus_dirnode * dirnode,
         }
     }
 
-    size_t name_len  = 0;
-    size_t total_len = 0;
-
-    name_len  = strlen(filename);
-    total_len = sizeof(struct dir_entry_s) + name_len + 1;
-
-    new_dir_entry = nexus_malloc(total_len);
-
-    new_dir_entry->total_len = total_len;
-    new_dir_entry->name_len  = name_len;
-    new_dir_entry->type      = type;
-
-    memcpy(new_dir_entry->name, filename, name_len);
-
-    nexus_uuid_copy(entry_uuid, &new_dir_entry->uuid);
+    new_dir_entry = __new_dir_entry(entry_uuid, type, filename);
 
     nexus_list_append(&dirnode->dir_entry_list, new_dir_entry);
 
-    dirnode->dir_entry_count += 1;
-    dirnode->dir_entry_buflen += total_len;
+    dirnode->dir_entry_count  += 1;
+    dirnode->dir_entry_buflen += new_dir_entry->total_len;
 
     return 0;
 }
@@ -612,6 +640,8 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
     nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
     *type = dir_entry->type;
 
+    list_iterator_free(iter);
+
     return 0;
 }
 
@@ -640,7 +670,7 @@ __find_symlink(struct nexus_dirnode * dirnode, struct nexus_uuid * uuid)
 }
 
 static int
-__remove_symlink(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
+__remove_symlink(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid, char ** target_path_dest)
 {
     struct symlink_entry_s * symlink_entry = NULL;
 
@@ -653,6 +683,10 @@ __remove_symlink(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
     }
 
     symlink_entry = list_iterator_get(iter);
+
+    if (target_path_dest) {
+        *target_path_dest = strndup(symlink_entry->target_path, NEXUS_PATH_MAX);
+    }
 
     dirnode->symlink_count  -= 1;
     dirnode->symlink_buflen -= symlink_entry->total_len;
@@ -683,11 +717,11 @@ dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
     return symlink_entry->target_path;
 }
 
-int
-dirnode_remove(struct nexus_dirnode * dirnode,
-               char                 * filename,
-               nexus_dirent_type_t  * type,
-               struct nexus_uuid    * entry_uuid)
+static inline int
+__dirnode_remove(struct nexus_dirnode * dirnode,
+                 char                 * filename,
+                 nexus_dirent_type_t  * type,
+                 struct nexus_uuid    * entry_uuid)
 {
     struct dir_entry_s * dir_entry = NULL;
 
@@ -706,16 +740,31 @@ dirnode_remove(struct nexus_dirnode * dirnode,
     dirnode->dir_entry_count  -= 1;
     dirnode->dir_entry_buflen -= dir_entry->total_len;
 
-    nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
     *type = dir_entry->type;
 
-    if (dir_entry->type == NEXUS_LNK) {
-        __remove_symlink(dirnode, entry_uuid);
-    }
+    nexus_uuid_copy(&dir_entry->uuid, entry_uuid);
 
     // remove from the list
     list_iterator_del(iter);
     list_iterator_free(iter);
 
     return 0;
+}
+
+int
+dirnode_remove(struct nexus_dirnode * dirnode,
+               char                 * filename,
+               nexus_dirent_type_t  * type,
+               struct nexus_uuid    * entry_uuid,
+               char                ** symlink_target_path)
+{
+    int ret = -1;
+
+    ret = __dirnode_remove(dirnode, filename, type, entry_uuid);
+
+    if (*type == NEXUS_LNK) {
+        __remove_symlink(dirnode, entry_uuid, symlink_target_path);
+    }
+
+    return ret;
 }
