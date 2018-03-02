@@ -12,6 +12,8 @@
 
 extern char * datastore_path;
 
+extern size_t datastore_pathlen;
+
 extern struct nexus_volume * mounted_volume;
 
 

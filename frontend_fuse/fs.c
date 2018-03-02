@@ -63,13 +63,17 @@ static void
 stackfs_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
 {
     struct fuse_entry_param e;
-    int                     res;
-    char *                  fullPath = NULL;
-    double                  attr_val;
+
+    char * fullPath       = NULL;
+    char * nexus_fullpath = NULL;
+
+    double attr_val = 0.0;
+
+    int ret = -1;
 
     // StackFS_trace("Lookup called on name : %s, parent ino : %llu",
     //							name, parent);
-    fullPath = (char *)malloc(PATH_MAX);
+    fullPath = nexus_malloc(PATH_MAX);
     construct_full_path(req, parent, fullPath, name);
 
     attr_val = lo_attr_valid_time(req);
@@ -78,16 +82,21 @@ stackfs_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
     e.attr_timeout  = attr_val;
     e.entry_timeout = 1.0; /* dentry timeout */
 
-    res = stat(fullPath, &e.attr);
+    ret = handle_lookup(fullPath, &nexus_fullpath);
 
-    if (res == 0) {
+    nexus_free(fullPath);
+
+    if (ret != 0) {
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+
+    ret = stat(nexus_fullpath, &e.attr);
+
+    if (ret == 0) {
         struct lo_inode * inode;
 
-        inode = find_lo_inode(req, &e.attr, fullPath);
-
-        if (fullPath) {
-            free(fullPath);
-	}
+        inode = find_lo_inode(req, &e.attr, nexus_fullpath);
 
         if (!inode)
             fuse_reply_err(req, ENOMEM);
@@ -97,25 +106,42 @@ stackfs_ll_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
             fuse_reply_entry(req, &e);
         }
     } else {
-        if (fullPath)
-            free(fullPath);
         fuse_reply_err(req, ENOENT);
     }
+
+    nexus_free(nexus_fullpath);
 }
 
 static void
 stackfs_ll_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 {
-    int         res;
     struct stat buf;
+
     (void)fi;
-    double attr_val;
+
+    char * path = lo_name(req, ino);
+
+    char * nexus_fullpath = NULL;
+
+    double attr_val = 0.0;
+
+    int ret = -1;
 
     // StackFS_trace("Getattr called on name : %s and inode : %llu",
     //			lo_name(req, ino), lo_inode(req, ino)->ino);
     attr_val = lo_attr_valid_time(req);
-    res = stat(lo_name(req, ino), &buf);
-    if (res == -1)
+
+    if (ino == FUSE_ROOT_ID) {
+        ret = stat(path, &buf);
+    } else {
+        ret = handle_lookup(path, &nexus_fullpath);
+        if (ret == 0) {
+            ret = stat(nexus_fullpath, &buf);
+            nexus_free(nexus_fullpath);
+        }
+    }
+
+    if (ret != 0)
         return (void)fuse_reply_err(req, errno);
 
     fuse_reply_attr(req, &buf, attr_val);
@@ -125,7 +151,7 @@ static void
 stackfs_ll_setattr(
     fuse_req_t req, fuse_ino_t ino, struct stat * attr, int to_set, struct fuse_file_info * fi)
 {
-    int res;
+    int ret;
     (void)fi;
     struct stat buf;
     double      attr_val;
@@ -135,8 +161,8 @@ stackfs_ll_setattr(
     attr_val = lo_attr_valid_time(req);
     if (to_set & FUSE_SET_ATTR_SIZE) {
         /*Truncate*/
-        res = truncate(lo_name(req, ino), attr->st_size);
-        if (res != 0) {
+        ret = truncate(lo_name(req, ino), attr->st_size);
+        if (ret != 0) {
             return (void)fuse_reply_err(req, errno);
         }
     }
@@ -148,16 +174,16 @@ stackfs_ll_setattr(
         tv.actime  = attr->st_atime;
         tv.modtime = attr->st_mtime;
 
-        res = utime(lo_name(req, ino), &tv);
+        ret = utime(lo_name(req, ino), &tv);
 
-        if (res != 0) {
+        if (ret != 0) {
             return (void)fuse_reply_err(req, errno);
         }
     }
 
     memset(&buf, 0, sizeof(buf));
-    res = stat(lo_name(req, ino), &buf);
-    if (res != 0)
+    ret = stat(lo_name(req, ino), &buf);
+    if (ret != 0)
         return (void)fuse_reply_err(req, errno);
 
     fuse_reply_attr(req, &buf, attr_val);
@@ -166,158 +192,209 @@ stackfs_ll_setattr(
 static void
 stackfs_ll_create(fuse_req_t req, fuse_ino_t parent, const char * name, mode_t mode, struct fuse_file_info * fi)
 {
-    struct fuse_entry_param e;
-
     char * fullPath = NULL;
 
-    double attr_val;
+    char * nexus_fullpath = NULL;
 
-    int fd, res;
+    double attr_val = 0.0f;
+
+    int fd = 0;
+    int err = -1;
+    int ret = -1;
 
     // StackFS_trace("Create called on %s and parent ino : %llu",
     //				name, lo_inode(req, parent)->ino);
 
-    fullPath = (char *)malloc(PATH_MAX);
+    attr_val = lo_attr_valid_time(req);
+
+
+    fullPath = nexus_malloc(PATH_MAX);
 
     construct_full_path(req, parent, fullPath, name);
 
-    attr_val = lo_attr_valid_time(req);
+    ret = handle_create(fullPath, NEXUS_REG, &nexus_fullpath);
 
-    fd = creat(fullPath, mode);
+    nexus_free(fullPath);
+
+    if (ret != 0) {
+        fuse_reply_err(req, -1);
+        return;
+    }
+
+    fd = creat(nexus_fullpath, mode);
 
     if (fd == -1) {
-        if (fullPath)
-            free(fullPath);
+        log_error("creat() call FAILED (%s)\n", nexus_fullpath);
+
         return (void)fuse_reply_err(req, errno);
     }
 
-    memset(&e, 0, sizeof(e));
+    /* insert lo_inode into the hash table */
+    {
+        struct fuse_entry_param e;
 
-    e.attr_timeout  = attr_val;
-    e.entry_timeout = 1.0;
+        struct lo_data  * lo_data  = NULL;
+        struct lo_inode * lo_inode = NULL;
 
-    res = stat(fullPath, &e.attr);
 
-    if (res == 0) {
-        /* insert lo_inode into the hash table */
-        struct lo_data *  lo_data;
-        struct lo_inode * lo_inode;
+        memset(&e, 0, sizeof(e));
 
-        lo_inode = calloc(1, sizeof(struct lo_inode));
-        if (!lo_inode) {
-            if (fullPath)
-                free(fullPath);
+        e.attr_timeout  = attr_val;
+        e.entry_timeout = 1.0;
 
-            return (void)fuse_reply_err(req, errno);
+        ret = stat(nexus_fullpath, &e.attr);
+
+        if (ret != 0) {
+            log_error("stat (%s) FAILED\n", nexus_fullpath);
+            err = errno;
+            goto err_out;
         }
+
+
+        lo_inode = nexus_malloc(sizeof(struct lo_inode));
 
         lo_inode->ino  = e.attr.st_ino;
         lo_inode->dev  = e.attr.st_dev;
-        lo_inode->name = strdup(fullPath);
+        lo_inode->name = nexus_fullpath;
         /* store this for mapping (debugging) */
         lo_inode->lo_ino = (uintptr_t)lo_inode;
         lo_inode->next = lo_inode->prev = NULL;
-        free(fullPath);
+
 
         lo_data = get_lo_data(req);
+
         pthread_spin_lock(&lo_data->spinlock);
 
-        res = insert_to_hash_table(lo_data, lo_inode);
+        ret = insert_to_hash_table(lo_data, lo_inode);
 
         pthread_spin_unlock(&lo_data->spinlock);
 
-        if (res == -1) {
-            free(lo_inode->name);
+        if (ret == -1) {
             free(lo_inode);
-            fuse_reply_err(req, EBUSY);
-        } else {
-            lo_inode->nlookup++;
-            e.ino = lo_inode->lo_ino;
-            // StackFS_trace("Create called, e.ino : %llu", e.ino);
-            fi->fh = fd;
-            fuse_reply_create(req, &e, fi);
+
+            err = EBUSY;
+            goto err_out;
         }
-    } else {
-        if (fullPath)
-            free(fullPath);
-        fuse_reply_err(req, errno);
+
+        lo_inode->nlookup++;
+        e.ino = lo_inode->lo_ino;
+        // StackFS_trace("Create called, e.ino : %llu", e.ino);
+        fi->fh = fd;
+        fuse_reply_create(req, &e, fi);
     }
+
+    return;
+
+err_out:
+    if (nexus_fullpath) {
+        free(nexus_fullpath);
+    }
+
+    fuse_reply_err(req, err);
 }
 
 static void
 stackfs_ll_mkdir(fuse_req_t req, fuse_ino_t parent, const char * name, mode_t mode)
 {
-    int                     res;
-    struct fuse_entry_param e;
-    char *                  fullPath = NULL;
-    double                  attr_val;
+    char * nexus_fullpath = NULL;
+
+    double attr_val = 0.0f;
+
+    int err = -1;
+    int ret = -1;
 
     // StackFS_trace("Mkdir called with name : %s, parent ino : %llu",
     //				name, lo_inode(req, parent)->ino);
 
-    fullPath = (char *)malloc(PATH_MAX);
-    construct_full_path(req, parent, fullPath, name);
     attr_val = lo_attr_valid_time(req);
 
-    res = mkdir(fullPath, mode);
+    {
+        char * fullPath = NULL;
 
-    if (res == -1) {
+        fullPath = nexus_malloc(PATH_MAX);
+
+        construct_full_path(req, parent, fullPath, name);
+
+        ret = handle_create(fullPath, NEXUS_REG, &nexus_fullpath);
+
+        nexus_free(fullPath);
+
+        if (ret != 0) {
+            fuse_reply_err(req, -1);
+            return;
+        }
+    }
+
+
+    ret = mkdir(nexus_fullpath, mode);
+
+    if (ret == -1) {
         /* Error occurred while creating the directory */
-        if (fullPath)
-            free(fullPath);
-
+        nexus_free(nexus_fullpath);
         return (void)fuse_reply_err(req, errno);
     }
 
+
     /* Assign the stats of the newly created directory */
-    memset(&e, 0, sizeof(e));
-    e.attr_timeout  = attr_val;
-    e.entry_timeout = 1.0; /* may be attr_val */
-    res             = stat(fullPath, &e.attr);
+    {
+        struct fuse_entry_param e;
 
-    if (res == 0) {
-        /* insert lo_inode into the hash table */
-        struct lo_data *  lo_data;
-        struct lo_inode * lo_inode;
+        struct lo_data  * lo_data  = NULL;
+        struct lo_inode * lo_inode = NULL;
 
-        lo_inode = calloc(1, sizeof(struct lo_inode));
-        if (!lo_inode) {
-            if (fullPath)
-                free(fullPath);
 
-            return (void)fuse_reply_err(req, errno);
+        memset(&e, 0, sizeof(e));
+
+        e.attr_timeout  = attr_val;
+        e.entry_timeout = 1.0;
+
+        ret = stat(nexus_fullpath, &e.attr);
+
+        if (ret != 0) {
+            log_error("stat (%s) FAILED\n", nexus_fullpath);
+            err = errno;
+            goto err_out;
         }
+
+
+        lo_inode = nexus_malloc(sizeof(struct lo_inode));
 
         lo_inode->ino  = e.attr.st_ino;
         lo_inode->dev  = e.attr.st_dev;
-        lo_inode->name = strdup(fullPath);
+        lo_inode->name = nexus_fullpath;
         /* store this for mapping (debugging) */
         lo_inode->lo_ino = (uintptr_t)lo_inode;
         lo_inode->next = lo_inode->prev = NULL;
-        free(fullPath);
 
         lo_data = get_lo_data(req);
 
         pthread_spin_lock(&lo_data->spinlock);
 
-        res = insert_to_hash_table(lo_data, lo_inode);
+        ret = insert_to_hash_table(lo_data, lo_inode);
 
         pthread_spin_unlock(&lo_data->spinlock);
 
-        if (res == -1) {
-            free(lo_inode->name);
+        if (ret == -1) {
             free(lo_inode);
-            fuse_reply_err(req, EBUSY);
-        } else {
-            lo_inode->nlookup++;
-            e.ino = lo_inode->lo_ino;
-            fuse_reply_entry(req, &e);
+
+            err = EBUSY;
+            goto err_out;
         }
-    } else {
-        if (fullPath)
-            free(fullPath);
-        fuse_reply_err(req, errno);
+
+        lo_inode->nlookup++;
+        e.ino = lo_inode->lo_ino;
+
+        fuse_reply_entry(req, &e);
     }
+
+    return;
+
+err_out:
+    if (nexus_fullpath) {
+        free(nexus_fullpath);
+    }
+
+    fuse_reply_err(req, err);
 }
 
 static void
@@ -402,22 +479,28 @@ stackfs_ll_read(
 }
 
 static void
-stackfs_ll_readdir(
-    fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info * fi)
+stackfs_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info * fi)
 {
     struct lo_dirptr * d;
-    char *             buf = NULL;
-    char *             p   = NULL;
-    size_t             rem;
-    int                err;
+
+    char * buf = NULL;
+    char * p   = NULL;
+
+    char * dirpath    = NULL;
+    char * d_name     = NULL;
+    char * nexus_name = NULL;
+
+    size_t rem = 0;
+
+    int err = -1;
+    int ret = -1;
+
     (void)ino;
 
     // StackFS_trace("Readdir called on name : %s and inode : %llu",
     //			lo_name(req, ino), lo_inode(req, ino)->ino);
     d   = lo_dirptr(fi);
-    buf = malloc(size * sizeof(char));
-    if (!buf)
-        return (void)fuse_reply_err(req, ENOMEM);
+    buf = nexus_malloc(size);
 
     /* If offset is not same, need to seek it */
     if (off != d->offset) {
@@ -425,8 +508,12 @@ stackfs_ll_readdir(
         d->entry  = NULL;
         d->offset = off;
     }
+
     p   = buf;
     rem = size;
+
+    dirpath = lo_name(req, ino);
+
     while (1) {
         size_t entsize;
         off_t  nextoff;
@@ -442,12 +529,33 @@ stackfs_ll_readdir(
                 break;
             }
         }
+
         nextoff = telldir(d->dp);
 
         struct stat st = {
             .st_ino = d->entry->d_ino, .st_mode = d->entry->d_type << 12,
         };
-        entsize = fuse_add_direntry(req, p, rem, d->entry->d_name, &st, nextoff);
+
+        d_name = d->entry->d_name;
+
+        // if we are not list . and .., we have to convert the obuscated name into a plain name
+        if (!(d_name[0] == '.' && (d_name[1] == '\0' || (d_name[1] == '.' && d_name[2] == '\0')))) {
+            ret = handle_filldir(dirpath, d->entry->d_name, &nexus_name);
+
+            if (ret != 0) {
+                goto skip_addentry;
+            }
+
+            d_name = nexus_name;
+        }
+
+        entsize = fuse_add_direntry(req, p, rem, d_name, &st, nextoff);
+
+        if (nexus_name) {
+            nexus_free(nexus_name);
+            nexus_name = NULL; // XXX redunant
+        }
+
         /* The above function returns the size of the entry size even though
         * the copy failed due to smaller buf size, so I'm checking after this
         * function and breaking out incase we exceed the size.
@@ -458,6 +566,7 @@ stackfs_ll_readdir(
         p += entsize;
         rem -= entsize;
 
+skip_addentry:
         d->entry  = NULL;
         d->offset = nextoff;
     }
@@ -552,44 +661,70 @@ stackfs_ll_write_buf(
 static void
 stackfs_ll_unlink(fuse_req_t req, fuse_ino_t parent, const char * name)
 {
-    int    res;
+    char * nexus_fullpath = NULL;
+
     char * fullPath = NULL;
+
+    int ret = -1;
 
     // StackFS_trace("Unlink called on name : %s, parent inode : %llu",
     //				name, lo_inode(req, parent)->ino);
+
     fullPath = (char *)malloc(PATH_MAX);
+
     construct_full_path(req, parent, fullPath, name);
 
-    res = unlink(fullPath);
+    ret = handle_delete(fullPath, &nexus_fullpath);
 
-    if (res == -1)
+    nexus_free(fullPath);
+
+    if (ret != 0) {
+        fuse_reply_err(req, -1);
+        return;
+    }
+
+    ret = unlink(nexus_fullpath);
+
+    if (ret == -1)
         fuse_reply_err(req, errno);
     else
-        fuse_reply_err(req, res);
-
-    if (fullPath)
-        free(fullPath);
+        fuse_reply_err(req, ret);
 }
 
 static void
 stackfs_ll_rmdir(fuse_req_t req, fuse_ino_t parent, const char * name)
 {
-    int    res;
+    char * nexus_fullpath = NULL;
+
     char * fullPath = NULL;
+
+    int ret = -1;
 
     // StackFS_trace("rmdir called with name : %s, parent inode : %llu",
     //				name, lo_inode(req, parent)->ino);
+
     fullPath = (char *)malloc(PATH_MAX);
+
     construct_full_path(req, parent, fullPath, name);
-    res = rmdir(fullPath);
 
-    if (res == -1)
+    ret = handle_delete(fullPath, &nexus_fullpath);
+
+    nexus_free(fullPath);
+
+    if (ret != 0) {
+        fuse_reply_err(req, -1);
+        return;
+    }
+
+    ret = rmdir(nexus_fullpath);
+
+    nexus_free(nexus_fullpath);
+
+    if (ret == -1) {
         fuse_reply_err(req, errno);
-    else
-        fuse_reply_err(req, res);
-
-    if (fullPath)
-        free(fullPath);
+    } else {
+        fuse_reply_err(req, ret);
+    }
 }
 
 static void
@@ -789,7 +924,6 @@ start_fuse(int argc, char * argv[], char * rootDir)
 	if (ret == -1) {
             goto err_out;
 	}
-
     }
 
     /* Initialise the spin lock for table */

@@ -8,6 +8,8 @@ char * volume_path = NULL;
 /* this is where the raw data files will be served from */
 char * datastore_path = NULL;
 
+size_t datastore_pathlen = 0;
+
 /* the currently running volume */
 struct nexus_volume * mounted_volume = NULL;
 
@@ -26,6 +28,8 @@ fuse_datastore_open(nexus_json_obj_t cfg)
     }
 
     asprintf(&datastore_path, "%s/%s", volume_path, root_path);
+
+    datastore_pathlen = strnlen(datastore_path, PATH_MAX);
 
     return datastore_path;
 }
