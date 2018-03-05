@@ -21,7 +21,7 @@ __vol_key_bytes(struct nexus_key * key)
 {
     struct __volkey * vkey = (struct __volkey *)key->key;
 
-    if (key->type == NEXUS_SEALED_VOLUME_KEY && vkey != NULL) {
+    if ((key->type == NEXUS_SEALED_VOLUME_KEY) && (vkey != NULL)) {
 	return vkey->len;
     }
 
@@ -33,7 +33,7 @@ __vol_key_data(struct nexus_key * key)
 {
     struct __volkey * vkey = (struct __volkey *)key->key;
 
-    if (key->type == NEXUS_SEALED_VOLUME_KEY && vkey != NULL) {
+    if ((key->type == NEXUS_SEALED_VOLUME_KEY) && (vkey != NULL)) {
 	return vkey->data;
     }
 

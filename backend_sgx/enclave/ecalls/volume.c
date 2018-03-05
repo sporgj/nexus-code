@@ -166,7 +166,7 @@ ecall_authentication_challenge(char                    * user_pubkey_IN,
     }
 
     // get the volume key
-    ret = nexus_enclave_volumekey_init(sealed_volkey_keybuf_out);
+    ret = nexus_enclave_volumekey_load(sealed_volkey_keybuf_out);
     if (ret != 0) {
         log_error("could not extract volumekey\n");
         goto err;

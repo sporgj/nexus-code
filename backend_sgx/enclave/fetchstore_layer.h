@@ -8,10 +8,10 @@ typedef enum {
 } xfer_op_t;
 
 void
-transfer_layer_init();
+fetchstore_layer_init();
 
 void
-transfer_layer_exit();
+fetchstore_layer_exit();
 
 /**
  * Creates a new transfer context.
@@ -20,7 +20,7 @@ transfer_layer_exit();
  * @return -1 on FAILURE
  */
 int
-transfer_layer_new(size_t offset, struct nexus_filenode * filenode);
+fetchstore_layer_new(size_t offset, struct nexus_filenode * filenode);
 
 /**
  * Processes external buffer
@@ -31,4 +31,4 @@ transfer_layer_new(size_t offset, struct nexus_filenode * filenode);
  * @return 0 for success
  */
 int
-transfer_layer_process(int xfer_id, uint8_t * external_addr, size_t buflen);
+fetchstore_layer_process(int xfer_id, uint8_t * external_addr, size_t buflen);

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <nexus_list.h>
+#include <nexus_mac.h>
 
 struct nexus_filenode {
     struct nexus_uuid my_uuid;

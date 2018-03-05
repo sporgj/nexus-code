@@ -1,7 +1,7 @@
 #pragma once
 
 #include "crypto_context.h"
-#include "transfer_layer.h"
+#include "fetchstore_layer.h"
 
 #include <nexus_mac.h>
 

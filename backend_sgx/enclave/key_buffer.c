@@ -26,7 +26,7 @@ key_buffer_free(struct nexus_key_buffer * key_buffer)
 }
 
 struct nexus_key *
-key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t raw_key_type)
+key_buffer_extract128(struct nexus_key_buffer * key_buffer)
 {
     struct nexus_key * raw_key = NULL;
 
@@ -46,7 +46,7 @@ key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t raw_key_ty
     }
 
     // derive raw key and return
-    raw_key = nexus_derive_key(raw_key_type, protected_key);
+    raw_key = nexus_derive_key(NEXUS_RAW_128_KEY, protected_key);
 
     nexus_free_key(protected_key);
     nexus_free(protected_key);
@@ -55,7 +55,7 @@ key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t raw_key_ty
     return raw_key;
 }
 
-struct nexus_key_buffer *
+static struct nexus_key_buffer *
 key_buffer_put(struct nexus_key * key, nexus_key_type_t protected_key_type)
 {
     struct nexus_key_buffer * key_buffer = NULL;
@@ -125,4 +125,16 @@ out:
     }
 
     return key_buffer;
+}
+
+struct nexus_key_buffer *
+key_buffer_wrap128(struct nexus_key * key)
+{
+    return key_buffer_put(key, NEXUS_WRAPPED_128_KEY);
+}
+
+struct nexus_key_buffer *
+key_buffer_seal(struct nexus_key * key)
+{
+    return key_buffer_put(key, NEXUS_SEALED_VOLUME_KEY);
 }

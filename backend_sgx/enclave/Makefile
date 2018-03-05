@@ -74,7 +74,7 @@ objs := nexus_enclave_t.o \
 	buffer_layer.o \
 	data_buffer.o \
 	crypto_buffer.o \
-	transfer_layer.o \
+	fetchstore_layer.o \
 	key_buffer.o \
 	raw_buffer.o \
 	user.o \

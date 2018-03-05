@@ -29,9 +29,9 @@ nexus_enclave_volumekey_serialize();
 
 
 /**
- * parses a volumekey
- * @param sealed_buf
+ * Loads the volumekey from a key buffer
+ * @param key_buffer
  * @return 0 on success
  */
 int
-nexus_enclave_volumekey_init(struct nexus_key_buffer * key_buffer);
+nexus_enclave_volumekey_load(struct nexus_key_buffer * key_buffer);

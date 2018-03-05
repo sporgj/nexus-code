@@ -41,7 +41,7 @@ nexus_enclave_volumekey_serialize()
 {
     struct nexus_key_buffer * key_buffer = NULL;
 
-    key_buffer = key_buffer_put(global_volumekey, NEXUS_SEALED_VOLUME_KEY);
+    key_buffer = key_buffer_seal(global_volumekey);
 
     if (key_buffer == NULL) {
         log_error("could not create key buffer\n");
@@ -57,14 +57,14 @@ nexus_enclave_volumekey_serialize()
  * @return 0 on success
  */
 int
-nexus_enclave_volumekey_init(struct nexus_key_buffer * key_buffer)
+nexus_enclave_volumekey_load(struct nexus_key_buffer * key_buffer)
 {
     struct nexus_key * unsealed_volumekey = NULL;
 
-    unsealed_volumekey = key_buffer_get(key_buffer, NEXUS_RAW_128_KEY);
+    unsealed_volumekey = key_buffer_extract128(key_buffer);
 
     if (unsealed_volumekey == NULL) {
-        log_error("key_buffer_get FAILED\n");
+        log_error("key_buffer_extract128 FAILED\n");
         return -1;
     }
 

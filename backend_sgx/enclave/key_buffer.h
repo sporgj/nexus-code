@@ -18,13 +18,12 @@ void
 key_buffer_free(struct nexus_key_buffer * key_buffer);
 
 /**
- * Extracts the raw key from a key_buffer
+ * Extracts the raw key from a wrapped key_buffer
  * @param key_buffer
- * @param raw_key_type: the type the returned key should be
  * @return NULL on failure
  */
 struct nexus_key *
-key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t raw_key_type);
+key_buffer_extract128(struct nexus_key_buffer * key_buffer);
 
 /**
  * Creates a new key buffer from a nexus key
@@ -33,6 +32,8 @@ key_buffer_get(struct nexus_key_buffer * key_buffer, nexus_key_type_t raw_key_ty
  * @return key_buffer
  */
 struct nexus_key_buffer *
-key_buffer_put(struct nexus_key * key, nexus_key_type_t protected_key_type);
+key_buffer_wrap128(struct nexus_key * key);
 
+struct nexus_key_buffer *
+key_buffer_seal(struct nexus_key * key);
 

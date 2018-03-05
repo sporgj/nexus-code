@@ -66,20 +66,20 @@ find_xfer_context(int xfer_id)
 }
 
 void
-transfer_layer_init()
+fetchstore_layer_init()
 {
     nexus_list_init(&xfer_list);
     nexus_list_set_deallocator(&xfer_list, free_xfer_context);
 }
 
 void
-transfer_layer_exit()
+fetchstore_layer_exit()
 {
     nexus_list_destroy(&xfer_list);
 }
 
 int
-transfer_layer_new(size_t offset, struct nexus_filenode * filenode)
+fetchstore_layer_new(size_t offset, struct nexus_filenode * filenode)
 {
     struct xfer_context * xfer_ctx = NULL;
 
@@ -197,7 +197,7 @@ out:
 }
 
 int
-transfer_layer_process(int xfer_id, uint8_t * external_addr, size_t buflen)
+fetchstore_layer_process(int xfer_id, uint8_t * external_addr, size_t buflen)
 {
     struct xfer_context * xfer_ctx = NULL;
 
@@ -262,7 +262,7 @@ next_chunk:
 }
 
 int
-transfer_layer_free(int xfer_id)
+fetchstore_layer_free(int xfer_id)
 {
     struct nexus_list_iterator * iter = NULL;
 

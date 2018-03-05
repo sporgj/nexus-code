@@ -19,6 +19,8 @@
 #include "nexus_enclave_t.h"
 
 #include "buffer_layer.h"
+#include "fetchstore_layer.h"
+
 #include "data_buffer.h"
 #include "crypto_buffer.h"
 #include "raw_buffer.h"
@@ -26,7 +28,6 @@
 
 #include "acl.h"
 #include "vfs.h"
-#include "transfer_layer.h"
 #include "volumekey.h"
 #include "crypto.h"
 #include "supernode.h"
