@@ -9,8 +9,8 @@
 
 
 /* from <linux/limits.h>
- * PATH_MAX ==> Maximum Path Length 
- * NAME_MAX ==> Maximum File Name Length 
+ * PATH_MAX ==> Maximum Path Length
+ * NAME_MAX ==> Maximum File Name Length
  */
 
 
@@ -18,10 +18,12 @@
 
 
 static const char * generic_cmd_str =		\
+    "{\n"					\
     "\"op\"   : %d,"     "\n"			\
     "\"name\" : \"%s\"," "\n"			\
     "\"path\" : \"%s\"," "\n"			\
-    "\"type\" : %d"      "\n";
+    "\"type\" : %d"      "\n"			\
+    "}\n";
 
 
 int
@@ -31,7 +33,7 @@ nexus_kern_create(struct vcache        * avc,
 		  char                ** nexus_name)
 {
     struct nexus_volume * vol = NULL;
-    
+
     char * cmd_str   = NULL;
     char * path      = NULL;
 
@@ -40,7 +42,7 @@ nexus_kern_create(struct vcache        * avc,
 
     int    ret       = 0;
 
-    
+
     if (name[0] == '\\') {
 	NEXUS_ERROR("Tried to create strange file (%s)\n", name);
 	ret = -1;
@@ -55,7 +57,7 @@ nexus_kern_create(struct vcache        * avc,
 	goto out;
     }
 
-    NEXUS_DEBUG("Nexus Create (Path=%s)\n", path); 
+    NEXUS_DEBUG("Nexus Create (Path=%s)\n", path);
 
     vol = nexus_get_volume(path);
 
@@ -65,7 +67,7 @@ nexus_kern_create(struct vcache        * avc,
     }
 
     NEXUS_DEBUG("Found Nexus Volume (%s)\n", vol->path);
-    
+
     cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_CREATE, name, path, type);
 
     if (cmd_str == NULL) {
@@ -78,7 +80,7 @@ nexus_kern_create(struct vcache        * avc,
     AFS_GUNLOCK();
     ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
@@ -91,9 +93,9 @@ nexus_kern_create(struct vcache        * avc,
 					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -101,14 +103,14 @@ nexus_kern_create(struct vcache        * avc,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
 	    goto out;
 	}
 
-	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);	
+	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
 
 
@@ -117,7 +119,7 @@ nexus_kern_create(struct vcache        * avc,
     if (path)      nexus_kfree(path);
     if (cmd_str)   nexus_kfree(cmd_str);
     if (resp_data) nexus_kfree(resp_data);
-    
+
     return ret;
 }
 
@@ -128,7 +130,7 @@ nexus_kern_lookup(struct vcache        * avc,
                   char                ** nexus_name)
 {
     struct nexus_volume * vol = NULL;
-    
+
     char * cmd_str   = NULL;
     char * path      = NULL;
 
@@ -137,7 +139,7 @@ nexus_kern_lookup(struct vcache        * avc,
 
     int    ret       = 0;
 
-    
+
     if (name[0] == '\\') {
 	NEXUS_ERROR("Tried to lookup strange file (%s)\n", name);
 	ret = -1;
@@ -152,7 +154,7 @@ nexus_kern_lookup(struct vcache        * avc,
 	goto out;
     }
 
-    NEXUS_DEBUG("Nexus Lookup (Path=%s)\n", path); 
+    NEXUS_DEBUG("Nexus Lookup (Path=%s)\n", path);
 
     vol = nexus_get_volume(path);
 
@@ -162,7 +164,7 @@ nexus_kern_lookup(struct vcache        * avc,
     }
 
     NEXUS_DEBUG("Found Nexus Volume (%s)\n", vol->path);
-    
+
     cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_LOOKUP, name, path, type);
 
     if (cmd_str == NULL) {
@@ -174,8 +176,8 @@ nexus_kern_lookup(struct vcache        * avc,
     AFS_GUNLOCK();
     ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
-    
+
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
@@ -188,9 +190,9 @@ nexus_kern_lookup(struct vcache        * avc,
 					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -198,7 +200,7 @@ nexus_kern_lookup(struct vcache        * avc,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
@@ -207,7 +209,7 @@ nexus_kern_lookup(struct vcache        * avc,
 
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
-    
+
  out:
     if (vol)       nexus_put_volume(vol);
     if (path)      nexus_kfree(path);
@@ -224,7 +226,7 @@ nexus_kern_remove(struct vcache        * avc,
                   char                ** nexus_name)
 {
     struct nexus_volume * vol = NULL;
-    
+
     char * cmd_str   = NULL;
     char * path      = NULL;
 
@@ -233,7 +235,7 @@ nexus_kern_remove(struct vcache        * avc,
 
     int    ret       = 0;
 
-    
+
     if (name[0] == '\\') {
 	NEXUS_ERROR("Tried to remove strange file (%s)\n", name);
 	ret = -1;
@@ -248,7 +250,7 @@ nexus_kern_remove(struct vcache        * avc,
 	goto out;
     }
 
-    NEXUS_DEBUG("Nexus Remove (Path=%s)\n", path); 
+    NEXUS_DEBUG("Nexus Remove (Path=%s)\n", path);
 
     vol = nexus_get_volume(path);
 
@@ -258,7 +260,7 @@ nexus_kern_remove(struct vcache        * avc,
     }
 
     NEXUS_DEBUG("Found Nexus Volume (%s)\n", vol->path);
-    
+
     cmd_str = kasprintf(GFP_KERNEL, generic_cmd_str, AFS_OP_REMOVE, name, path, type);
 
     if (cmd_str == NULL) {
@@ -270,8 +272,8 @@ nexus_kern_remove(struct vcache        * avc,
     AFS_GUNLOCK();
     ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
-    
+
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
@@ -284,9 +286,9 @@ nexus_kern_remove(struct vcache        * avc,
 					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -294,7 +296,7 @@ nexus_kern_remove(struct vcache        * avc,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
@@ -304,7 +306,7 @@ nexus_kern_remove(struct vcache        * avc,
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
 
-    
+
  out:
     if (vol)       nexus_put_volume(vol);
     if (path)      nexus_kfree(path);
@@ -318,9 +320,11 @@ nexus_kern_remove(struct vcache        * avc,
 
 
 static const char * symlink_cmd_str =		\
+    "{\n"					\
     "\"op\"     : %d,"     "\n"			\
     "\"source\" : \"%s\"," "\n"			\
-    "\"target\" : \"%s\"" "\n";
+    "\"target\" : \"%s\"" "\n"			\
+    "}\n";
 
 
 int
@@ -337,7 +341,7 @@ nexus_kern_symlink(struct dentry  * dentry,
     u32    resp_len  = 0;
 
     int    ret       = 0;
-    
+
     path = nexus_get_path_from_dentry(dentry);
 
       if (path == NULL) {
@@ -346,7 +350,7 @@ nexus_kern_symlink(struct dentry  * dentry,
 	goto out;
     }
 
-    NEXUS_DEBUG("Nexus Symlink (Path=%s)\n", path); 
+    NEXUS_DEBUG("Nexus Symlink (Path=%s)\n", path);
 
     vol = nexus_get_volume(path);
 
@@ -368,7 +372,7 @@ nexus_kern_symlink(struct dentry  * dentry,
     AFS_GUNLOCK();
     ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
@@ -382,9 +386,9 @@ nexus_kern_symlink(struct dentry  * dentry,
 					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -392,7 +396,7 @@ nexus_kern_symlink(struct dentry  * dentry,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
@@ -401,7 +405,7 @@ nexus_kern_symlink(struct dentry  * dentry,
 
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
-    
+
  out:
     if (vol)       nexus_put_volume(vol);
     if (path)      nexus_kfree(path);
@@ -413,9 +417,11 @@ nexus_kern_symlink(struct dentry  * dentry,
 
 
 static const char * hardlink_cmd_str =		\
+    "{\n"					\
     "\"op\"     : %d,"     "\n"			\
     "\"source\" : \"%s\"," "\n"			\
-    "\"target\" : \"%s\"," "\n";
+    "\"target\" : \"%s\"," "\n"			\
+    "}\n";
 
 int
 nexus_kern_hardlink(struct dentry  * old_dentry,
@@ -424,18 +430,18 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 {
     struct nexus_volume * vol     = NULL;
     struct nexus_volume * tgt_vol = NULL;
-    
+
     char * cmd_str   = NULL;
     char * path      = NULL;
     char * target    = NULL;
-    
+
     char * resp_data = NULL;
     u32    resp_len  = 0;
 
     int    ret       = 0;
-    
+
     path = nexus_get_path_from_dentry(old_dentry);
-    
+
     if (path == NULL) {
 	NEXUS_ERROR("Could not get path for dentry\n");
 	ret = -1;
@@ -449,9 +455,9 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 	ret = -1;
 	goto out;
     }
-    
 
-    NEXUS_DEBUG("Nexus Hardlink (Path=%s)\n", path); 
+
+    NEXUS_DEBUG("Nexus Hardlink (Path=%s)\n", path);
 
     vol = nexus_get_volume(path);
 
@@ -469,7 +475,7 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 	ret = -1;
 	goto out;
     }
-    
+
     cmd_str = kasprintf(GFP_KERNEL, hardlink_cmd_str, AFS_OP_HARDLINK, path, target);
 
     if (cmd_str == NULL) {
@@ -481,7 +487,7 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
     AFS_GUNLOCK();
     ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
@@ -495,9 +501,9 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 					    {"nexus_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -505,7 +511,7 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
@@ -514,7 +520,7 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
-    
+
  out:
     if (vol)       nexus_put_volume(vol);
     if (tgt_vol)   nexus_put_volume(tgt_vol);
@@ -527,10 +533,12 @@ nexus_kern_hardlink(struct dentry  * old_dentry,
 }
 
 static const char * filldir_cmd_str =			\
+    "{\n"						\
     "\"op\"         : %d,"     "\n"			\
     "\"path\"       : \"%s\"," "\n"			\
     "\"nexus_name\" : \"%s\"," "\n"			\
-    "\"type\"       : %d"      "\n";
+    "\"type\"       : %d"      "\n"			\
+    "}\n";
 
 int
 nexus_kern_filldir(char                 * parent_dir,
@@ -539,9 +547,9 @@ nexus_kern_filldir(char                 * parent_dir,
                    char                ** real_name)
 {
     struct nexus_volume * vol = NULL;
-    
+
     char * cmd_str   = NULL;
-    
+
     char * resp_data = NULL;
     u32    resp_len  = 0;
 
@@ -554,7 +562,7 @@ nexus_kern_filldir(char                 * parent_dir,
 	goto out;
     }
 
-    
+
     cmd_str = kasprintf(GFP_KERNEL, filldir_cmd_str, AFS_OP_FILLDIR, parent_dir, nexus_name, type);
 
     if (cmd_str == NULL) {
@@ -566,8 +574,8 @@ nexus_kern_filldir(char                 * parent_dir,
     AFS_GUNLOCK();
     ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
-    
+
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
@@ -580,9 +588,9 @@ nexus_kern_filldir(char                 * parent_dir,
 					    {"real_name", NEXUS_JSON_STRING, {0}} };
 
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -590,7 +598,7 @@ nexus_kern_filldir(char                 * parent_dir,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
@@ -602,7 +610,7 @@ nexus_kern_filldir(char                 * parent_dir,
 	nexus_json_release_params(resp, 2);
     }
 
-    
+
  out:
     if (cmd_str)   nexus_kfree(cmd_str);
     if (resp_data) nexus_kfree(resp_data);
@@ -611,11 +619,13 @@ nexus_kern_filldir(char                 * parent_dir,
 }
 
 static const char * rename_cmd_str =		\
+    "{\n"					\
     "\"op\"        : %d,"     "\n"		\
     "\"old_path\"  : \"%s\"," "\n"		\
     "\"old_name\"  : \"%s\"," "\n"		\
     "\"new_path\"  : \"%s\"," "\n"		\
-    "\"new_name\"  : \"%s\""  "\n";
+    "\"new_name\"  : \"%s\""  "\n"		\
+    "}\n";
 
 
 int
@@ -639,12 +649,12 @@ nexus_kern_rename(struct vcache  * old_vcache,
     char * resp_data = NULL;
     u32    resp_len  = 0;
 
-    
+
     int unlocked = 0;
-    
+
     int ret = 0;
 
-    
+
     old_path = nexus_get_path_from_vcache(old_vcache);
 
     if (old_path == NULL) {
@@ -660,7 +670,7 @@ nexus_kern_rename(struct vcache  * old_vcache,
 	ret = -1;
 	goto out;
     }
-    
+
     nexus_printk("Renaming %s/%s to %s/%s\n",
 		 old_path, old_name,
 		 new_path, new_name);
@@ -668,12 +678,12 @@ nexus_kern_rename(struct vcache  * old_vcache,
     old_vol = nexus_get_volume(old_path);
     new_vol = nexus_get_volume(new_path);
 
-    /* 
+    /*
      * TODO: I think this should work if we are crossing Nexus boundaries......
      *       I think we should change the command to a single path translation
      *       and issue two (one for each side of the operation)
      */
-    
+
     if ( (old_vol == NULL) &&
 	 (new_vol == NULL) ) {
 	/* No volumes at all */
@@ -683,14 +693,14 @@ nexus_kern_rename(struct vcache  * old_vcache,
 
     NEXUS_DEBUG("Found Nexus Volumes (old_vol=%s) (new_vol=%s)\n", old_vol->path, new_vol->path);
 
-    
+
     if (old_vol != new_vol) {
 	NEXUS_ERROR("Rename spans Nexus volume boundaries\n");
 	panic("What the fuck do we do here....\n");
 	ret = -1;
 	goto out;
     }
-    
+
     cmd_str = kasprintf(GFP_KERNEL, rename_cmd_str, AFS_OP_RENAME, old_path, old_name, new_path, new_name);
 
     if (cmd_str == NULL) {
@@ -700,7 +710,7 @@ nexus_kern_rename(struct vcache  * old_vcache,
     }
 
     AFS_GUNLOCK();
-    
+
     /* check if cross directory renaming is present */
     rename_mutex = &AFSTOV(old_vcache)->i_sb->s_vfs_rename_mutex;
 
@@ -708,27 +718,27 @@ nexus_kern_rename(struct vcache  * old_vcache,
         mutex_unlock(rename_mutex);
         unlocked = 1;
     }
-    
+
     ret = nexus_send_cmd(old_vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
     AFS_GLOCK();
-    
+
     if (ret == -1) {
 	NEXUS_ERROR("Error Sending Nexus Command\n");
 	ret = -1;
 	goto out;
     }
-    
+
 
     // handle response...
     {
 	struct nexus_json_param resp[3] = { {"code",           NEXUS_JSON_S32,    {0}},
 					    {"old_nexus_name", NEXUS_JSON_STRING, {0}},
 					    {"new_nexus_name", NEXUS_JSON_STRING, {0}} };
-	
+
 	s32 ret_code = 0;
-	
+
 	ret = nexus_json_parse(resp_data, resp, 2);
-	
+
 	if (ret != 0) {
 	    NEXUS_ERROR("Could not parse JSON response\n");
 	    ret = -1;
@@ -736,7 +746,7 @@ nexus_kern_rename(struct vcache  * old_vcache,
 	}
 
 	ret_code = (s32)resp[0].val;
-	
+
 	if (ret_code != 0) {
 	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
 	    ret = -1;
@@ -756,7 +766,7 @@ nexus_kern_rename(struct vcache  * old_vcache,
     if (new_path)  nexus_kfree(new_path);
     if (cmd_str)   nexus_kfree(cmd_str);
     if (resp_data) nexus_kfree(resp_data);
-    
+
     return ret;
 }
 
@@ -765,7 +775,7 @@ nexus_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data)
 {
 
 #if 0
-    
+
     struct nx_daemon_rsp * reply   = NULL;
     caddr_t                global_outbuffer = NULL;
     char *                 path    = NULL;

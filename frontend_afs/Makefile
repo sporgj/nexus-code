@@ -1,5 +1,7 @@
+include ../build.mk
 
 buildpath = ../build
+
 
 INCLUDES := -I../libnexus
 CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 $(INCLUDES)
@@ -11,13 +13,24 @@ AR = ar
 exec_objs :=	main.o \
 		handler.o
 
-test_objs :=	test.o \
-		handler.o
-
-execs := nexus-afs nexus-test
+execs := nexus-afs
 
 
-libs := ../libnexus/libnexus.a
+
+libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid\
+	-lpthread
+
+LDFLAGS := -L$(SGX_SDK)/lib64
+
+ifeq ($(SGX_MODE), SIM)
+	libs += -lsgx_urts_sim -lsgx_uae_service_sim
+else ifeq ($(SGX_MODE), HW)
+	libs += -lsgx_urts -lsgx_uae_service
+else
+        $(error Invalid SGX MODE)
+endif
+
+
 
 build = \
         @if [ -z "$V" ]; then \
@@ -29,7 +42,7 @@ build = \
         fi
 
 
-all: frontend_afs.a
+all: nexus-afs frontend_afs.a
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
@@ -45,9 +58,6 @@ frontend_afs.a: $(exec_objs)
 	@cp $@ ../build
 
 nexus-afs: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
-
-nexus-test: $(test_objs)
 	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
 
 

@@ -125,6 +125,7 @@ volume_last_put(struct kref * kref)
     struct nexus_volume * vol = container_of(kref, struct nexus_volume, refcount);
 
     /* Abort any pending commands */
+    NEXUS_DEBUG("deregistering volume: %s\n", vol->path);
     
     deregister_volume(vol);
     
@@ -183,6 +184,9 @@ nexus_send_cmd(struct nexus_volume * vol,
 
 	if (vol->is_online == 0) {
 	    NEXUS_ERROR("daemon is offline\n");
+	    // remove the volume here
+	    nexus_put_volume(vol);
+
 	    ret = -1;
 	    goto out1;
 	}
