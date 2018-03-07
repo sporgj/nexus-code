@@ -82,6 +82,15 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
                         char                ** nexus_name,
                         void                 * priv_data);
 
+int
+sgx_backend_fs_rename(struct nexus_volume  * volume,
+                      char                 * from_dirpath,
+                      char                 * oldname,
+                      char                 * to_dirpath,
+                      char                 * newname,
+                      char                ** old_nexusname,
+                      char                ** new_nexusname,
+                      void                 * priv_data);
 
 void
 key_buffer_init(struct nexus_key_buffer * key_buffer);

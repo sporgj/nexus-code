@@ -193,19 +193,18 @@ nexus_kern_lookup(struct vcache        * avc,
 
 	ret = nexus_json_parse(resp_data, resp, 2);
 
-	if (ret != 0) {
-	    NEXUS_ERROR("Could not parse JSON response\n");
-	    ret = -1;
-	    goto out;
-	}
+	if (ret != 0 && resp[0].val == 0) {
+            NEXUS_ERROR("Could not parse JSON response\n");
+            ret = -1;
+            goto out;
+        }
 
 	ret_code = (s32)resp[0].val;
 
 	if (ret_code != 0) {
-	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
-	    ret = -1;
-	    goto out;
-	}
+            ret = -1;
+            goto out;
+        }
 
 	*nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
     }
@@ -591,19 +590,18 @@ nexus_kern_filldir(char                 * parent_dir,
 
 	ret = nexus_json_parse(resp_data, resp, 2);
 
-	if (ret != 0) {
-	    NEXUS_ERROR("Could not parse JSON response\n");
-	    ret = -1;
-	    goto out;
-	}
+	if (ret != 0 && resp[0].val == 0) {
+            NEXUS_ERROR("Could not parse JSON response\n");
+            ret = -1;
+            goto out;
+        }
 
 	ret_code = (s32)resp[0].val;
 
 	if (ret_code != 0) {
-	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
-	    ret = -1;
-	    goto out;
-	}
+            ret = -1;
+            goto out;
+        }
 
 	*real_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
 
@@ -671,10 +669,6 @@ nexus_kern_rename(struct vcache  * old_vcache,
 	goto out;
     }
 
-    nexus_printk("Renaming %s/%s to %s/%s\n",
-		 old_path, old_name,
-		 new_path, new_name);
-
     old_vol = nexus_get_volume(old_path);
     new_vol = nexus_get_volume(new_path);
 
@@ -737,21 +731,21 @@ nexus_kern_rename(struct vcache  * old_vcache,
 
 	s32 ret_code = 0;
 
-	ret = nexus_json_parse(resp_data, resp, 2);
+	ret = nexus_json_parse(resp_data, resp, 3);
 
-	if (ret != 0) {
-	    NEXUS_ERROR("Could not parse JSON response\n");
-	    ret = -1;
-	    goto out;
-	}
+	if ((ret != 0) && (resp[0].val == 0)) {
+            NEXUS_ERROR("Could not parse JSON response\n");
+            ret = -1;
+            goto out;
+        }
 
 	ret_code = (s32)resp[0].val;
 
 	if (ret_code != 0) {
-	    NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
-	    ret = -1;
-	    goto out;
-	}
+            NEXUS_ERROR("User space returned error... (%d)\n", ret_code);
+            ret = -1;
+            goto out;
+        }
 
 	*old_nexus_name = kstrdup((char *)resp[1].val, GFP_KERNEL);
 	*new_nexus_name = kstrdup((char *)resp[2].val, GFP_KERNEL);

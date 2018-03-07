@@ -290,6 +290,12 @@ nexus_backend_fs_rename(struct nexus_volume  * volume,
 	return -1;
     }
 
-    // TODO
-    return -1;
+    return backend->impl->fs_rename(volume,
+                                    from_dirpath,
+                                    oldname,
+                                    to_dirpath,
+                                    newname,
+                                    old_nexusname,
+                                    new_nexusname,
+                                    backend->priv_data);
 }

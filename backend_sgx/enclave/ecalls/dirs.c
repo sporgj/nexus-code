@@ -103,7 +103,9 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
         return -1;
     }
 
-    nexus_vfs_delete(uuid_OUT);
+    if (type != NEXUS_LNK) {
+        nexus_vfs_delete(uuid_OUT);
+    }
 
     return 0;
 }
@@ -367,7 +369,7 @@ __nxs_fs_hardlink(struct nexus_dirnode * link_dirnode,
     // generate the uuid and add entry to dirnode
     nexus_uuid_gen(link_uuid);
 
-    ret = buffer_layer_hardlink(&target_uuid, link_uuid);
+    ret = buffer_layer_hardlink(link_uuid, &target_uuid);
 
     if (ret != 0) {
         log_error("buffer_layer_hardlink() FAILED\n");

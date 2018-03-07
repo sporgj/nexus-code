@@ -17,7 +17,7 @@ static DEFINE_SPINLOCK(volume_list_lock);
 static struct list_head volume_list = LIST_HEAD_INIT(volume_list);
 
 
-/* 
+/*
  * Should the path check be the least sized path? Is that enough to check for nesting?
  */
 
@@ -26,26 +26,27 @@ __get_volume(char * path)
 {
     struct nexus_volume * vol = NULL;
     struct nexus_volume * tmp = NULL;
-        
+
     list_for_each_entry(tmp, &volume_list, node) {
 	NEXUS_DEBUG("checking volume (%s)\n", tmp->path);
 	NEXUS_DEBUG("Comparing with (%s)\n", path);
-	
-	
-	if (strncmp(tmp->path, path, strlen(tmp->path)) == 0) {
 
-	    NEXUS_DEBUG("Matched Volume paths\n");
-	    
-	    if (kref_get_unless_zero(&(tmp->refcount)) == 0) {
-		break;
-	    }
 
-	    vol = tmp;
+	if ((strncmp(tmp->path, path, strlen(tmp->path)) == 0)
+		&& (tmp->is_online == 1)) {
 
-	    break;
-	}
+            NEXUS_DEBUG("Matched Volume paths\n");
+
+            if (kref_get_unless_zero(&(tmp->refcount)) == 0) {
+                break;
+            }
+
+            vol = tmp;
+
+            break;
+        }
     }
-    
+
     return vol;
 }
 
@@ -54,8 +55,8 @@ nexus_get_volume(char * path)
 {
     struct nexus_volume * vol = NULL;
     unsigned long flags;
-    
-    
+
+
     spin_lock_irqsave(&volume_list_lock, flags);
     {
 	vol = __get_volume(path);
@@ -71,7 +72,7 @@ register_volume(struct nexus_volume * vol)
 {
     unsigned long flags = 0;
     int ret = -1;
-    
+
     if (!try_module_get(THIS_MODULE)) {
 	return -1;
     }
@@ -85,16 +86,16 @@ register_volume(struct nexus_volume * vol)
 	tmp_vol = __get_volume(vol->path);
 
 	if (tmp_vol != NULL) {
-	    nexus_put_volume(tmp_vol);
-	    goto out;
-	}
+            nexus_put_volume(tmp_vol);
+            goto out;
+        }
 
 	list_add(&(vol->node), &volume_list);
 	ret = 0;
     }
  out:
     spin_unlock_irqrestore(&volume_list_lock, flags);
-    
+
     if (ret == -1) {
 	NEXUS_DEBUG("Volume '%s' exists\n", vol->path);
     }
@@ -107,14 +108,14 @@ static int
 deregister_volume(struct nexus_volume * vol)
 {
     unsigned long flags = 0;
-    
+
     spin_lock_irqsave(&volume_list_lock, flags);
     {
 	NEXUS_DEBUG("Deregistering VOLUME '%s'\n", vol->path);
 	list_del(&(vol->node));
     }
     spin_unlock_irqrestore(&volume_list_lock, flags);
-    
+
     return 0;
 }
 
@@ -126,9 +127,9 @@ volume_last_put(struct kref * kref)
 
     /* Abort any pending commands */
     NEXUS_DEBUG("deregistering volume: %s\n", vol->path);
-    
+
     deregister_volume(vol);
-    
+
     kfree(vol->path);
     kfree(vol);
 
@@ -155,7 +156,7 @@ nexus_send_cmd(struct nexus_volume * vol,
 	       uint8_t            ** resp_data)
 {
     int ret = 0;
-    
+
     // acquire vol->cmd_queue mutex
     ret = mutex_lock_interruptible(&(vol->cmd_queue.lock));
 
@@ -163,18 +164,18 @@ nexus_send_cmd(struct nexus_volume * vol,
 	NEXUS_ERROR("Command Queue Mutex lock was interrupted...\n");
 	goto out2;
     }
-    
+
     // set data + len
     // mark as active
     vol->cmd_queue.cmd_data  = cmd_data;
-    vol->cmd_queue.cmd_len   = cmd_len;    
+    vol->cmd_queue.cmd_len   = cmd_len;
     vol->cmd_queue.resp_len  = 0;
     vol->cmd_queue.resp_data = NULL;
-    
+
     vol->cmd_queue.active    = 1;
 
     __asm__ ("":::"memory");
-    
+
     // wakeup waiting daemon
     wake_up_interruptible(&(vol->cmd_queue.daemon_waitq));
 
@@ -183,13 +184,13 @@ nexus_send_cmd(struct nexus_volume * vol,
     while (vol->cmd_queue.complete == 0) {
 
 	if (vol->is_online == 0) {
-	    NEXUS_ERROR("daemon is offline\n");
-	    // remove the volume here
-	    nexus_put_volume(vol);
+            NEXUS_ERROR("daemon is offline\n");
+            // remove the volume here
+            nexus_put_volume(vol);
 
-	    ret = -1;
-	    goto out1;
-	}
+            ret = -1;
+            goto out1;
+        }
 
 	schedule();
     }
@@ -199,10 +200,10 @@ nexus_send_cmd(struct nexus_volume * vol,
 
     if (vol->cmd_queue.error == 1) {
 	ret = -1;
-	
+
 	goto out1;
     }
-    
+
     // copy resp len/data ptrs
     *resp_len  = vol->cmd_queue.resp_len;
     *resp_data = vol->cmd_queue.resp_data;
@@ -212,27 +213,21 @@ nexus_send_cmd(struct nexus_volume * vol,
     vol->cmd_queue.complete  = 0;
 
  out1:
-    
+
     // release mutex
     mutex_unlock(&(vol->cmd_queue.lock));
 
  out2:
-    
+
     return ret;
 }
 
-
-
-
 static ssize_t
-volume_read(struct file * filp,
-	    char __user * buf,
-	    size_t        count,
-	    loff_t      * f_pos)
+volume_read(struct file * filp, char __user * buf, size_t count, loff_t * f_pos)
 {
     struct nexus_volume * vol = filp->private_data;
-    
-    nexus_printk("Read of size %lu\n", count);
+
+    NEXUS_DEBUG("Read of size %lu\n", count);
 
 
     if ((vol->cmd_queue.active   == 0) ||
@@ -247,30 +242,27 @@ volume_read(struct file * filp,
     if (count < vol->cmd_queue.cmd_len) {
 	return -EINVAL;
     }
-    
+
     copy_to_user(buf, vol->cmd_queue.cmd_data, vol->cmd_queue.cmd_len);
 
     return vol->cmd_queue.cmd_len;
 }
 
 static ssize_t
-volume_write(struct file       * filp,
-	     const char __user * buf,
-	     size_t              count,
-	     loff_t            * f_pos)
+volume_write(struct file * filp, const char __user * buf, size_t count, loff_t * f_pos)
 {
     struct nexus_volume * vol = filp->private_data;
-    
+
     uint8_t * resp = NULL;
     int       ret  = 0;
 
-    nexus_printk("Write of Size %lu\n", count);
+    NEXUS_DEBUG("Write of Size %lu\n", count);
 
     if ((vol->cmd_queue.active   == 0) ||
 	(vol->cmd_queue.complete == 1)) {
 	return 0;
     }
-     
+
 
     // check size of resp
     // too large: set error flag in cmd_queue, mark cmd_queue complete, and return -EINVAL
@@ -278,7 +270,7 @@ volume_write(struct file       * filp,
 	return -EINVAL;
     }
 
-    
+
     // kmalloc buffer for resp
     resp = kmalloc(count, GFP_KERNEL);
 
@@ -286,33 +278,32 @@ volume_write(struct file       * filp,
 	NEXUS_ERROR("Could not allocate kernel memory for response (count=%lu)\n", count);
 	return -ENOMEM;
     }
-    
+
     // copy_from_user
     ret = copy_from_user(resp, buf, count);
 
     NEXUS_DEBUG("Write copy_from_user returned %d\n", ret);
-    
+
     if (ret) {
 	NEXUS_ERROR("Could not copy response from userspace\n");
 	return -EFAULT;
     }
-    
+
     // set resp fields in cmd_queue
     vol->cmd_queue.resp_data = resp;
     vol->cmd_queue.resp_len  = count;
-    
+
     __asm__ ("":::"memory");
 
     // mark cmd_queue as complete
     vol->cmd_queue.complete  = 1;
-    
+
     // return count;
     return count;
 }
 
 static unsigned int
-volume_poll(struct file              * filp,
-	    struct poll_table_struct * poll_tb)
+volume_poll(struct file * filp, struct poll_table_struct * poll_tb)
 {
     struct nexus_volume * vol = filp->private_data;
 
@@ -324,22 +315,20 @@ volume_poll(struct file              * filp,
 	(vol->cmd_queue.complete == 0)) {
 	return mask;
     }
-    
+
     return 0;
 }
 
-
 static int
-volume_release(struct inode * inode,
-	       struct file  * filp)
+volume_release(struct inode * inode, struct file * filp)
 {
     struct nexus_volume * vol = filp->private_data;
 
     NEXUS_DEBUG("Release Volume (%s)\n", vol->path);
     vol->is_online = 0;
-    
+
     nexus_put_volume(vol);
-    
+
     return 0;
 }
 
@@ -359,7 +348,7 @@ init_cmd_queue(struct nexus_volume * vol)
     init_waitqueue_head(&(vol->cmd_queue.daemon_waitq));
 
     mutex_init(&(vol->cmd_queue.lock));
-    
+
     return 0;
 }
 
@@ -393,7 +382,7 @@ create_nexus_volume(char * path)
 
     kref_init(&(vol->refcount));
 
-    
+
     // Insert volume into active list
     ret = register_volume(vol);
 
@@ -404,14 +393,14 @@ create_nexus_volume(char * path)
 
 
     vol_fd = anon_inode_getfd("nexus-volume", &vol_fops, vol, O_RDWR);
-    
+
     if (vol_fd < 0) {
 	NEXUS_ERROR("Could not create volume inode\n");
 	goto err4;
     }
 
     vol->is_online = 1;
-    
+
     return vol_fd;
 
  err4:
@@ -420,7 +409,7 @@ create_nexus_volume(char * path)
     nexus_kfree(vol->path);
  err2:
     nexus_kfree(vol);
-    
+
  err1:
     return -1;
 }

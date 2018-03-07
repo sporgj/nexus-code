@@ -17,8 +17,6 @@ nexus_json_parse(char                    * str,
     int ret            = -1;
     int i              = 0;
 
-    NEXUS_DEBUG("PARSING (%s)\n", str);
-    
     /* Initialize JSMN parser */
     jsmn_init(&parser);
 
@@ -31,7 +29,7 @@ nexus_json_parse(char                    * str,
     }
 
     memset(tokens, 0, sizeof(jsmntok_t) * num_tokens);
-    
+
 
     /* Parse JSON */
     ret = jsmn_parse(&parser, str, strlen(str), tokens, num_tokens);
@@ -43,22 +41,25 @@ nexus_json_parse(char                    * str,
 	goto out;
     }
 
-    
+
     /* Check Params and grab values */
     for (i = 0; i < num_params; i++) {
 
 	jsmntok_t * name_tok = &(tokens[(i * 2)]);
 	jsmntok_t *  val_tok = &(tokens[(i * 2) + 1]);
-	
+
 	char * name  = str + name_tok->start;
 	char * value = str +  val_tok->start;
-	
-	if (strncmp(params[i].name, name, strlen(params[i].name)) != 0) {
-	    NEXUS_ERROR("Error matching JSON format\n");
-	    goto out;
-	}	
 
-	switch (params[i].type) {
+	if (strncmp(params[i].name, name, strlen(params[i].name)) != 0) {
+            // JBD: Because messages from userspace only need to specify the
+            // exit code on FAILURE, this will print waay to often (e.g. failed lookups)
+            //
+            // NEXUS_ERROR("Error matching JSON format\n");
+            goto out;
+        }
+
+        switch (params[i].type) {
 	    case NEXUS_JSON_U8:
 		if (val_tok->type != JSMN_PRIMITIVE) {
 		    NEXUS_ERROR("JSON Error: type mismatch\n");
@@ -193,25 +194,20 @@ nexus_json_parse(char                    * str,
 
     }
 
-    
+
     if (param_overflow) {
         ret = 1;
     } else {
         ret = 0;
     }
-        
+
  out:
 
-    if (ret < 0) {
-	NEXUS_ERROR("Error Parsing JSON value\n");
-    }
-    
     if (tokens) nexus_kfree(tokens);
 
     return ret;
 
 }
-		 
 
 
 /* For now just free temporary strings allocated in the params */

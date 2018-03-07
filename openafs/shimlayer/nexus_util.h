@@ -60,13 +60,16 @@ u64 nexus_atou64(u64 dflt, char * str);
         task_unlock(current);                                           \
     } while (0)
 
+#ifdef NXDEBUG
 #define NEXUS_DEBUG(fmt, args...)                                             \
     do {                                                                \
         task_lock(current);                                             \
         printk(KERN_DEBUG "NEXUS> [%s] (%u): " fmt, current->comm, nexus_get_cpu(), ##args); \
         task_unlock(current);                                           \
     } while (0)
-
+#else
+#define NEXUS_DEBUG(fmt, args...)
+#endif
 
 
 

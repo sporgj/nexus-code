@@ -176,7 +176,8 @@ struct nexus_backend_impl {
                      char                 * to_dirpath,
                      char                 * newname,
                      char                ** old_nexusname,
-                     char                ** new_nexusname);
+                     char                ** new_nexusname,
+                     void                 * priv_data);
 };
 
 
