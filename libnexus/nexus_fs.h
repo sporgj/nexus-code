@@ -15,7 +15,7 @@
 
 struct nexus_volume;
 
-/* 
+/*
  *  These are probably just going to be passthrough functions...
  */
 
@@ -37,7 +37,6 @@ struct nexus_stat {
 
     nexus_dirent_type_t type;
     size_t              size;
-    
 };
 
 /**
@@ -136,7 +135,7 @@ nexus_fs_encrypt(struct nexus_volume * volume,
 int
 nexus_fs_decrypt(struct nexus_volume * volume,
 		 char                * path,
-		 uint8_t             * in_buf,		 
+		 uint8_t             * in_buf,
 		 uint8_t             * out_buf,
 		 off_t                 offset,
 		 size_t                size);

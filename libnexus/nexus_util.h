@@ -23,6 +23,19 @@ extern "C" {
 
 
 
+static inline int min(int a, int b) {
+    if (a > b)
+        return b;
+    return a;
+}
+
+static inline int max(int a, int b) {
+    if (a > b)
+        return a;
+    return b;
+}
+
+
 void * nexus_malloc(size_t size);
 
 

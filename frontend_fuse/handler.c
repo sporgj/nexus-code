@@ -89,7 +89,7 @@ handle_delete(const char * path, char ** nexus_fullpath)
     ret = nexus_fs_remove(mounted_volume, dirpath, fname, &nexus_name);
 
     if (ret != 0) {
-        log_error("creating %s FAILED\n", path);
+        log_error("deleting %s FAILED\n", path);
         goto out;
     }
 
@@ -129,7 +129,6 @@ handle_lookup(const char * path, char ** nexus_fullpath)
     ret = nexus_fs_lookup(mounted_volume, dirpath, fname, &nexus_name);
 
     if (ret != 0) {
-        log_error("creating %s FAILED\n", path);
         goto out;
     }
 
@@ -158,7 +157,6 @@ handle_filldir(const char * path, const char * name, char ** nexus_name)
     ret = nexus_fs_filldir(mounted_volume, nexus_abspath, (char *)name, nexus_name);
 
     if (ret != 0) {
-        log_error("creating %s FAILED\n", nexus_abspath);
         return -1;
     }
 

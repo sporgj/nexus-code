@@ -17,19 +17,33 @@ struct nexus_volume * mounted_volume = NULL;
 static void *
 fuse_datastore_open(nexus_json_obj_t cfg)
 {
-    char * root_path = NULL;
+    char * root_datastore_path = NULL;
+    char * volume_fullpath     = NULL;
+
     int    ret = 0;
 
-    ret = nexus_json_get_string(cfg, "root_path", &root_path);
+
+    ret = nexus_json_get_string(cfg, "root_path", &root_datastore_path);
 
     if (ret == -1) {
         log_error("Invalid FLAT datastore config. Missing root_path\n");
         return NULL;
     }
 
-    asprintf(&datastore_path, "%s/%s", volume_path, root_path);
+    volume_fullpath = get_current_dir_name();
+
+    asprintf(&datastore_path, "%s/%s", volume_fullpath, root_datastore_path);
+
+    if (datastore_path == NULL) {
+        log_error("could not generate datastore path (%s)\n", volume_fullpath);
+        nexus_free(volume_fullpath);
+        perror("strernno");
+        return NULL;
+    }
 
     datastore_pathlen = strnlen(datastore_path, PATH_MAX);
+
+    nexus_free(volume_fullpath);
 
     return datastore_path;
 }
