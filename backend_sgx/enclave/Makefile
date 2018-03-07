@@ -63,6 +63,7 @@ trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 nexus_ecall_objs := \
 	dirs.o \
+	files.o \
 	volume.o
 
 ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))
@@ -74,7 +75,6 @@ objs := nexus_enclave_t.o \
 	buffer_layer.o \
 	data_buffer.o \
 	crypto_buffer.o \
-	fetchstore_layer.o \
 	key_buffer.o \
 	raw_buffer.o \
 	user.o \

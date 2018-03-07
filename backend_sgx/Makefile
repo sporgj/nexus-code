@@ -46,6 +46,7 @@ objs := nexus_enclave_u.o \
 	keybuf.o \
 	volume_ops.o \
 	dir_ops.o \
+	file_ops.o \
 	buffer_manager.o \
 	xxhash.o \
 	ocalls.o

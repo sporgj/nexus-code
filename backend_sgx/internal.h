@@ -22,6 +22,8 @@
 struct sgx_backend {
     sgx_enclave_id_t enclave_id;
 
+    size_t volume_chunk_size;
+
     struct buffer_manager * buf_manager;
 
     struct nexus_volume * volume;

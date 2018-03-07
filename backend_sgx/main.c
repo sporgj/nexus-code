@@ -99,6 +99,8 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
         sgx_backend->buf_manager = buf_manager;
     }
 
+    sgx_backend->volume_chunk_size = NEXUS_CHUNK_SIZE;
+
     return sgx_backend;
 out:
     if (sgx_backend) {

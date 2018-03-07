@@ -1,57 +1,46 @@
 #pragma once
 
 #include "crypto_context.h"
-#include "fetchstore_layer.h"
 
 #include <nexus_mac.h>
 
-struct data_buffer;
-
-/**
- * Creates a new data_buffer from an external address. A data buffer can only encrypt a
- * chunk at a time.
- *
- * @param external_addr
- * @param chunk_offset
- * @return chunk_size
- */
-struct nexus_data_buf *
-nexus_data_buf_create(size_t chunk_size);
+struct nexus_data_buf;
 
 /**
  * Start the cryptographic process
  * @param data_buffer
  * @param crypto_context
- * @param encrypt (true to encrypt)
+ * @param chunk_size
+ * @param mode
  */
-void
-nexus_data_buf_start(struct nexus_data_buf   * data_buffer,
-                     struct nexus_crypto_ctx * crypto_context,
-                     xfer_op_t                 mode);
-
-/**
- * Completes the data_buffer
- * @param data_buffer
- * @param mac
- */
-void
-nexus_data_buf_finish(struct nexus_data_buf * data_buffer, struct nexus_mac * mac);
+struct nexus_data_buf *
+nexus_data_buf_new(struct nexus_crypto_ctx * crypto_context,
+                   size_t                    chunk_size,
+                   nexus_crypto_mode_t       mode);
 
 /**
  * Continue with the encryption/decryption
  * @param data_buffer
+ * @param external_input_addr
+ * @param external_output_addr
  * @param buflen
- * @param left_over
  */
 int
-nexus_data_buf_update(struct nexus_data_buf * data_buffer,
-                      uint8_t               * external_addr,
-                      size_t                  buflen,
-                      size_t                * left_over);
+nexus_data_buf_write(struct nexus_data_buf * data_buffer,
+                     uint8_t               * external_input_addr,
+                     uint8_t               * external_output_addr,
+                     size_t                  buflen);
 
 /**
- * Frees the nexus_data_buf
+ * Writes the result of the encryption to the mac
  * @param data_buffer
+ * @param mac
+ */
+void
+nexus_data_buf_flush(struct nexus_data_buf * data_buffer, struct nexus_mac * mac);
+
+/**
+ * frees the data buffer
  */
 void
 nexus_data_buf_free(struct nexus_data_buf * data_buffer);

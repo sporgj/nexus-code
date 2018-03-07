@@ -101,6 +101,29 @@ enclave {
                    [out] struct nexus_uuid   * old_uuid_out,
                    [out] struct nexus_uuid   * new_uuid_out
         );
+
+        // file operations
+
+        // TODO add argument to indicate moredata
+        public int ecall_fs_encrypt
+        (
+            [in, string] char                * filepath_IN,
+            [user_check] uint8_t             * input_buffer_in,
+            [user_check] uint8_t             * output_buffer_in,
+                         size_t                size,
+                         size_t                offset,
+                         size_t                filesize
+        );
+
+        public int ecall_fs_decrypt
+        (
+            [in, string] char                * filepath_IN,
+            [user_check] uint8_t             * input_buffer_in,
+            [user_check] uint8_t             * output_buffer_in,
+                         size_t                size,
+                         size_t                offset,
+                         size_t                filesize
+        );
     };
 
 
