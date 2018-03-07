@@ -6,7 +6,7 @@
 #include <nexus_log.h>
 #include <nexus_json.h>
 
-static const char * generic_success_rsp_str = "code : %d, nexus_name : \"%s\"";
+static const char * generic_success_rsp_str = "\"code\" : 0, \"nexus_name\" : \"%s\"";
 
 static char *
 __get_nexus_abspath(char * afs_fullpath)
@@ -14,6 +14,24 @@ __get_nexus_abspath(char * afs_fullpath)
     // XXX: duplicate string?
 
     return (afs_fullpath + datastore_pathlen);
+}
+
+static void
+__get_nexus_dirpath(const char * filepath, char ** dirpath, char ** filename)
+{
+    char * fname = NULL;
+
+    const char * nexus_abspath = filepath + datastore_pathlen;
+
+    fname = strrchr(nexus_abspath, '/');
+
+    if (fname == NULL) {
+        *filename = strndup(nexus_abspath, PATH_MAX);
+        *dirpath = strndup("", PATH_MAX);
+    } else {
+        *filename = strndup(fname + 1, PATH_MAX);
+        *dirpath = strndup(nexus_abspath, (int)(fname - nexus_abspath));
+    }
 }
 
 static int
@@ -54,7 +72,7 @@ handle_create(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
     }
 
 
-    ret = asprintf((char **)resp_buf, generic_success_rsp_str, ret, nexus_name);
+    ret = asprintf((char **)resp_buf, generic_success_rsp_str, nexus_name);
 
     if (ret == -1) {
 	log_error("Could not create response string\n");
@@ -108,7 +126,7 @@ handle_remove(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
     }
 
 
-    ret = asprintf((char **)resp_buf, generic_success_rsp_str, ret, nexus_name);
+    ret = asprintf((char **)resp_buf, generic_success_rsp_str, nexus_name);
 
     if (ret == -1) {
 	log_error("Could not create response string\n");
@@ -160,7 +178,7 @@ handle_lookup(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
     }
 
 
-    ret = asprintf((char **)resp_buf, generic_success_rsp_str, ret, nexus_name);
+    ret = asprintf((char **)resp_buf, generic_success_rsp_str, nexus_name);
 
     if (ret == -1) {
 	log_error("Could not create response string\n");
@@ -197,7 +215,7 @@ handle_filldir(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         ret = nexus_json_get_params(json_obj, filldir_cmd, 4);
 
         if (ret < 0) {
-            log_error("Could not parse create command\n");
+            log_error("Could not parse filldir command\n");
             goto out;
         }
 
@@ -213,7 +231,7 @@ handle_filldir(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
     }
 
 
-    ret = asprintf((char **)resp_buf, "code : %d, real_name : \"%s\"", ret, real_name);
+    ret = asprintf((char **)resp_buf, "\"code\" : 0, \"real_name\" : \"%s\"", real_name);
 
     if (ret == -1) {
 	log_error("Could not create response string\n");
@@ -226,6 +244,223 @@ handle_filldir(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
  out:
     if (real_name) {
         nexus_free(real_name);
+    }
+
+    return ret;
+}
+
+static int
+handle_symlink(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_size)
+{
+    struct nexus_json_param symlink_cmd[3] = { {"op",     NEXUS_JSON_U32,    {0} },
+                                               {"source", NEXUS_JSON_STRING, {0} },
+                                               {"target", NEXUS_JSON_STRING, {0} } };
+
+    char * source     = NULL;
+    char * target     = NULL;
+
+    char * nexus_name = NULL;
+
+    int ret = -1;
+
+
+    {
+        ret = nexus_json_get_params(json_obj, symlink_cmd, 3);
+
+        if (ret < 0) {
+            log_error("Could not parse symlink command\n");
+            goto out;
+        }
+
+        source = symlink_cmd[1].ptr;
+        target = symlink_cmd[2].ptr;
+    }
+
+    // perform the symlink
+    {
+        char * dirpath  = NULL;
+        char * linkname = NULL;
+
+        __get_nexus_dirpath(source, &dirpath, &linkname);
+
+        ret = nexus_fs_symlink(mounted_volume, dirpath, linkname, target, &nexus_name);
+
+        if (ret != 0) {
+            log_error("symlink: dirpath=%s, linkname=%s, target=%s\n", dirpath, linkname, target);
+
+            nexus_free(dirpath);
+            nexus_free(linkname);
+
+            goto out;
+        }
+
+        nexus_free(dirpath);
+        nexus_free(linkname);
+    }
+
+
+    ret = asprintf((char **)resp_buf, "\"code\" : 0, \"nexus_name\" : \"%s\"", nexus_name);
+
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+	goto out;
+    }
+
+    *resp_size = ret + 1;
+
+    ret = 0;
+ out:
+    if (nexus_name) {
+        nexus_free(nexus_name);
+    }
+
+    return ret;
+}
+
+static int
+handle_hardlink(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_size)
+{
+    struct nexus_json_param hardlink_cmd[3] = { {"op",     NEXUS_JSON_U32,    {0} },
+                                                {"source", NEXUS_JSON_STRING, {0} },
+                                                {"target", NEXUS_JSON_STRING, {0} } };
+
+    char * source      = NULL;
+    char * target      = NULL;
+
+    char * nexus_name  = NULL;
+
+    int ret = -1;
+
+
+    {
+        ret = nexus_json_get_params(json_obj, hardlink_cmd, 3);
+
+        if (ret < 0) {
+            log_error("Could not parse hardlink command\n");
+            goto out;
+        }
+
+        source = hardlink_cmd[1].ptr;
+        target = hardlink_cmd[2].ptr;
+    }
+
+    // perform the hardlink
+    {
+        char * link_dirpath  = NULL;
+        char * link_filename = NULL;
+        char * tget_dirpath  = NULL;
+        char * tget_filename = NULL;
+
+        __get_nexus_dirpath(source, &link_dirpath, &link_filename);
+        __get_nexus_dirpath(target, &tget_dirpath, &tget_filename);
+
+        ret = nexus_fs_hardlink(mounted_volume,
+                                link_dirpath,
+                                link_filename,
+                                tget_dirpath,
+                                tget_filename,
+                                &nexus_name);
+
+        nexus_free(link_dirpath);
+        nexus_free(link_filename);
+        nexus_free(tget_dirpath);
+        nexus_free(tget_filename);
+
+        if (ret != 0) {
+            log_error("hardlink: %s -> %s FAILED\n", source, target);
+            goto out;
+        }
+    }
+
+
+    ret = asprintf((char **)resp_buf, "\"code\" : 0, \"nexus_name\" : \"%s\"", nexus_name);
+
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+	goto out;
+    }
+
+    *resp_size = ret + 1;
+
+    ret = 0;
+ out:
+    if (nexus_name) {
+        nexus_free(nexus_name);
+    }
+
+    return ret;
+}
+
+static int
+handle_rename(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_size)
+{
+    struct nexus_json_param rename_cmd[5] = { {"op",     NEXUS_JSON_U32,      {0} },
+                                              {"old_path", NEXUS_JSON_STRING, {0} },
+                                              {"old_name", NEXUS_JSON_STRING, {0} },
+                                              {"new_path", NEXUS_JSON_STRING, {0} },
+                                              {"new_name", NEXUS_JSON_STRING, {0} } };
+
+    char * old_dirpath  = NULL;
+    char * old_filename = NULL;
+    char * new_dirpath  = NULL;
+    char * new_filename = NULL;
+
+    char * old_nexus_name  = NULL;
+    char * new_nexus_name  = NULL;
+
+    int ret = -1;
+
+
+    {
+        ret = nexus_json_get_params(json_obj, rename_cmd, 5);
+
+        if (ret < 0) {
+            log_error("Could not parse rename command\n");
+            goto out;
+        }
+
+        old_dirpath  = __get_nexus_abspath(rename_cmd[1].ptr);
+        old_filename = rename_cmd[2].ptr;
+        new_dirpath  = __get_nexus_abspath(rename_cmd[3].ptr);
+        new_filename = rename_cmd[4].ptr;
+    }
+
+
+    ret = nexus_fs_rename(mounted_volume,
+                          old_dirpath,
+                          old_filename,
+                          new_dirpath,
+                          new_filename,
+                          &old_nexus_name,
+                          &new_nexus_name);
+
+    if (ret != 0) {
+        log_error("rename: %s/%s -> %s/%s FAILED\n", old_dirpath, old_filename, new_dirpath,
+                    new_filename);
+        goto out;
+    }
+
+
+    ret = asprintf((char **)resp_buf,
+                   "\"code\" : 0, \"old_nexus_name\" : \"%s\", \"new_nexus_name\" : \"%s\"",
+                   old_nexus_name,
+                   new_nexus_name);
+
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+	goto out;
+    }
+
+    *resp_size = ret + 1;
+
+    ret = 0;
+ out:
+    if (old_nexus_name) {
+        nexus_free(old_nexus_name);
+    }
+
+    if (new_nexus_name) {
+        nexus_free(new_nexus_name);
     }
 
     return ret;
@@ -271,6 +506,15 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
             break;
         case AFS_OP_FILLDIR:
             ret = handle_filldir(json_obj, resp_buf, resp_size);
+            break;
+        case AFS_OP_SYMLINK:
+            ret = handle_symlink(json_obj, resp_buf, resp_size);
+            break;
+        case AFS_OP_HARDLINK:
+            ret = handle_hardlink(json_obj, resp_buf, resp_size);
+            break;
+        case AFS_OP_RENAME:
+            ret = handle_rename(json_obj, resp_buf, resp_size);
             break;
         default:
             ret = -1;

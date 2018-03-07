@@ -26,14 +26,12 @@ static int volume_fd = 0; // used for communicating with the kernel
 static char * volume_path       = NULL;
 
 
-static const char generic_err_rsp_str[] = "{\n"
-                                          "\"code\": -1\n"
-                                          "}\n";
+static const char generic_err_rsp_str[] = "\"code\": -1";
 
 static uint8_t *
 __generic_error_message(uint32_t * rsp_size)
 {
-    *rsp_size = strnlen(generic_err_rsp_str, PATH_MAX);
+    *rsp_size = strnlen(generic_err_rsp_str, PATH_MAX) + 1;
     return (uint8_t *)strndup(generic_err_rsp_str, *rsp_size);
 }
 
@@ -203,6 +201,9 @@ handle_afs_cmds(int volume_fd)
         if (ret == -1) {
             resp_buf = __generic_error_message((uint32_t *) &resp_size);
         }
+
+        printf("responding: %s\n", (char *)resp_buf);
+        fflush(stdout);
 
         ret = write(volume_fd, resp_buf, resp_size);
 
