@@ -54,6 +54,7 @@ extern struct nexus_supernode * global_supernode;
 extern nexus_uid_t        global_user_id;
 
 extern size_t global_chunk_size;
+extern size_t global_log2chunk_size;
 
 // pointer to the backend info. Used in ocalls;
 void * global_backend_ext;

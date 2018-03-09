@@ -4,8 +4,8 @@ static int
 __nxs_chunk_crypto(struct nexus_filenode * filenode,
                    uint8_t               * input_buffer_in,
                    uint8_t               * output_buffer_in,
-                   size_t                  size,
                    size_t                  offset,
+                   size_t                  size,
                    size_t                  filesize,
                    nexus_crypto_mode_t     mode)
 {
@@ -70,8 +70,8 @@ int
 __nxs_fs_crypto(char              * filepath_IN,
                 uint8_t           * input_buffer_in,
                 uint8_t           * output_buffer_in,
-                size_t              size,
                 size_t              offset,
+                size_t              size,
                 size_t              filesize,
                 nexus_crypto_mode_t mode)
 {
@@ -101,8 +101,8 @@ __nxs_fs_crypto(char              * filepath_IN,
     ret = __nxs_chunk_crypto(metadata->filenode,
                              input_buffer_in,
                              output_buffer_in,
-                             size,
                              offset,
+                             size,
                              filesize,
                              mode);
 
@@ -132,15 +132,15 @@ int
 ecall_fs_encrypt(char    * filepath_IN,
                  uint8_t * input_buffer_in,
                  uint8_t * output_buffer_in,
-                 size_t    size,
                  size_t    offset,
+                 size_t    size,
                  size_t    filesize)
 {
     return __nxs_fs_crypto(filepath_IN,
                            input_buffer_in,
                            output_buffer_in,
-                           size,
                            offset,
+                           size,
                            filesize,
                            NEXUS_ENCRYPT);
 }
@@ -149,15 +149,15 @@ int
 ecall_fs_decrypt(char    * filepath_IN,
                  uint8_t * input_buffer_in,
                  uint8_t * output_buffer_in,
-                 size_t    size,
                  size_t    offset,
+                 size_t    size,
                  size_t    filesize)
 {
     return __nxs_fs_crypto(filepath_IN,
                            input_buffer_in,
                            output_buffer_in,
-                           size,
                            offset,
+                           size,
                            filesize,
                            NEXUS_DECRYPT);
 }

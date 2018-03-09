@@ -18,6 +18,9 @@
 
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
+#include "key_buffer.h"
+
+
 
 struct sgx_backend {
     sgx_enclave_id_t enclave_id;
@@ -28,6 +31,7 @@ struct sgx_backend {
 
     struct nexus_volume * volume;
 };
+
 
 
 int
@@ -92,14 +96,22 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                       char                ** new_nexusname,
                       void                 * priv_data);
 
-void
-key_buffer_init(struct nexus_key_buffer * key_buffer);
+int
+sgx_backend_fs_encrypt(struct nexus_volume * volume,
+                       char                * filepath,
+                       uint8_t             * in_buf,
+                       uint8_t             * out_buf,
+                       size_t                offset,
+                       size_t                size,
+                       size_t                filesize,
+                       void                * priv_data);
 
 int
-key_buffer_put(struct nexus_key_buffer * key_buffer, struct nexus_key * key);
-
-void
-key_buffer_free(struct nexus_key_buffer * key_buffer);
-
-int
-key_buffer_derive(struct nexus_key_buffer * key_buffer, struct nexus_key * key);
+sgx_backend_fs_decrypt(struct nexus_volume * volume,
+                       char                * filepath,
+                       uint8_t             * in_buf,
+                       uint8_t             * out_buf,
+                       size_t                offset,
+                       size_t                size,
+                       size_t                filesize,
+                       void                * priv_data);
