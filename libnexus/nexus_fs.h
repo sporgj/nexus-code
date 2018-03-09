@@ -94,6 +94,23 @@ nexus_fs_rename(struct nexus_volume * volume,
 
 
 
+int
+nexus_fs_encrypt(struct nexus_volume * volume,
+                 char                * path,
+                 uint8_t             * in_buf,
+                 uint8_t             * out_buf,
+                 off_t                 offset,
+                 size_t                size,
+                 size_t                filesize);
+
+int
+nexus_fs_decrypt(struct nexus_volume * volume,
+                 char                * path,
+                 uint8_t             * in_buf,
+                 uint8_t             * out_buf,
+                 off_t                 offset,
+                 size_t                size,
+                 size_t                filesize);
 
 
 
@@ -123,19 +140,3 @@ nexus_fs_create(struct nexus_volume * volume,
 
 
 
-int
-nexus_fs_encrypt(struct nexus_volume * volume,
-		 char                * path,
-		 uint8_t             * in_buf,
-		 uint8_t             * out_buf,
-		 off_t                 offset,
-		 size_t                size);
-
-
-int
-nexus_fs_decrypt(struct nexus_volume * volume,
-		 char                * path,
-		 uint8_t             * in_buf,
-		 uint8_t             * out_buf,
-		 off_t                 offset,
-		 size_t                size);

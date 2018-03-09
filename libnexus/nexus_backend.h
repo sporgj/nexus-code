@@ -52,56 +52,6 @@ nexus_backend_fs_create(struct nexus_volume * volume,
 			struct nexus_stat   * stat);
 
 
-int
-nexus_backend_fs_touch(struct nexus_volume  * volume,
-                       char                 * dirpath,
-                       char                 * plain_name,
-                       nexus_dirent_type_t    type,
-                       char                ** nexus_name);
-
-int
-nexus_backend_fs_remove(struct nexus_volume * volume,
-                        char                * dirpath,
-                        char                * plain_name,
-                        char               ** nexus_name);
-
-int
-nexus_backend_fs_lookup(struct nexus_volume * volume,
-                        char                * dirpath,
-                        char                * plain_name,
-                        char               ** nexus_name);
-
-int
-nexus_backend_fs_filldir(struct nexus_volume * volume,
-                         char                * dirpath,
-                         char                * nexus_name,
-                         char               ** plain_name);
-
-int
-nexus_backend_fs_symlink(struct nexus_volume  * volume,
-                         char                 * dirpath,
-                         char                 * link_name,
-                         char                 * target_path,
-                         char                ** nexus_name);
-
-int
-nexus_backend_fs_hardlink(struct nexus_volume  * volume,
-                          char                 * link_dirpath,
-                          char                 * link_name,
-                          char                 * target_dirpath,
-                          char                 * target_name,
-                          char                ** nexus_name);
-
-int
-nexus_backend_fs_rename(struct nexus_volume  * volume,
-                        char                 * from_dirpath,
-                        char                 * oldname,
-                        char                 * to_dirpath,
-                        char                 * newname,
-                        char                ** old_nexusname,
-                        char                ** new_nexusname);
-
-
 struct nexus_backend_impl {
     char * name;
 
@@ -178,6 +128,24 @@ struct nexus_backend_impl {
                      char                ** old_nexusname,
                      char                ** new_nexusname,
                      void                 * priv_data);
+
+    int (*fs_encrypt)(struct nexus_volume * volume,
+                      char                * path,
+                      uint8_t             * in_buf,
+                      uint8_t             * out_buf,
+                      size_t                offset,
+                      size_t                size,
+                      size_t                filesize,
+                      void                * priv_data);
+
+    int (*fs_decrypt)(struct nexus_volume * volume,
+                      char                * path,
+                      uint8_t             * in_buf,
+                      uint8_t             * out_buf,
+                      size_t                offset,
+                      size_t                size,
+                      size_t                filesize,
+                      void                * priv_data);
 };
 
 
