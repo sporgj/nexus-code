@@ -42,7 +42,7 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
     }
 
     if (sgx_backend->buf_manager) {
-        free_buffer_manager(sgx_backend->buf_manager);
+        buffer_manager_destroy(sgx_backend->buf_manager);
     }
 
     nexus_free(sgx_backend);
@@ -89,7 +89,7 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 
     // create the buffer_table
     {
-        struct buffer_manager * buf_manager = new_buffer_manager();
+        struct buffer_manager * buf_manager = buffer_manager_init();
 
         if (buf_manager == NULL) {
             log_error("could not create a new buf manager\n");

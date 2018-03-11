@@ -4,19 +4,14 @@
 
 
 static struct nexus_dentry *
-create_dentry(struct nexus_dentry * parent,
-              struct nexus_uuid   * uuid,
-              const char          * name,
-              nexus_dirent_type_t   type)
+d_alloc(struct nexus_dentry * parent,
+        struct nexus_uuid   * uuid,
+        const char          * name,
+        nexus_dirent_type_t   type)
 {
     struct nexus_dentry * dentry = NULL;
 
     dentry = nexus_malloc(sizeof(struct nexus_dentry));
-
-    if (dentry == NULL) {
-        log_error("Could not allocate dentry\n");
-        return NULL;
-    }
 
     INIT_LIST_HEAD(&dentry->children);
 
@@ -27,10 +22,50 @@ create_dentry(struct nexus_dentry * parent,
 
     nexus_uuid_copy(uuid, &dentry->uuid);
 
-    /* Add dentry as a child to the parent */
+    return dentry;
+}
+
+static void
+d_free(struct nexus_dentry * dentry)
+{
+    nexus_free(dentry->name);
+    nexus_free(dentry);
+}
+
+static struct nexus_dentry *
+create_dentry(struct nexus_dentry * parent,
+              struct nexus_uuid   * uuid,
+              const char          * name,
+              nexus_dirent_type_t   type)
+{
+    struct nexus_dentry * dentry = NULL;
+
+    dentry = d_alloc(parent, uuid, name, type);
+
     list_add_tail(&dentry->siblings, &parent->children);
 
     return dentry;
+}
+
+static void
+d_prune(struct nexus_dentry * dentry)
+{
+    while (!list_empty(&dentry->children)) {
+        struct nexus_dentry * first_child = NULL;
+
+        first_child = list_first_entry(&dentry->children, struct nexus_dentry, siblings);
+
+        list_del(&first_child->siblings);
+
+        d_prune(first_child);
+
+        d_free(first_child);
+    }
+
+    if (dentry->metadata) {
+        // TODO refactor into VFS call
+        dentry->metadata->dentry = NULL;
+    }
 }
 
 static struct nexus_dentry *
@@ -52,6 +87,26 @@ d_lookup(struct nexus_dentry * parent, const char * name)
     }
 
     return NULL;
+}
+
+void
+dentry_delete(struct nexus_dentry * dentry)
+{
+    list_del(&dentry->siblings);
+    d_prune(dentry);
+    d_free(dentry);
+}
+
+void
+dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child_filename)
+{
+    struct nexus_dentry * dentry = NULL;
+
+    dentry = d_lookup(parent_dentry, child_filename);
+
+    if (dentry != NULL) {
+        dentry_delete(dentry);
+    }
 }
 
 static int
@@ -90,6 +145,8 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
 
     char * name       = NULL;
     char * next_token = NULL;
+
+    struct nexus_dirnode * dirnode    = NULL;
 
     struct nexus_dentry * curr_dentry = root_dentry;
     struct nexus_dentry * next_dentry = NULL;
@@ -135,12 +192,34 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
         }
 
         // if the entry is not found, let's leave
-        ret = dirnode_find_by_name(curr_dentry->metadata->dirnode, name, &atype, &uuid);
+        dirnode = curr_dentry->metadata->dirnode;
+
+        ret = dirnode_find_by_name(dirnode, name, &atype, &uuid);
         if (ret != 0) {
             log_error("nexus_dirnode_lookup() FAILED\n");
             return NULL;
         }
 
+        if (atype == NEXUS_LNK) {
+            char * symlink_target = dirnode_get_link(dirnode, &uuid);
+
+            if (symlink_target == NULL) {
+                log_error("getting symlink (%s) target FAILED\n", name);
+            }
+
+            // TODO handle absolute paths in symlink targets
+
+            next_dentry = walk_path(curr_dentry, symlink_target, builder);
+
+            nexus_free(symlink_target);
+
+            if (next_dentry == NULL) {
+                log_error("traversing symlink (%s) target FAILED\n", name);
+                return NULL;
+            }
+
+            goto next;
+        }
 
         // allocate and add the dentry to the tree
         next_dentry = create_dentry(curr_dentry, &uuid, name, atype);

@@ -714,7 +714,7 @@ dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
 
     list_iterator_free(iter);
 
-    return symlink_entry->target_path;
+    return strndup(symlink_entry->target_path, NEXUS_PATH_MAX);
 }
 
 static inline int

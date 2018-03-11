@@ -7,10 +7,10 @@
 struct buffer_manager;
 
 struct buffer_manager *
-new_buffer_manager();
+buffer_manager_init();
 
 void
-free_buffer_manager(struct buffer_manager * buf_manager);
+buffer_manager_destroy(struct buffer_manager * buf_manager);
 
 
 /**

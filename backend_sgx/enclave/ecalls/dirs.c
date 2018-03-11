@@ -129,10 +129,13 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
         return -1;
     }
 
-    // perform the create operation
+
+    dentry_delete_child(dentry, filename_IN);
+
+
     ret = __nxs_fs_remove(metadata, filename_IN, &entry_uuid);
     if (ret != 0) {
-        log_error("__nxs_fs_delete() FAILED\n");
+        log_error("__nxs_fs_remove() FAILED\n");
         goto out;
     }
 
@@ -142,7 +145,6 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
         goto out;
     }
 
-    // copy out the UUID of the new entry
     nexus_uuid_copy(&entry_uuid, uuid_out);
 
     ret = 0;
@@ -185,13 +187,12 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
         return -1;
     }
 
-    // perform the create operation
     ret = __nxs_fs_lookup(metadata, filename_IN, &entry_uuid);
     if (ret != 0) {
+        // lookups fail very often, no need to report the error
         goto out;
     }
 
-    // copy out the UUID of the new entry
     nexus_uuid_copy(&entry_uuid, uuid_out);
 
     ret = 0;
@@ -239,7 +240,6 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
         return -1;
     }
 
-    // perform the create operation
     ret = __nxs_fs_filldir(metadata, dirpath_IN, uuid, &name_ptr, &name_len);
     if (ret != 0) {
         goto out;
@@ -276,7 +276,7 @@ int
 __nxs_fs_symlink(struct nexus_metadata * metadata,
                  char                  * dirpath_IN,
                  char                  * link_name,
-                 char                  * target_path,
+                 char                  * symlink_target,
                  struct nexus_uuid     * entry_uuid)
 {
     struct nexus_dirnode * dirnode = metadata->dirnode;
@@ -284,7 +284,7 @@ __nxs_fs_symlink(struct nexus_metadata * metadata,
 
     nexus_uuid_gen(entry_uuid);
 
-    if (dirnode_add_link(dirnode, link_name, target_path, entry_uuid)) {
+    if (dirnode_add_link(dirnode, link_name, symlink_target, entry_uuid)) {
         log_error("could not add link to dirnode\n");
         return -1;
     }
@@ -381,7 +381,7 @@ __nxs_fs_hardlink(struct nexus_dirnode * link_dirnode,
     if (ret != 0) {
         // TODO undo the hardlink
 
-        log_error("dirnode_find_by_name(%s) FAILED\n", target_name_IN);
+        log_error("dirnode_add(%s) FAILED\n", target_name_IN);
         return -1;
     }
 
@@ -466,9 +466,9 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
     nexus_dirent_type_t type;
     nexus_dirent_type_t tmp_type;
 
-    char * target_path = NULL;
+    char * symlink_target = NULL;
 
-    ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &target_path);
+    ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &symlink_target);
 
     if (ret != 0) {
         log_error("could not remove (%s) from directory\n", oldname);
@@ -490,9 +490,9 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
     }
 
     if (type == NEXUS_LNK) {
-        ret = dirnode_add_link(to_dirnode, newname, target_path, new_uuid);
+        ret = dirnode_add_link(to_dirnode, newname, symlink_target, new_uuid);
 
-        nexus_free(target_path);
+        nexus_free(symlink_target);
     } else {
         ret = dirnode_add(to_dirnode, newname, type, new_uuid);
     }
@@ -531,18 +531,21 @@ ecall_fs_rename(char              * from_dirpath_IN,
     from_metadata = nexus_vfs_get(from_dirpath_IN, NEXUS_DIRNODE, &from_dentry);
 
     if (from_metadata == NULL) {
-      log_error("could not get metadata (%s)\n", from_dirpath_IN);
-      return -1;
+        log_error("could not get metadata (%s)\n", from_dirpath_IN);
+        return -1;
     }
 
     to_metadata = nexus_vfs_get(to_dirpath_IN, NEXUS_DIRNODE, &to_dentry);
 
     if (to_metadata == NULL) {
-      nexus_vfs_put(from_metadata);
+        nexus_vfs_put(from_metadata);
 
-      log_error("could not get metadata (%s)\n", to_dirpath_IN);
-      return -1;
+        log_error("could not get metadata (%s)\n", to_dirpath_IN);
+        return -1;
     }
+
+    dentry_delete_child(from_dentry, oldname_IN);
+    dentry_delete_child(to_dentry, newname_IN);
 
     // if it's the same dirnode
     if (dirnode_compare(from_metadata->dirnode, to_metadata->dirnode) == 0) {

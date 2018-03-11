@@ -141,3 +141,11 @@ metadata_set_dirty(struct nexus_metadata * metadata, bool dirty);
  */
 struct nexus_dentry *
 dentry_lookup(struct nexus_dentry * root_dentry, char * path);
+
+void
+dentry_delete(struct nexus_dentry * dentry);
+
+void
+dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child);
+
+

@@ -57,7 +57,7 @@ conditional_remove_func(uintptr_t value)
 }
 
 struct buffer_manager *
-new_buffer_manager()
+buffer_manager_init()
 {
     struct buffer_manager * buf_manager = NULL;
 
@@ -75,7 +75,7 @@ new_buffer_manager()
 }
 
 void
-free_buffer_manager(struct buffer_manager * buf_manager)
+buffer_manager_destroy(struct buffer_manager * buf_manager)
 {
     // only free the values
     nexus_free_htable(buf_manager->buffers_table, 1, 0);
