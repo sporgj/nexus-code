@@ -476,8 +476,8 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
     }
 
 
-    // for example if moving foo/bar.txt to cat/bar.txt, if bar.txt already exists, we need to remove it
-    ret = dirnode_remove(to_dirnode, oldname, &tmp_type, new_uuid, NULL);
+    // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
+    ret = dirnode_remove(to_dirnode, newname, &tmp_type, new_uuid, NULL);
 
     if (ret == 0) {
         // this means there was an existing entry in the dirnode

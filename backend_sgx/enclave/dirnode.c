@@ -597,16 +597,16 @@ dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
 static struct nexus_list_iterator *
 __find_by_name(struct nexus_dirnode * dirnode, const char * fname)
 {
-    struct dir_entry_s * dir_entry = NULL;
-
     struct nexus_list_iterator * iter = NULL;
+
+    size_t len = strnlen(fname, NEXUS_NAME_MAX);
 
     iter = list_iterator_new(&dirnode->dir_entry_list);
 
     while (list_iterator_is_valid(iter)) {
-        dir_entry = list_iterator_get(iter);
+        struct dir_entry_s * dir_entry = list_iterator_get(iter);
 
-        if (strncmp(dir_entry->name, fname, dir_entry->name_len) == 0) {
+        if ((dir_entry->name_len == len) && (memcmp(dir_entry->name, fname, len) == 0)) {
             return iter;
         }
 
