@@ -5,6 +5,7 @@
 #undef ERROR
 #define ERROR(fmt, args...) printk(KERN_ERR "nexus_fetch: " fmt, ##args)
 
+#if 0
 static int
 nexus_fetch_init(struct kern_xfer_context * context,
                  struct vcache *            avc,
@@ -280,6 +281,56 @@ out:
 
     return ret;
 }
+
+int
+nexus_kern_fetch(struct afs_conn *      tc,
+                 struct rx_connection * rxconn,
+                 struct osi_file *      fp,
+                 afs_size_t             base,
+                 struct dcache *        adc,
+                 struct vcache *        avc,
+                 afs_int32              size,
+                 struct rx_call *       acall,
+                 char *                 path)
+{
+    struct kern_xfer_context context;
+
+    int nbytes = 0;
+    int ret    = -1;
+
+    memset(&context, 0, sizeof(struct kern_xfer_context));
+
+    context.id         = -1;
+    context.path       = path;
+    context.total_size = avc->f.m.Length;
+    context.afs_call   = acall;
+
+    /* 1 - initialize the context */
+    if (nexus_fetch_init(&context, avc, base, size)) {
+        goto out;
+    }
+
+    if (adc) {
+        adc->validPos = base;
+    }
+
+    /* 2 - set the context buffer */
+    context.buflen = dev->xfer_len;
+    context.buffer = dev->xfer_buffer;
+
+    /* 3 - lets start the transfer */
+    if (nexus_fetch_xfer(&context, adc, fp, base, size, &nbytes)) {
+        goto out;
+    }
+
+    ret = 0;
+
+out:
+    nexus_fetch_exit(&context, ret);
+    // TODO if the userspace returns an error, erase the tdc contents
+    return ret;
+}
+#endif
 
 int
 nexus_kern_fetch(struct afs_conn *      tc,

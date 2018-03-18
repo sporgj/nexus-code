@@ -29,19 +29,6 @@
 #include "nexus.h"
 #include "nexus_util.h"
 
-#define MAX_FSERV_SIZE        PAGE_SIZE
-
-#define NXKERN_NBR_DEVS       1
-#define NXKERN_PIPE_BUFFER    PAGE_SIZE
-
-#define NXMOD_PAGE_ORDER      0
-#define NXMOD_BUFFER_SIZE     (PAGE_SIZE << NXMOD_PAGE_ORDER)
-#define NXMOD_BUFFER_ALLOC()  (char *)get_zeroed_page(GFP_KERNEL)
-#define NXMOD_BUFFER_FREE(x)  free_page(x)
-
-#define NXMOD_XFER_ORDER      5
-#define NEXUS_XFER_SIZE       (PAGE_SIZE << NXMOD_XFER_ORDER)
-
 #define FALSE 0
 #define TRUE 1
 
@@ -78,20 +65,12 @@ struct nexus_mod {
     char *               inb;
     size_t               inb_len;
 
-        
-    char *               xfer_buffer;
-    int                  xfer_order;
-    int                  xfer_pages;
-    size_t               buffersize;
-    size_t               xfer_len;
-
     struct mutex         send_mutex;
-    
+
     spinlock_t           dev_lock;
     struct task_struct * daemon;
-    
-    struct cdev          cdev;
-    
+
+    struct cdev cdev;
 };
 
 extern struct nexus_mod * dev;

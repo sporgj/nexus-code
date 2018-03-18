@@ -14,26 +14,8 @@ static struct class * nexus_class     = NULL;
 static int            nexus_major_num = 0;
 
 
-/***********************/
-/* Stuff to get rid of */
-/***********************/
-
-static struct nexus_mod nexus_device;
-struct nexus_mod * dev = &nexus_device;
-
-mid_t message_counter = 0;
-
-
-DEFINE_MUTEX(xfer_buffer_mutex);
-DEFINE_MUTEX(message_counter_mutex);
-
-/***********************/
-/***********************/
-
-
 static int
-nexus_open(struct inode * inode,
-	   struct file  * fp)
+nexus_open(struct inode * inode, struct file * fp)
 {
     unsigned long flags    = 0;
     int           acquired = 0;
@@ -56,8 +38,7 @@ nexus_open(struct inode * inode,
 }
 
 static int
-nexus_release(struct inode * inode,
-	      struct file  * fp)
+nexus_release(struct inode * inode, struct file * fp)
 {
     /* grab the lock, reset all variables */
     unsigned long flags = 0;
@@ -92,9 +73,7 @@ nexus_write(struct file       * fp,
 }
 
 static long
-nexus_ioctl(struct file    * filp,
-	    unsigned int     cmd,
-	    unsigned long    arg)
+nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
 {
     int ret = 0;
 
@@ -107,50 +86,48 @@ nexus_ioctl(struct file    * filp,
     }
 
     switch (cmd) {
-	case IOCTL_ADD_PATH: {
-	    char * path = kmalloc(PATH_MAX, GFP_KERNEL);
-	    
-	    if (path == NULL) {
-		NEXUS_ERROR("Could not allocate space for path\n");
-		ret = -1;
-		break;
-	    }
-	    
-	    ret = strncpy_from_user(path, (char *)arg, PATH_MAX);
+    case IOCTL_ADD_PATH: {
+        char * path = kmalloc(PATH_MAX, GFP_KERNEL);
 
-	    if ( (ret == 0) ||
-		 (ret == PATH_MAX) ) {
-		NEXUS_ERROR("Tried to register a path with invalid length (ret = %d)\n", ret);
-		ret = -ERANGE;
-		break;
-	    } else if (ret < 0) {
-		NEXUS_ERROR("Error copying path from userspace\n");
-		break;
-	    }
- 	    	    
-	    /* copy the string from userspace */
-	    nexus_printk("path: %s\n", path);
+        if (path == NULL) {
+            NEXUS_ERROR("Could not allocate space for path\n");
+            ret = -1;
+            break;
+        }
 
+        ret = strncpy_from_user(path, (char *)arg, PATH_MAX);
 
-	    /* We need some way to check the input path against the actual file system structure....
-	     * Probably do a dentry lookup and verify that it esists....
-	     */
-	    if (path[0] == '\0') {
-		NEXUS_ERROR("Tried to register empty path\n");
-		return -1;
-	    }
-	    
-	    ret = create_nexus_volume(path);
-	    
-	    if (ret == -1) {
-		NEXUS_ERROR("Could not create volume '%s'\n", path);
-		ret = -1;
-	    }
-	    
-	    kfree(path);
-	    
-	    break;
-	}
+        if ((ret == 0) || (ret == PATH_MAX)) {
+            NEXUS_ERROR("Tried to register a path with invalid length (ret = %d)\n", ret);
+            ret = -ERANGE;
+            break;
+        } else if (ret < 0) {
+            NEXUS_ERROR("Error copying path from userspace\n");
+            break;
+        }
+
+        /* copy the string from userspace */
+        nexus_printk("path: %s\n", path);
+
+        /* We need some way to check the input path against the actual file system structure....
+         * Probably do a dentry lookup and verify that it esists....
+         */
+        if (path[0] == '\0') {
+            NEXUS_ERROR("Tried to register empty path\n");
+            return -1;
+        }
+
+        ret = create_nexus_volume(path);
+
+        if (ret == -1) {
+            NEXUS_ERROR("Could not create volume '%s'\n", path);
+            ret = -1;
+        }
+
+        kfree(path);
+
+        break;
+    }
 
     case IOCTL_MMAP_SIZE:
 
@@ -158,6 +135,7 @@ nexus_ioctl(struct file    * filp,
             NEXUS_ERROR("sending mmap order FAILED\n");
             ret = -1;
         }
+
         break;
 
     default:
@@ -165,78 +143,6 @@ nexus_ioctl(struct file    * filp,
     }
 
     return ret;
-}
-
-static int
-nexus_mmap_fault(struct vm_area_struct * vma,
-		 struct vm_fault       * fault_info)
-{
-
-    // Should never fault, the mapping was screwed up.
-
-    
-    char        * addr  = NULL;
-    struct page * page  = NULL;
-    pgoff_t       index = fault_info->pgoff;
-
-    if (index >= dev->xfer_pages) {
-        NEXUS_ERROR("mmap_fault pgoff=%d, pages=%d\n", (int)index, dev->xfer_pages);
-        return VM_FAULT_NOPAGE;
-    }
-
-    /* convert the address to a page */
-    addr = dev->xfer_buffer + (index << PAGE_SHIFT);
-    page = virt_to_page(addr);
-
-    /*
-    NEXUS_ERROR("nexus_fault: index=%d (%p), current=%d (%s) virt=%p page=%p\n",
-          (int)index, addr, (int)current->pid, current->comm,
-          fault_info->virtual_address, page);
-          */
-
-    if (!page) {
-        return VM_FAULT_SIGBUS;
-    }
-
-    // get_page(page);
-    fault_info->page = page;
-
-
-    return 0;
-}
-
-static struct vm_operations_struct mmap_ops = {
-    .fault = nexus_mmap_fault
-};
-
-static int
-nexus_mmap(struct file           * filp,
-	   struct vm_area_struct * vma)
-{
-    struct page   * page      = NULL;
-    unsigned long   user_addr = vma->vm_start;
-
-    int err = 0;
-    int i   = 0;
-
-    vma->vm_ops           = &mmap_ops;
-    vma->vm_flags        |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
-    vma->vm_private_data  = filp->private_data;
-
-    for (i = 0; i < dev->xfer_pages; i++) {
-
-        page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
-        err  = vm_insert_page(vma, user_addr, page);
-
-        if (err) {
-            NEXUS_ERROR("mmap error (%d)\n", err);
-            return err;
-        }
-
-        user_addr += PAGE_SIZE;
-    }
-
-    return 0;
 }
 
 static struct file_operations nexus_mod_fops = {
@@ -250,8 +156,7 @@ static struct file_operations nexus_mod_fops = {
 };
 
 static int
-proc_show(struct seq_file * sf,
-	  void            * v)
+proc_show(struct seq_file * sf, void * v)
 {
     struct nexus_volume_path * curr;
 
@@ -273,8 +178,7 @@ proc_show(struct seq_file * sf,
 }
 
 static int
-proc_open(struct inode * inode,
-	  struct file  * file)
+proc_open(struct inode * inode, struct file * file)
 {
     return single_open(file, proc_show, NULL);
 }
@@ -294,104 +198,11 @@ static struct file_operations nexus_proc_fops = {
  * hold dev->send_mutex
  */
 int
-nexus_mod_send(afs_op_type_t           type,
-               XDR                   * xdrs,
-               struct nx_daemon_rsp ** pp_reply,
-               int                   * p_err)
-{
-    struct nx_daemon_rsp * p_reply     = NULL;
-    struct afs_op_msg    * msg_out     = NULL;
-    struct afs_op_msg    * msg_in      = NULL;
-
-    size_t payload_len = (xdrs->x_private - xdrs->x_base);
-    size_t inbound_len;
-
-    int err = -1;
-
-    
-    if (NEXUS_IS_OFFLINE) {
-        READPTR_UNLOCK();
-        return -1;
-    }
-
-    /* write the message to the outbuffer buffer */
-    msg_out         = (struct afs_op_msg *)dev->outb;
-    msg_out->type   = type;
-    msg_out->msg_id = ucrpc__genid();
-    msg_out->len    = payload_len;
-
-    dev->outb_len = AFS_OP_MSG_SIZE(msg_out);
-
-    /* now, lets wait for the response */
-    while (1) {
-
-        DEFINE_WAIT(wait);
-
-        if (NEXUS_IS_OFFLINE) {
-            printk(KERN_ERR "process is offline :(");
-            goto out;
-        }
-
-        wake_up_interruptible(&dev->outq);
-        /* sleep the kernel thread */
-
-        prepare_to_wait(&dev->msgq, &wait, TASK_INTERRUPTIBLE);
-
-        /* the buffer is "empty", nothing to read */
-        if (dev->inb_len == 0) {
-            schedule();
-        }
-
-        finish_wait(&dev->msgq, &wait);
-
-        msg_in      = (struct afs_op_msg *)(dev->inb);
-        inbound_len = AFS_OP_MSG_SIZE(msg_in);
-
-        // XXX: the following lines are redundant as the lock ensures that
-        // messages cannot
-        // be interleaved. Remove this?
-        /* JRL: Still an old reply? */
-        if (msg_in->ack_id != msg_out->msg_id) {
-            continue;
-        }
-
-        dev->inb_len -= inbound_len;
-
-        /* allocate the response data */
-        p_reply = kmalloc(inbound_len, GFP_KERNEL);
-        if (p_reply == NULL) {
-            *p_err    = msg_in->status;
-            *pp_reply = NULL;
-
-            NEXUS_ERROR("allocation error\n");
-
-            goto out;
-        }
-
-        /* copy the XDR raw data and decode the fields */
-        memcpy(p_reply->data, msg_in->payload, msg_in->len);
-        xdrmem_create(&p_reply->xdrs, p_reply->data, msg_in->len, XDR_DECODE);
-
-        *p_err    = msg_in->status;
-        *pp_reply = p_reply;
-        err       = 0;
-
-        break;
-    }
-
-out:
-    READPTR_UNLOCK();
-
-    return err;
-}
-
-
-
 int
 nexus_mod_init(void)
 {
     dev_t devno = MKDEV(0, 0); // Dynamically assign the major number
-    
+
     struct page * page = NULL;
 
     int ret   = 0;
@@ -401,62 +212,6 @@ nexus_mod_init(void)
 
     nexus_printk("Initializing Nexus\n");
 
-
-    /********************************/
-    /* Going to get rid of all this */
-    /********************************/
-    
-    /* lets now initialize the data structures */
-    memset(dev, 0, sizeof(struct nexus_mod));
-
-    init_waitqueue_head(&dev->outq);
-    init_waitqueue_head(&dev->msgq);
-
-    mutex_init(&(dev->send_mutex));
-    spin_lock_init(&(dev->dev_lock));
-
-    // FIXME dev-outb != NULL?
-    dev->outb = NXMOD_BUFFER_ALLOC();
-    dev->inb  = NXMOD_BUFFER_ALLOC();
-
-    if ((dev->outb == NULL) || (dev->inb == NULL)) {
-        NEXUS_ERROR("allocating buffers failed\n");
-        return -1;
-    }
-
-    /* allocate the transfer buffer */
-    while (1) {
-        if ((dev->xfer_buffer = (char *)__get_free_pages(GFP_KERNEL, order))) {
-            break;
-        }
-
-        if (--order < 0) {
-            printk(KERN_NOTICE "could not allocate xfer_buffer\n");
-            return -1;
-        }
-    }
-
-    dev->xfer_order = (order);
-    dev->xfer_pages = (1 << order);
-    dev->xfer_len   = (dev->xfer_pages << PAGE_SHIFT);
-
-    dev->buffersize = NXMOD_BUFFER_SIZE;
-    dev->inb_len    = 0;
-    dev->outb_len   = 0;
-
-    for (i = 0; i < dev->xfer_pages; i++) {
-        page = virt_to_page(dev->xfer_buffer + (i << PAGE_SHIFT));
-        get_page(page);
-    }
-
-    mutex_init(&xfer_buffer_mutex);
-
-
-    /********************************/
-    /********************************/
-    /********************************/
-    
-
     nexus_class = class_create(THIS_MODULE, "nexus");
     if (IS_ERR(nexus_class)) {
 	NEXUS_ERROR("Failed to register Nexus device class\n");
@@ -465,7 +220,7 @@ nexus_mod_init(void)
 
     printk("intializing Nexus Control device\n");
 
-    
+
     /* lets setup the character device */
     ret = alloc_chrdev_region(&devno, 0, 1, "nexus");
 
@@ -478,7 +233,6 @@ nexus_mod_init(void)
     devno           = MKDEV(nexus_major_num, 1);
 
     NEXUS_DEBUG("Creating Nexus Device file: Major %d, Minor %d\n", nexus_major_num, MINOR(devno));
-    
 
     cdev_init(&dev->cdev, &nexus_mod_fops);
     dev->cdev.owner = THIS_MODULE;
@@ -493,8 +247,7 @@ nexus_mod_init(void)
 
     device_create(nexus_class, NULL, devno, NULL, "nexus");
 
-    
-    
+
     /* create the proc file */
     proc_create_data("nexus", 0, NULL, &nexus_proc_fops, NULL);
 
@@ -520,7 +273,7 @@ nexus_mod_exit(void)
     dev_t devno;
 
     nexus_printk("Deinitializing Nexus\n");
-    
+
 
     devno = MKDEV(nexus_major_num, 1);
 
@@ -533,7 +286,7 @@ nexus_mod_exit(void)
 
 
     remove_proc_entry("nexus", NULL);
-    
-    
+
+
     return 0;
 }
