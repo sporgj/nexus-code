@@ -7,6 +7,7 @@
 #include "nexus_volume.h"
 
 
+struct nexus_mod * dev = NULL;
 
 
 /* major & minor numbers for our modules */
@@ -42,8 +43,6 @@ nexus_release(struct inode * inode, struct file * fp)
 {
     /* grab the lock, reset all variables */
     unsigned long flags = 0;
-
-    nexus_clear_volume_list();
 
     spin_lock_irqsave(&(dev->dev_lock), flags);
     {
@@ -129,15 +128,6 @@ nexus_ioctl(struct file * filp, unsigned int cmd, unsigned long arg)
         break;
     }
 
-    case IOCTL_MMAP_SIZE:
-
-        if (copy_to_user((char *)arg, &dev->xfer_len, sizeof(dev->xfer_len))) {
-            NEXUS_ERROR("sending mmap order FAILED\n");
-            ret = -1;
-        }
-
-        break;
-
     default:
         ret = -1;
     }
@@ -150,28 +140,17 @@ static struct file_operations nexus_mod_fops = {
     .unlocked_ioctl = nexus_ioctl,
     .open           = nexus_open,
     .release        = nexus_release,
-    .mmap           = nexus_mmap,
     .write          = nexus_write,
-    .read           = nexus_read,
+    .read           = nexus_read
 };
 
 static int
 proc_show(struct seq_file * sf, void * v)
 {
-    struct nexus_volume_path * curr;
-
     if (dev->daemon == NULL) {
         seq_printf(sf, "daemon offline :(\n");
     } else {
         seq_printf(sf, "daemon pid: %d\n", (int)dev->daemon->pid);
-    }
-
-    seq_printf(sf, "outb=%zu, inb=%zu\n", dev->outb_len, dev->inb_len);
-
-    seq_printf(sf, "paths:\n");
-    list_for_each_entry(curr, &nexus_volumes_head, list)
-    {
-        seq_printf(sf, "%s\n", curr->afs_path);
     }
 
     return 0;
@@ -198,16 +177,11 @@ static struct file_operations nexus_proc_fops = {
  * hold dev->send_mutex
  */
 int
-int
 nexus_mod_init(void)
 {
     dev_t devno = MKDEV(0, 0); // Dynamically assign the major number
 
-    struct page * page = NULL;
-
     int ret   = 0;
-    int order = NXMOD_XFER_ORDER;
-    int i     = 0;
 
 
     nexus_printk("Initializing Nexus\n");
@@ -251,11 +225,7 @@ nexus_mod_init(void)
     /* create the proc file */
     proc_create_data("nexus", 0, NULL, &nexus_proc_fops, NULL);
 
-    printk(KERN_INFO "nexus_mod: mounted, xfer: %zuB [%p - %p] %d pages\n",
-           dev->xfer_len,
-           dev->xfer_buffer,
-           dev->xfer_buffer + dev->xfer_len,
-           dev->xfer_pages);
+    printk(KERN_INFO "nexus_mod: mounted pages\n");
 
     /* initialize the kernel data structures */
     nexus_kern_init();

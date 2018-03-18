@@ -4,6 +4,8 @@
 #include <linux/mm.h>
 #include <linux/page-flags.h>
 
+#if 0
+
 static int
 nexus_store_exit(struct kern_xfer_context * context,
                  int               error,
@@ -378,4 +380,24 @@ out:
     }
 
     return ret;
+}
+
+#endif
+
+int
+nexus_kern_store(struct vcache          * avc,
+                 struct dcache         ** dclist,
+                 afs_size_t               bytes,
+                 afs_hyper_t            * anewDV,
+                 int                    * doProcessFS,
+                 struct AFSFetchStatus  * OutStatus,
+                 afs_uint32               nchunks,
+                 int                      nomore,
+                 struct rx_call         * afs_call,
+                 char                   * path,
+                 int                      base,
+                 struct storeOps        * ops,
+                 void                   * rock)
+{
+    return -1;
 }

@@ -220,22 +220,6 @@ nexus_kern_fetch(struct afs_conn *      afs_conn,
 int
 nexus_kern_storeacl(struct vcache * avc, AFSOpaque * acl_data);
 
-char *
-lookup_shdw_name(const char * shadow_name);
-
-char *
-lookup_path_name(const char * parent_path, const char * fname);
-
-void
-add_path_to_cache(const char * shadow_name,
-                  const char * parent_path,
-                  const char * fname);
-
-void
-remove_path_name(const char * parent_path, const char * fname);
-
-void
-remove_shdw_name(const char * shadow_name);
 
 static inline nexus_fs_obj_type_t
 dentry_type(const struct dentry * dentry)

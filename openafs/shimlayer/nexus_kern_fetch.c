@@ -330,7 +330,6 @@ out:
     // TODO if the userspace returns an error, erase the tdc contents
     return ret;
 }
-#endif
 
 int
 nexus_kern_fetch(struct afs_conn *      tc,
@@ -379,4 +378,19 @@ out:
     nexus_fetch_exit(&context, ret);
     // TODO if the userspace returns an error, erase the tdc contents
     return ret;
+}
+#endif
+
+int
+nexus_kern_fetch(struct afs_conn      * tc,
+                 struct rx_connection * rxconn,
+                 struct osi_file      * fp,
+                 afs_size_t             base,
+                 struct dcache        * adc,
+                 struct vcache        * avc,
+                 afs_int32              size,
+                 struct rx_call       * acall,
+                 char                 * path)
+{
+    return -1;
 }

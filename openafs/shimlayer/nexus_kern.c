@@ -26,6 +26,13 @@ nexus_kern_init(void)
 }
 
 
+void
+nexus_kern_ping(void)
+{
+    // TODO
+}
+
+
 static char *
 __get_path_buffer(void)
 {
@@ -37,8 +44,10 @@ __get_path_buffer(void)
 static void
 __put_path_buffer(char * buffer)
 {
+    (void) buffer;
     mutex_unlock(&__path_buf_mutex);
 }
+
 
 char *
 nexus_get_path_from_dentry(struct dentry * dentry)
@@ -100,74 +109,6 @@ nexus_get_path_from_vcache(struct vcache * vcache)
     dput(dentry);
     
     return path;
-}
-
-
-
-
-
-
-
-/* the list of all paths watched */
-LIST_HEAD(nexus_volumes_head);
-
-bool
-startsWith(const char * pre, const char * str)
-{
-    size_t lenpre = strlen(pre);
-    size_t lenstr = strlen(str);
-
-    return (lenstr < lenpre) ? 0 : (strncmp(pre, str, lenpre) == 0);
-}
-
-int
-nexus_add_volume(const char * path)
-{
-    struct nexus_volume_path * curr = NULL;
-    int                        len  = strnlen(path, NEXUS_PATH_MAX);
-
-    list_for_each_entry(curr, &nexus_volumes_head, list)
-    {
-        if (strncmp(curr->afs_path, path, curr->path_len) == 0) {
-            return 0;
-        }
-    }
-
-    /* if we are here, we need to add the entry to the list */
-    curr = (struct nexus_volume_path *)kzalloc(
-        sizeof(struct nexus_volume_path) + len, GFP_KERNEL);
-    if (curr == NULL) {
-        NEXUS_ERROR("allocation error, cannot add path to list");
-        return -1;
-    }
-
-    curr->path_len = len;
-
-    /* we should allow for paths that do not contain '/afs' */
-    if (startsWith(AFS_PREFIX, path)) {
-        strncpy(curr->afs_path, path + AFS_PREFIX_LEN, len - AFS_PREFIX_LEN);
-    } else {
-        strncpy(curr->afs_path, path, len);
-    }
-
-    list_add(&curr->list, &nexus_volumes_head);
-
-    return 0;
-}
-
-void
-nexus_clear_volume_list(void)
-{
-    struct nexus_volume_path * curr_wp = NULL;
-    struct nexus_volume_path * prev_wp = NULL;
-
-    list_for_each_entry_safe(curr_wp, prev_wp, &nexus_volumes_head, list)
-    {
-        list_del(&curr_wp->list);
-        kfree(curr_wp);
-    }
-
-    INIT_LIST_HEAD(&nexus_volumes_head);
 }
 
 int
