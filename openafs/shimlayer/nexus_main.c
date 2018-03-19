@@ -9,6 +9,23 @@
 
 struct nexus_mod * dev = NULL;
 
+const char * generic_databuf_command = "{\n"
+                                       "\"op\"   : %d,"
+                                       "\n"
+                                       "\"path\" : \"%s\","
+                                       "\n"
+                                       "\"offset\" : \"%zu\","
+                                       "\n"
+                                       "\"buflen\" : \"%zu\","
+                                       "\n"
+                                       "\"filesize\" : %zu"
+                                       "\n"
+                                       "}\n";
+
+spinlock_t * nexus_databuffer_lock = NULL;
+char       * nexus_databuffer_ptr  = NULL;
+size_t       nexus_databuffer_size = 0;
+
 
 /* major & minor numbers for our modules */
 static struct class * nexus_class     = NULL;
@@ -66,7 +83,7 @@ static ssize_t
 nexus_write(struct file       * fp,
             const char __user * buf,
             size_t              count,
-            loff_t *            f_pos)
+            loff_t            * f_pos)
 {
     return 0;
 }

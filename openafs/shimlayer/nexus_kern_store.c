@@ -1,158 +1,13 @@
-#include "nexus_kern.h"
 #include "nexus_module.h"
-#include <linux/highmem.h>
-#include <linux/mm.h>
-#include <linux/page-flags.h>
-
-#if 0
+#include "nexus_json.h"
+#include "nexus_util.h"
+#include "nexus_kern.h"
+#include "nexus_volume.h"
 
 static int
-nexus_store_exit(struct kern_xfer_context * context,
-                 int               error,
-                 int             * do_processfs)
+nexus_store_upload(struct rx_call * afs_call, uint8_t * buffer, int tlen, int * byteswritten)
 {
-    struct nx_daemon_rsp * reply   = NULL;
-    caddr_t        buf_ptr = NULL;
-    XDR            xdrs;
-
-    int code   =  0;
-    int buflen =  0;
-    int ret    = -1;
-
-
-    *do_processfs = 0;
-
-    /* lets close the userspace context  */
-    if ((buf_ptr = READPTR_LOCK()) == 0) {
-        goto out;
-    }
-
-    buflen = READPTR_BUFLEN();
-
-    /* create the encoded XDR data structure on the buffer */
-    xdrmem_create(&xdrs, buf_ptr, buflen, XDR_ENCODE);
-
-    if ((xdr_int(&xdrs, &context->id) == FALSE) ||
-	(xdr_int(&xdrs, &error)       == FALSE) ) {
-	
-        READPTR_UNLOCK();
-        NEXUS_ERROR("store_close: could not parse response\n");
-        goto out;
-    }
-
-    ret = nexus_mod_send(AFS_OP_ENCRYPT_STOP, &xdrs, &reply, &code);
-    
-    if (ret || code) {
-        NEXUS_ERROR("store_close, could not get response from uspace\n");
-        goto out;
-    }
-
-    *do_processfs = 1;
-
-    ret = 0;
-out:
-    if (reply) {
-        kfree(reply);
-    }
-
-    return ret;
-}
-
-/**
- * Instantiates a new transfer context
- * @param context
- * @param avc is the vnode
- * @param bytes the amount of data being transferred
- * @param the starting position of the transfer (should be at a chunk boundary
- *
- * return 0 on success
- */
-static int
-nexus_store_init(struct kern_xfer_context * context,
-                 struct vcache   * avc,
-                 afs_size_t        bytes,
-                 int               start_pos)
-{
-    struct nx_daemon_rsp * reply   = NULL;
-    caddr_t                buf_ptr = NULL;
-    xfer_req_t             xfer_req;
-    xfer_rsp_t             xfer_rsp;
-    XDR *                  x_data = NULL;
-    XDR                    xdrs;
-
-    int code     = 0;
-    int ret      = -1;
-
-    if ((buf_ptr = READPTR_LOCK()) == 0) {
-        return -1;
-    }
-
-    /* initiate a store operation with the daemon */
-    xdrmem_create(&xdrs, buf_ptr, READPTR_BUFLEN(), XDR_ENCODE);
-
-    xfer_req = (xfer_req_t){.op         = NEXUS_STORE,
-                            .xfer_size  = bytes,
-                            .offset     = start_pos,
-                            .file_size  = avc->f.m.Length};
-
-    if ((xdr_opaque(&xdrs, (caddr_t)&xfer_req, sizeof(xfer_req_t)) == FALSE) ||
-        (xdr_string(&xdrs, &context->path, NEXUS_PATH_MAX)         == FALSE) ) {
-	
-        READPTR_UNLOCK();
-        NEXUS_ERROR("could not encode xfer_req XDR object\n");
-
-	goto out;
-    }
-
-    ret = nexus_mod_send(AFS_OP_ENCRYPT_START, &xdrs, &reply, &code);
-    
-    if (ret || code) {
-        NEXUS_ERROR("init '%s' (start=%d, len=%d)\n", context->path, start_pos,
-              (int)bytes);
-        goto out;
-    }
-
-    /* 2 - Get the response */
-    x_data = &reply->xdrs;
-    
-    if (!xdr_opaque(x_data, (caddr_t)&xfer_rsp, sizeof(xfer_rsp_t))) {
-        NEXUS_ERROR("could not parse from init\n");
-        goto out;
-    }
-
-    if (xfer_rsp.xfer_id == -1) {
-        NEXUS_ERROR("store_init '%s' FAILED\n", context->path);
-        goto out;
-    }
-
-    context->id        = xfer_rsp.xfer_id;
-    context->xfer_size = bytes;
-    context->offset    = start_pos;
-
-    ret = 0;
-out:
-    if (reply) {
-        kfree(reply);
-    }
-
-    return ret;
-}
-
-/**
- * Writes the content of the buffer to the server
- *
- * @param context
- * @param tlen
- * @param byteswritten will contain the number of bytes sent to the server
- */
-static int
-nexus_store_write_to_fserver(struct kern_xfer_context * context,
-                            uint8_t *                  buffer,
-                            int                        tlen,
-                            int *                      byteswritten)
-{
-    struct rx_call * afs_call = context->afs_call;
-    uint8_t        * buf      = buffer;
+    uint8_t * buf = buffer;
 
     afs_int32 nbytes     = 0;
     afs_int32 bytes_left = tlen;
@@ -166,7 +21,7 @@ nexus_store_write_to_fserver(struct kern_xfer_context * context,
     RX_AFS_GUNLOCK();
     
     while (bytes_left > 0) {
-        size = MIN(MAX_FSERV_SIZE, bytes_left);
+        size = MIN(MAX_FILESERVER_TRANSFER_BYTES, bytes_left);
 
 	nbytes = rx_Write(afs_call, buf, size);
 	
@@ -187,125 +42,124 @@ out:
 }
 
 static int
-nexus_store_read_chunk_file(struct osi_file * fp,
-                            caddr_t           buf,
-                            int               bytes_left,
-                            int *             byteswritten)
+nexus_store_encrypt(struct nexus_volume * vol,
+                    char                * path,
+                    size_t                offset,
+                    size_t                buflen,
+                    size_t                filesize)
 {
-    int       ret    = 0;
-    afs_int32 nbytes = 0;
-    afs_int32 size   = 0;
+    char * cmd_str   = NULL;
 
-    *byteswritten = 0;
+    char * resp_data = NULL;
+    u32    resp_len  = 0;
 
-    while (bytes_left > 0) {
-        // XXX: why only read this much from the file at a time?
-        size = MIN(MAX_FSERV_SIZE, bytes_left);
+    int    ret       = 0;
 
-        nbytes = afs_osi_Read(fp, -1, buf, size);
 
-        if (nbytes != size) {
-            NEXUS_ERROR("nbytes=%d, size=%d\n", nbytes, size);
+    cmd_str = kasprintf(GFP_KERNEL, generic_databuf_command, AFS_OP_ENCRYPT, path, offset, buflen, filesize);
+
+    if (cmd_str == NULL) {
+	NEXUS_ERROR("Could not create command string\n");
+        return -1;
+    }
+
+    AFS_GUNLOCK();
+    ret = nexus_send_cmd(vol, strlen(cmd_str) + 1, cmd_str, &resp_len, (u8 **)&resp_data);
+    AFS_GLOCK();
+
+
+    if (ret == -1) {
+	NEXUS_ERROR("Error Sending Nexus Command\n");
+	ret = -1;
+	goto out;
+    }
+
+    // handle response...
+    {
+        struct nexus_json_param resp[1] = { { "code", NEXUS_JSON_S32, { 0 } } };
+
+        s32 ret_code = 0;
+
+	ret = nexus_json_parse(resp_data, resp, 1);
+
+	if (ret != 0 && resp[0].val == 0) {
+            NEXUS_ERROR("Could not parse JSON response\n");
+            ret = -1;
             goto out;
         }
 
-        buf           += size;
-        bytes_left    -= size;
-        *byteswritten += size;
+	ret_code = (s32)resp[0].val;
+
+	if (ret_code != 0) {
+            ret = -1;
+            goto out;
+        }
     }
 
 out:
+    if (cmd_str) {
+        nexus_kfree(cmd_str);
+    }
+
     return ret;
 }
 
 static int
-nexus_store_xfer(struct kern_xfer_context * context,
-		 struct dcache   * tdc,
-		 int             * xferred)
+nexus_store_transfer(struct nexus_volume * vol,
+                     struct rx_call      * afs_call,
+                     struct dcache       * tdc,
+                     char                * path,
+                     size_t                offset,
+                     size_t                filesize,
+                     int                 * transferred)
 {
-    int                    ret        = -1;
-    int                    bytes_left = tdc->f.chunkBytes;
-    int                    nbytes     = 0;
-    int                    code       = 0;
-    int                    size       = 0;
-    struct osi_file *      fp         = NULL;
-    struct nx_daemon_rsp * reply      = NULL;
-    caddr_t                rpc_ptr    = NULL;
-    XDR                    xdrs;
+    struct osi_file * fp = NULL;
 
-    *xferred = 0;
+    int nbytes_uploaded = 0;
+    int nbytes          = 0;
+    int size            = 0;
 
-    /* open the chunk file and start encrypting */
-    // note: AFS panics on failure
+    int ret = -1;
+
+
+    // copy a chunk of the data into the transfer buffer
+    // OS panic on failure :)
     fp = afs_CFileOpen(&tdc->f.inode);
 
-    while (bytes_left > 0) {
+    // the nexus_databuffer_size is at least the chunk length
+    // this operation accounts for small chunks
+    size = MIN(tdc->f.chunkBytes, nexus_databuffer_size);
 
-	size = MIN(bytes_left, context->buflen);
+    nbytes = afs_osi_Read(fp, -1, nexus_databuffer_ptr, size);
 
-        /* 1 - read the file into the buffer */
-        mutex_lock_interruptible(&xfer_buffer_mutex);
-        if (nexus_store_read_chunk_file(fp, context->buffer, size, &nbytes)) {
-            goto out;
-        }
-
-        if ((rpc_ptr = READPTR_LOCK()) == 0) {
-            goto out;
-        }
-
-        /* 2 - tell uspace we have data */
-        xdrmem_create(&xdrs, rpc_ptr, READPTR_BUFLEN(), XDR_ENCODE);
-
-	if ( (xdr_int(&xdrs, &context->id) == FALSE) ||
-	     (xdr_int(&xdrs, &size)        == FALSE) ) {
-
-	    READPTR_UNLOCK();
-            NEXUS_ERROR("xdr store_xfer failed\n");
-
-	    goto out;
-        }
-
-        ret = nexus_mod_send(AFS_OP_ENCRYPT_READY, &xdrs, &reply, &code);
-
-        if (ret || code) {
-            NEXUS_ERROR("could not send data to uspace (code=%d)\n", code);
-            goto out;
-        }
-
-        kfree(reply);
-        reply = NULL;
-
-        /* write the encrypted data to the server */
-        if (nexus_store_write_to_fserver(context, context->buffer, size, &nbytes)) {
-            goto out;
-        }
-
-        mutex_unlock(&xfer_buffer_mutex);
-
-        bytes_left -= size;
-        *xferred   += size;
-
-        // TODO add special handling for files locked on the server
-    }
-
-    ret = 0;
-out:
     osi_UFSClose(fp);
 
-    if (reply) {
-        kfree(reply);
+    if (size != nbytes) {
+        NEXUS_ERROR("error reading chunk file. tried=%d, got=%d\n", size, nbytes);
+        return -1;
     }
 
-    if (mutex_is_locked(&xfer_buffer_mutex)) {
-        mutex_unlock(&xfer_buffer_mutex);
+
+    // encrypt the buffer
+    ret = nexus_store_encrypt(vol, path, offset, nbytes, filesize);
+
+    if (ret != 0) {
+        NEXUS_ERROR("nexus_store_encrypt FAILED\n");
+        return -1;
     }
 
-    return ret;
+
+    // ship the data to the fileserver
+    ret = nexus_store_upload(afs_call, nexus_databuffer_ptr, nbytes, &nbytes_uploaded);
+
+    if (ret != 0) {
+        NEXUS_ERROR("nexus_store_upload FAILED\n");
+        return -1;
+    }
+
+    return 0;
 }
 
-/**
- * Storing the dcaches
- */
 int
 nexus_kern_store(struct vcache          * avc,
                  struct dcache         ** dclist,
@@ -321,83 +175,53 @@ nexus_kern_store(struct vcache          * avc,
                  struct storeOps        * ops,
                  void                   * rock)
 {
-    int                      ret          = -1;
-    int                      bytes_stored = 0;
-    int                      nbytes       = 0;
-    int                      i;
-    struct kern_xfer_context context;
+    struct nexus_volume * vol = NULL;
 
-    memset(&context, 0, sizeof(struct kern_xfer_context));
+    unsigned long flags = 0;
 
-    context.id         = -1;
-    context.path       = path;
-    context.total_size = avc->f.m.Length;
-    context.afs_call   = afs_call;
+    int filesize     = avc->f.m.Length;
+    int offset       = base;
 
-    /* 1 - instantiate the context */
-    // TODO return special code for a NOOP
-    if (nexus_store_init(&context, avc, bytes, base)) {
-        goto out;
+    int bytes_stored = 0;
+    int nbytes       = 0;
+
+    afs_uint32 i = 0;
+
+    int ret = -1;
+
+
+    vol = nexus_get_volume(path);
+
+    if (vol == NULL) {
+        return -1;
     }
 
-    /* 2 - set the context buffer */
-    context.buflen = dev->xfer_len;
-    context.buffer = dev->xfer_buffer;
+    spin_lock_irqsave(nexus_databuffer_lock, flags);
 
-    /* 3 - lets start uploading stuff */
+    avc->f.truncPos = AFS_NOTRUNC;
+
+    // start uploading each chunk
     for (i = 0; i < nchunks; i++) {
-        avc->f.truncPos = AFS_NOTRUNC;
-
         // TODO add code for afs_wakeup for cases file is locked at the server
-        if (nexus_store_xfer(&context, dclist[i], &nbytes)) {
-            NEXUS_ERROR("nexus_store_xfer error :(");
+        ret = nexus_store_transfer(vol, afs_call, dclist[i], path, offset, filesize, &nbytes);
+
+        if (ret != 0) {
+            NEXUS_ERROR("could not transfer chunk (path=%s, chunk_num=%d) error :(",
+                        path, dclist[i]->f.chunk);
             goto out;
         }
 
         // TODO add code for "small" tdc entries: send a buffer of zeros
 
         bytes_stored += nbytes;
+        offset       += nbytes;
     }
 
-    if (bytes_stored != bytes) {
-        NEXUS_ERROR("incomplete store (%s) stored=%d, size=%d\n", path, bytes_stored,
-              (int)bytes);
-    }
-
-    // close the connection
-    ret = (*ops->close)(rock, OutStatus, doProcessFS);
-
-    /* the processs completed successfully, increment the data version */
-    if (*doProcessFS) {
-        hadd32(*anewDV, 1);
-    }
-
+    ret = 0;
 out:
-    nexus_store_exit(&context, ret, doProcessFS);
+    spin_unlock_irqrestore(nexus_databuffer_lock, flags);
 
-    if (ops) {
-        ret = (*ops->destroy)(&rock, ret);
-    }
+    nexus_put_volume(vol);
 
     return ret;
-}
-
-#endif
-
-int
-nexus_kern_store(struct vcache          * avc,
-                 struct dcache         ** dclist,
-                 afs_size_t               bytes,
-                 afs_hyper_t            * anewDV,
-                 int                    * doProcessFS,
-                 struct AFSFetchStatus  * OutStatus,
-                 afs_uint32               nchunks,
-                 int                      nomore,
-                 struct rx_call         * afs_call,
-                 char                   * path,
-                 int                      base,
-                 struct storeOps        * ops,
-                 void                   * rock)
-{
-    return -1;
 }

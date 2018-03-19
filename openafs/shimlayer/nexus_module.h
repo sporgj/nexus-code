@@ -25,8 +25,7 @@
 // clang-format on
 
 
-#include "afs.h"
-#include "nexus.h"
+#include "nexus_afs.h"
 #include "nexus_util.h"
 
 #define FALSE 0
@@ -50,6 +49,14 @@ extern struct nexus_mod * dev;
 
 
 
+// ******** data transfer *********
+#define MAX_FILESERVER_TRANSFER_BYTES  PAGE_SIZE // this is from AFS
+
+extern const char * generic_databuf_command;
+
+extern spinlock_t * nexus_databuffer_lock;
+extern char       * nexus_databuffer_ptr;
+extern size_t       nexus_databuffer_size;
 
 // initialization routine called after device is mounted
 int nexus_kern_init(void);
