@@ -39,6 +39,8 @@ static inline int max(int a, int b) {
 void * nexus_malloc(size_t size);
 
 
+void nexus_hexdump(void * ptr, size_t size);
+
 
 int nexus_strtoi8 (char * str, int8_t   * value);
 int nexus_strtou8 (char * str, uint8_t  * value);
