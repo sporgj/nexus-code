@@ -8,7 +8,13 @@
 
 #include "crypto_context.h"
 
+// ---- GCM stuff ----
+#define GCM128_KEY_SIZE (16)
+#define GCM128_IV_SIZE  (16)
+
+
 #define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
+
 
 uint8_t *
 crypto_aes_ecb_encrypt(struct nexus_key * key,

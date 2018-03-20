@@ -18,10 +18,6 @@
 */
 
 
-// ---- GCM stuff ----
-#define GCM128_KEY_SIZE (16)
-#define GCM128_IV_SIZE  (16)
-
 
 struct __gcm_header {
     uint8_t key[GCM128_KEY_SIZE];
