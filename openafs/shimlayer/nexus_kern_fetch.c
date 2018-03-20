@@ -132,11 +132,15 @@ nexus_kern_fetch(struct afs_conn      * tc,
     }
 
 
-    ret = nexus_fetch_decrypt(vol, path, base, size, filesize); 
+    ret = nexus_fetch_decrypt(vol, path, base, size, filesize);
 
     if (ret != 0) {
         NEXUS_ERROR("could not decrypt file contents\n");
         goto out;
+    }
+
+    if (adc) {
+        adc->validPos = base;
     }
 
     ret = 0;

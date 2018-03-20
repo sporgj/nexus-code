@@ -19,12 +19,12 @@ nexus_store_upload(struct rx_call * afs_call, uint8_t * buffer, int tlen, int * 
 
     /* send the data to the server */
     RX_AFS_GUNLOCK();
-    
+
     while (bytes_left > 0) {
         size = MIN(MAX_FILESERVER_TRANSFER_BYTES, bytes_left);
 
 	nbytes = rx_Write(afs_call, buf, size);
-	
+
         if (nbytes != size) {
             NEXUS_ERROR("afs_server exp=%d, act=%d\n", tlen, (int)nbytes);
             ret = -1;
@@ -193,6 +193,10 @@ nexus_kern_store(struct vcache          * avc,
     vol = nexus_get_volume(path);
 
     if (vol == NULL) {
+        if (ops) {
+            (*ops->destroy)(&rock, ret);
+        }
+
         return -1;
     }
 
@@ -217,9 +221,23 @@ nexus_kern_store(struct vcache          * avc,
         offset       += nbytes;
     }
 
-    ret = 0;
+    if (bytes_stored != bytes) {
+        NEXUS_ERROR("incomplete store (%s) stored=%d, size=%d\n", path, bytes_stored, (int)bytes);
+        ret = -1;
+        goto out;
+    }
+
+    ret = (*ops->close)(rock, OutStatus, doProcessFS);
+
+    if (*doProcessFS) {
+        hadd32(*anewDV, 1);
+    }
 out:
     spin_unlock_irqrestore(nexus_databuffer_lock, flags);
+
+    if (ops) {
+        ret = (*ops->destroy)(&rock, ret);
+    }
 
     nexus_put_volume(vol);
 

@@ -29,7 +29,7 @@ struct task_struct * nexus_daemon  = NULL;
 spinlock_t * nexus_databuffer_lock = NULL;
 char       * nexus_databuffer_ptr  = NULL;
 
-static struct page * databuf_pages = 0;
+static struct page * nexus_databuf_pages = 0;
 
 
 /* major & minor numbers for our modules */
@@ -177,18 +177,20 @@ nexus_mmap(struct file *filp, struct vm_area_struct *vma)
     }
 
     // vma->vm_ops = &mmap_vmas;
+    vma->vm_flags |= (VM_READ | VM_WRITE | VM_DONTCOPY | VM_IO | VM_LOCKED);
     vma->vm_private_data = filp->private_data;
 
 
     uaddr = vma->vm_start;
 
-    for (; i < NEXUS_DATABUF_PAGES; i++) {
-        struct page * page = databuf_pages + i;
+    for (i = vma->vm_pgoff; i < NEXUS_DATABUF_PAGES; i++) {
+        struct page * page = nexus_databuf_pages + i;
 
         int err = vm_insert_page(vma, uaddr, page);
 
         if (err) {
-            NEXUS_ERROR("mmap error (%d)\n", err);
+            NEXUS_ERROR("mmap error (err=%d). i=%d. page_address=%p, uaddr=%p\n",
+                        err, i, page_address(page), (void *)uaddr);
             return err;
         }
 
@@ -242,21 +244,21 @@ __alloc_mod_memory(void)
 {
     int i = 0;
 
-    databuf_pages = alloc_pages(GFP_KERNEL, NEXUS_DATABUF_ORDER);
+    nexus_databuf_pages = alloc_pages(GFP_KERNEL, NEXUS_DATABUF_ORDER);
 
-    if (databuf_pages == NULL) {
+    if (nexus_databuf_pages == NULL) {
 	printk(KERN_ERR "could not allocate pages (order=%d)\n", NEXUS_DATABUF_ORDER);
 	return -ENOMEM;
     }
 
     // pin the pages
     for (; i < NEXUS_DATABUF_PAGES; i++) {
-	struct page * page = databuf_pages + i;
+	struct page * page = nexus_databuf_pages + i;
 
-        mark_page_reserved(page);
+        get_page(page);
     }
 
-    nexus_databuffer_ptr  = page_address(databuf_pages);
+    nexus_databuffer_ptr  = page_address(nexus_databuf_pages);
     nexus_databuffer_lock = nexus_kmalloc(sizeof(spinlock_t), GFP_KERNEL);
 
     spin_lock_init(nexus_databuffer_lock);
@@ -270,10 +272,12 @@ __free_mod_memory(void)
     int i = 0;
 
     for (; i < NEXUS_DATABUF_PAGES; i++) {
-	struct page * page = databuf_pages + i;
+	struct page * page = nexus_databuf_pages + i;
 
-        free_reserved_page(page);
+        put_page(page);
     }
+
+    __free_pages(nexus_databuf_pages, NEXUS_DATABUF_ORDER);
 
     nexus_databuffer_ptr  = NULL;
     // XXX: check if the lock is unused?
