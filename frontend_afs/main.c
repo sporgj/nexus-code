@@ -21,7 +21,8 @@ char * datastore_path = NULL;
 
 size_t datastore_pathlen = 0;
 
-static int volume_fd = 0; // used for communicating with the kernel
+static int nexus_fd  = -1; // used for communicating with the kernel (mmap)
+static int volume_fd = -1;
 
 static char * volume_path       = NULL;
 
@@ -38,9 +39,6 @@ __generic_error_message(uint32_t * rsp_size)
 static int
 attach_volume_datastore(char * path)
 {
-    int  nexus_fd = 0;
-    int volume_fd = 0;
-
     nexus_fd = open(NEXUS_DEVICE, O_RDWR);
 
     if (nexus_fd == -1) {
@@ -49,8 +47,6 @@ attach_volume_datastore(char * path)
     }
 
     volume_fd = ioctl(nexus_fd, NEXUS_IOCTL_CREATE_VOLUME, path);
-
-    close(nexus_fd);
 
     if (volume_fd == -1) {
 	log_error("Could not create Nexus Volume (%s)\n", path);
@@ -202,9 +198,6 @@ handle_afs_cmds(int volume_fd)
             resp_buf = __generic_error_message((uint32_t *) &resp_size);
         }
 
-        printf("responding: %s\n", (char *)resp_buf);
-        fflush(stdout);
-
         ret = write(volume_fd, resp_buf, resp_size);
 
         if (ret != resp_size) {
@@ -258,6 +251,11 @@ main(int argc, char ** argv)
             log_error("could not mount volume :(");
             return -1;
         }
+    }
+
+    if (volume_fd == -1) {
+        log_error("the volume has not been mounted\n");
+        return -1;
     }
 
     printf("Started %s at: %s\n", argv[0], volume_path);

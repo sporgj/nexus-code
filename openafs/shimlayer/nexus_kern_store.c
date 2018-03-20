@@ -128,7 +128,7 @@ nexus_store_transfer(struct nexus_volume * vol,
 
     // the nexus_databuffer_size is at least the chunk length
     // this operation accounts for small chunks
-    size = MIN(tdc->f.chunkBytes, nexus_databuffer_size);
+    size = MIN(tdc->f.chunkBytes, NEXUS_DATABUF_SIZE);
 
     nbytes = afs_osi_Read(fp, -1, nexus_databuffer_ptr, size);
 

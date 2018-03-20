@@ -99,7 +99,7 @@ ocall_buffer_flush(struct nexus_uuid * metadata_uuid, void * backend_info)
     struct sgx_backend * sgx_backend = NULL;
 
     uint8_t * buffer_addr = NULL;
-    size_t    buffer_size = NULL;
+    size_t    buffer_size = 0;
 
     int ret = -1;
 

@@ -58,7 +58,7 @@ frontend_afs.a: $(exec_objs)
 	@cp $@ ../build
 
 nexus-afs: $(exec_objs)
-	$(call build,CC,$(CC) $(CFLAGS) $^ $(libs) -o $@)
+	$(call build,CC,$(CC) $(CFLAGS) $^ $(LDFLAGS) $(libs) -o $@)
 
 
 

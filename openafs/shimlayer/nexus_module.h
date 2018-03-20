@@ -32,20 +32,10 @@
 #define TRUE 1
 
 
-struct nexus_mod {
-    struct mutex         send_mutex;
-
-    spinlock_t           dev_lock;
-    struct task_struct * daemon;
-
-    struct cdev cdev;
-};
-
-
-extern struct nexus_mod * dev;
+extern struct task_struct * nexus_daemon;
 
 #define NEXUS_IS_OFFLINE					\
-    (dev->daemon == NULL || task_is_stopped(dev->daemon))
+    (nexus_daemon == NULL || task_is_stopped(nexus_daemon))
 
 
 
