@@ -22,3 +22,14 @@ nexus_crypto_ctx_generate(struct nexus_crypto_ctx * crypto_ctx);
 void
 nexus_crypto_ctx_copy(struct nexus_crypto_ctx * src_crypto_ctx,
                       struct nexus_crypto_ctx * dst_crypto_ctx);
+
+
+size_t
+nexus_crypto_ctx_bufsize(void);
+
+int
+nexus_crypto_ctx_serialize(struct nexus_crypto_ctx * crypto_ctx, uint8_t * buffer, size_t buflen);
+
+int
+nexus_crypto_ctx_parse(struct nexus_crypto_ctx * crypto_ctx, uint8_t * buffer, size_t buflen);
+

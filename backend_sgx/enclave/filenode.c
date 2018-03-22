@@ -10,13 +10,7 @@ struct __filenode_hdr {
 } __attribute__((packed));
 
 
-struct __chunk_buf {
-    uint8_t key[GCM128_KEY_SIZE];
-    uint8_t  iv[GCM128_IV_SIZE];
-    uint8_t mac[NEXUS_MAC_SIZE];
-} __attribute__((packed));
-
-struct chunk_entry_s {
+struct chunk_entry {
     struct nexus_crypto_ctx crypto_ctx;
 };
 
@@ -47,7 +41,7 @@ __free_chunk_entry(void * element)
 static size_t
 __get_filenode_size(struct nexus_filenode * filenode)
 {
-    return sizeof(struct __filenode_hdr) + (filenode->nchunks * sizeof(struct __chunk_buf));
+    return sizeof(struct __filenode_hdr) + (filenode->nchunks * nexus_crypto_ctx_bufsize());
 }
 
 static void
@@ -82,43 +76,16 @@ filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 }
 
 static int
-__parse_chunk_entry(struct chunk_entry_s * chunk_entry, struct __chunk_buf * chunk_buf)
+__parse_chunk_entry(struct chunk_entry * chunk_entry,
+                    uint8_t            * buffer,
+                    size_t               buflen,
+                    size_t             * p_size)
 {
-    struct nexus_crypto_ctx * crypto_ctx = &(chunk_entry->crypto_ctx);
+    int ret = nexus_crypto_ctx_parse(&chunk_entry->crypto_ctx, buffer, buflen);
 
-    int ret = -1;
+    *p_size = nexus_crypto_ctx_bufsize();
 
-
-    ret = __nexus_key_from_buf(&(crypto_ctx->key),
-                               NEXUS_RAW_128_KEY,
-                               chunk_buf->key,
-                               GCM128_KEY_SIZE);
-
-    if (ret != 0) {
-        log_error("could not parse key from buffer\n");
-        return -1;
-    }
-
-
-    ret = __nexus_key_from_buf(&(crypto_ctx->iv),
-                               NEXUS_RAW_128_KEY,
-                               chunk_buf->key,
-                               GCM128_KEY_SIZE);
-
-    if (ret != 0) {
-        log_error("could not parse IV from buffer\n");
-        return -1;
-    }
-
-
-    ret = __nexus_mac_from_buf(&(crypto_ctx->mac), chunk_buf->mac);
-
-    if (ret != 0) {
-        log_error("could not get mac from buf\n");
-        return -1;
-    }
-
-    return 0;
+    return ret;
 }
 
 static uint8_t *
@@ -146,23 +113,19 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
 }
 
 struct nexus_filenode *
-filenode_from_buffer(uint8_t * buffer, size_t buflen)
+filenode_from_buffer(uint8_t * buffer, size_t bytes_left)
 {
     struct nexus_filenode * filenode        = NULL;
 
-    struct __chunk_buf    * chunk_buf       = NULL;
-
-    struct chunk_entry_s  * new_chunk_entry = NULL;
+    struct chunk_entry    * new_chunk_entry = NULL;
 
     uint8_t               * input_ptr       = NULL;
-
-    int                     ret             = -1;
 
 
     filenode = nexus_malloc(sizeof(struct nexus_filenode));
 
 
-    input_ptr = __parse_filenode_header(filenode, buffer, buflen);
+    input_ptr = __parse_filenode_header(filenode, buffer, bytes_left);
 
     if (input_ptr == NULL) {
         nexus_free(filenode);
@@ -170,13 +133,15 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
         return NULL;
     }
 
-
-    chunk_buf = (struct __chunk_buf *) input_ptr;
+    bytes_left -= sizeof(struct __filenode_hdr);
 
     for (size_t i = 0; i < filenode->nchunks; i++) {
-        new_chunk_entry = nexus_malloc(sizeof(struct chunk_entry_s));
+        size_t size     = 0;
+        int    ret      = -1;
 
-        ret = __parse_chunk_entry(new_chunk_entry, chunk_buf);
+        new_chunk_entry = nexus_malloc(sizeof(struct chunk_entry));
+
+        ret = __parse_chunk_entry(new_chunk_entry, input_ptr, bytes_left, &size);
 
         if (ret != 0) {
             log_error("could not parse chunk entry (num=%d)\n", i);
@@ -186,7 +151,8 @@ filenode_from_buffer(uint8_t * buffer, size_t buflen)
 
         nexus_list_append(&filenode->chunk_list, new_chunk_entry);
 
-        chunk_buf++;
+        bytes_left -= size;
+        input_ptr  += size;
     }
 
     return filenode;
@@ -235,31 +201,16 @@ filenode_load(struct nexus_uuid * uuid)
 }
 
 static int
-__serialize_chunk_entry(struct chunk_entry_s * chunk_entry, struct __chunk_buf * chunk_buf)
+__serialize_chunk_entry(struct chunk_entry * chunk_entry,
+                        uint8_t            * output_ptr,
+                        size_t               buflen,
+                        size_t             * p_size)
 {
-    struct nexus_crypto_ctx * crypto_ctx = &(chunk_entry->crypto_ctx);
+    int ret = nexus_crypto_ctx_serialize(&chunk_entry->crypto_ctx, output_ptr, buflen);
 
-    uint8_t * ret_ptr = NULL;
+    *p_size = nexus_crypto_ctx_bufsize();
 
-
-    ret_ptr = nexus_key_to_buf(&(crypto_ctx->key), chunk_buf->key, GCM128_KEY_SIZE);
-
-    if (ret_ptr == NULL) {
-        log_error("could not serialize key to buffer\n");
-        return -1;
-    }
-
-
-    ret_ptr = nexus_key_to_buf(&(crypto_ctx->iv), chunk_buf->iv, GCM128_KEY_SIZE);
-
-    if (ret_ptr == NULL) {
-        log_error("could not serialize iv to buffer\n");
-        return -1;
-    }
-
-    nexus_mac_to_buf(&(crypto_ctx->mac), chunk_buf->mac);
-
-    return 0;
+    return ret;
 }
 
 
@@ -283,15 +234,11 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
 }
 
 int
-filenode_serialize(struct nexus_filenode * filenode, uint8_t * buffer)
+filenode_serialize(struct nexus_filenode * filenode, size_t bytes_left, uint8_t * buffer)
 {
-    struct chunk_entry_s * curr_chunk_entry = NULL;
-
-    struct __chunk_buf   * chunk_buf        = NULL;
+    struct chunk_entry   * curr_chunk_entry = NULL;
 
     uint8_t              * output_ptr       = NULL;
-
-    int                    ret              = -1;
 
 
     output_ptr = __serialize_filenode_header(filenode, buffer);
@@ -302,19 +249,24 @@ filenode_serialize(struct nexus_filenode * filenode, uint8_t * buffer)
     }
 
 
-    chunk_buf = (struct __chunk_buf *) output_ptr;
+    bytes_left -= sizeof(struct __filenode_hdr);
 
     for (size_t i = 0; i < filenode->nchunks; i++) {
+        size_t      size = 0;
+        int         ret  = -1;
+
         curr_chunk_entry = nexus_list_get(&filenode->chunk_list, i);
 
-        ret = __serialize_chunk_entry(curr_chunk_entry, chunk_buf);
+
+        ret = __serialize_chunk_entry(curr_chunk_entry, output_ptr, bytes_left, &size);
 
         if (ret != 0) {
             log_error("serializing chunk entry (num=%d)\n", i);
             return -1;
         }
 
-        chunk_buf++;
+        output_ptr += size;
+        bytes_left -= size;
     }
 
     return 0;
@@ -323,11 +275,11 @@ filenode_serialize(struct nexus_filenode * filenode, uint8_t * buffer)
 int
 filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
 {
-    struct nexus_crypto_buf * crypto_buffer = NULL;
+    struct nexus_crypto_buf * crypto_buffer     = NULL;
 
-    size_t    serialized_buflen = 0;
+    size_t                    serialized_buflen = 0;
 
-    int ret = -1;
+    int                       ret               = -1;
 
 
     serialized_buflen = __get_filenode_size(filenode);
@@ -350,7 +302,7 @@ filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
             goto out;
         }
 
-        ret = filenode_serialize(filenode, output_buffer);
+        ret = filenode_serialize(filenode, buffer_size, output_buffer);
         if (ret != 0) {
             log_error("filenode_serialize() FAILED\n");
             goto out;
@@ -403,7 +355,7 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
 
     // if the file got smaller, we need to pop off some entries
     while (difference < 0) {
-        struct chunk_entry_s * chunk_entry = nexus_list_pop(&filenode->chunk_list);
+        struct chunk_entry * chunk_entry = nexus_list_pop(&filenode->chunk_list);
 
         __free_chunk_entry(chunk_entry);
 
@@ -411,7 +363,7 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
     }
 
     while (difference > 0) {
-        struct chunk_entry_s * chunk_entry = nexus_malloc(sizeof(struct chunk_entry_s));
+        struct chunk_entry * chunk_entry = nexus_malloc(sizeof(struct chunk_entry));
 
         nexus_list_append(&filenode->chunk_list, chunk_entry);
 
@@ -426,7 +378,7 @@ filenode_get_chunk(struct nexus_filenode * filenode, size_t offset)
 {
     size_t chunk_num = get_chunk_number(filenode, offset);
 
-    struct chunk_entry_s * chunk_entry = nexus_list_get(&filenode->chunk_list, chunk_num);
+    struct chunk_entry * chunk_entry = nexus_list_get(&filenode->chunk_list, chunk_num);
 
     return chunk_entry ? &chunk_entry->crypto_ctx : NULL;
 }
