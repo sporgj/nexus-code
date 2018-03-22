@@ -13,3 +13,7 @@ extern struct nexus_volume * mounted_volume;
 extern char * datastore_path;
 
 extern size_t datastore_pathlen;
+
+// for the data transfer
+extern uint8_t * global_databuf_addr;
+extern size_t    global_databuf_size;

@@ -298,7 +298,6 @@ handle_symlink(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         nexus_free(linkname);
     }
 
-
     ret = asprintf((char **)resp_buf, "\"code\" : 0, \"nexus_name\" : \"%s\"", nexus_name);
 
     if (ret == -1) {
@@ -466,6 +465,122 @@ handle_rename(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
     return ret;
 }
 
+static int
+handle_encrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_size)
+{
+    struct nexus_json_param encrypt_cmd[5] = { { "op", NEXUS_JSON_U32, { 0 } },
+                                               { "path", NEXUS_JSON_STRING, { 0 } },
+                                               { "offset", NEXUS_JSON_U32, { 0 } },
+                                               { "buflen", NEXUS_JSON_U32, { 0 } },
+                                               { "filesize", NEXUS_JSON_U32, { 0 } } };
+
+    char * path     = NULL;
+    size_t offset   = 0;
+    size_t buflen   = 0;
+    size_t filesize = 0;
+
+    int ret = -1;
+
+    {
+        ret = nexus_json_get_params(json_obj, encrypt_cmd, 5);
+
+        if (ret < 0) {
+            log_error("could not parse encrypt command\n");
+            return -1;
+        }
+
+        path     = __get_nexus_abspath(encrypt_cmd[1].ptr);
+        offset   = encrypt_cmd[2].val;
+        buflen   = encrypt_cmd[3].val;
+        filesize = encrypt_cmd[4].val;
+    }
+
+
+    ret = nexus_fs_encrypt(mounted_volume,
+                           path,
+                           global_databuf_addr,
+                           global_databuf_addr,
+                           offset,
+                           buflen,
+                           filesize);
+
+    if (ret != 0) {
+        printf("encrypting (%s) FAILED\n", path);
+        return -1;
+    }
+
+    ret = asprintf((char **)resp_buf, "\"code\" : 0");
+
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+        return -1;
+    }
+
+    *resp_size = ret + 1;
+
+    return 0;
+}
+
+static int
+handle_decrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_size)
+{
+    struct nexus_json_param decrypt_cmd[5] = { { "op", NEXUS_JSON_U32, { 0 } },
+                                               { "path", NEXUS_JSON_STRING, { 0 } },
+                                               { "offset", NEXUS_JSON_U32, { 0 } },
+                                               { "buflen", NEXUS_JSON_U32, { 0 } },
+                                               { "filesize", NEXUS_JSON_U32, { 0 } } };
+
+    char * path     = NULL;
+    size_t offset   = 0;
+    size_t buflen   = 0;
+    size_t filesize = 0;
+
+    int ret = -1;
+
+    {
+        ret = nexus_json_get_params(json_obj, decrypt_cmd, 5);
+
+        if (ret < 0) {
+            log_error("could not parse decrypt command\n");
+            return -1;
+        }
+
+        path     = __get_nexus_abspath(decrypt_cmd[1].ptr);
+        offset   = decrypt_cmd[2].val;
+        buflen   = decrypt_cmd[3].val;
+        filesize = decrypt_cmd[4].val;
+    }
+
+
+    nexus_hexdump(global_databuf_addr, min(buflen, 32));
+
+    ret = nexus_fs_decrypt(mounted_volume,
+                           path,
+                           global_databuf_addr,
+                           global_databuf_addr,
+                           offset,
+                           buflen,
+                           filesize);
+
+    if (ret != 0) {
+        printf("decrypting (%s) FAILED\n", path);
+        return -1;
+    }
+
+    nexus_hexdump(global_databuf_addr, min(buflen, 32));
+
+    ret = asprintf((char **)resp_buf, "\"code\" : 0");
+
+    if (ret == -1) {
+	log_error("Could not create response string\n");
+        return -1;
+    }
+
+    *resp_size = ret + 1;
+
+    return 0;
+}
+
 int
 dispatch_nexus_command(uint8_t   * cmd_buf,
                        uint32_t    cmd_size,
@@ -490,8 +605,8 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
     if (ret < 0) {
         nexus_json_free(json_obj);
 
-	log_error("Error parsing nexus command\n");
-	return -1;
+        log_error("Error parsing nexus command\n");
+        return -1;
     }
 
     switch (op_code.val) {
@@ -515,6 +630,12 @@ dispatch_nexus_command(uint8_t   * cmd_buf,
             break;
         case AFS_OP_RENAME:
             ret = handle_rename(json_obj, resp_buf, resp_size);
+            break;
+        case AFS_OP_ENCRYPT:
+            ret = handle_encrypt(json_obj, resp_buf, resp_size);
+            break;
+        case AFS_OP_DECRYPT:
+            ret = handle_decrypt(json_obj, resp_buf, resp_size);
             break;
         default:
             ret = -1;

@@ -14,11 +14,11 @@ struct __chunk_buf {
     uint8_t key[GCM128_KEY_SIZE];
     uint8_t  iv[GCM128_IV_SIZE];
     uint8_t mac[NEXUS_MAC_SIZE];
-};
+} __attribute__((packed));
 
 struct chunk_entry_s {
     struct nexus_crypto_ctx crypto_ctx;
-} __attribute__((packed));
+};
 
 
 static inline size_t

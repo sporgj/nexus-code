@@ -17,6 +17,10 @@
 #define NEXUS_DEVICE "/dev/nexus"
 
 
+#ifndef PAGE_SHIFT
+#define PAGE_SHIFT  12
+#endif
+
 #define NEXUS_DATABUF_ORDER (9)
 #define NEXUS_DATABUF_PAGES (1 << NEXUS_DATABUF_ORDER)
 #define NEXUS_DATABUF_SIZE  (NEXUS_DATABUF_PAGES << PAGE_SHIFT)

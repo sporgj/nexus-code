@@ -16,25 +16,31 @@
 #define DEFAULT_VOLUME_PATH       "$HOME/nexus-volume"
 
 struct nexus_volume * mounted_volume = NULL;
+static char         * volume_path    = NULL;
 
-char * datastore_path = NULL;
 
+char * datastore_path    = NULL;
 size_t datastore_pathlen = 0;
+
 
 static int nexus_fd  = -1; // used for communicating with the kernel (mmap)
 static int volume_fd = -1;
 
-static char * volume_path       = NULL;
+
+uint8_t * global_databuf_addr = NULL;
+size_t    global_databuf_size = NEXUS_DATABUF_SIZE;
 
 
-static const char generic_err_rsp_str[] = "\"code\": -1";
 
 static uint8_t *
 __generic_error_message(uint32_t * rsp_size)
 {
+    static const char generic_err_rsp_str[] = "\"code\": -1";
+
     *rsp_size = strnlen(generic_err_rsp_str, PATH_MAX) + 1;
     return (uint8_t *)strndup(generic_err_rsp_str, *rsp_size);
 }
+
 
 static int
 attach_volume_datastore(char * path)
@@ -59,17 +65,30 @@ attach_volume_datastore(char * path)
 static void *
 afs_datastore_open(nexus_json_obj_t cfg)
 {
-    char * root_path = NULL;
+    char * root_datastore_path = NULL;
+
     int    ret = 0;
 
-    ret = nexus_json_get_string(cfg, "root_path", &root_path);
+    ret = nexus_json_get_string(cfg, "root_path", &root_datastore_path);
 
     if (ret == -1) {
-        log_error("Invalid FLAT datastore config. Missing root_path\n");
+        log_error("Invalid AFS datastore config. Missing root_path\n");
         return NULL;
     }
 
-    asprintf(&datastore_path, "%s/%s", volume_path, root_path);
+
+    {
+        char * fullpath = get_current_dir_name();
+        char * tmp_path = NULL;
+
+        asprintf(&tmp_path, "%s/%s", fullpath, root_datastore_path);
+
+        datastore_path = realpath(tmp_path, NULL);
+
+        nexus_free(fullpath);
+        nexus_free(tmp_path);
+    }
+
 
     volume_fd = attach_volume_datastore(datastore_path);
 
@@ -106,26 +125,19 @@ handle_afs_cmds(int volume_fd)
 
     int ret      = 0;
 
-#if 0
-    /* set the memory map */
-    ret = ioctl(fd, IOCTL_MMAP_SIZE, &global_xfer_buflen);
-
-    if (ret != 0) {
-        log_error("ioctl MMAP_SIZE failed");
-        return -1;
-    }
-
     /* mmap the xfer address to kernel memory */
-    global_xfer_addr = mmap(
-        NULL, global_xfer_buflen, PROT_READ | PROT_WRITE, MAP_SHARED, fno, 0);
+    global_databuf_addr = mmap(NULL,
+                               global_databuf_size,
+                               PROT_READ | PROT_WRITE,
+                               MAP_SHARED,
+                               nexus_fd,
+                               0);
 
-    if (global_xfer_addr == (void *)-1) {
-        log_error("mmap failed (size=%zu) :(", global_xfer_buflen);
+    if (global_databuf_addr == (void *)-1) {
+        log_error("mmap failed (size=%zu) :(", global_databuf_size);
         return -1;
     }
 
-    log_debug("mmap %p for %zu bytes", global_xfer_addr, global_xfer_buflen);
-#endif
 
     epoll_fd = epoll_create1(0);
 
@@ -258,7 +270,7 @@ main(int argc, char ** argv)
         return -1;
     }
 
-    printf("Started %s at: %s\n", argv[0], volume_path);
+    printf("Started %s at: %s\n", argv[0], datastore_path);
     fflush(stdout);
 
     handle_afs_cmds(volume_fd);
