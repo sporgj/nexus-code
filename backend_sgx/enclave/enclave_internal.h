@@ -34,6 +34,7 @@
 #include "dirnode.h"
 #include "filenode.h"
 
+#include <nexus_volume.h>
 #include <nexus_fs.h>
 #include <nexus_log.h>
 #include <nexus_mac.h>
@@ -56,5 +57,5 @@ extern nexus_uid_t        global_user_id;
 extern size_t global_chunk_size;
 extern size_t global_log2chunk_size;
 
-// pointer to the backend info. Used in ocalls;
-void * global_backend_ext;
+// pointer to the backend info. Used in ocalls
+struct nexus_volume * global_volume;

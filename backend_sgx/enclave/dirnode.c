@@ -405,7 +405,7 @@ dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 }
 
 int
-dirnode_store(struct nexus_dirnode * dirnode, struct nexus_mac * mac)
+dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -416,7 +416,7 @@ dirnode_store(struct nexus_dirnode * dirnode, struct nexus_mac * mac)
 
     serialized_buflen = __get_total_size(dirnode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &dirnode->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, uuid);
     if (!crypto_buffer) {
         goto out;
     }

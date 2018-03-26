@@ -4,15 +4,6 @@
 
 #include <nexus_hashtable.h>
 
-struct __buf {
-    struct nexus_uuid uuid;
-
-    int refcount; // TODO consider switching to atomic.h
-
-    uint8_t * addr;
-    size_t    size;
-};
-
 // XXX given that uuid's are random, not sure if having a prime number for capacity
 // buys us much
 #define BUFFER_TABLE_SIZE 127
@@ -86,7 +77,8 @@ int
 __alloc_buf(struct buffer_manager * buf_manager,
             uint8_t               * addr,
             size_t                  size,
-            struct nexus_uuid     * uuid)
+            struct nexus_uuid     * uuid,
+            bool                    on_disk)
 {
     struct __buf * buf = NULL;
 
@@ -97,6 +89,7 @@ __alloc_buf(struct buffer_manager * buf_manager,
     buf->size = size;
 
     buf->refcount = 1;
+    buf->on_disk  = on_disk;
 
     nexus_uuid_copy(uuid, &buf->uuid);
 
@@ -138,7 +131,7 @@ buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct ne
 
     // TODO invalidate existing entry
 
-    ret = __alloc_buf(buf_manager, addr, size, buf_uuid);
+    ret = __alloc_buf(buf_manager, addr, size, buf_uuid, false);
     if (ret != 0) {
         goto cleanup;
     }
@@ -154,14 +147,17 @@ cleanup:
 int
 buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid)
 {
-    return __alloc_buf(buf_manager, addr, size, uuid);
+    int ret = __alloc_buf(buf_manager, addr, size, uuid, true);
+
+    if (ret != 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
-
-uint8_t *
-buffer_manager_get(struct buffer_manager * buf_manager,
-                   struct nexus_uuid     * uuid,
-                   size_t                * p_buffer_size)
+struct __buf *
+buffer_manager_get(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {
     struct __buf * buf = NULL;
 
@@ -172,10 +168,10 @@ buffer_manager_get(struct buffer_manager * buf_manager,
 
     buf->refcount += 1;
 
-    *p_buffer_size = buf->size;
-
-    return buf->addr;
+    return buf;
 }
+
+
 
 void
 buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)

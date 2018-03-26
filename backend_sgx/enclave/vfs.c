@@ -153,7 +153,7 @@ nexus_vfs_flush(struct nexus_metadata * metadata)
 {
     switch (metadata->type) {
     case NEXUS_DIRNODE:
-        return dirnode_store(metadata->dirnode, NULL);
+        return dirnode_store(&metadata->uuid, metadata->dirnode, NULL);
     case NEXUS_FILENODE:
         return filenode_store(metadata->filenode, NULL);
     default:

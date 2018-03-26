@@ -10,7 +10,7 @@ enclave {
          */
         public int ecall_init_enclave
         (
-            [user_check] void * backend_info
+            [user_check] struct nexus_volume * volume
         );
 
 
@@ -138,9 +138,9 @@ enclave {
         uint8_t *
         ocall_buffer_alloc
         (
-                         size_t              size,
-            [in]         struct nexus_uuid * metadata_uuid,
-            [user_check] void              * backend_info
+                         size_t                size,
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
         );
 
         /**
@@ -151,9 +151,9 @@ enclave {
         uint8_t *
         ocall_buffer_get
         (
-            [in]         struct nexus_uuid * metadata_uuid,
-            [out]        size_t            * buffer_size,
-            [user_check] void              * backend_info
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [out]        size_t              * buffer_size,
+            [user_check] struct nexus_volume * volume
         );
 
         /**
@@ -163,8 +163,8 @@ enclave {
         int
         ocall_buffer_flush
         (
-            [in]         struct nexus_uuid * metadata_uuid,
-            [user_check] void              * backend_info
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
         );
 
         /**
@@ -174,23 +174,23 @@ enclave {
         void
         ocall_buffer_put
         (
-            [in]         struct nexus_uuid * metadata_uuid,
-            [user_check] void              * backend_info
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
         );
 
         int
         ocall_buffer_del
         (
-            [in]         struct nexus_uuid * metadata_uuid,
-            [user_check] void              * backend_info
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
         );
 
         int
         ocall_buffer_hardlink
         (
-            [in]         struct nexus_uuid * link_uuid,
-            [in]         struct nexus_uuid * target_uuid,
-            [user_check] void              * backend_info
+            [in]         struct nexus_uuid   * link_uuid,
+            [in]         struct nexus_uuid   * target_uuid,
+            [user_check] struct nexus_volume * volume
         );
 
 

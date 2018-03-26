@@ -13,7 +13,7 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
         return NULL;
     }
 
-    err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_backend_ext);
+    err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_volume);
     if (err || external_addr == NULL) {
         log_error("could not allocate space for crypto_buffer (err=%d)\n", err);
         return NULL;
@@ -30,7 +30,7 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
     int err = -1;
 
 
-    err = ocall_buffer_get(&external_addr, uuid, size, global_backend_ext);
+    err = ocall_buffer_get(&external_addr, uuid, size, global_volume);
 
     if (err || external_addr == NULL) {
         log_error("ocall_buffer_get FAILED (err=%d)\n", err);
@@ -43,7 +43,7 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
 int
 buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
-    ocall_buffer_put(buffer_uuid, global_backend_ext);
+    ocall_buffer_put(buffer_uuid, global_volume);
 
     return 0;
 }
@@ -54,7 +54,7 @@ buffer_layer_delete(struct nexus_uuid * uuid)
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_del(&ret, uuid, global_backend_ext);
+    err = ocall_buffer_del(&ret, uuid, global_volume);
 
     // XXX: what do to about err?
     (void) err;
@@ -86,7 +86,7 @@ buffer_layer_flush(struct nexus_uuid * uuid)
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_flush(&ret, uuid, global_backend_ext);
+    err = ocall_buffer_flush(&ret, uuid, global_volume);
 
     if (err || ret) {
         log_error("ocall_buffer_flush FAILED (err=%d, ret=%d)\n", err, ret);
@@ -102,7 +102,7 @@ buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_hardlink(&ret, link_uuid, target_uuid, global_backend_ext);
+    err = ocall_buffer_hardlink(&ret, link_uuid, target_uuid, global_volume);
 
     if (err || ret) {
         log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);

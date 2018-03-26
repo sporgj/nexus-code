@@ -1,17 +1,18 @@
 #include "enclave_internal.h"
 
 // the sealing key used in protecting volumekeys
-void * global_backend_ext  = NULL;
+struct nexus_volume * global_volume = NULL;
 
 // TODO: make this per-instance configurable
 size_t global_chunk_size = NEXUS_CHUNK_SIZE;
 
 size_t global_log2chunk_size = 0;
 
+
 int
-ecall_init_enclave(void * backend_info)
+ecall_init_enclave(struct nexus_volume * volume)
 {
-    global_backend_ext = backend_info;
+    global_volume = volume;
 
     if (nexus_vfs_init() != 0) {
         return -1;

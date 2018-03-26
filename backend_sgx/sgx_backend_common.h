@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <nexus_volume.h>
 #include <nexus_uuid.h>
 #include <nexus_key.h>
 #include <nexus_fs.h>

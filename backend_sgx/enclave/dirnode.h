@@ -52,12 +52,19 @@ dirnode_load(struct nexus_uuid * uuid);
 /**
  * Writes dirnode to datastore
  *
+ * FIXME
+ * In some cases, the uuid from which a dirnode was read from is not equals to its
+ * dirnode->my_uuid. This is usually the result of a rename operation (which does not
+ * rewrite the dirnode of the moved directory). Explicitly specifying the uuid (stored
+ * by the vfs) is a temporary solution.
+ *
+ * @param uuid: to write to.
  * @param dirnode
  * @param mac
  * @return 0 on success
  */
 int
-dirnode_store(struct nexus_dirnode * dirnode, struct nexus_mac * mac);
+dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct nexus_mac * mac);
 
 int
 dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode);

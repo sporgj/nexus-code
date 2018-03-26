@@ -46,7 +46,7 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         // make the dirnode's uuid the root uuid
         nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
 
-        ret = dirnode_store(root_dirnode, NULL);
+        ret = dirnode_store(&root_dirnode->my_uuid, root_dirnode, NULL);
 
         if (ret != 0) {
             log_error("dirnode_store FAILED\n");

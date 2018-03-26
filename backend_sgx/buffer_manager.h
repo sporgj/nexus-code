@@ -4,6 +4,18 @@
 
 #pragma once
 
+struct __buf {
+    struct nexus_uuid   uuid;
+
+    int                 refcount; // TODO consider switching to atomic.h
+
+    uint8_t           * addr;
+
+    size_t              size;
+
+    bool                on_disk;
+};
+
 struct buffer_manager;
 
 struct buffer_manager *
@@ -39,10 +51,8 @@ buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t s
  * @param p_buffer_size will contain the size of the buffer
  * @return the buffer address. NULL on failure
  */
-uint8_t *
-buffer_manager_get(struct buffer_manager * buffer_manager,
-                   struct nexus_uuid     * uuid,
-                   size_t                * p_buffer_size);
+struct __buf *
+buffer_manager_get(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);
 
 /**
  * Frees buffer with specified uuid
