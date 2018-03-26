@@ -10,7 +10,8 @@ nexus_frontends :=	shell \
 nexus_backends  :=     	backend_sgx \
 			backend_clear
 
-nexus_datastores :=     datastore_flat 
+nexus_datastores :=     datastore_flat \
+			datastore_twolevel
 
 
 components := libmbedcypto.a libnexus.a $(addsuffix .a, $(nexus_backends) $(nexus_datastores))
