@@ -64,10 +64,10 @@ ocall_buffer_get(struct nexus_uuid * metadata_uuid, size_t * p_size, struct nexu
     {
         buf = buffer_manager_get(sgx_backend->buf_manager, metadata_uuid);
 
-        *p_size = buf->size;
-
         if (buf) {
             // TODO additional freshness checks here
+
+            *p_size = buf->size;
 
             return buf->addr;
         }

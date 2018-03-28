@@ -77,6 +77,20 @@ nexus_malloc(size_t size)
     return ptr;
 }
 
+void
+nexus_splitpath(const char * filepath, char ** dirpath, char ** filename)
+{
+    char * fname = strrchr(filepath, '/');
+
+    if (fname == NULL) {
+        *filename = strndup(filepath, PATH_MAX);
+        *dirpath = strndup("", PATH_MAX);
+    } else {
+        *filename = strndup(fname + 1, PATH_MAX);
+        *dirpath = strndup(filepath, (int)(fname - filepath));
+    }
+}
+
 // https://gist.github.com/ccbrown/9722406
 void
 nexus_hexdump(void * ptr, size_t size)

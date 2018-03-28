@@ -38,6 +38,11 @@ static inline int max(int a, int b) {
 
 void * nexus_malloc(size_t size);
 
+/**
+ * Splits path into malloced dirpath and filename components
+ */
+void
+nexus_splitpath(const char * filepath, char ** dirpath, char ** filename);
 
 void nexus_hexdump(void * ptr, size_t size);
 

@@ -5,6 +5,56 @@
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
 
+
+/* creates a new enclave */
+static int
+init_enclave(struct sgx_backend * backend)
+{
+    sgx_launch_token_t token = { 0 };
+
+    int err = -1;
+    int ret = -1;
+
+    if (backend->enclave_id == 0) {
+        int updated = 0;
+
+        ret = sgx_create_enclave(backend->enclave_path,
+                                 SGX_DEBUG_FLAG,
+                                 &token,
+                                 &updated,
+                                 &backend->enclave_id,
+                                 NULL);
+
+        if (ret != SGX_SUCCESS) {
+            log_error("Could not open enclave(%s): ret=%#x\n", backend->enclave_path, ret);
+            return -1;
+        }
+    }
+
+    err = ecall_init_enclave(backend->enclave_id, &ret, backend->volume);
+
+    if (err || ret) {
+        log_error("ecall_init_enclave() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+exit_enclave(struct sgx_backend * backend)
+{
+    int ret = 0;
+
+    log_debug("Destroying enclave (eid=%zu)", backend->enclave_id);
+
+    ret = sgx_destroy_enclave(backend->enclave_id);
+
+    backend->enclave_id = 0;
+
+    return ret;
+}
+
 // TODO refactor this
 //
 static char *
@@ -51,7 +101,7 @@ __user_pubkey_str(struct nexus_key ** optional_privkey)
 int
 sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
 {
-    struct sgx_backend      * sgx_backend    = NULL;
+    struct sgx_backend      * sgx_backend    = (struct sgx_backend *)priv_data;
 
     char                    * public_key_str = NULL;
 
@@ -60,20 +110,29 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     int ret = -1;
 
 
-    key_buffer_init(&volkey_keybuf);
-
-    sgx_backend = (struct sgx_backend *)priv_data;
-
     // derive the public key string
     public_key_str = __user_pubkey_str(NULL);
+
     if (public_key_str == NULL) {
         return -1;
     }
 
+
+    sgx_backend->volume = volume;
+
+    if (init_enclave(sgx_backend)) {
+        nexus_free(public_key_str);
+
+        log_error("could not initialize the enclave\n");
+        return -1;
+    }
+
+
+    key_buffer_init(&volkey_keybuf);
+
     {
-        // the enclave calls ocall_metadata_set, which needs a volume pointer
-        // to the backend info
-        sgx_backend->volume = volume;
+        // for the ocalls
+        volume->private_data = sgx_backend;
 
         int err = ecall_create_volume(sgx_backend->enclave_id,
                                       &ret,
@@ -81,8 +140,7 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
                                       &volume->supernode_uuid,
                                       &volkey_keybuf);
 
-        // restore the volume pointer
-        sgx_backend->volume = NULL;
+        volume->private_data = NULL;
 
         if (err || ret) {
             log_error("ecall_create_volume() FAILED\n");
@@ -90,23 +148,24 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
         }
     }
 
+
     // copy the volumekey from the buffer_manager
-    {
-        ret = key_buffer_derive(&volkey_keybuf, &volume->vol_key);
+    ret = key_buffer_derive(&volkey_keybuf, &volume->vol_key);
 
-        key_buffer_free(&volkey_keybuf);
-
-        if (ret != 0) {
-            log_error("key_buffer_derive() FAILED\n");
-            goto out;
-        }
+    if (ret != 0) {
+        log_error("key_buffer_derive() FAILED\n");
+        goto out;
     }
 
     ret = 0;
 out:
-    if (public_key_str) {
-        nexus_free(public_key_str);
-    }
+    nexus_free(public_key_str);
+
+    key_buffer_free(&volkey_keybuf);
+
+    exit_enclave(sgx_backend);
+
+    sgx_backend->volume = NULL;
 
     return ret;
 }
@@ -211,11 +270,7 @@ __sign_response(struct sgx_backend      * sgx_backend,
 
     ret = 0;
 out:
-    if (ret) {
-        buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
-
-        return -1;
-    }
+    buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
 
     return 0;
 }
@@ -223,17 +278,10 @@ out:
 int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 {
-    struct sgx_backend * sgx_backend       = NULL;
-
-    struct nexus_key_buffer volkey_buffer;
+    struct sgx_backend * sgx_backend       = (struct sgx_backend *)priv_data;
 
     struct nexus_key   * user_prv_key      = NULL;
     char               * public_key_str    = NULL;
-
-    struct nexus_uuid  * supernode_uuid = NULL;
-
-    uint8_t signature_buffer[MBEDTLS_MPI_MAX_SIZE] = { 0 };
-    size_t  signature_len                          = 0;
 
     struct nonce_challenge nonce;
 
@@ -241,33 +289,50 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
     int ret = -1;
 
 
-    sgx_backend = (struct sgx_backend *)priv_data;
-
-    sgx_backend->volume = volume;
-
     // get the user's public key and the volume key
     public_key_str = __user_pubkey_str(&user_prv_key);
+
     if (public_key_str == NULL) {
         log_error("could not get user's public key\n");
         return -1;
     }
 
-    key_buffer_init(&volkey_buffer);
 
-    ret = key_buffer_put(&volkey_buffer, &volume->vol_key);
+    sgx_backend->volume = volume;
 
-    if (ret != 0) {
+    if (init_enclave(sgx_backend)) {
         nexus_free(public_key_str);
+
+        sgx_backend->volume = NULL;
+
+        log_error("could not initialize the enclave\n");
         return -1;
     }
 
+    volume->private_data = sgx_backend;
+
     // request a challenge from the enclave
     {
+        struct nexus_key_buffer volkey_buffer;
+
+        key_buffer_init(&volkey_buffer);
+
+        ret = key_buffer_put(&volkey_buffer, &volume->vol_key);
+
+        if (ret != 0) {
+            nexus_free(public_key_str);
+
+            log_error("could not write volumekey into key buffer\n");
+            goto out;
+        }
+
         err = ecall_authentication_challenge(sgx_backend->enclave_id,
                                              &ret,
                                              public_key_str,
                                              &volkey_buffer,
                                              &nonce);
+
+        key_buffer_free(&volkey_buffer);
 
         if (err || ret) {
             ret = -1;
@@ -277,23 +342,22 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         }
     }
 
-    // generate the response
+    // respond to the challenge
     {
+        uint8_t signature_buffer[MBEDTLS_MPI_MAX_SIZE] = { 0 };
+        size_t  signature_len                          = 0;
+
         ret = __sign_response(sgx_backend, &nonce, user_prv_key, signature_buffer, &signature_len);
 
         if (ret != 0) {
             log_error("could not generate response\n");
             goto out;
         }
-    }
 
-    supernode_uuid = &(sgx_backend->volume->supernode_uuid);
 
-    // respond to the challenge
-    {
         err = ecall_authentication_response(sgx_backend->enclave_id,
                                             &ret,
-                                            supernode_uuid,
+                                            &(volume->supernode_uuid),
                                             signature_buffer,
                                             signature_len);
 
@@ -305,6 +369,8 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         }
     }
 
+    sgx_backend->volume = volume;
+
     ret = 0;
 out:
     nexus_free_key(user_prv_key);
@@ -312,14 +378,12 @@ out:
 
     nexus_free(public_key_str);
 
-    key_buffer_free(&volkey_buffer);
-
-    if (supernode_uuid) {
-        buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
-    }
-
     if (ret) {
-        sgx_backend->volume = NULL;
+        exit_enclave(sgx_backend);
+
+        sgx_backend->volume  = NULL;
+
+        volume->private_data = NULL;
     }
 
     return ret;

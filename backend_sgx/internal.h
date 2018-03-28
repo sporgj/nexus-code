@@ -30,6 +30,8 @@ struct sgx_backend {
     struct buffer_manager * buf_manager;
 
     struct nexus_volume * volume;
+
+    char * enclave_path;
 };
 
 
