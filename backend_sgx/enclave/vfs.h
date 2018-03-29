@@ -98,6 +98,12 @@ void
 nexus_vfs_put(struct nexus_metadata * metadata);
 
 /**
+ * Drops the metadata out of the VFS.
+ */
+void
+nexus_vfs_drop(struct nexus_metadata * metadata);
+
+/**
  * Flushes the content of the metadata back to the backing store
  * @param metadata
  */
@@ -124,6 +130,8 @@ nexus_vfs_load(struct nexus_uuid * metadata_uuid, nexus_metadata_type_t metadata
 
 void
 nexus_vfs_delete(struct nexus_uuid * metadata_uuid);
+
+
 
 // metadata functions
 void

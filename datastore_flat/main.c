@@ -37,9 +37,9 @@ __get_full_path(struct flat_datastore * datastore,
     char * full_path = NULL;
 
     int ret = 0;
-    
+
     filename = nexus_uuid_to_alt64(uuid);
-	
+
     if (filename == NULL) {
 	log_error("Could not generate alt64 string\n");
 	return NULL;
@@ -308,53 +308,7 @@ flat_update_uuid(struct nexus_uuid * uuid,
 
 }
 
-static int
-flat_new_uuid(struct nexus_uuid * uuid,
-	      char              * path,
-	      uint8_t           * buf,
-	      uint32_t            size,
-	      void              * priv_data)
-{
-    struct flat_datastore * datastore = priv_data;
-    char                  * filename  = NULL;
 
-    int ret = -1;
-
-    filename = __get_full_path(datastore, uuid);
-
-
-    if (filename == NULL) {
-	log_error("Could not get filename\n");
-	goto err;
-    }    
-    
-    // stat the file, make sure it doesn't exist
-    ret = access(filename, W_OK);
-
-    if ( !( (ret == -1) &&
-	    (errno == ENOENT) ) ) {
-
-	log_error("Tried to add a file that already exists\n");
-	goto err;
-    }
-
-    ret = nexus_write_raw_file(filename, buf, size);
-    
-    if (ret != 0) {
-        log_error("Could not add file (%s)", filename);
-	goto err;
-    }
-
-
-    nexus_free(filename);
-    return 0;
-
- err:
-
-    nexus_free(filename);
-    return -1;
-}
-    
 static int
 flat_del_uuid(struct nexus_uuid * uuid,
 	      char              * path,
@@ -391,7 +345,7 @@ flat_del_uuid(struct nexus_uuid * uuid,
 
 static int
 flat_hardlink_uuid(struct nexus_uuid * link_uuid,
-                   char              * link_path,
+                   char              * from_path,
                    struct nexus_uuid * target_uuid,
                    char              * target_path,
                    void              * priv_data)
@@ -414,7 +368,7 @@ flat_hardlink_uuid(struct nexus_uuid * link_uuid,
     ret = link(target_fullpath, link_fullpath);
 
     if (ret != 0) {
-	log_error("harlink '%s' -> '%s' FAILED\n", target_fullpath, link_fullpath);
+	log_error("hardlink '%s' -> '%s' FAILED\n", target_fullpath, link_fullpath);
 	perror("error: ");
 	goto err_out;
     }
@@ -433,6 +387,47 @@ err_out:
 }
 
 
+int
+flat_rename_uuid(struct nexus_uuid * from_uuid,
+                 char              * from_path,
+                 struct nexus_uuid * to_uuid,
+                 char              * to_path,
+                 void              * priv_data)
+{
+    struct flat_datastore * datastore = priv_data;
+
+    char * from_fullpath = NULL;
+    char * to_fullpath   = NULL;
+
+    int ret = -1;
+
+    from_fullpath = __get_full_path(datastore, from_uuid);
+    to_fullpath   = __get_full_path(datastore, to_uuid);
+
+    if ((from_fullpath == NULL) || (to_fullpath == NULL)) {
+        log_error("error deriving paths (from=%s, to=%s)\n", from_fullpath, to_fullpath);
+        goto err_out;
+    }
+
+    ret = rename(from_fullpath, to_fullpath);
+
+    if (ret != 0) {
+        log_error("renaming '%s' -> '%s' FAILED\n", from_fullpath, to_fullpath);
+        goto err_out;
+    }
+
+    ret = 0;
+err_out:
+    if (from_fullpath) {
+        nexus_free(from_fullpath);
+    }
+
+    if (to_fullpath) {
+        nexus_free(to_fullpath);
+    }
+
+    return ret;
+}
 
 
 static struct nexus_datastore_impl flat_datastore = {
@@ -447,10 +442,10 @@ static struct nexus_datastore_impl flat_datastore = {
     .get_uuid    = flat_get_uuid,
     .put_uuid    = flat_put_uuid,
     .update_uuid = flat_update_uuid,
-    .new_uuid    = flat_new_uuid,
     .del_uuid    = flat_del_uuid,
 
-    .hardlink_uuid = flat_hardlink_uuid
+    .hardlink_uuid = flat_hardlink_uuid,
+    .rename_uuid   = flat_rename_uuid
 };
 
 

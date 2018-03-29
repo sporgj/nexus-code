@@ -502,6 +502,14 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
         return -1;
     }
 
+
+    ret = buffer_layer_rename(old_uuid, new_uuid);
+
+    if (ret != 0) {
+        log_error("buffer_layer_rename() FAILED\n");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -568,34 +576,41 @@ ecall_fs_rename(char              * from_dirpath_IN,
 
     if (ret != 0) {
         log_error("rename operation failed\n");
+        goto out_err;
     }
 
-    // TODO call datastore for renaming
 
     ret = nexus_vfs_flush(from_metadata);
+
     if (ret != 0) {
         log_error("could not flush source dirnode\n");
-        goto out;
+        goto out_err;
     }
 
     if (to_metadata != NULL) {
         ret = nexus_vfs_flush(to_metadata);
         if (ret != 0) {
             log_error("could not flush destination dirnode\n");
-            goto out;
+            goto out_err;
         }
     }
 
     nexus_uuid_copy(&old_uuid, old_uuid_out);
     nexus_uuid_copy(&new_uuid, new_uuid_out);
 
-    ret = 0;
-out:
     nexus_vfs_put(from_metadata);
 
     if (to_metadata) {
         nexus_vfs_put(to_metadata);
     }
 
-    return ret;
+    return 0;
+out_err:
+    nexus_vfs_drop(from_metadata);
+
+    if (to_metadata) {
+        nexus_vfs_drop(to_metadata);
+    }
+
+    return -1;
 }

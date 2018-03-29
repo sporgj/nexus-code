@@ -148,6 +148,13 @@ nexus_vfs_put(struct nexus_metadata * metadata)
     free_metadata(metadata);
 }
 
+void
+nexus_vfs_drop(struct nexus_metadata * metadata)
+{
+    // TODO
+    free_metadata(metadata);
+}
+
 int
 nexus_vfs_flush(struct nexus_metadata * metadata)
 {
@@ -228,8 +235,7 @@ nexus_vfs_load(struct nexus_uuid * metadata_uuid, nexus_metadata_type_t metadata
 void
 nexus_vfs_delete(struct nexus_uuid * uuid)
 {
-    // TODO delete from the metadata cache,
-    // remove all pointing dentries
+    // TODO
 
     buffer_layer_delete(uuid);
 }

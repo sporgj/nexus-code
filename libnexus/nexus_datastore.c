@@ -227,17 +227,6 @@ nexus_datastore_update_uuid(struct nexus_datastore * datastore,
 }
 
 int
-nexus_datastore_new_uuid(struct nexus_datastore * datastore,
-			 struct nexus_uuid      * uuid,
-			 char                   * path,
-			 uint8_t                * buf,
-			 uint32_t                 size)
-{
-    return datastore->impl->new_uuid(uuid, path, buf, size, datastore->priv_data);
-}
-
-
-int
 nexus_datastore_del_uuid(struct nexus_datastore * datastore,
 			 struct nexus_uuid      * uuid,
 			 char                   * path)
@@ -263,3 +252,18 @@ nexus_datastore_hardlink_uuid(struct nexus_datastore * datastore,
                                           target_path,
                                           datastore->priv_data);
 }
+
+int
+nexus_datastore_rename_uuid(struct nexus_datastore   * datastore,
+                            struct nexus_uuid        * from_uuid,
+                            char                     * from_path,
+                            struct nexus_uuid        * to_uuid,
+                            char                     * to_path)
+{
+    return datastore->impl->rename_uuid(from_uuid,
+                                        from_path,
+                                        to_uuid,
+                                        to_path,
+                                        datastore->priv_data);
+}
+

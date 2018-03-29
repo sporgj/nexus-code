@@ -119,7 +119,7 @@ ocall_buffer_flush(struct nexus_uuid * metadata_uuid, struct nexus_volume * volu
     }
 
 
-    ret = nexus_datastore_put_uuid(sgx_backend->volume->metadata_store,
+    ret = nexus_datastore_put_uuid(volume->metadata_store,
                                    metadata_uuid,
                                    NULL,
                                    buf->addr,
@@ -144,7 +144,7 @@ ocall_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume
 
     buffer_manager_del(sgx_backend->buf_manager, metadata_uuid);
 
-    return nexus_datastore_del_uuid(sgx_backend->volume->metadata_store, metadata_uuid, NULL);
+    return nexus_datastore_del_uuid(volume->metadata_store, metadata_uuid, NULL);
 }
 
 int
@@ -152,13 +152,17 @@ ocall_buffer_hardlink(struct nexus_uuid   * link_uuid,
                       struct nexus_uuid   * target_uuid,
                       struct nexus_volume * volume)
 {
-    struct sgx_backend * sgx_backend = NULL;
-
-    sgx_backend = (struct sgx_backend *)volume->private_data;
-
-    return nexus_datastore_hardlink_uuid(sgx_backend->volume->metadata_store,
+    return nexus_datastore_hardlink_uuid(volume->metadata_store,
                                          link_uuid,
                                          NULL,
                                          target_uuid,
                                          NULL);
+}
+
+int
+ocall_buffer_rename(struct nexus_uuid   * from_uuid,
+                    struct nexus_uuid   * to_uuid,
+                    struct nexus_volume * volume)
+{
+    return nexus_datastore_rename_uuid(volume->metadata_store, from_uuid, NULL, to_uuid, NULL);
 }

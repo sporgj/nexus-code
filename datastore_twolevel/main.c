@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <limits.h>
 
+#include <stdbool.h>
+
 #include <nexus_datastore.h>
 #include <nexus_log.h>
 #include <nexus_raw_file.h>
@@ -23,7 +25,7 @@ struct twolevel_datastore {
 };
 
 static char *
-__get_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * uuid)
+__generic_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * uuid, bool makedir)
 {
     char * filename  = NULL;
     char * dirpath   = NULL;
@@ -38,24 +40,61 @@ __get_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * uuid)
         return NULL;
     }
 
-
     dirpath = strndup(filename, LEVEL2_DIRNAME_LEN);
 
-    ret = asprintf(&full_path,
-                   "%s/%s/%s",
-                   datastore->root_path,
-                   dirpath,
-                   filename);
+
+    if (makedir) {
+        char * dir_fullpath = NULL;
+
+        ret = asprintf(&dir_fullpath, "%s/%s", datastore->root_path, dirpath);
+
+        if (ret == -1) {
+            log_error("asprintf failed\n");
+            goto out_err;
+        }
+
+        ret = mkdir(dir_fullpath, 0770);
+
+        if ((ret == -1) && (errno != EEXIST)) {
+            log_error("could not create directory (%s)\n", dir_fullpath);
+
+            nexus_free(dir_fullpath);
+            goto out_err;
+        }
+
+        nexus_free(dir_fullpath);
+    }
+
+    ret = asprintf(&full_path, "%s/%s/%s", datastore->root_path, dirpath, filename);
 
     nexus_free(dirpath);
 
     nexus_free(filename);
 
     if (ret == -1) {
+        log_error("asprintf failed\n");
         return NULL;
     }
 
     return full_path;
+
+out_err:
+    nexus_free(dirpath);
+    nexus_free(filename);
+
+    return NULL;
+}
+
+static char *
+__make_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * uuid)
+{
+    return __generic_full_path(datastore, uuid, true);
+}
+
+static char *
+__get_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * uuid)
+{
+    return __generic_full_path(datastore, uuid, false);
 }
 
 static void *
@@ -311,50 +350,6 @@ twolevel_update_uuid(struct nexus_uuid * uuid,
 }
 
 static int
-twolevel_new_uuid(struct nexus_uuid * uuid,
-                  char              * path,
-                  uint8_t           * buf,
-                  uint32_t            size,
-                  void              * priv_data)
-{
-    struct twolevel_datastore * datastore = priv_data;
-
-    char * filename = NULL;
-
-    int ret = -1;
-
-
-    filename = __get_full_path(datastore, uuid);
-
-    if (filename == NULL) {
-        log_error("Could not get filename\n");
-        goto err;
-    }
-
-    // stat the file, make sure it doesn't exist
-    ret = access(filename, W_OK);
-
-    if (!((ret == -1) && (errno == ENOENT))) {
-        log_error("Tried to add a file that already exists\n");
-        goto err;
-    }
-
-    ret = nexus_write_raw_file(filename, buf, size);
-
-    if (ret != 0) {
-        log_error("Could not add file (%s)", filename);
-        goto err;
-    }
-
-    nexus_free(filename);
-    return 0;
-
-err:
-    nexus_free(filename);
-    return -1;
-}
-
-static int
 twolevel_del_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
@@ -399,9 +394,9 @@ twolevel_hardlink_uuid(struct nexus_uuid * link_uuid,
     int ret = -1;
 
     link_fullpath   = __get_full_path(datastore, link_uuid);
-    target_fullpath = __get_full_path(datastore, target_uuid);
+    target_fullpath = __make_full_path(datastore, target_uuid);
 
-    if (link_fullpath == NULL || target_fullpath == NULL) {
+    if ((link_fullpath == NULL) || (target_fullpath == NULL)) {
         log_error("could not derive link/target path\n");
         goto err_out;
     }
@@ -427,6 +422,48 @@ err_out:
     return ret;
 }
 
+int
+twolevel_rename_uuid(struct nexus_uuid * from_uuid,
+                     char              * from_path,
+                     struct nexus_uuid * to_uuid,
+                     char              * to_path,
+                     void              * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    char * from_fullpath = NULL;
+    char * to_fullpath   = NULL;
+
+    int ret = -1;
+
+    from_fullpath = __get_full_path(datastore, from_uuid);
+    to_fullpath   = __make_full_path(datastore, to_uuid);
+
+    if ((from_fullpath == NULL) || (to_fullpath == NULL)) {
+        log_error("error deriving paths (from=%s, to=%s)\n", from_fullpath, to_fullpath);
+        goto err_out;
+    }
+
+    ret = rename(from_fullpath, to_fullpath);
+
+    if (ret != 0) {
+        log_error("renaming '%s' -> '%s' FAILED\n", from_fullpath, to_fullpath);
+        goto err_out;
+    }
+
+    ret = 0;
+err_out:
+    if (from_fullpath) {
+        nexus_free(from_fullpath);
+    }
+
+    if (to_fullpath) {
+        nexus_free(to_fullpath);
+    }
+
+    return ret;
+}
+
 static struct nexus_datastore_impl twolevel_datastore = {
     .name          = "TWOLEVEL",
 
@@ -439,10 +476,10 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .get_uuid      = twolevel_get_uuid,
     .put_uuid      = twolevel_put_uuid,
     .update_uuid   = twolevel_update_uuid,
-    .new_uuid      = twolevel_new_uuid,
     .del_uuid      = twolevel_del_uuid,
 
-    .hardlink_uuid = twolevel_hardlink_uuid
+    .hardlink_uuid = twolevel_hardlink_uuid,
+    .rename_uuid   = twolevel_rename_uuid
 };
 
 

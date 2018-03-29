@@ -111,3 +111,19 @@ buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_
 
     return 0;
 }
+
+int
+buffer_layer_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_rename(&ret, from_uuid, to_uuid, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}

@@ -51,3 +51,11 @@ buffer_layer_delete(struct nexus_uuid * uuid);
  */
 int
 buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_uuid);
+
+/**
+ * Renames a metadata object on disk
+ * @param from_uuid
+ * @param to_uuid
+ */
+int
+buffer_layer_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid);

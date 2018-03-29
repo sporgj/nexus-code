@@ -193,6 +193,14 @@ enclave {
             [user_check] struct nexus_volume * volume
         );
 
+        int
+        ocall_buffer_rename
+        (
+            [in]         struct nexus_uuid   * from_uuid,
+            [in]         struct nexus_uuid   * to_uuid,
+            [user_check] struct nexus_volume * volume
+        );
+
 
         // ---------------------- utilities ---------------------
 
