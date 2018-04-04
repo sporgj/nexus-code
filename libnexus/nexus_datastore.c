@@ -104,7 +104,7 @@ nexus_datastore_create(char             * name,
 
     datastore = nexus_malloc(sizeof(struct nexus_datastore));
 
-        
+
     log_debug("initializing datastore (%s)\n", name);
 
     datastore->impl      = impl;
@@ -127,7 +127,7 @@ nexus_datastore_delete(char             * name,
     struct nexus_datastore_impl * impl = NULL;
 
     int ret = 0;
-    
+
     impl = nexus_htable_search(datastore_table, (uintptr_t)name);
 
     if (impl == NULL) {
@@ -139,7 +139,7 @@ nexus_datastore_delete(char             * name,
 
     if (ret == -1) {
 	log_error("Could not delete datastore (%s)\n", name);
-    }    
+    }
 
     return ret;
 }
@@ -166,7 +166,6 @@ nexus_datastore_open(char             * name,
 	return NULL;
     }
 
-        
     log_debug("initializing datastore (%s)\n", name);
 
     datastore->impl      = impl;
@@ -195,41 +194,65 @@ nexus_datastore_close(struct nexus_datastore * datastore)
 
 
 int
-nexus_datastore_get_uuid(struct nexus_datastore * datastore,
-			 struct nexus_uuid      * uuid,
-			 char                   * path,
-			 uint8_t               ** buf,
-			 uint32_t               * size)
+nexus_datastore_get_uuid(struct nexus_datastore     * datastore,
+                         struct nexus_uuid          * uuid,
+                         char                       * path,
+                         uint8_t                   ** buf,
+                         uint32_t                   * size)
 {
     return datastore->impl->get_uuid(uuid, path, buf, size, datastore->priv_data);
 }
 
 
 int
-nexus_datastore_put_uuid(struct nexus_datastore * datastore,
-			 struct nexus_uuid      * uuid,
-			 char                   * path,
-			 uint8_t                * buf,
-			 uint32_t                 size)
+nexus_datastore_put_uuid(struct nexus_datastore     * datastore,
+                         struct nexus_uuid          * uuid,
+                         char                       * path,
+                         uint8_t                    * buf,
+                         uint32_t                     size)
 {
     return datastore->impl->put_uuid(uuid, path, buf, size, datastore->priv_data);
 }
 
 
+
+struct nexus_raw_file *
+nexus_datastore_write_start(struct nexus_datastore * datastore,
+                            struct nexus_uuid      * uuid,
+                            char                   * path)
+{
+    return datastore->impl->write_start(uuid, path, datastore->priv_data);
+}
+
 int
-nexus_datastore_update_uuid(struct nexus_datastore * datastore,
-			    struct nexus_uuid      * uuid,
-			    char                   * path,
-			    uint8_t                * buf,
-			    uint32_t                 size)
+nexus_datastore_write_bytes(struct nexus_datastore * datastore,
+                            struct nexus_raw_file  * fd,
+                            uint8_t                * buf,
+                            uint32_t                 size)
+{
+    return datastore->impl->write_bytes(fd, buf, size, datastore->priv_data);
+}
+
+void
+nexus_datastore_write_finish(struct nexus_datastore * datastore, struct nexus_raw_file * fd)
+{
+    return datastore->impl->write_finish(fd, datastore->priv_data);
+}
+
+
+
+int
+nexus_datastore_update_uuid(struct nexus_datastore  * datastore,
+                            struct nexus_uuid       * uuid,
+                            char                    * path,
+                            uint8_t                 * buf,
+                            uint32_t                  size)
 {
     return datastore->impl->update_uuid(uuid, path, buf, size, datastore->priv_data);
 }
 
 int
-nexus_datastore_del_uuid(struct nexus_datastore * datastore,
-			 struct nexus_uuid      * uuid,
-			 char                   * path)
+nexus_datastore_del_uuid(struct nexus_datastore * datastore, struct nexus_uuid * uuid, char * path)
 {
     return datastore->impl->del_uuid(uuid, path, datastore->priv_data);
 }

@@ -229,7 +229,7 @@ twolevel_get_uuid(struct nexus_uuid  * uuid,
                   void               * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
-    char                  * filename  = NULL;
+    char                      * filename  = NULL;
 
     int ret = -1;
 
@@ -251,10 +251,58 @@ twolevel_get_uuid(struct nexus_uuid  * uuid,
     nexus_free(filename);
     return 0;
 
- err:
+err:
     nexus_free(filename);
     return -1;
 }
+
+
+struct nexus_raw_file *
+twolevel_write_start(struct nexus_uuid * uuid, char * path, void * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    struct nexus_raw_file     * raw_file  = NULL;
+
+    char                      * filepath  = NULL;
+
+
+    filepath = __make_full_path(datastore, uuid);
+
+    if (filepath == NULL) {
+        log_error("could not get filepath\n");
+        return NULL;
+    }
+
+
+    raw_file = nexus_acquire_raw_file(filepath);
+
+    nexus_free(filepath);
+
+    if (raw_file == NULL) {
+        log_error("nexus_open_raw_file FAILED\n");
+        return NULL;
+    }
+
+    return raw_file;
+}
+
+int
+twolevel_write_bytes(struct nexus_raw_file * raw_file,
+                     uint8_t               * buf,
+                     uint32_t                size,
+                     void                  * priv_data)
+{
+    return nexus_update_raw_file(raw_file, buf, size);
+}
+
+void
+twolevel_write_finish(struct nexus_raw_file * raw_file, void * priv_data)
+{
+    nexus_release_raw_file(raw_file);
+}
+
+
 
 static int
 __put_uuid_failsafe(char * filepath, uint8_t * buf, uint32_t size)
@@ -281,6 +329,8 @@ __put_uuid_failsafe(char * filepath, uint8_t * buf, uint32_t size)
 
     return nexus_write_raw_file(filepath, buf, size);
 }
+
+
 
 static int
 twolevel_put_uuid(struct nexus_uuid * uuid,
@@ -464,6 +514,8 @@ err_out:
     return ret;
 }
 
+
+
 static struct nexus_datastore_impl twolevel_datastore = {
     .name          = "TWOLEVEL",
 
@@ -477,6 +529,10 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .put_uuid      = twolevel_put_uuid,
     .update_uuid   = twolevel_update_uuid,
     .del_uuid      = twolevel_del_uuid,
+
+    .write_start   = twolevel_write_start,
+    .write_bytes   = twolevel_write_bytes,
+    .write_finish  = twolevel_write_finish,
 
     .hardlink_uuid = twolevel_hardlink_uuid,
     .rename_uuid   = twolevel_rename_uuid

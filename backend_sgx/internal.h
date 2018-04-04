@@ -18,8 +18,8 @@
 
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
+#include "lock_manager.h"
 #include "key_buffer.h"
-
 
 
 struct sgx_backend {
@@ -28,6 +28,8 @@ struct sgx_backend {
     size_t volume_chunk_size;
 
     struct buffer_manager * buf_manager;
+
+    struct lock_manager * lock_manager;
 
     struct nexus_volume * volume;
 
@@ -117,3 +119,11 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
                        size_t                size,
                        size_t                filesize,
                        void                * priv_data);
+
+
+
+int
+uuid_equal_func(uintptr_t key1, uintptr_t key2);
+
+uint32_t
+uuid_hash_func(uintptr_t key);

@@ -48,6 +48,8 @@ objs := nexus_enclave_u.o \
 	dir_ops.o \
 	file_ops.o \
 	buffer_manager.o \
+	lock_manager.o \
+	uuid_hash.o \
 	xxhash.o \
 	ocalls.o
 

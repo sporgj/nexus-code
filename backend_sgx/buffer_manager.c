@@ -1,12 +1,8 @@
 #include "internal.h"
 
-#include "xxhash.h"
-
 #include <nexus_hashtable.h>
 
-// XXX given that uuid's are random, not sure if having a prime number for capacity
-// buys us much
-#define BUFFER_TABLE_SIZE 127
+#define HASHTABLE_SIZE 127
 
 struct buffer_manager {
     struct nexus_hashtable * buffers_table;
@@ -16,20 +12,6 @@ struct buffer_manager {
     // TODO it may be helpful to have the total size occupied by the buffers
 };
 
-
-static uint32_t
-hash_func(uintptr_t key)
-{
-    struct nexus_uuid * uuid = (struct nexus_uuid *)key;
-
-    return (uint32_t)(XXH32(uuid, sizeof(struct nexus_uuid), 0));
-}
-
-static int
-equal_func(uintptr_t key1, uintptr_t key2)
-{
-    return nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0;
-}
 
 static bool
 conditional_remove_func(uintptr_t value)
@@ -47,6 +29,7 @@ conditional_remove_func(uintptr_t value)
     return buf->refcount == 0;
 }
 
+
 struct buffer_manager *
 buffer_manager_init()
 {
@@ -54,7 +37,9 @@ buffer_manager_init()
 
     buf_manager = nexus_malloc(sizeof(struct buffer_manager));
 
-    buf_manager->buffers_table = nexus_create_htable(BUFFER_TABLE_SIZE, hash_func, equal_func);
+    buf_manager->buffers_table = nexus_create_htable(HASHTABLE_SIZE,
+                                                     uuid_hash_func,
+                                                     uuid_equal_func);
 
     if (buf_manager->buffers_table == NULL) {
         nexus_free(buf_manager);
@@ -170,8 +155,6 @@ buffer_manager_get(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
 
     return buf;
 }
-
-
 
 void
 buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)

@@ -46,6 +46,92 @@ ocall_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
     buffer_manager_put(sgx_backend->buf_manager, uuid);
 }
 
+int
+ocall_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
+{
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
+
+    struct nexus_raw_file * raw_file = NULL;
+
+    // this blocks
+    raw_file = nexus_datastore_write_start(volume->metadata_store, uuid, NULL);
+
+    if (raw_file == NULL) {
+        log_error("nexus_datastore_write_start() FAILED\n");
+        return -1;
+    }
+
+    if (lock_manager_add(sgx_backend->lock_manager, uuid, raw_file)) {
+        log_error("could not lock file\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+ocall_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
+{
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
+
+    struct nexus_raw_file * raw_file = NULL;
+
+
+    raw_file = lock_manager_drop(sgx_backend->lock_manager, uuid);
+
+    if (raw_file == NULL) {
+        log_error("could not find file in lock manager\n");
+        return -1;
+    }
+
+    nexus_datastore_write_finish(volume->metadata_store, raw_file);
+
+    return 0;
+}
+
+int
+ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
+{
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
+
+    struct nexus_raw_file * raw_file = NULL;
+
+    raw_file = lock_manager_get(sgx_backend->lock_manager, uuid);
+
+    if (raw_file == NULL) {
+        log_error("could not find file in lock manager\n");
+        return -1;
+    }
+
+
+    {
+        struct __buf * buf = NULL;
+
+        int ret = -1;
+
+
+        buf = buffer_manager_get(sgx_backend->buf_manager, uuid);
+
+        if (buf == NULL) {
+            log_error("buffer_manager_get returned NULL\n");
+            return -1;
+        }
+
+        ret = nexus_datastore_write_bytes(volume->metadata_store, raw_file, buf->addr, buf->size);
+
+        buffer_manager_put(sgx_backend->buf_manager, &buf->uuid);
+
+        if (ret) {
+            log_error("nexus_datastore_put_uuid FAILED\n");
+            return -1;
+        }
+
+        return 0;
+    }
+
+    return 0;
+}
+
 uint8_t *
 ocall_buffer_get(struct nexus_uuid * metadata_uuid, size_t * p_size, struct nexus_volume * volume)
 {
@@ -96,43 +182,6 @@ ocall_buffer_get(struct nexus_uuid * metadata_uuid, size_t * p_size, struct nexu
     }
 
     return buffer_addr;
-}
-
-int
-ocall_buffer_flush(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
-{
-    struct sgx_backend * sgx_backend = NULL;
-
-    struct __buf * buf = NULL;
-
-    int ret = -1;
-
-
-    sgx_backend = (struct sgx_backend *)volume->private_data;
-
-
-    buf = buffer_manager_get(sgx_backend->buf_manager, metadata_uuid);
-
-    if (buf == NULL) {
-        log_error("buffer_manager_get returned NULL\n");
-        return -1;
-    }
-
-
-    ret = nexus_datastore_put_uuid(volume->metadata_store,
-                                   metadata_uuid,
-                                   NULL,
-                                   buf->addr,
-                                   buf->size);
-
-    buffer_manager_put(sgx_backend->buf_manager, &buf->uuid);
-
-    if (ret) {
-        log_error("nexus_datastore_put_uuid FAILED\n");
-        return -1;
-    }
-
-    return 0;
 }
 
 int

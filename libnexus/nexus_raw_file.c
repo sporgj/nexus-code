@@ -8,14 +8,78 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <ftw.h>
 
+#include <linux/limits.h>
 
 #include <nexus_raw_file.h>
 #include <nexus_util.h>
 #include <nexus_log.h>
+
+
+
+struct nexus_raw_file *
+nexus_acquire_raw_file(char * filepath)
+{
+    struct nexus_raw_file * raw_file = NULL;
+
+    raw_file = nexus_malloc(sizeof(struct nexus_raw_file));
+
+    raw_file->file_ptr = fopen(filepath, "wb");
+
+    if (raw_file->file_ptr == NULL) {
+	log_error("could not open file (%s)\n", filepath);
+
+	nexus_free(raw_file);
+	return NULL;
+    }
+
+    if (flock(fileno(raw_file->file_ptr), LOCK_EX)) {
+	fclose(raw_file->file_ptr);
+	nexus_free(raw_file);
+
+        log_error("could not lock file (%s)", filepath);
+	return NULL;
+    }
+
+    raw_file->filepath = strndup(filepath, PATH_MAX);
+
+    return raw_file;
+}
+
+void
+nexus_release_raw_file(struct nexus_raw_file * raw_file)
+{
+    if (raw_file == NULL) {
+	return;
+    }
+
+    fclose(raw_file->file_ptr); // closing the file should release the lock
+
+    nexus_free(raw_file->filepath);
+
+    nexus_free(raw_file);
+}
+
+int
+nexus_update_raw_file(struct nexus_raw_file * raw_file, uint8_t * buf, size_t size)
+{
+    int nbytes = fwrite(buf, 1, size, raw_file->file_ptr);
+
+    if (nbytes != (int) size) {
+        log_error("could not write file (%s). tried=%d, actual=%d\n",
+                  raw_file->filepath,
+                  (int)size,
+                  nbytes);
+        return -1;
+    }
+
+    return 0;
+}
+
 
 
 int

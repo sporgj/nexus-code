@@ -157,22 +157,41 @@ enclave {
         );
 
         /**
-         * Writes back the content of the modified buffer
-         * @return 0 on success
+         * Frees an allocated buffer
+         * @param buffer_uuid
          */
-        int
-        ocall_buffer_flush
+        void
+        ocall_buffer_put
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
         );
 
         /**
-         * Frees an allocated buffer
-         * @param buffer_uuid
+         * Locks the metadata object
+         * @param metadata_uuid
+         * @param volume
          */
-        void
-        ocall_buffer_put
+        int
+        ocall_buffer_lock
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
+        );
+
+        int
+        ocall_buffer_unlock
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
+        );
+
+        /**
+         * Writes back the content of the modified buffer
+         * @return 0 on success
+         */
+        int
+        ocall_buffer_flush
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume

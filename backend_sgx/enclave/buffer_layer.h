@@ -22,11 +22,23 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size);
 
 /**
  * Drops reference to a specified buffer
- * @param buffer_uuid
+ * @param uuid
  * @return 0 on success
  */
 int
-buffer_layer_put(struct nexus_uuid * buffer_uuid);
+buffer_layer_put(struct nexus_uuid * uuid);
+
+/**
+ * Locks the metadata file on disk
+ */
+int
+buffer_layer_lock(struct nexus_uuid * uuid);
+
+/**
+ * Unlocks the previously locked file
+ */
+int
+buffer_layer_unlock(struct nexus_uuid * uuid);
 
 /**
  * Flushes the buffer layer to the metadata

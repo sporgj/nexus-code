@@ -81,6 +81,38 @@ buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
 }
 
 int
+buffer_layer_lock(struct nexus_uuid * uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_lock(&ret, uuid, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_lock FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+buffer_layer_unlock(struct nexus_uuid * uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_unlock(&ret, uuid, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_unlock FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
 buffer_layer_flush(struct nexus_uuid * uuid)
 {
     int err = -1;

@@ -430,6 +430,48 @@ err_out:
 }
 
 
+struct nexus_raw_file *
+flat_write_start(struct nexus_uuid * uuid, char * path, void * priv_data)
+{
+    struct flat_datastore * datastore = priv_data;
+
+    struct nexus_raw_file * raw_file  = NULL;
+
+    char                  * filepath  = NULL;
+
+
+    filepath = __get_full_path(datastore, uuid);
+
+    if (filepath == NULL) {
+        log_error("could not get filepath\n");
+        return NULL;
+    }
+
+
+    raw_file = nexus_acquire_raw_file(filepath);
+
+    nexus_free(filepath);
+
+    if (raw_file == NULL) {
+        log_error("nexus_open_raw_file FAILED\n");
+	return NULL;
+    }
+
+    return raw_file;
+}
+
+int
+flat_write_bytes(struct nexus_raw_file * raw_file, uint8_t * buf, uint32_t size, void * priv_data)
+{
+    return nexus_update_raw_file(raw_file, buf, size);
+}
+
+void
+flat_write_finish(struct nexus_raw_file * raw_file, void * priv_data)
+{
+    nexus_release_raw_file(raw_file);
+}
+
 static struct nexus_datastore_impl flat_datastore = {
     .name        = "FLAT",
 
@@ -443,6 +485,10 @@ static struct nexus_datastore_impl flat_datastore = {
     .put_uuid    = flat_put_uuid,
     .update_uuid = flat_update_uuid,
     .del_uuid    = flat_del_uuid,
+
+    .write_start   = flat_write_start,
+    .write_bytes   = flat_write_bytes,
+    .write_finish  = flat_write_finish,
 
     .hardlink_uuid = flat_hardlink_uuid,
     .rename_uuid   = flat_rename_uuid

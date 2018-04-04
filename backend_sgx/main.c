@@ -7,6 +7,10 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
         buffer_manager_destroy(sgx_backend->buf_manager);
     }
 
+    if (sgx_backend->lock_manager) {
+        lock_manager_destroy(sgx_backend->lock_manager);
+    }
+
     nexus_free(sgx_backend);
 
     return 0;
@@ -40,6 +44,18 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
         }
 
         sgx_backend->buf_manager = buf_manager;
+    }
+
+    // create the lock table
+    {
+        struct lock_manager * lock_manager = lock_manager_init();
+
+        if (lock_manager == NULL) {
+            log_error("could not create lock manager\n");
+            goto out;
+        }
+
+        sgx_backend->lock_manager = lock_manager;
     }
 
     sgx_backend->volume_chunk_size = NEXUS_CHUNK_SIZE;

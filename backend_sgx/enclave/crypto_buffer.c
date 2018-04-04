@@ -18,7 +18,6 @@
 */
 
 
-
 struct __gcm_header {
     uint8_t key[GCM128_KEY_SIZE];
     uint8_t  iv[GCM128_IV_SIZE];
@@ -48,6 +47,8 @@ struct nexus_crypto_buf {
 
     struct nexus_uuid uuid;
 
+    bool has_lock; // if the UUID was locked
+
     // for managing the external buffer
     uint8_t * external_addr;
     size_t    external_size;
@@ -65,10 +66,17 @@ nexus_crypto_buf_new(size_t size, struct nexus_uuid * uuid)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
+    if (buffer_layer_lock(uuid)) {
+        log_error("could not lock uuid in untrusted memory\n");
+        return NULL;
+    }
+
     crypto_buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
 
     crypto_buf->internal_addr = nexus_malloc(size);
     crypto_buf->internal_size = size;
+
+    crypto_buf->has_lock      = true;
 
     nexus_uuid_copy(uuid, &crypto_buf->uuid);
 
@@ -97,6 +105,8 @@ nexus_crypto_buf_create(struct nexus_uuid * buf_uuid)
     crypto_buf->external_addr = external_addr;
     crypto_buf->external_size = external_size;
 
+    crypto_buf->has_lock      = false;
+
     return crypto_buf;
 }
 
@@ -116,6 +126,10 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
 
     // free the crypto context
     nexus_crypto_ctx_free(&(crypto_buf->crypto_ctx));
+
+    if (crypto_buf->has_lock) {
+        buffer_layer_unlock(&(crypto_buf->uuid));
+    }
 
     nexus_free(crypto_buf);
 }
@@ -449,8 +463,6 @@ out:
 
     return ret;
 }
-
-
 
 int
 nexus_crypto_buf_flush(struct nexus_crypto_buf * buf)

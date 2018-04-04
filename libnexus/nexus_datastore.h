@@ -44,25 +44,43 @@ nexus_datastore_close(struct nexus_datastore * datastore);
 // metadata file operations
 
 int
-nexus_datastore_get_uuid(struct nexus_datastore      * datastore,
-                         struct nexus_uuid           * uuid,
-                         char                        * path,
-                         uint8_t                    ** buf,
-                         uint32_t                    * size);
+nexus_datastore_get_uuid(struct nexus_datastore    * datastore,
+                         struct nexus_uuid         * uuid,
+                         char                      * path,
+                         uint8_t                  ** buf,
+                         uint32_t                  * size);
 
 int
-nexus_datastore_put_uuid(struct nexus_datastore      * datastore,
-                         struct nexus_uuid           * uuid,
-                         char                        * path,
-                         uint8_t                     * buf,
-                         uint32_t                      size);
+nexus_datastore_put_uuid(struct nexus_datastore    * datastore,
+                         struct nexus_uuid         * uuid,
+                         char                      * path,
+                         uint8_t                   * buf,
+                         uint32_t                    size);
 
 int
-nexus_datastore_update_uuid(struct nexus_datastore   * datastore,
-                            struct nexus_uuid        * uuid,
-                            char                     * path,
-                            uint8_t                  * buf,
-                            uint32_t                   size);
+nexus_datastore_update_uuid(struct nexus_datastore * datastore,
+                            struct nexus_uuid      * uuid,
+                            char                   * path,
+                            uint8_t                * buf,
+                            uint32_t                 size);
+
+
+struct nexus_raw_file *
+nexus_datastore_write_start(struct nexus_datastore * datastore,
+                            struct nexus_uuid      * uuid,
+                            char                   * path);
+
+int
+nexus_datastore_write_bytes(struct nexus_datastore * datastore,
+                            struct nexus_raw_file  * raw_file,
+                            uint8_t                * buf,
+                            uint32_t                 size);
+
+void
+nexus_datastore_write_finish(struct nexus_datastore * datastore, struct nexus_raw_file * raw_file);
+
+
+// metadata directory operations
 
 int
 nexus_datastore_del_uuid(struct nexus_datastore      * datastore,
@@ -141,6 +159,24 @@ struct nexus_datastore_impl {
                        uint8_t           * buf,
                        uint32_t            size,
                        void              * priv_data);
+
+    /**
+     * Acquires an exclusive lock on metadata and returns fd
+     */
+    struct nexus_raw_file * (*write_start)(struct nexus_uuid * uuid, char * path, void * priv_data);
+
+    /**
+     * Writes the bytes on the acquired file descriptor
+     */
+    int (*write_bytes)(struct nexus_raw_file * raw_file,
+                       uint8_t               * buf,
+                       uint32_t                size,
+                       void                  * priv_data);
+
+    /**
+     * Closes the file
+     */
+    void (*write_finish)(struct nexus_raw_file * raw_file, void * priv_data);
 
     /**
      * Removes uuid from the metadata store
