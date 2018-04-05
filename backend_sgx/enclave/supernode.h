@@ -20,6 +20,8 @@
 
 
 struct nexus_supernode {
+    uint32_t          version;
+
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 

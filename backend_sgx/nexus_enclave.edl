@@ -198,6 +198,13 @@ enclave {
         );
 
         int
+        ocall_buffer_new
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
+        );
+
+        int
         ocall_buffer_del
         (
             [in]         struct nexus_uuid   * metadata_uuid,

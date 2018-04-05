@@ -83,6 +83,11 @@ nexus_datastore_write_finish(struct nexus_datastore * datastore, struct nexus_ra
 // metadata directory operations
 
 int
+nexus_datastore_new_uuid(struct nexus_datastore      * datastore,
+                         struct nexus_uuid           * uuid,
+                         char                        * path);
+
+int
 nexus_datastore_del_uuid(struct nexus_datastore      * datastore,
                          struct nexus_uuid           * uuid,
                          char                        * path);
@@ -177,6 +182,14 @@ struct nexus_datastore_impl {
      * Closes the file
      */
     void (*write_finish)(struct nexus_raw_file * raw_file, void * priv_data);
+
+    /**
+     * Creates an empty file in the datastore
+     * @param uuid
+     * @param path
+     * @param priv_data
+     */
+    int (*new_uuid)(struct nexus_uuid * uuid, char * path, void * priv_data);
 
     /**
      * Removes uuid from the metadata store

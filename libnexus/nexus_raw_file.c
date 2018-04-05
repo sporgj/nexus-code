@@ -104,14 +104,16 @@ nexus_read_raw_file(char     * path,
 
     file_size = file_stats.st_size;
 
-    /* This check is probably not necessary.... */
     if (file_size <= 0) {
-	log_error("Invalid file size for (%s)\n", path);
-	return -1;
+	*size = 0;
+	*buf = nexus_malloc(1);
+
+	return 0;
     }
 
+
     file_data = nexus_malloc(file_size + 1); // We add an extra byte here to make sure strings are NULL terminated
-    
+
     file_ptr  = fopen(path, "rb");
 
     if (file_ptr == NULL) {
@@ -172,6 +174,23 @@ nexus_write_raw_file(char   * path,
     return ret;
 }
 
+
+int
+nexus_touch_raw_file(char * filepath)
+{
+    FILE * fd = NULL;
+
+    fd = fopen(filepath, "wb");
+
+    if (fd == NULL) {
+	log_error("could not create file (%s)\n", filepath);
+	return -1;
+    }
+
+    fclose(fd);
+
+    return 0;
+}
 
 int
 nexus_delete_raw_file(char * path)

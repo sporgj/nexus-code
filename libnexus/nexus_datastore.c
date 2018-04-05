@@ -39,7 +39,7 @@ datastore_eq_fn(uintptr_t key_1,
 {
     char * name_1 = (char *)key_1;
     char * name_2 = (char *)key_2;
-    
+
     return (strcasecmp(name_1, name_2) == 0);
 }
 
@@ -249,6 +249,12 @@ nexus_datastore_update_uuid(struct nexus_datastore  * datastore,
                             uint32_t                  size)
 {
     return datastore->impl->update_uuid(uuid, path, buf, size, datastore->priv_data);
+}
+
+int
+nexus_datastore_new_uuid(struct nexus_datastore * datastore, struct nexus_uuid * uuid, char * path)
+{
+    return datastore->impl->new_uuid(uuid, path, datastore->priv_data);
 }
 
 int

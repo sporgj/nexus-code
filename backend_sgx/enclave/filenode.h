@@ -11,6 +11,8 @@
 #include <nexus_mac.h>
 
 struct nexus_filenode {
+    uint32_t          version;
+
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 

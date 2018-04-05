@@ -62,7 +62,7 @@ struct nexus_crypto_buf {
 
 
 struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size, struct nexus_uuid * uuid)
+nexus_crypto_buf_new(size_t size, size_t version, struct nexus_uuid * uuid)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
@@ -77,6 +77,8 @@ nexus_crypto_buf_new(size_t size, struct nexus_uuid * uuid)
     crypto_buf->internal_size = size;
 
     crypto_buf->has_lock      = true;
+
+    crypto_buf->version       = version;
 
     nexus_uuid_copy(uuid, &crypto_buf->uuid);
 
@@ -248,6 +250,7 @@ __parse_header(struct nexus_crypto_buf * crypto_buf)
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
                      size_t                  * buffer_size,
+                     uint32_t                * version,
                      struct nexus_mac        * mac)
 {
     struct crypto_buf_hdr * buf_hdr = NULL;
@@ -256,6 +259,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     /* Internal buffer already exists */
     if (crypto_buf->internal_addr != NULL) {
         *buffer_size = crypto_buf->internal_size;
+        *version     = crypto_buf->version;
 
         return crypto_buf->internal_addr;
     }
@@ -267,6 +271,18 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
         return NULL;
     }
 
+
+    // if it's an empty file, just return an empty buffer
+    if (crypto_buf->external_size == 0) {
+        *version = 0;
+        *buffer_size = 0;
+
+        if (crypto_buf->internal_addr == NULL) {
+            crypto_buf->internal_addr = nexus_malloc(1);
+        }
+
+        return crypto_buf->internal_addr;
+    }
 
     // parses and unwraps the buffer's crypto context
     buf_hdr = __parse_header(crypto_buf);
@@ -304,6 +320,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     nexus_free(buf_hdr);
 
     *buffer_size = crypto_buf->internal_size;
+    *version     = crypto_buf->version;
 
     return crypto_buf->internal_addr;
 

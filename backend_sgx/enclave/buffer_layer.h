@@ -49,6 +49,13 @@ int
 buffer_layer_flush(struct nexus_uuid * uuid);
 
 /**
+ * Creates an empty file on the datastore
+ * @param uuid
+ */
+int
+buffer_layer_new(struct nexus_uuid * uuid);
+
+/**
  * Deletes a metadata buffer
  * @param uuid
  */

@@ -185,6 +185,12 @@ ocall_buffer_get(struct nexus_uuid * metadata_uuid, size_t * p_size, struct nexu
 }
 
 int
+ocall_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
+{
+    return nexus_datastore_new_uuid(volume->metadata_store, metadata_uuid, NULL);
+}
+
+int
 ocall_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 {
     struct sgx_backend * sgx_backend = NULL;

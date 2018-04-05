@@ -48,6 +48,22 @@ buffer_layer_put(struct nexus_uuid * buffer_uuid)
     return 0;
 }
 
+int
+buffer_layer_new(struct nexus_uuid * uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_new(&ret, uuid, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_new FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
 void
 buffer_layer_delete(struct nexus_uuid * uuid)
 {

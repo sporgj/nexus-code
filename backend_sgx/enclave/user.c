@@ -25,6 +25,8 @@ struct __table_hdr {
 
 
 struct nexus_usertable {
+    uint32_t version;
+
     uint64_t auto_increment;
     uint64_t user_count;
     uint64_t total_size;
@@ -198,6 +200,8 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
+    uint32_t version = 0;
+
     int ret = -1;
 
 
@@ -208,7 +212,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, mac);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, mac);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
@@ -231,6 +235,8 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
 
         return NULL;
     }
+
+    usertable->version = version;
 
     return usertable;
 }
@@ -298,7 +304,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 
     serialized_buflen = nexus_usertable_buflen(usertable);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &usertable->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, usertable->version, &usertable->my_uuid);
 
     if (!crypto_buffer) {
         log_error("could not initialize crypto buffer\n");
@@ -313,7 +319,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &usertable->version, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_buffer buffer\n");
             goto out;

@@ -51,6 +51,14 @@ int
 nexus_write_raw_file(char * path, void * buf, size_t len);
 
 
+/**
+ * Creates an empty file
+ * @param path
+ * @return 0 on success
+ */
+int
+nexus_touch_raw_file(char * path);
+
 /*
  * This will delete a single file
  *  path must point to a file (not a directory)

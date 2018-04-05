@@ -400,6 +400,28 @@ twolevel_update_uuid(struct nexus_uuid * uuid,
 }
 
 static int
+twolevel_new_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+    char *                      filepath  = NULL;
+
+    int ret = -1;
+
+    filepath = __make_full_path(datastore, uuid);
+
+    if (filepath == NULL) {
+        log_error("could not get filepath\n");
+        return -1;
+    }
+
+    ret = nexus_touch_raw_file(filepath);
+
+    nexus_free(filepath);
+
+    return ret;
+}
+
+static int
 twolevel_del_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
@@ -528,6 +550,7 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .get_uuid      = twolevel_get_uuid,
     .put_uuid      = twolevel_put_uuid,
     .update_uuid   = twolevel_update_uuid,
+    .new_uuid      = twolevel_new_uuid,
     .del_uuid      = twolevel_del_uuid,
 
     .write_start   = twolevel_write_start,

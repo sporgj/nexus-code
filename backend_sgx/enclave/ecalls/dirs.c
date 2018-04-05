@@ -7,33 +7,19 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
                 nexus_dirent_type_t     type_IN,
                 struct nexus_uuid     * entry_uuid)
 {
-    nexus_metadata_type_t metadata_type = (type_IN == NEXUS_DIR) ? NEXUS_DIRNODE : NEXUS_FILENODE;
-
     int ret = -1;
 
+
     // create the new metadata
-    {
-        struct nexus_metadata * new_metadata = NULL;
+    nexus_uuid_gen(entry_uuid);
 
-        new_metadata = nexus_vfs_create(dentry, metadata_type);
+    ret = buffer_layer_new(entry_uuid);
 
-        if (new_metadata == NULL) {
-            log_error("could not create metadata\n");
-            return -1;
-        }
-
-        ret = nexus_vfs_flush(new_metadata);
-
-        if (ret != 0) {
-            nexus_vfs_put(new_metadata);
-            log_error("could not flush metadata\n");
-            return -1;
-        }
-
-        nexus_uuid_copy(&new_metadata->uuid, entry_uuid);
-
-        nexus_vfs_put(new_metadata);
+    if (ret != 0) {
+        log_error("could not create empty metadata \n");
+        return -1;
     }
+
 
     // update the parent dirnode
     ret = dirnode_add(parent_dirnode, filename_IN, type_IN, entry_uuid);

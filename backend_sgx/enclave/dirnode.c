@@ -269,6 +269,8 @@ dirnode_load(struct nexus_uuid * uuid)
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
+    uint32_t version = 0;
+
 
     crypto_buffer = nexus_crypto_buf_create(uuid);
 
@@ -277,12 +279,18 @@ dirnode_load(struct nexus_uuid * uuid)
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, NULL);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
         log_error("nexus_crypto_buf_get() FAILED\n");
         return NULL;
+    }
+
+    // an empty dirnode...
+    if (version == 0) {
+        nexus_crypto_buf_free(crypto_buffer);
+        return dirnode_create(&global_supernode->root_uuid, uuid);
     }
 
 
@@ -294,6 +302,8 @@ dirnode_load(struct nexus_uuid * uuid)
         log_error("__parse_dirnode FAILED\n");
         return NULL;
     }
+
+    dirnode->version = version;
 
     return dirnode;
 }
@@ -416,7 +426,7 @@ dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct n
 
     serialized_buflen = __get_total_size(dirnode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, dirnode->version, uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -428,7 +438,7 @@ dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct n
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &dirnode->version, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_buffer buffer\n");
             goto out;

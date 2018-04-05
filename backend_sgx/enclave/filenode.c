@@ -172,6 +172,8 @@ filenode_load(struct nexus_uuid * uuid)
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
+    uint32_t version = 0;
+
 
     crypto_buffer = nexus_crypto_buf_create(uuid);
 
@@ -180,13 +182,20 @@ filenode_load(struct nexus_uuid * uuid)
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, NULL);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
         log_error("nexus_crypto_buf_get() FAILED\n");
         return NULL;
     }
+
+
+    if (version == 0) {
+        nexus_crypto_buf_free(crypto_buffer);
+        return filenode_create(&global_supernode->root_uuid, uuid);
+    }
+
 
     filenode = filenode_from_buffer(buffer, buflen);
 
@@ -196,6 +205,9 @@ filenode_load(struct nexus_uuid * uuid)
         log_error("__parse_filenode FAILED\n");
         return NULL;
     }
+
+    filenode->version = version;
+
 
     return filenode;
 }
@@ -284,7 +296,7 @@ filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
 
     serialized_buflen = __get_filenode_size(filenode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, &filenode->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, filenode->version, &filenode->my_uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -296,7 +308,7 @@ filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &filenode->version, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_buffer buffer\n");
             goto out;

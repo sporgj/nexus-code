@@ -23,10 +23,12 @@ nexus_crypto_buf_create(struct nexus_uuid * uuid);
  * Creates a new crypto buffer which will encrypt a metadata buffer of size.
  *
  * @param size
+ * @param version
+ * @param uuid
  * @return crypto_buf
  */
 struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size, struct nexus_uuid * uuid);
+nexus_crypto_buf_new(size_t size, size_t version, struct nexus_uuid * uuid);
 
 void
 nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
@@ -51,6 +53,7 @@ nexus_crypto_buf_sha256_exterior(struct nexus_crypto_buf * crypto_buf,
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
                      size_t                  * buffer_size,
+                     uint32_t                * version,
                      struct nexus_mac        * mac);
 
 

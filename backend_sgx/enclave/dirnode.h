@@ -15,6 +15,8 @@
 #include <nexus_list.h>
 
 struct nexus_dirnode {
+    uint32_t          version;
+
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 
