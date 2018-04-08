@@ -19,20 +19,20 @@
 
 
 struct __gcm_header {
-    uint8_t key[GCM128_KEY_SIZE];
-    uint8_t  iv[GCM128_IV_SIZE];
-    uint8_t mac[NEXUS_MAC_SIZE];
+    uint8_t                     key[GCM128_KEY_SIZE];
+    uint8_t                      iv[GCM128_IV_SIZE];
+    uint8_t                     mac[NEXUS_MAC_SIZE];
 } __attribute__((packed));
 
 
 struct crypto_buf_hdr {
-    uint32_t magic;
+    uint32_t                    magic;
 
-    uint32_t version;
+    uint32_t                    version;
 
-    uint32_t size; // size of the encrypted buffer
+    uint32_t                    size; // size of the encrypted buffer
 
-    struct __gcm_header gcm_hdr;
+    struct __gcm_header         gcm_hdr;
 } __attribute__((packed));
 
 
@@ -41,28 +41,33 @@ struct crypto_buf_hdr {
 
 
 struct nexus_crypto_buf {
-    struct nexus_crypto_ctx crypto_ctx;
+    struct nexus_crypto_ctx     crypto_ctx;
 
-    uint32_t version;
+    uint32_t                    version;
 
-    struct nexus_uuid uuid;
+    struct nexus_uuid           uuid;
 
-    bool has_lock; // if the UUID was locked
+    bool                        has_lock; // if the UUID was locked
 
-    // for managing the external buffer
-    uint8_t * external_addr;
-    size_t    external_size;
+    uint8_t                   * external_addr;
+    size_t                      external_size;
 
-    uint8_t * internal_addr;
-    size_t    internal_size;
+    uint8_t                   * internal_addr;
+    size_t                      internal_size;
 };
 
 
 
 
+static size_t
+__get_header_len()
+{
+      return sizeof(struct crypto_buf_hdr);
+}
+
 
 struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size, size_t version, struct nexus_uuid * uuid)
+nexus_crypto_buf_new(size_t size, uint32_t version, struct nexus_uuid * uuid)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
@@ -109,6 +114,17 @@ nexus_crypto_buf_create(struct nexus_uuid * buf_uuid)
 
     crypto_buf->has_lock      = false;
 
+    // get the version
+    if (external_size >= __get_header_len()) {
+        struct crypto_buf_hdr * buf_hdr = (struct crypto_buf_hdr *) external_addr;
+
+        crypto_buf->version = buf_hdr->version;
+    } else if (external_size == 0) {
+        crypto_buf->version = 0;
+    } else {
+        crypto_buf->version = CRYPTOBUF_INVALID_VERSION;
+    }
+
     return crypto_buf;
 }
 
@@ -134,6 +150,12 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
     }
 
     nexus_free(crypto_buf);
+}
+
+uint32_t
+nexus_crypto_buf_version(struct nexus_crypto_buf * buf)
+{
+    return buf->version;
 }
 
 int
@@ -205,12 +227,6 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
     return -1;
 }
 
-static int
-__get_header_len()
-{
-      return sizeof(struct crypto_buf_hdr);
-}
-
 static struct crypto_buf_hdr *
 __parse_header(struct nexus_crypto_buf * crypto_buf)
 {
@@ -250,7 +266,6 @@ __parse_header(struct nexus_crypto_buf * crypto_buf)
 void *
 nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
                      size_t                  * buffer_size,
-                     uint32_t                * version,
                      struct nexus_mac        * mac)
 {
     struct crypto_buf_hdr * buf_hdr = NULL;
@@ -259,30 +274,17 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     /* Internal buffer already exists */
     if (crypto_buf->internal_addr != NULL) {
         *buffer_size = crypto_buf->internal_size;
-        *version     = crypto_buf->version;
 
         return crypto_buf->internal_addr;
     }
 
 
 
-    if (crypto_buf->external_addr == NULL) {
+    if (crypto_buf->external_addr == NULL || crypto_buf->external_size == 0) {
         log_error("Error: Unitialized crypto_buf\n");
         return NULL;
     }
 
-
-    // if it's an empty file, just return an empty buffer
-    if (crypto_buf->external_size == 0) {
-        *version = 0;
-        *buffer_size = 0;
-
-        if (crypto_buf->internal_addr == NULL) {
-            crypto_buf->internal_addr = nexus_malloc(1);
-        }
-
-        return crypto_buf->internal_addr;
-    }
 
     // parses and unwraps the buffer's crypto context
     buf_hdr = __parse_header(crypto_buf);
@@ -315,12 +317,9 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
     }
 
 
-    crypto_buf->version = buf_hdr->version;
-
     nexus_free(buf_hdr);
 
     *buffer_size = crypto_buf->internal_size;
-    *version     = crypto_buf->version;
 
     return crypto_buf->internal_addr;
 

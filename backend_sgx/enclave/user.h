@@ -7,21 +7,21 @@
 #define NEXUS_MAX_NAMELEN 25
 
 
-typedef uint64_t nexus_uid_t;
+typedef uint64_t              nexus_uid_t;
 
-typedef struct nexus_hash pubkey_hash_t;
+typedef struct nexus_hash     pubkey_hash_t;
 
-typedef uint32_t nexus_user_flags_t;
+typedef uint32_t              nexus_user_flags_t;
 
 
 struct nexus_user {
-    char * name;
+    char                    * name;
 
-    nexus_user_flags_t flags;
+    nexus_user_flags_t        flags;
 
-    nexus_uid_t user_id;
+    nexus_uid_t               user_id;
 
-    pubkey_hash_t pubkey_hash;
+    pubkey_hash_t             pubkey_hash;
 };
 
 /**

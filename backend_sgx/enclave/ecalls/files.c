@@ -111,13 +111,12 @@ __nxs_fs_crypto(char              * filepath_IN,
         goto out;
     }
 
-    if (mode == NEXUS_ENCRYPT) {
-        ret = nexus_vfs_flush(metadata);
 
-        if (ret != 0) {
-            log_error("nexus_vfs_flush FAILED\n");
-            goto out;
-        }
+    ret = nexus_metadata_store(metadata);
+
+    if (ret != 0) {
+        log_error("nexus_vfs_put FAILED\n");
+        goto out;
     }
 
     ret = 0;

@@ -7,7 +7,7 @@
 #include <nexus_list.h>
 
 struct nexus_acl {
-    size_t count;
+    size_t            count;
 
     struct nexus_list acls;
 };

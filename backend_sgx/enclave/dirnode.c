@@ -51,6 +51,22 @@ static void
 dirnode_init(struct nexus_dirnode * dirnode);
 
 
+static inline void
+__set_dirty(struct nexus_dirnode * dirnode)
+{
+    if (dirnode->metadata) {
+        dirnode->metadata->is_dirty = true;
+    }
+}
+
+static inline void
+__set_clean(struct nexus_dirnode * dirnode)
+{
+    if (dirnode->metadata) {
+        dirnode->metadata->is_dirty = false;
+    }
+}
+
 
 // --------------------------- dir entry stuff -------------------------------
 
@@ -253,33 +269,16 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
     return dirnode;
 }
 
-int
-dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode)
-{
-    return nexus_uuid_compare(&src_dirnode->my_uuid, &dst_dirnode->my_uuid);
-}
-
 struct nexus_dirnode *
-dirnode_load(struct nexus_uuid * uuid)
+dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
 {
     struct nexus_dirnode * dirnode = NULL;
-
-    struct nexus_crypto_buf * crypto_buffer = NULL;
 
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
-    uint32_t version = 0;
 
-
-    crypto_buffer = nexus_crypto_buf_create(uuid);
-
-    if (crypto_buffer == NULL) {
-        log_error("metadata_read FAILED\n");
-        return NULL;
-    }
-
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
@@ -287,23 +286,31 @@ dirnode_load(struct nexus_uuid * uuid)
         return NULL;
     }
 
-    // an empty dirnode...
-    if (version == 0) {
-        nexus_crypto_buf_free(crypto_buffer);
-        return dirnode_create(&global_supernode->root_uuid, uuid);
-    }
-
-
     dirnode = dirnode_from_buffer(buffer, buflen);
-
-    nexus_crypto_buf_free(crypto_buffer);
 
     if (dirnode == NULL) {
         log_error("__parse_dirnode FAILED\n");
         return NULL;
     }
 
-    dirnode->version = version;
+    return dirnode;
+}
+
+struct nexus_dirnode *
+dirnode_load(struct nexus_uuid * uuid)
+{
+    struct nexus_dirnode * dirnode = NULL;
+
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid);
+
+    if (crypto_buffer == NULL) {
+        log_error("metadata_read FAILED\n");
+        return NULL;
+    }
+
+    dirnode = dirnode_from_crypto_buf(crypto_buffer);
+
+    nexus_crypto_buf_free(crypto_buffer);
 
     return dirnode;
 }
@@ -399,6 +406,13 @@ dirnode_init(struct nexus_dirnode * dirnode)
     nexus_acl_init(&dirnode->dir_acl);
 }
 
+// XXX: remove this function
+int
+dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode)
+{
+    return nexus_uuid_compare(&src_dirnode->my_uuid, &dst_dirnode->my_uuid);
+}
+
 struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
@@ -415,7 +429,10 @@ dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 }
 
 int
-dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct nexus_mac * mac)
+dirnode_store(struct nexus_uuid    * uuid,
+              struct nexus_dirnode * dirnode,
+              uint32_t               version,
+              struct nexus_mac     * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -426,7 +443,7 @@ dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct n
 
     serialized_buflen = __get_total_size(dirnode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, dirnode->version, uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -438,7 +455,7 @@ dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct n
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &dirnode->version, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_buffer buffer\n");
             goto out;
@@ -462,6 +479,8 @@ dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct n
         log_error("metadata_write FAILED\n");
         goto out;
     }
+
+    __set_clean(dirnode);
 
     ret = 0;
 out:
@@ -512,6 +531,8 @@ dirnode_add(struct nexus_dirnode * dirnode,
     dirnode->dir_entry_count  += 1;
     dirnode->dir_entry_buflen += new_dir_entry->total_len;
 
+    __set_dirty(dirnode);
+
     return 0;
 }
 
@@ -527,6 +548,7 @@ dirnode_add_link(struct nexus_dirnode * dirnode,
     size_t total_len  = 0;
 
 
+    // sets the dirnode dirty
     if (dirnode_add(dirnode, link_name, NEXUS_LNK, entry_uuid) != 0) {
         log_error("dirnode_add() FAILED\n");
         return -1;
@@ -775,6 +797,8 @@ dirnode_remove(struct nexus_dirnode * dirnode,
     if (*type == NEXUS_LNK) {
         __remove_symlink(dirnode, entry_uuid, symlink_target_path);
     }
+
+    __set_dirty(dirnode);
 
     return ret;
 }

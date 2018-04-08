@@ -32,3 +32,17 @@ ecall_init_enclave(struct nexus_volume * volume)
 
     return 0;
 }
+
+int
+nexus_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
+{
+    struct nexus_user * user = NULL;
+
+    user = nexus_usertable_find_pubkey(global_supernode->usertable, user_pubkey_hash);
+
+    if (user == NULL) {
+        return -1;
+    }
+
+    return 0;
+}

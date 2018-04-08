@@ -3,14 +3,14 @@
 #include <mbedtls/gcm.h>
 
 struct nexus_data_buf {
-    size_t    chunk_size;
-    size_t    completed;
+    size_t                  chunk_size;
+    size_t                  completed;
 
-    uint8_t * external_addr;
+    uint8_t               * external_addr;
 
-    struct nexus_key iv;
+    struct nexus_key        iv;
 
-    mbedtls_gcm_context gcm_context;
+    mbedtls_gcm_context     gcm_context;
 };
 
 
@@ -19,9 +19,7 @@ nexus_data_buf_new(struct nexus_crypto_ctx * crypto_context,
                    size_t                    chunk_size,
                    nexus_crypto_mode_t       mode)
 {
-    struct nexus_data_buf * data_buffer = NULL;
-
-    data_buffer = nexus_malloc(sizeof(struct nexus_data_buf));
+    struct nexus_data_buf * data_buffer = nexus_malloc(sizeof(struct nexus_data_buf));
 
     data_buffer->chunk_size = chunk_size;
 

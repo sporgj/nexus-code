@@ -56,12 +56,10 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
-    uint32_t version = 0;
-
     int ret = -1;
 
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
 
     if (buffer == NULL) {
         log_error("nexus_crypto_buf_get() FAILED\n");
@@ -80,8 +78,6 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
         return NULL;
     }
 
-    supernode->version = version;
-
     // get the usertable
     {
         struct nexus_mac usertable_mac;
@@ -98,6 +94,9 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
             goto err;
         }
     }
+
+
+    supernode->version = nexus_crypto_buf_version(crypto_buffer);
 
     return supernode;
 err:
@@ -191,7 +190,7 @@ supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &supernode->version, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_bufffer buffer\n");
             goto out;
@@ -217,6 +216,7 @@ supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
         goto out;
     }
 
+    supernode->version += 1;
 
     ret = 0;
 out:

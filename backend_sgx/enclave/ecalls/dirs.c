@@ -61,7 +61,7 @@ ecall_fs_create(char                * dirpath_IN,
         goto out;
     }
 
-    ret = nexus_vfs_flush(metadata);
+    ret = nexus_metadata_store(metadata);
     if (ret != 0) {
         log_error("flushing metadata FAILED\n");
         goto out;
@@ -125,8 +125,9 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
         goto out;
     }
 
-    ret = nexus_vfs_flush(metadata);
+    ret = nexus_metadata_store(metadata);
     if (ret != 0) {
+        metadata = NULL;
         log_error("flushing metadata FAILED\n");
         goto out;
     }
@@ -235,13 +236,11 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
     {
         char * untrusted_addr = NULL;
 
-        int err = -1;
-
-        ret = -1;
-
-        err = ocall_calloc((void **)&untrusted_addr, name_len);
+        int    err            = ocall_calloc((void **)&untrusted_addr, name_len);
 
         if (err || untrusted_addr == NULL) {
+            ret = -1;
+
             log_error("allocation error \n");
             goto out;
         }
@@ -309,7 +308,7 @@ ecall_fs_symlink(char              * dirpath_IN,
     }
 
 
-    ret = nexus_vfs_flush(metadata);
+    ret = nexus_metadata_store(metadata);
 
     if (ret != 0) {
         log_error("flushing metadata FAILED\n");
@@ -320,6 +319,7 @@ ecall_fs_symlink(char              * dirpath_IN,
     nexus_uuid_copy(&entry_uuid, uuid_out);
 
     ret = 0;
+
 out:
     nexus_vfs_put(metadata);
 
@@ -422,7 +422,8 @@ ecall_fs_hardlink(char              * link_dirpath_IN,
         goto out;
     }
 
-    ret = nexus_vfs_flush(link_metadata);
+    ret = nexus_metadata_store(link_metadata);
+
     if (ret != 0) {
         log_error("flushing metadata FAILED\n");
         goto out;
@@ -433,7 +434,6 @@ ecall_fs_hardlink(char              * link_dirpath_IN,
 
     ret = 0;
 out:
-    nexus_vfs_put(link_metadata);
     nexus_vfs_put(target_metadata);
 
     return ret;
@@ -447,14 +447,12 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
                 struct nexus_uuid    * old_uuid,
                 struct nexus_uuid    * new_uuid)
 {
-    int ret = -1;
-
     nexus_dirent_type_t type;
     nexus_dirent_type_t tmp_type;
 
     char * symlink_target = NULL;
 
-    ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &symlink_target);
+    int ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &symlink_target);
 
     if (ret != 0) {
         log_error("could not remove (%s) from directory\n", oldname);
@@ -562,41 +560,37 @@ ecall_fs_rename(char              * from_dirpath_IN,
 
     if (ret != 0) {
         log_error("rename operation failed\n");
-        goto out_err;
+        goto out;
     }
 
 
-    ret = nexus_vfs_flush(from_metadata);
+    ret = nexus_metadata_store(from_metadata);
 
     if (ret != 0) {
         log_error("could not flush source dirnode\n");
-        goto out_err;
+        goto out;
     }
 
     if (to_metadata != NULL) {
-        ret = nexus_vfs_flush(to_metadata);
+        ret = nexus_metadata_store(to_metadata);
+
         if (ret != 0) {
             log_error("could not flush destination dirnode\n");
-            goto out_err;
+            goto out;
         }
     }
 
     nexus_uuid_copy(&old_uuid, old_uuid_out);
     nexus_uuid_copy(&new_uuid, new_uuid_out);
 
+    ret = 0;
+
+out:
     nexus_vfs_put(from_metadata);
 
     if (to_metadata) {
         nexus_vfs_put(to_metadata);
     }
 
-    return 0;
-out_err:
-    nexus_vfs_drop(from_metadata);
-
-    if (to_metadata) {
-        nexus_vfs_drop(to_metadata);
-    }
-
-    return -1;
+    return ret;
 }

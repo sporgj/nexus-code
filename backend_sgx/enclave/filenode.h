@@ -10,9 +10,11 @@
 #include <nexus_list.h>
 #include <nexus_mac.h>
 
-struct nexus_filenode {
-    uint32_t          version;
 
+struct nexus_metadata;
+
+
+struct nexus_filenode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 
@@ -23,6 +25,8 @@ struct nexus_filenode {
     uint64_t filesize;
 
     struct nexus_list chunk_list;
+
+    struct nexus_metadata * metadata;
 };
 
 
@@ -43,11 +47,14 @@ filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
 struct nexus_filenode *
 filenode_load(struct nexus_uuid * uuid);
 
-int
-filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac);
-
 struct nexus_filenode *
-filenode_from_buffer(uint8_t * buffer, size_t buflen);
+filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf);
+
+int
+filenode_store(struct nexus_uuid     * uuid,
+               struct nexus_filenode * filenode,
+               uint32_t                version,
+               struct nexus_mac      * mac);
 
 /**
  * Frees an allocated filenode

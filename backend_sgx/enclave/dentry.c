@@ -9,9 +9,7 @@ d_alloc(struct nexus_dentry * parent,
         const char          * name,
         nexus_dirent_type_t   type)
 {
-    struct nexus_dentry * dentry = NULL;
-
-    dentry = nexus_malloc(sizeof(struct nexus_dentry));
+    struct nexus_dentry * dentry = nexus_malloc(sizeof(struct nexus_dentry));
 
     INIT_LIST_HEAD(&dentry->children);
 

@@ -31,6 +31,8 @@
 #include "crypto.h"
 #include "supernode.h"
 #include "user.h"
+#include "metadata.h"
+#include "dentry.h"
 #include "dirnode.h"
 #include "filenode.h"
 
@@ -43,19 +45,32 @@
 #include <nexus_uuid.h>
 #include <nexus_util.h>
 #include <nexus_list.h>
+#include <nexus_lru.h>
+#include <nexus_hashtable.h>
+
 
 #define ocall_debug(str) \
     ocall_print("enclave> " str "\n")
 
 
-extern struct nexus_key * global_volumekey;
 
-extern struct nexus_supernode * global_supernode;
+extern struct nexus_volume         * global_volume;
 
-extern nexus_uid_t        global_user_id;
+extern struct nexus_key            * global_volumekey;
 
-extern size_t global_chunk_size;
-extern size_t global_log2chunk_size;
+extern struct nexus_supernode      * global_supernode;
 
-// pointer to the backend info. Used in ocalls
-struct nexus_volume * global_volume;
+extern nexus_uid_t                   global_user_id;
+
+
+extern size_t                        global_chunk_size;
+extern size_t                        global_log2chunk_size;
+
+
+/**
+ * Verifies the pubkey
+ * @param user_pubkey_hash
+ * @return 0
+ */
+int
+nexus_verfiy_pubkey(struct nexus_hash * user_pubkey_hash);

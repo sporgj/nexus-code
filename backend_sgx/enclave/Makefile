@@ -51,9 +51,10 @@ nexus_trusted_objs := \
 	nexus_log.o \
 	nexus_hash.o \
 	nexus_list.o \
+	nexus_lru.o \
+	nexus_hashtable.o \
 	nexus_mac.o \
 	nexus_util.o \
-	nexus_hash.o \
 	nexus_key.o \
 	nexus_encode.o \
 	nexus_uuid.o
@@ -84,6 +85,7 @@ objs := nexus_enclave_t.o \
 	crypto_context.o \
 	crypto.o \
 	volumekey.o \
+	metadata.o \
 	dirnode.o \
 	filenode.o \
 	supernode.o \

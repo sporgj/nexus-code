@@ -12,9 +12,7 @@ struct nexus_raw_buf {
 struct nexus_raw_buf *
 nexus_raw_buf_create(uint8_t * external_addr, size_t external_size)
 {
-    struct nexus_raw_buf * raw_buf = NULL;
-
-    raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
+    struct nexus_raw_buf * raw_buf = nexus_malloc(sizeof(struct nexus_raw_buf));
 
 
     raw_buf->external_addr = external_addr;

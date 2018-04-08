@@ -46,7 +46,7 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         // make the dirnode's uuid the root uuid
         nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
 
-        ret = dirnode_store(&root_dirnode->my_uuid, root_dirnode, NULL);
+        ret = dirnode_store(&root_dirnode->my_uuid, root_dirnode, 0, NULL);
 
         if (ret != 0) {
             log_error("dirnode_store FAILED\n");
@@ -268,7 +268,7 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
             goto out;
         }
 
-        ret = nexus_vfs_verfiy_pubkey(&user_pubkey_hash);
+        ret = nexus_verfiy_pubkey(&user_pubkey_hash);
         if (ret != 0) {
             nexus_vfs_deinit();
             log_error("could not verify the user's public key\n");

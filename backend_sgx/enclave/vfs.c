@@ -57,20 +57,6 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
     return 0;
 }
 
-int
-nexus_vfs_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
-{
-    struct nexus_user * user = NULL;
-
-    user = nexus_usertable_find_pubkey(global_supernode->usertable, user_pubkey_hash);
-
-    if (user == NULL) {
-        return -1;
-    }
-
-    return 0;
-}
-
 struct nexus_metadata *
 nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type)
 {
@@ -107,9 +93,7 @@ nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type
 struct nexus_metadata *
 nexus_vfs_get(char * filepath, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry)
 {
-    struct nexus_dentry * dentry = NULL;
-
-    dentry = dentry_lookup(&root_dentry, filepath);
+    struct nexus_dentry * dentry = dentry_lookup(&root_dentry, filepath);
 
     if (dentry == NULL) {
         log_error("dentry_lookup FAILED\n");
@@ -121,54 +105,27 @@ nexus_vfs_get(char * filepath, nexus_metadata_type_t type, struct nexus_dentry *
     return dentry->metadata;
 }
 
-static void
-free_metadata(struct nexus_metadata * metadata)
-{
-    switch (metadata->type) {
-    case NEXUS_DIRNODE:
-        dirnode_free(metadata->dirnode);
-        break;
-    case NEXUS_FILENODE:
-        filenode_free(metadata->filenode);
-        break;
-    }
 
-    // update the dentry
-    if (metadata->dentry) {
-        metadata->dentry->metadata = NULL;
-    }
-
-    nexus_free(metadata);
-}
-
-void
+int
 nexus_vfs_put(struct nexus_metadata * metadata)
 {
+    int ret = -1;
+
+    if (metadata->is_dirty) {
+        ret = nexus_metadata_store(metadata);
+    }
+
     // we have no caching for now, just delete
-    free_metadata(metadata);
+    nexus_metadata_free(metadata);
+
+    return ret;
 }
 
 void
 nexus_vfs_drop(struct nexus_metadata * metadata)
 {
     // TODO
-    free_metadata(metadata);
-}
-
-int
-nexus_vfs_flush(struct nexus_metadata * metadata)
-{
-    switch (metadata->type) {
-    case NEXUS_DIRNODE:
-        return dirnode_store(&metadata->uuid, metadata->dirnode, NULL);
-    case NEXUS_FILENODE:
-        return filenode_store(metadata->filenode, NULL);
-    default:
-        log_error("Flush operation for metadata not implemented\n");
-        return -1;
-    }
-
-    return -1;
+    nexus_metadata_free(metadata);
 }
 
 int
@@ -178,58 +135,11 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata)
     return 0;
 }
 
-static struct nexus_metadata *
-create_metadata(struct nexus_uuid     * metadata_uuid,
-                void                  * metadata_obj,
-                nexus_metadata_type_t   metadata_type)
-{
-    struct nexus_metadata * metadata = NULL;
-
-    metadata = nexus_malloc(sizeof(struct nexus_metadata));
-
-    metadata->type      = metadata_type;
-
-    nexus_uuid_copy(metadata_uuid, &metadata->uuid);
-
-    if (metadata_type == NEXUS_DIRNODE) {
-        metadata->dirnode = (struct nexus_dirnode *) metadata_obj;
-    } else if (metadata_type == NEXUS_FILENODE) {
-        metadata->filenode = (struct nexus_filenode *) metadata_obj;
-    }
-
-    return metadata;
-}
-
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid * metadata_uuid, nexus_metadata_type_t metadata_type)
+nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type)
 {
-    struct nexus_dirnode  * dirnode  = NULL;
-    struct nexus_filenode * filenode = NULL;
-
-    switch (metadata_type) {
-    case NEXUS_DIRNODE:
-        dirnode = dirnode_load(metadata_uuid);
-
-        if (dirnode == NULL) {
-            log_error("loading dirnode in VFS failed\n");
-            return NULL;
-        }
-
-        return create_metadata(metadata_uuid, dirnode, NEXUS_DIRNODE);
-
-    case NEXUS_FILENODE:
-        filenode = filenode_load(metadata_uuid);
-
-        if (filenode == NULL) {
-            log_error("loading filenode in VFS failed\n");
-            return NULL;
-        }
-
-        return create_metadata(metadata_uuid, filenode, NEXUS_FILENODE);
-    }
-
-    log_error("incorrect metadata type (%d)\n", metadata_type);
-    return NULL;
+    // search cache for contents
+    return nexus_metadata_load(uuid, type);
 }
 
 void

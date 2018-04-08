@@ -14,9 +14,9 @@
 #include <nexus_uuid.h>
 #include <nexus_list.h>
 
-struct nexus_dirnode {
-    uint32_t          version;
+struct nexus_metadata;
 
+struct nexus_dirnode {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 
@@ -31,6 +31,9 @@ struct nexus_dirnode {
     struct nexus_list symlink_list;
 
     struct nexus_list dir_entry_list;
+
+
+    struct nexus_metadata * metadata;
 };
 
 /**
@@ -51,6 +54,9 @@ dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
 struct nexus_dirnode *
 dirnode_load(struct nexus_uuid * uuid);
 
+struct nexus_dirnode *
+dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf);
+
 /**
  * Writes dirnode to datastore
  *
@@ -66,7 +72,10 @@ dirnode_load(struct nexus_uuid * uuid);
  * @return 0 on success
  */
 int
-dirnode_store(struct nexus_uuid * uuid, struct nexus_dirnode * dirnode, struct nexus_mac * mac);
+dirnode_store(struct   nexus_uuid    * uuid,
+              struct   nexus_dirnode * dirnode,
+              uint32_t                 version,
+              struct   nexus_mac     * mac);
 
 int
 dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode);

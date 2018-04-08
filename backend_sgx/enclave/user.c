@@ -200,8 +200,6 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
-    uint32_t version = 0;
-
     int ret = -1;
 
 
@@ -212,7 +210,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, mac);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, mac);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
@@ -236,7 +234,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
         return NULL;
     }
 
-    usertable->version = version;
+    usertable->version = nexus_crypto_buf_version(crypto_buffer);
 
     return usertable;
 }
@@ -319,7 +317,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &usertable->version, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_buffer buffer\n");
             goto out;
@@ -340,10 +338,14 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 
     // flush the buffer to the backend
     ret = nexus_crypto_buf_flush(crypto_buffer);
+
     if (ret) {
         log_error("metadata_write FAILED\n");
         goto out;
     }
+
+
+    usertable->version += 1;
 
     ret = 0;
 out:

@@ -1,18 +1,19 @@
 #include "enclave_internal.h"
 
 struct __filenode_hdr {
-    struct nexus_uuid my_uuid;
-    struct nexus_uuid root_uuid;
+    struct nexus_uuid         my_uuid;
+    struct nexus_uuid         root_uuid;
 
-    uint32_t nchunks;
-    uint8_t  log2chunksize;
-    uint64_t filesize;
+    uint32_t                  nchunks;
+    uint8_t                   log2chunksize;
+    uint64_t                  filesize;
 } __attribute__((packed));
 
 
 struct chunk_entry {
-    struct nexus_crypto_ctx crypto_ctx;
+    struct nexus_crypto_ctx   crypto_ctx;
 };
+
 
 
 static inline size_t
@@ -35,6 +36,23 @@ static void
 __free_chunk_entry(void * element)
 {
     free(element);
+}
+
+
+static inline void
+__set_dirty(struct nexus_filenode * filenode)
+{
+    if (filenode->metadata) {
+        filenode->metadata->is_dirty = true;
+    }
+}
+
+static inline void
+__set_clean(struct nexus_filenode * filenode)
+{
+    if (filenode->metadata) {
+        filenode->metadata->is_dirty = false;
+    }
 }
 
 
@@ -163,51 +181,46 @@ out_err:
 }
 
 struct nexus_filenode *
-filenode_load(struct nexus_uuid * uuid)
+filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
 {
     struct nexus_filenode * filenode = NULL;
-
-    struct nexus_crypto_buf * crypto_buffer = NULL;
 
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
-    uint32_t version = 0;
 
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
 
-    crypto_buffer = nexus_crypto_buf_create(uuid);
+    if (buffer == NULL) {
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return NULL;
+    }
+
+    filenode = filenode_from_buffer(buffer, buflen);
+
+    if (filenode == NULL) {
+        log_error("filenode_from_buffer FAILED\n");
+        return NULL;
+    }
+
+    return filenode;
+}
+
+struct nexus_filenode *
+filenode_load(struct nexus_uuid * uuid)
+{
+    struct nexus_filenode * filenode = NULL;
+
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &version, NULL);
-
-    if (buffer == NULL) {
-        nexus_crypto_buf_free(crypto_buffer);
-        log_error("nexus_crypto_buf_get() FAILED\n");
-        return NULL;
-    }
-
-
-    if (version == 0) {
-        nexus_crypto_buf_free(crypto_buffer);
-        return filenode_create(&global_supernode->root_uuid, uuid);
-    }
-
-
-    filenode = filenode_from_buffer(buffer, buflen);
+    filenode = filenode_from_crypto_buf(crypto_buffer);
 
     nexus_crypto_buf_free(crypto_buffer);
-
-    if (filenode == NULL) {
-        log_error("__parse_filenode FAILED\n");
-        return NULL;
-    }
-
-    filenode->version = version;
-
 
     return filenode;
 }
@@ -285,7 +298,10 @@ filenode_serialize(struct nexus_filenode * filenode, size_t bytes_left, uint8_t 
 }
 
 int
-filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
+filenode_store(struct nexus_uuid     * uuid,
+               struct nexus_filenode * filenode,
+               uint32_t                version,
+               struct nexus_mac      * mac)
 {
     struct nexus_crypto_buf * crypto_buffer     = NULL;
 
@@ -296,7 +312,7 @@ filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
 
     serialized_buflen = __get_filenode_size(filenode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, filenode->version, &filenode->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &filenode->my_uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -308,7 +324,7 @@ filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
         size_t    buffer_size   = 0;
 
 
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, &filenode->version, NULL);
+        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
         if (output_buffer == NULL) {
             log_error("could not get the crypto_buffer buffer\n");
             goto out;
@@ -332,6 +348,8 @@ filenode_store(struct nexus_filenode * filenode, struct nexus_mac * mac)
         log_error("metadata_write FAILED\n");
         goto out;
     }
+
+    __set_clean(filenode);
 
     ret = 0;
 out:
@@ -381,6 +399,8 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
 
         difference--;
     }
+
+    __set_dirty(filenode);
 
     return 0;
 }

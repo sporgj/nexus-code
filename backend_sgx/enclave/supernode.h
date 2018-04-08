@@ -20,16 +20,16 @@
 
 
 struct nexus_supernode {
-    uint32_t          version;
+    uint32_t                   version;
 
-    struct nexus_uuid my_uuid;
-    struct nexus_uuid root_uuid;
+    struct nexus_uuid          my_uuid;
+    struct nexus_uuid          root_uuid;
 
     // the user table will be stored in a separate metadata file
-    struct nexus_uuid usertable_uuid;
-    struct nexus_mac  usertable_mac;
+    struct nexus_uuid          usertable_uuid;
+    struct nexus_mac           usertable_mac;
 
-    struct nexus_usertable * usertable;
+    struct nexus_usertable   * usertable;
 };
 
 

@@ -6,6 +6,10 @@
 
 #include "nexus_mac.h"
 
+
+#define CRYPTOBUF_INVALID_VERSION (UINT32_MAX)
+
+
 // represents an encrypted metadata object
 struct nexus_crypto_buf;
 
@@ -28,10 +32,18 @@ nexus_crypto_buf_create(struct nexus_uuid * uuid);
  * @return crypto_buf
  */
 struct nexus_crypto_buf *
-nexus_crypto_buf_new(size_t size, size_t version, struct nexus_uuid * uuid);
+nexus_crypto_buf_new(size_t size, uint32_t version, struct nexus_uuid * uuid);
 
 void
 nexus_crypto_buf_free(struct nexus_crypto_buf * buf);
+
+/**
+ * Returns the version of the crypto buffer
+ * @param buf
+ * @return CRYPTOBUF_INVALID_VERSION on failure
+ */
+uint32_t
+nexus_crypto_buf_version(struct nexus_crypto_buf * buf);
 
 /**
  * Allows you to compute the sha256 of the external buffer
@@ -51,15 +63,10 @@ nexus_crypto_buf_sha256_exterior(struct nexus_crypto_buf * crypto_buf,
  * @return NULL on failure
  */
 void *
-nexus_crypto_buf_get(struct nexus_crypto_buf * buf,
-                     size_t                  * buffer_size,
-                     uint32_t                * version,
-                     struct nexus_mac        * mac);
-
+nexus_crypto_buf_get(struct nexus_crypto_buf * buf, size_t * buffer_size, struct nexus_mac * mac);
 
 int
-nexus_crypto_buf_put(struct nexus_crypto_buf * buf,
-                     struct nexus_mac        * mac);
+nexus_crypto_buf_put(struct nexus_crypto_buf * buf, struct nexus_mac * mac);
 
 /**
  * Writes the encrypted contents of the crypto buf into the buffer
