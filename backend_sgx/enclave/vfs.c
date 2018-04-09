@@ -1,18 +1,43 @@
 #include "enclave_internal.h"
 
-struct nexus_supernode  * global_supernode = NULL;
+#define LRU_CAPACITY    (256)
 
-static struct nexus_list  metadata_objects_list;
-static size_t             metadata_objects_count;
 
-static struct nexus_dentry root_dentry;
+struct nexus_supernode      * global_supernode         = NULL;
+
+static struct nexus_lru     * metadata_objects_list    = NULL;
+static size_t                 metadata_objects_count   = 0;
+
+static struct nexus_dentry    root_dentry;
+
+
+uint32_t
+__hasher(uintptr_t key)
+{
+    return nexus_uuid_hash((struct nexus_uuid *)key);
+}
+
+int __equals(uintptr_t key1, uintptr_t key2)
+{
+    return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
+}
+
+void
+__freer(uintptr_t element, uintptr_t key)
+{
+    struct nexus_metadata * metadata = (struct nexus_metadata *) element;
+
+    nexus_metadata_free(metadata);
+}
+
+
 
 int
 nexus_vfs_init()
 {
     global_supernode = NULL;
 
-    nexus_list_init(&metadata_objects_list);
+    metadata_objects_list = nexus_lru_create(LRU_CAPACITY, __hasher, __equals, __freer);
 
     metadata_objects_count = 0;
 
@@ -22,7 +47,8 @@ nexus_vfs_init()
 void
 nexus_vfs_deinit()
 {
-    nexus_list_destroy(&metadata_objects_list);
+    nexus_lru_destroy(metadata_objects_list);
+
     metadata_objects_count = 0;
 
     if (global_supernode) {
@@ -93,7 +119,9 @@ nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type
 struct nexus_metadata *
 nexus_vfs_get(char * filepath, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry)
 {
-    struct nexus_dentry * dentry = dentry_lookup(&root_dentry, filepath);
+    struct nexus_metadata * metadata = NULL;
+
+    struct nexus_dentry   * dentry   = dentry_lookup(&root_dentry, filepath);
 
     if (dentry == NULL) {
         log_error("dentry_lookup FAILED\n");
@@ -102,30 +130,25 @@ nexus_vfs_get(char * filepath, nexus_metadata_type_t type, struct nexus_dentry *
 
     *path_dentry = dentry;
 
-    return dentry->metadata;
+    metadata = dentry->metadata;
+
+    // TODO increase usage count
+
+    return metadata;
 }
 
 
-int
+void
 nexus_vfs_put(struct nexus_metadata * metadata)
 {
-    int ret = -1;
-
-    if (metadata->is_dirty) {
-        ret = nexus_metadata_store(metadata);
-    }
-
-    // we have no caching for now, just delete
-    nexus_metadata_free(metadata);
-
-    return ret;
+    // TODO
 }
 
 void
 nexus_vfs_drop(struct nexus_metadata * metadata)
 {
-    // TODO
-    nexus_metadata_free(metadata);
+    // this eventually calls nexus_metadata_free
+    nexus_lru_del(metadata_objects_list, &metadata->uuid);
 }
 
 int
@@ -139,7 +162,16 @@ struct nexus_metadata *
 nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type)
 {
     // search cache for contents
-    return nexus_metadata_load(uuid, type);
+    struct nexus_metadata * metadata = nexus_metadata_load(uuid, type);
+
+    if (metadata == NULL) {
+        log_error("loading data into VFS failed\n");
+        return NULL;
+    }
+
+    nexus_lru_put(metadata_objects_list, uuid, metadata);
+
+    return metadata;
 }
 
 void

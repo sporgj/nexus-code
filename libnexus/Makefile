@@ -27,7 +27,8 @@ objs :=	nexus_main.o \
 	nexus_key.o \
 	nexus_uuid.o \
 	nexus_raw_file.o \
-	nexus_json.o
+	nexus_json.o \
+	xxhash.o
 
 
 

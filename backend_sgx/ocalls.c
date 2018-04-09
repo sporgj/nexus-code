@@ -74,10 +74,7 @@ ocall_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
-    struct nexus_raw_file * raw_file = NULL;
-
-
-    raw_file = lock_manager_drop(sgx_backend->lock_manager, uuid);
+    struct nexus_raw_file * raw_file = lock_manager_drop(sgx_backend->lock_manager, uuid);
 
     if (raw_file == NULL) {
         log_error("could not find file in lock manager\n");
@@ -94,9 +91,7 @@ ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
-    struct nexus_raw_file * raw_file = NULL;
-
-    raw_file = lock_manager_get(sgx_backend->lock_manager, uuid);
+    struct nexus_raw_file * raw_file = lock_manager_get(sgx_backend->lock_manager, uuid);
 
     if (raw_file == NULL) {
         log_error("could not find file in lock manager\n");
@@ -133,22 +128,20 @@ ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
 }
 
 uint8_t *
-ocall_buffer_get(struct nexus_uuid * metadata_uuid, size_t * p_size, struct nexus_volume * volume)
+ocall_buffer_get(struct nexus_uuid * uuid, size_t * p_size, struct nexus_volume * volume)
 {
-    struct sgx_backend * sgx_backend = NULL;
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
-    struct __buf * buf = NULL;
+    struct __buf       * buf         = NULL;
 
-    uint8_t * buffer_addr = NULL;
+    uint8_t            * addr        = NULL;
 
-    int ret = -1;
+    int                  ret         = -1;
 
-
-    sgx_backend = (struct sgx_backend *)volume->private_data;
 
     // check the buffer manager
     {
-        buf = buffer_manager_get(sgx_backend->buf_manager, metadata_uuid);
+        buf = buffer_manager_get(sgx_backend->buf_manager, uuid);
 
         if (buf) {
             // TODO additional freshness checks here
@@ -161,27 +154,23 @@ ocall_buffer_get(struct nexus_uuid * metadata_uuid, size_t * p_size, struct nexu
 
     // let's get it from the backing metadata store
 
-    ret = nexus_datastore_get_uuid(volume->metadata_store,
-                                   metadata_uuid,
-                                   NULL,
-                                   &buffer_addr,
-                                   (uint32_t *)p_size);
+    ret = nexus_datastore_get_uuid(volume->metadata_store, uuid, NULL, &addr, (uint32_t *)p_size);
 
     if (ret != 0) {
         log_error("nexus_datastore_get_uuid FAILED\n");
         return NULL;
     }
 
-    ret = buffer_manager_add(sgx_backend->buf_manager, buffer_addr, *p_size, metadata_uuid);
+    ret = buffer_manager_add(sgx_backend->buf_manager, addr, *p_size, uuid);
 
     if (ret != 0) {
         log_error("buffer_manager_add FAILED\n");
 
-        nexus_free(buffer_addr);
+        nexus_free(addr);
         return NULL;
     }
 
-    return buffer_addr;
+    return addr;
 }
 
 int

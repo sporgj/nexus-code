@@ -34,6 +34,10 @@ nexus_metadata_free(struct nexus_metadata * metadata)
         break;
     }
 
+    if (metadata->dentry) {
+        metadata->dentry->metadata = NULL;
+    }
+
     nexus_free(metadata);
 }
 

@@ -7,13 +7,14 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 struct nexus_lru;
 
 
-typedef uint32_t (*lru_hasher)   (uintptr_t element);
-typedef int      (*lru_comparer) (uintptr_t element1, uintptr_t element2);
-typedef void     (*lru_freer)    (uintptr_t element, uintptr_t key);
+typedef uint32_t (*lru_hasher)   (uintptr_t key);
+typedef int      (*lru_comparer) (uintptr_t key1, uintptr_t key2);
+typedef void     (*lru_freer)    (uintptr_t element, uintptr_t key); // key can be NULL
 
 
 /**
@@ -54,9 +55,10 @@ nexus_lru_get(struct nexus_lru * lru, void * key);
  * @param lru
  * @param key
  * @param value
+ * @return true if the insertion succeeded
  */
-void
-nexus_lru_add(struct nexus_lru * lru, void * key, void * value);
+bool
+nexus_lru_put(struct nexus_lru * lru, void * key, void * value);
 
 /**
  * Deletes the key from the LRU

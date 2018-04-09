@@ -18,6 +18,7 @@
 
 static char * volume_path   = NULL;
 
+static char * config_path   = NULL;
 
 static int cmd_line_user_key    = 0;
 
@@ -29,12 +30,13 @@ __set_defaults()
 
 static void usage()
 {
-    printf("create: Creates a Nexus volume\n\n"			\
-	   "Usage: create <volume-path> [options]\n"		\
-	   " Options: \n");
+    printf("create: Creates a Nexus volume\n\n"
+           "Usage: create [options] <volume-path> <config_path>\n"
+           " Options: \n");
 
     printf("\t[--user_key]   (default: %-*s)       : Location of User's public key\n",
-	   32, nexus_config.user_key_path);
+           32,
+           nexus_config.user_key_path);
 
     return;
 }
@@ -48,7 +50,7 @@ create_volume_main(int argc, char ** argv)
     struct nexus_volume * vol = NULL;
 
     __set_defaults();
-    
+
     /* Override defaults with command line arguments */
     {
  	int  opt_index = 0;
@@ -87,19 +89,20 @@ create_volume_main(int argc, char ** argv)
 		
 	/* At this point we should just have the volume path in ARGV */
 
-	if (argc - used_opts != 2) {
+	if (argc - used_opts != 3) {
 	    usage();
 	    return -1;
 	}
 
 
 	volume_path = argv[used_opts + 1];
+	config_path = argv[used_opts + 2];
     }
 
 
-    printf("Creating Nexus Volume at (%s)\n", volume_path);
+    printf("Creating Nexus Volume at (%s), config=(%s)\n", volume_path, config_path);
     
-    vol = nexus_create_volume(volume_path, NULL);
+    vol = nexus_create_volume(volume_path, config_path);
 
     if (vol == NULL) {
 	log_error("Could not create volume at (%s)\n", volume_path);

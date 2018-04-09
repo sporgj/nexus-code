@@ -42,3 +42,6 @@ char * nexus_uuid_to_alt64(struct nexus_uuid * uuid);
 int    nexus_uuid_from_alt64(struct nexus_uuid * uuid, char * alt64_str);
 
 bool nexus_uuid_is_valid(struct nexus_uuid * uuid);
+
+uint32_t
+nexus_uuid_hash(struct nexus_uuid * uuid);

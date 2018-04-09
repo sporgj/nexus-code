@@ -43,11 +43,10 @@ struct nexus_metadata *
 nexus_vfs_get(char * path, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry);
 
 /**
- * puts back a metadata onto the VFS. If dirty, metadata will be flushed
+ * puts back a metadata onto the VFS
  * @param metadata
- * @return -1 if flushing metadata failed.
  */
-int
+void
 nexus_vfs_put(struct nexus_metadata * metadata);
 
 /**

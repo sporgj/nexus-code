@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "xxhash.c"
+
 #include "../enclave_internal.h"
 
 int
@@ -62,4 +64,10 @@ nexus_uuid_is_valid(struct nexus_uuid * uuid)
     }
 
     return false;
+}
+
+uint32_t
+nexus_uuid_hash(struct nexus_uuid * uuid)
+{
+    return (uint32_t)(XXH32(uuid, sizeof(struct nexus_uuid), 0));
 }

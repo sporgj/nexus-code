@@ -59,7 +59,8 @@ nexus_lru_create(size_t capacity, lru_hasher hasher, lru_comparer comparer, lru_
         return NULL;
     }
 
-    lru->freer = freer;
+    lru->freer    = freer;
+    lru->capacity = capacity;
 
     return lru;
 }
@@ -107,6 +108,8 @@ try_shrinking_lru(struct nexus_lru * lru)
         return;
     }
 
+    // TODO add function that calls a "shrinker"
+
     lru_node = list_last_entry(&(lru->list), struct lru_node, node);
 
     nexus_htable_remove(lru->htable, lru_node->key, 0);
@@ -117,7 +120,9 @@ try_shrinking_lru(struct nexus_lru * lru)
 bool
 nexus_lru_put(struct nexus_lru * lru, void * key, void * value)
 {
-    struct lru_node * lru_node = (struct lru_node *)nexus_htable_search(lru->htable, (uintptr_t)key);
+    struct lru_node * lru_node = (struct lru_node *) nexus_htable_remove(lru->htable,
+                                                                         (uintptr_t)key,
+                                                                         0);
 
     if (lru_node == NULL) {
         try_shrinking_lru(lru);
@@ -127,7 +132,7 @@ nexus_lru_put(struct nexus_lru * lru, void * key, void * value)
         lru_node->key   = (uintptr_t)key;
 
         list_add(&(lru_node->node), &(lru->list));
-        nexus_htable_insert(lru->htable, lru_node->key, lru_node->value);
+        nexus_htable_insert(lru->htable, lru_node->key, (uintptr_t)lru_node);
         lru->count += 1;
 
         return true;
@@ -136,9 +141,11 @@ nexus_lru_put(struct nexus_lru * lru, void * key, void * value)
     // replace value and move shit to the front
     lru->freer(lru_node->value, lru_node->key);
 
+    lru_node->key   = (uintptr_t)key;
     lru_node->value = (uintptr_t)value;
 
     list_move(&(lru_node->node), &(lru->list));
+    nexus_htable_insert(lru->htable, lru_node->key, (uintptr_t)lru_node);
 
     return true;
 }

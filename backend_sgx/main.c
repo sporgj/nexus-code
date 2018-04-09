@@ -1,5 +1,17 @@
 #include "internal.h"
 
+int
+uuid_equal_func(uintptr_t key1, uintptr_t key2)
+{
+    return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
+}
+
+uint32_t
+uuid_hash_func(uintptr_t key)
+{
+    return nexus_uuid_hash((struct nexus_uuid *)key);
+}
+
 static int
 sgx_backend_exit(struct sgx_backend * sgx_backend)
 {

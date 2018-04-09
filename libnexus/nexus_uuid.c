@@ -13,6 +13,8 @@
 #include <nexus_util.h>
 #include <nexus_log.h>
 
+#include "xxhash.h"
+
 
 int
 nexus_uuid_gen(struct nexus_uuid * uuid)
@@ -139,4 +141,10 @@ nexus_uuid_from_alt64(struct nexus_uuid * uuid,
     nexus_free(tmp_buf);
     
     return 0;
+}
+
+uint32_t
+nexus_uuid_hash(struct nexus_uuid * uuid)
+{
+    return (uint32_t)(XXH32(uuid, sizeof(struct nexus_uuid), 0));
 }

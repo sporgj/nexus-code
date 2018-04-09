@@ -68,13 +68,42 @@ __parse_nexus_options(int argc, char ** argv)
 }
 
 
-
 static void create_file_usage()
 {
     printf("create_file: create a file at a volume path\n\n"\
 	   "Usage: create_file <volume> <path-in-volume>\n");
 
     return;
+}
+
+static int
+__fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type)
+{
+    char * dirpath  = NULL;
+    char * filename = NULL;
+
+    char * nexus_name = NULL;
+
+    int ret = -1;
+
+    nexus_splitpath(path, &dirpath, &filename);
+
+    ret = nexus_fs_touch(vol, dirpath, filename, type, &nexus_name);
+
+    nexus_free(dirpath);
+    nexus_free(filename);
+
+    if (ret != 0) {
+	log_error("creating %s FAILED\n", path);
+	return -1;
+    }
+
+    printf(" .created %s -> %s\n", path, nexus_name);
+    fflush(stdout);
+
+    nexus_free(nexus_name);
+
+    return 0;
 }
 
 
@@ -112,7 +141,6 @@ create_file_main(int argc, char ** argv)
     file_path   = argv[used_opts + 2];
     
     
-
     vol = nexus_mount_volume(volume_path);
 
     if (vol == NULL) {
@@ -120,14 +148,25 @@ create_file_main(int argc, char ** argv)
 	return -1;
     }
 
-    
-    ret = nexus_fs_create(vol, file_path, NEXUS_REG, &file_stat);
+    (void)file_path;
+    (void)file_stat;
+    (void)ret;
 
-    if (ret == -1) {
-	printf("Error: Could not create file\n");
+    if (__fs_touch(vol, "foo", NEXUS_DIR)) {
 	return -1;
     }
-       
+
+    if (__fs_touch(vol, "foo/bar.txt", NEXUS_REG)) {
+	return -1;
+    }
+
+    if (__fs_touch(vol, "cow", NEXUS_DIR)) {
+	return -1;
+    }
+
+    if (__fs_touch(vol, "cow/meat.txt", NEXUS_REG)) {
+	return -1;
+    }
+
     return 0;
-    
 }
