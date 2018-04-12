@@ -540,7 +540,7 @@ ecall_fs_rename(char              * from_dirpath_IN,
     dentry_delete_child(to_dentry, newname_IN);
 
     // if it's the same dirnode
-    if (dirnode_compare(from_metadata->dirnode, to_metadata->dirnode) == 0) {
+    if (nexus_metadata_compare(from_metadata, to_metadata) == 0) {
         nexus_vfs_put(to_metadata);
 
         to_metadata = NULL;

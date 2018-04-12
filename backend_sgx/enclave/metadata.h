@@ -56,6 +56,10 @@ nexus_metadata_new(struct nexus_uuid     * uuid,
 void
 nexus_metadata_free(struct nexus_metadata * metadata);
 
+
+int
+nexus_metadata_compare(struct nexus_metadata * metadata1, struct nexus_metadata * metadata2);
+
 /**
  * Loads the metadata from the specified UUID
  * @param uuid

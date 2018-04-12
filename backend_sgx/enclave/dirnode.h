@@ -17,21 +17,25 @@
 struct nexus_metadata;
 
 struct nexus_dirnode {
-    struct nexus_uuid my_uuid;
-    struct nexus_uuid root_uuid;
+    struct nexus_uuid       my_uuid;
+    struct nexus_uuid       root_uuid;
 
-    uint32_t symlink_count;
-    uint32_t symlink_buflen;
+    size_t                  symlink_count;
+    size_t                  symlink_buflen;
 
-    uint32_t dir_entry_count;
-    uint32_t dir_entry_buflen;
+    size_t                  dir_entry_count;
+    size_t                  dir_entry_buflen;
 
-    struct nexus_acl dir_acl;
+    size_t                  bucket_count;
 
-    struct nexus_list symlink_list;
 
-    struct nexus_list dir_entry_list;
+    struct nexus_acl        dir_acl;
 
+    struct nexus_list       symlink_list;
+
+    struct list_head        dir_entry_list;
+
+    struct nexus_list       bucket_list;
 
     struct nexus_metadata * metadata;
 };

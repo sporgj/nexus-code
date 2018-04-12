@@ -177,7 +177,7 @@ nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type)
 void
 nexus_vfs_delete(struct nexus_uuid * uuid)
 {
-    // TODO
+    nexus_lru_del(metadata_objects_list, uuid);
 
     buffer_layer_delete(uuid);
 }

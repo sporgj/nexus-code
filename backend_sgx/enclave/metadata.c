@@ -41,6 +41,12 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     nexus_free(metadata);
 }
 
+int
+nexus_metadata_compare(struct nexus_metadata * metadata1, struct nexus_metadata * metadata2)
+{
+    return nexus_uuid_compare(&metadata1->uuid, &metadata2->uuid);
+}
+
 static void *
 __read_object(struct nexus_uuid * uuid, nexus_metadata_type_t type, uint32_t * version)
 {

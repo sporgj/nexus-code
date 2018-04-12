@@ -120,6 +120,8 @@ revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
             log_error("could not revalidate dentry\n");
             return -1;
         }
+
+        return 0;
     }
 
     // dentry->metadata = NULL
@@ -194,7 +196,7 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
 
         ret = dirnode_find_by_name(dirnode, name, &atype, &uuid);
         if (ret != 0) {
-            log_error("nexus_dirnode_lookup() FAILED\n");
+            log_error("could not find('%s') metadata\n", name);
             return NULL;
         }
 
@@ -263,30 +265,4 @@ dentry_lookup(struct nexus_dentry * root_dentry, char * path)
     path_builder_free(&builder);
 
     return dentry;
-}
-
-struct nexus_uuid_path *
-dentry_uuid_path(struct nexus_dentry * dentry)
-{
-#if 0
-    struct nexus_uuid_path * uuid_path = NULL;
-
-    struct path_builder builder;
-
-
-    path_builder_init(&builder);
-
-    while (dentry != NULL) {
-        path_builder_prepend(&builder, dentry);
-        dentry = dentry->parent;
-    }
-
-    uuid_path = path_builder_get_path(&builder);
-
-    path_builder_free(&builder);
-
-    return uuid_path;
-#endif
-
-    return NULL;
 }
