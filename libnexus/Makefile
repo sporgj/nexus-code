@@ -27,6 +27,7 @@ objs :=	nexus_main.o \
 	nexus_key.o \
 	nexus_uuid.o \
 	nexus_raw_file.o \
+	nexus_file_handle.o \
 	nexus_json.o \
 	xxhash.o
 
@@ -42,7 +43,7 @@ build = \
         fi
 
 
-all: libnexus.a 
+all: libnexus.a
 	@cp $^ $(buildpath)
 
 % : %.c

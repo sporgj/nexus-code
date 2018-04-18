@@ -1,4 +1,4 @@
-/* 
+/**
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -21,6 +21,7 @@
 #include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_raw_file.h>
+#include <nexus_locked_file.h>
 #include <nexus_util.h>
 #include <nexus_types.h>
 
@@ -202,7 +203,7 @@ flat_get_uuid(struct nexus_uuid  * uuid,
 	log_error("Could not get filename\n");
 	return -1;
     }
-    
+
     ret = nexus_read_raw_file(filename, buf, (size_t *)size);
 
     if (ret != 0) {
@@ -222,10 +223,10 @@ flat_get_uuid(struct nexus_uuid  * uuid,
 
 static int
 flat_put_uuid(struct nexus_uuid * uuid,
-	      char              * path,
-	      uint8_t           * buf,
-	      uint32_t            size,
-	      void              * priv_data)
+              char              * path,
+              uint8_t           * buf,
+              uint32_t            size,
+              void              * priv_data)
 {
     struct flat_datastore * datastore = priv_data;
     char                  * filename  = NULL;
@@ -241,7 +242,7 @@ flat_put_uuid(struct nexus_uuid * uuid,
     }
 
     ret = nexus_write_raw_file(filename, buf, size);
-    
+
     if (ret != 0) {
         log_error("Could not add file (%s)", filename);
 	goto err;
@@ -256,7 +257,7 @@ flat_put_uuid(struct nexus_uuid * uuid,
     nexus_free(filename);
     return -1;
 }
-   
+
 
 static int
 flat_update_uuid(struct nexus_uuid * uuid,
@@ -430,14 +431,18 @@ err_out:
 }
 
 
-struct nexus_raw_file *
-flat_write_start(struct nexus_uuid * uuid, char * path, void * priv_data)
+struct nexus_locked_file *
+flat_open_locked(struct nexus_uuid  * uuid,
+                 char               * path,
+                 uint8_t           ** buf,
+                 uint32_t           * size,
+                 void               * priv_data)
 {
-    struct flat_datastore * datastore = priv_data;
+    struct flat_datastore    * datastore   = priv_data;
 
-    struct nexus_raw_file * raw_file  = NULL;
+    struct nexus_locked_file * locked_file = NULL;
 
-    char                  * filepath  = NULL;
+    char                     * filepath    = NULL;
 
 
     filepath = __get_full_path(datastore, uuid);
@@ -448,29 +453,33 @@ flat_write_start(struct nexus_uuid * uuid, char * path, void * priv_data)
     }
 
 
-    raw_file = nexus_acquire_raw_file(filepath);
+    locked_file = nexus_open_locked_file(filepath, buf, (size_t *)size);
 
     nexus_free(filepath);
 
-    if (raw_file == NULL) {
-        log_error("nexus_open_raw_file FAILED\n");
+    if (locked_file == NULL) {
+        log_error("nexus_open_locked_file FAILED\n");
 	return NULL;
     }
 
-    return raw_file;
+    return locked_file;
 }
 
 int
-flat_write_bytes(struct nexus_raw_file * raw_file, uint8_t * buf, uint32_t size, void * priv_data)
+flat_write_locked(struct nexus_locked_file * locked_file,
+                  uint8_t                  * buf,
+                  uint32_t                   size,
+                  void                     * priv_data)
 {
-    return nexus_update_raw_file(raw_file, buf, size);
+    return nexus_write_locked_file(locked_file, buf, size);
 }
 
 void
-flat_write_finish(struct nexus_raw_file * raw_file, void * priv_data)
+flat_close_locked(struct nexus_locked_file * locked_file, void * priv_data)
 {
-    nexus_release_raw_file(raw_file);
+    nexus_close_locked_file(locked_file);
 }
+
 
 static struct nexus_datastore_impl flat_datastore = {
     .name        = "FLAT",
@@ -486,9 +495,9 @@ static struct nexus_datastore_impl flat_datastore = {
     .update_uuid = flat_update_uuid,
     .del_uuid    = flat_del_uuid,
 
-    .write_start   = flat_write_start,
-    .write_bytes   = flat_write_bytes,
-    .write_finish  = flat_write_finish,
+    .open_uuid   = flat_open_locked,
+    .write_uuid  = flat_write_locked,
+    .close_uuid  = flat_close_locked,
 
     .hardlink_uuid = flat_hardlink_uuid,
     .rename_uuid   = flat_rename_uuid

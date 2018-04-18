@@ -13,6 +13,8 @@ struct __buf {
 
     size_t              size;
 
+    time_t              timestamp; // last time it was read on disk
+
     bool                on_disk;
 };
 
@@ -60,6 +62,9 @@ buffer_manager_get(struct buffer_manager * buffer_manager, struct nexus_uuid * u
  */
 void
 buffer_manager_put(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);
+
+void
+__buffer_manager_put(struct buffer_manager * buffer_manager, struct __buf * buf);
 
 /**
  * Deletes a file from the buffer manager

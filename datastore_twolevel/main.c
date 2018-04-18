@@ -14,6 +14,7 @@
 #include <nexus_datastore.h>
 #include <nexus_log.h>
 #include <nexus_raw_file.h>
+#include <nexus_file_handle.h>
 #include <nexus_util.h>
 #include <nexus_types.h>
 
@@ -129,7 +130,7 @@ twolevel_create(nexus_json_obj_t cfg)
         }
     }
 
-    datastore = calloc(1, sizeof(struct twolevel_datastore));
+    datastore = nexus_malloc(sizeof(struct twolevel_datastore));
 
     if (datastore == NULL) {
         log_error("Could not allocate datastore state\n");
@@ -193,7 +194,7 @@ twolevel_open(nexus_json_obj_t cfg)
         return NULL;
     }
 
-    datastore = calloc(1, sizeof(struct twolevel_datastore));
+    datastore = nexus_malloc(sizeof(struct twolevel_datastore));
 
     if (datastore == NULL) {
         log_error("Could not allocate datastore state\n");
@@ -256,15 +257,14 @@ err:
     return -1;
 }
 
-
-struct nexus_raw_file *
-twolevel_write_start(struct nexus_uuid * uuid, char * path, void * priv_data)
+struct nexus_file_handle *
+twolevel_fopen(struct nexus_uuid * uuid, char * path, nexus_io_mode_t mode, void * priv_data)
 {
-    struct twolevel_datastore * datastore = priv_data;
+    struct twolevel_datastore * datastore   = priv_data;
 
-    struct nexus_raw_file     * raw_file  = NULL;
+    struct nexus_file_handle  * file_handle = NULL;
 
-    char                      * filepath  = NULL;
+    char                      * filepath    = NULL;
 
 
     filepath = __make_full_path(datastore, uuid);
@@ -275,31 +275,40 @@ twolevel_write_start(struct nexus_uuid * uuid, char * path, void * priv_data)
     }
 
 
-    raw_file = nexus_acquire_raw_file(filepath);
+    file_handle = nexus_file_handle_open(filepath, mode);
 
     nexus_free(filepath);
 
-    if (raw_file == NULL) {
-        log_error("nexus_open_raw_file FAILED\n");
+    if (file_handle == NULL) {
+        log_error("nexus_open_file_handle FAILED\n");
         return NULL;
     }
 
-    return raw_file;
+    return file_handle;
 }
 
 int
-twolevel_write_bytes(struct nexus_raw_file * raw_file,
-                     uint8_t               * buf,
-                     uint32_t                size,
-                     void                  * priv_data)
+twolevel_fread(struct nexus_file_handle  * file_handle,
+                uint8_t                 ** buf,
+                size_t                   * size,
+                void                     * priv_data)
 {
-    return nexus_update_raw_file(raw_file, buf, size);
+    return nexus_file_handle_read(file_handle, buf, size);
+}
+
+int
+twolevel_fwrite(struct nexus_file_handle * file_handle,
+                uint8_t                  * buf,
+                size_t                     size,
+                void                     * priv_data)
+{
+    return nexus_file_handle_write(file_handle, buf, size);
 }
 
 void
-twolevel_write_finish(struct nexus_raw_file * raw_file, void * priv_data)
+twolevel_fclose(struct nexus_file_handle * file_handle, void * priv_data)
 {
-    nexus_release_raw_file(raw_file);
+    nexus_file_handle_close(file_handle);
 }
 
 
@@ -398,6 +407,33 @@ twolevel_update_uuid(struct nexus_uuid * uuid,
 
     return 0;
 }
+
+static int
+twolevel_stat_uuid(struct nexus_uuid * uuid,
+                   char              * path,
+                   struct nexus_stat * stat,
+                   void              * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    char                      * filename  =  __get_full_path(datastore, uuid);
+
+    int                         ret       = -1;
+
+
+
+    if (filename == NULL) {
+        log_error("Could not get filename\n");
+        return -1;
+    }
+
+    ret = nexus_stat_raw_file(filename, stat);
+
+    nexus_free(filename);
+
+    return ret;
+}
+
 
 static int
 twolevel_new_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
@@ -548,14 +584,17 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .close         = twolevel_close,
 
     .get_uuid      = twolevel_get_uuid,
-    .put_uuid      = twolevel_put_uuid,
-    .update_uuid   = twolevel_update_uuid,
+    .put_uuid      = twolevel_put_uuid, // TODO remove
+    .update_uuid   = twolevel_update_uuid, // TODO remove
+
+    .stat_uuid     = twolevel_stat_uuid,
     .new_uuid      = twolevel_new_uuid,
     .del_uuid      = twolevel_del_uuid,
 
-    .write_start   = twolevel_write_start,
-    .write_bytes   = twolevel_write_bytes,
-    .write_finish  = twolevel_write_finish,
+    .fopen         = twolevel_fopen,
+    .fread         = twolevel_fread,
+    .fwrite        = twolevel_fwrite,
+    .fclose        = twolevel_fclose,
 
     .hardlink_uuid = twolevel_hardlink_uuid,
     .rename_uuid   = twolevel_rename_uuid

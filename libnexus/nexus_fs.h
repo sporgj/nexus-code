@@ -26,6 +26,11 @@ typedef enum {
     NEXUS_LNK = 3   /* symlink      */
 } nexus_dirent_type_t;
 
+typedef enum {
+    NEXUS_FREAD = 0x01,
+    NEXUS_FWRITE = 0x02
+} nexus_io_mode_t;
+
 
 struct nexus_dirent {
     char                name[NAME_MAX];
@@ -33,11 +38,8 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
-    char name[NAME_MAX];
-    char path[PATH_MAX];
-
-    nexus_dirent_type_t type;
-    size_t              size;
+    size_t timestamp;
+    size_t size;
 };
 
 /**

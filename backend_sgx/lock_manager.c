@@ -11,18 +11,10 @@ struct lock_manager {
     struct nexus_hashtable * htable;
 };
 
-struct __locked_uuid {
-    struct nexus_uuid       uuid;
-
-    struct nexus_raw_file * raw_file;
-};
-
 struct lock_manager *
 lock_manager_init()
 {
-    struct lock_manager * lock_manager = NULL;
-
-    lock_manager = nexus_malloc(sizeof(struct lock_manager));
+    struct lock_manager * lock_manager = nexus_malloc(sizeof(struct lock_manager));
 
     lock_manager->htable = nexus_create_htable(HASHTABLE_SIZE, uuid_hash_func, uuid_equal_func);
 
@@ -43,9 +35,9 @@ lock_manager_destroy(struct lock_manager * lock_manager)
 }
 
 int
-lock_manager_add(struct lock_manager   * lock_manager,
-                 struct nexus_uuid     * uuid,
-                 struct nexus_raw_file * raw_file)
+lock_manager_add(struct lock_manager      * lock_manager,
+                 struct nexus_uuid        * uuid,
+                 struct nexus_file_handle * file_handle)
 {
     struct __locked_uuid * locked_uuid = NULL;
 
@@ -63,13 +55,15 @@ lock_manager_add(struct lock_manager   * lock_manager,
 
     nexus_uuid_copy(uuid, &locked_uuid->uuid);
 
-    locked_uuid->raw_file = raw_file;
+    locked_uuid->file_handle = file_handle;
 
     ret = nexus_htable_insert(lock_manager->htable,
                               (uintptr_t)&locked_uuid->uuid,
                               (uintptr_t)locked_uuid);
 
     if (ret == 0) {
+        nexus_free(locked_uuid);
+
         log_error("could not insert item into lock_manager\n");
         return -1;
     }
@@ -77,12 +71,12 @@ lock_manager_add(struct lock_manager   * lock_manager,
     return 0;
 }
 
-struct nexus_raw_file *
-lock_manager_drop(struct lock_manager * lock_manager, struct nexus_uuid * uuid)
+struct nexus_file_handle *
+lock_manager_del(struct lock_manager * lock_manager, struct nexus_uuid * uuid)
 {
-    struct __locked_uuid  * locked_uuid = NULL;
+    struct nexus_file_handle * file_handle = NULL;
 
-    struct nexus_raw_file * raw_file    = NULL;
+    struct __locked_uuid  * locked_uuid    = NULL;
 
 
     locked_uuid = (struct __locked_uuid *)nexus_htable_remove(lock_manager->htable,
@@ -93,22 +87,21 @@ lock_manager_drop(struct lock_manager * lock_manager, struct nexus_uuid * uuid)
         return NULL;
     }
 
-    raw_file = locked_uuid->raw_file;
+    file_handle = locked_uuid->file_handle;
 
     nexus_free(locked_uuid);
 
-    return raw_file;
+    return file_handle;
 }
 
-struct nexus_raw_file *
-lock_manager_get(struct lock_manager * lock_manager, struct nexus_uuid * uuid)
+struct nexus_file_handle *
+lock_manager_find(struct lock_manager * lock_manager, struct nexus_uuid * uuid)
 {
-    struct __locked_uuid  * locked_uuid = NULL;
+    struct __locked_uuid  * result = NULL;
 
-    locked_uuid = (struct __locked_uuid *) nexus_htable_search(lock_manager->htable, (uintptr_t)uuid);
-
-    if (locked_uuid) {
-        return locked_uuid->raw_file;
+    result = (struct __locked_uuid *) nexus_htable_search(lock_manager->htable, (uintptr_t)uuid);
+    if (result) {
+        return result->file_handle;
     }
 
     return NULL;

@@ -1,5 +1,7 @@
 #include "internal.h"
 
+#include "io.c"
+
 // -------------------------- utilities -----------------------
 
 void *
@@ -47,58 +49,17 @@ ocall_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
 }
 
 int
-ocall_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
-{
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
-
-    struct nexus_raw_file * raw_file = NULL;
-
-    // this blocks
-    raw_file = nexus_datastore_write_start(volume->metadata_store, uuid, NULL);
-
-    if (raw_file == NULL) {
-        log_error("nexus_datastore_write_start() FAILED\n");
-        return -1;
-    }
-
-    if (lock_manager_add(sgx_backend->lock_manager, uuid, raw_file)) {
-        log_error("could not lock file\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-ocall_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
-{
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
-
-    struct nexus_raw_file * raw_file = lock_manager_drop(sgx_backend->lock_manager, uuid);
-
-    if (raw_file == NULL) {
-        log_error("could not find file in lock manager\n");
-        return -1;
-    }
-
-    nexus_datastore_write_finish(volume->metadata_store, raw_file);
-
-    return 0;
-}
-
-int
 ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
+    struct nexus_locked_file * locked_file = lock_manager_get(sgx_backend->lock_manager, uuid);
 
-    struct nexus_raw_file * raw_file = lock_manager_get(sgx_backend->lock_manager, uuid);
-
-    if (raw_file == NULL) {
+    if (locked_file == NULL) {
         log_error("could not find file in lock manager\n");
         return -1;
     }
 
 
+    // write the contents
     {
         struct __buf * buf = NULL;
 
@@ -112,7 +73,7 @@ ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
             return -1;
         }
 
-        ret = nexus_datastore_write_bytes(volume->metadata_store, raw_file, buf->addr, buf->size);
+        ret = nexus_datastore_write_uuid(volume->metadata_store, locked_file, buf->addr, buf->size);
 
         buffer_manager_put(sgx_backend->buf_manager, &buf->uuid);
 
@@ -127,50 +88,15 @@ ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
     return 0;
 }
 
+
 uint8_t *
-ocall_buffer_get(struct nexus_uuid * uuid, size_t * p_size, struct nexus_volume * volume)
+ocall_buffer_get(struct nexus_uuid   * uuid,
+                 nexus_io_mode_t       mode,
+                 size_t              * p_size,
+                 struct nexus_volume * volume)
 {
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
-    struct __buf       * buf         = NULL;
-
-    uint8_t            * addr        = NULL;
-
-    int                  ret         = -1;
-
-
-    // check the buffer manager
-    {
-        buf = buffer_manager_get(sgx_backend->buf_manager, uuid);
-
-        if (buf) {
-            // TODO additional freshness checks here
-
-            *p_size = buf->size;
-
-            return buf->addr;
-        }
-    }
-
-    // let's get it from the backing metadata store
-
-    ret = nexus_datastore_get_uuid(volume->metadata_store, uuid, NULL, &addr, (uint32_t *)p_size);
-
-    if (ret != 0) {
-        log_error("nexus_datastore_get_uuid FAILED\n");
-        return NULL;
-    }
-
-    ret = buffer_manager_add(sgx_backend->buf_manager, addr, *p_size, uuid);
-
-    if (ret != 0) {
-        log_error("buffer_manager_add FAILED\n");
-
-        nexus_free(addr);
-        return NULL;
-    }
-
-    return addr;
+    return io_buffer_get(uuid, mode, p_size, volume);
 }
 
 int
@@ -182,9 +108,7 @@ ocall_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume
 int
 ocall_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 {
-    struct sgx_backend * sgx_backend = NULL;
-
-    sgx_backend = (struct sgx_backend *)volume->private_data;
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
     buffer_manager_del(sgx_backend->buf_manager, metadata_uuid);
 

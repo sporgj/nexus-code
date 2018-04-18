@@ -8,6 +8,7 @@
 #pragma once
 
 
+#include <nexus_fs.h>
 #include <nexus_uuid.h>
 #include <nexus_json.h>
 
@@ -65,22 +66,40 @@ nexus_datastore_update_uuid(struct nexus_datastore * datastore,
                             uint32_t                 size);
 
 
-struct nexus_raw_file *
-nexus_datastore_write_start(struct nexus_datastore * datastore,
-                            struct nexus_uuid      * uuid,
-                            char                   * path);
+
+
+struct nexus_file_handle *
+nexus_datastore_fopen(struct nexus_datastore    * datastore,
+                      struct nexus_uuid         * uuid,
+                      char                      * path,
+                      nexus_io_mode_t             mode);
 
 int
-nexus_datastore_write_bytes(struct nexus_datastore * datastore,
-                            struct nexus_raw_file  * raw_file,
-                            uint8_t                * buf,
-                            uint32_t                 size);
+nexus_datastore_fread(struct nexus_datastore    * datastore,
+                      struct nexus_file_handle  * file_handle,
+                      uint8_t                  ** buf,
+                      size_t                    * size);
+
+int
+nexus_datastore_fwrite(struct nexus_datastore   * datastore,
+                       struct nexus_file_handle * file_handle,
+                       uint8_t                  * buf,
+                       size_t                     size);
 
 void
-nexus_datastore_write_finish(struct nexus_datastore * datastore, struct nexus_raw_file * raw_file);
+nexus_datastore_fclose(struct nexus_datastore   * datastore,
+                       struct nexus_file_handle * file_handle);
+
+
 
 
 // metadata directory operations
+
+int
+nexus_datastore_stat_uuid(struct nexus_datastore      * datastore,
+                          struct nexus_uuid           * uuid,
+                          char                        * path,
+                          struct nexus_stat           * stat);
 
 int
 nexus_datastore_new_uuid(struct nexus_datastore      * datastore,
@@ -123,6 +142,18 @@ struct nexus_datastore_impl {
     void * (*open)(nexus_json_obj_t datastore_cfg);
     int    (*close)(void * priv_data);
 
+
+    /**
+     * Runs a 'stat' call on the uuid file
+     * @param uuid
+     * @param path
+     * @param stat
+     * @param priv_data
+     */
+    int (*stat_uuid)(struct nexus_uuid  * uuid,
+                     char               * path,
+                     struct nexus_stat  * stat,
+                     void               * priv_data);
     /**
      * Gets uuid content
      * @param uuid
@@ -165,23 +196,40 @@ struct nexus_datastore_impl {
                        uint32_t            size,
                        void              * priv_data);
 
-    /**
-     * Acquires an exclusive lock on metadata and returns fd
-     */
-    struct nexus_raw_file * (*write_start)(struct nexus_uuid * uuid, char * path, void * priv_data);
 
     /**
-     * Writes the bytes on the acquired file descriptor
+     * Acquires an exclusive lock on metadata and returns a nexus_file_handle
      */
-    int (*write_bytes)(struct nexus_raw_file * raw_file,
-                       uint8_t               * buf,
-                       uint32_t                size,
-                       void                  * priv_data);
+    struct nexus_file_handle * (*fopen_uuid)(struct nexus_uuid  * uuid,
+                                             char               * path,
+                                             nexus_io_mode_t      mode,
+                                             void               * priv_data);
+
+    /**
+     * Reads the contents of the metadata file
+     */
+    int (*fread_uuid)(struct nexus_file_handle  * file_handle,
+                      uint8_t                  ** buf,
+                      size_t                    * size,
+                      void                      * priv_data);
+
+    /**
+     * Writes to a locked file
+     * @param buf
+     * @param size
+     * @param priv_data
+     */
+    int (*fwrite_uuid)(struct nexus_file_handle * file_handle,
+                       uint8_t                  * buf,
+                       size_t                     size,
+                       void                     * priv_data);
 
     /**
      * Closes the file
      */
-    void (*write_finish)(struct nexus_raw_file * raw_file, void * priv_data);
+    void (*fclose_uuid)(struct nexus_file_handle * file_handle, void * priv_data);
+
+
 
     /**
      * Creates an empty file in the datastore

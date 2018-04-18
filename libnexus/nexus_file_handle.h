@@ -1,0 +1,30 @@
+#pragma once
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "nexus_fs.h"
+
+
+struct nexus_file_handle {
+    FILE            * file_ptr;
+    char            * filepath;
+    nexus_io_mode_t   mode;
+    bool              touched;
+};
+
+
+struct nexus_file_handle *
+nexus_file_handle_open(char * filepath, nexus_io_mode_t mode);
+
+void
+nexus_file_handle_close(struct nexus_file_handle * file_handle);
+
+int
+nexus_file_handle_read(struct nexus_file_handle * file_handle, uint8_t ** p_buf, size_t * p_size);
+
+int
+nexus_file_handle_write(struct nexus_file_handle * file_handle, uint8_t * buf, size_t size);
+
+int
+nexus_file_handle_flush(struct nexus_file_handle * file_handle);

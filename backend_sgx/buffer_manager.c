@@ -29,6 +29,12 @@ conditional_remove_func(uintptr_t value)
     return buf->refcount == 0;
 }
 
+void
+free_buf(struct __buf * buf)
+{
+    nexus_free(buf->addr);
+    nexus_free(buf);
+}
 
 struct buffer_manager *
 buffer_manager_init()
@@ -65,10 +71,7 @@ __alloc_buf(struct buffer_manager * buf_manager,
             struct nexus_uuid     * uuid,
             bool                    on_disk)
 {
-    struct __buf * buf = NULL;
-
-
-    buf = nexus_malloc(sizeof(struct __buf));
+    struct __buf * buf = nexus_malloc(sizeof(struct __buf));
 
     buf->addr = addr;
     buf->size = size;
@@ -81,15 +84,21 @@ __alloc_buf(struct buffer_manager * buf_manager,
     // insert in the htable
     {
         struct __buf * old_buf = NULL;
+
+        uintptr_t      key     = (uintptr_t)&buf->uuid;
+
         int ret = -1;
 
         // XXX, for now, we remove the old and add the new
-        old_buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, (uintptr_t)&buf->uuid, 0);
+        old_buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, key, 0);
+
         if (old_buf) {
-            nexus_free(old_buf);
+            free_buf(old_buf);
+            buf_manager->table_size -= 1;
         }
 
-        ret = nexus_htable_insert(buf_manager->buffers_table, (uintptr_t)&buf->uuid, (uintptr_t)buf);
+        ret = nexus_htable_insert( buf_manager->buffers_table, key, (uintptr_t)buf);
+
         if (ret == 0) {
             log_error("nexus_htable_insert FAILED\n");
             goto cleanup;
@@ -170,7 +179,7 @@ buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
         return;
     }
 
-    nexus_free(buf);
+    free_buf(buf);
 }
 
 void
@@ -184,5 +193,5 @@ buffer_manager_del(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
         return;
     }
 
-    nexus_free(buf);
+    free_buf(buf);
 }

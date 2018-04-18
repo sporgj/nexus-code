@@ -594,3 +594,14 @@ out:
 
     return ret;
 }
+
+
+int
+ecall_fs_readdir(char * dirpath)
+{
+    int ret = -1;
+
+    ret = 0;
+out:
+    return ret;
+}

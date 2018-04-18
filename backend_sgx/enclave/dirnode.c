@@ -390,6 +390,24 @@ dirnode_load(struct nexus_uuid * uuid)
 }
 
 
+/********************    FILLDIR    *********************/
+size_t
+dirnode_readdir_total_size(struct nexus_dirnode * dirnode)
+{
+    size_t size = 0;
+
+    struct list_head * pos = NULL;
+
+    list_for_each(pos, &dirnode->dir_entry_list) {
+        struct dir_entry * dir_entry = list_entry(pos, struct dir_entry, dir_list);
+
+        // readdirs will contain pairs of names and UUIDs
+        size += (dir_entry->dir_rec.name_len + sizeof(struct nexus_uuid));
+    }
+
+    return size;
+}
+
 
 /******************** SERIALIZATION ********************/
 

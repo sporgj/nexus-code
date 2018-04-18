@@ -216,29 +216,39 @@ nexus_datastore_put_uuid(struct nexus_datastore     * datastore,
 
 
 
-struct nexus_raw_file *
-nexus_datastore_write_start(struct nexus_datastore * datastore,
-                            struct nexus_uuid      * uuid,
-                            char                   * path)
+struct nexus_file_handle *
+nexus_datastore_fopen(struct nexus_datastore   * datastore,
+                           struct nexus_uuid        * uuid,
+                           char                     * path,
+                           nexus_io_mode_t            mode)
 {
-    return datastore->impl->write_start(uuid, path, datastore->priv_data);
+    return datastore->impl->fopen(uuid, path, mode, datastore->priv_data);
 }
 
 int
-nexus_datastore_write_bytes(struct nexus_datastore * datastore,
-                            struct nexus_raw_file  * fd,
-                            uint8_t                * buf,
-                            uint32_t                 size)
+nexus_datastore_fread(struct nexus_datastore    * datastore,
+                           struct nexus_file_handle  * file_handle,
+                           uint8_t                  ** buf,
+                           size_t                    * size)
 {
-    return datastore->impl->write_bytes(fd, buf, size, datastore->priv_data);
+    return datastore->impl->fread(file_handle, buf, size, datastore->priv_data);
+}
+
+int
+nexus_datastore_fwrite(struct nexus_datastore   * datastore,
+                           struct nexus_file_handle  * file_handle,
+                           uint8_t                   * buf,
+                           size_t                      size)
+{
+    return datastore->impl->fwrite(file_handle, buf, size, datastore->priv_data);
 }
 
 void
-nexus_datastore_write_finish(struct nexus_datastore * datastore, struct nexus_raw_file * fd)
+nexus_datastore_fclose(struct nexus_datastore   * datastore,
+                            struct nexus_file_handle * file_handle)
 {
-    return datastore->impl->write_finish(fd, datastore->priv_data);
+    return datastore->impl->fclose(file_handle, datastore->priv_data);
 }
-
 
 
 int
@@ -249,6 +259,15 @@ nexus_datastore_update_uuid(struct nexus_datastore  * datastore,
                             uint32_t                  size)
 {
     return datastore->impl->update_uuid(uuid, path, buf, size, datastore->priv_data);
+}
+
+int
+nexus_datastore_stat_uuid(struct nexus_datastore      * datastore,
+                          struct nexus_uuid           * uuid,
+                          char                        * path,
+                          struct nexus_stat           * stat)
+{
+    return datastore->impl->stat_uuid(uuid, path, stat, datastore->priv_data);
 }
 
 int
