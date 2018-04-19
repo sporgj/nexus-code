@@ -40,55 +40,6 @@ ocall_buffer_alloc(size_t size, struct nexus_uuid * uuid, struct nexus_volume * 
     return buffer_manager_alloc(sgx_backend->buf_manager, size, uuid);
 }
 
-void
-ocall_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
-{
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
-
-    buffer_manager_put(sgx_backend->buf_manager, uuid);
-}
-
-int
-ocall_buffer_flush(struct nexus_uuid * uuid, struct nexus_volume * volume)
-{
-    struct nexus_locked_file * locked_file = lock_manager_get(sgx_backend->lock_manager, uuid);
-
-    if (locked_file == NULL) {
-        log_error("could not find file in lock manager\n");
-        return -1;
-    }
-
-
-    // write the contents
-    {
-        struct __buf * buf = NULL;
-
-        int ret = -1;
-
-
-        buf = buffer_manager_get(sgx_backend->buf_manager, uuid);
-
-        if (buf == NULL) {
-            log_error("buffer_manager_get returned NULL\n");
-            return -1;
-        }
-
-        ret = nexus_datastore_write_uuid(volume->metadata_store, locked_file, buf->addr, buf->size);
-
-        buffer_manager_put(sgx_backend->buf_manager, &buf->uuid);
-
-        if (ret) {
-            log_error("nexus_datastore_put_uuid FAILED\n");
-            return -1;
-        }
-
-        return 0;
-    }
-
-    return 0;
-}
-
-
 uint8_t *
 ocall_buffer_get(struct nexus_uuid   * uuid,
                  nexus_io_mode_t       mode,
@@ -97,6 +48,12 @@ ocall_buffer_get(struct nexus_uuid   * uuid,
 {
 
     return io_buffer_get(uuid, mode, p_size, volume);
+}
+
+int
+ocall_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
+{
+    return io_buffer_put(uuid, volume);
 }
 
 int

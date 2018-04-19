@@ -13,7 +13,7 @@ struct __buf {
 
     size_t              size;
 
-    time_t              timestamp; // last time it was read on disk
+    size_t              timestamp; // last time it was read on disk
 
     bool                on_disk;
 };
@@ -46,6 +46,9 @@ buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct ne
  */
 int
 buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid);
+
+struct __buf *
+buffer_manager_find(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);
 
 /**
  * Returns the address stored at uuid

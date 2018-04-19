@@ -152,6 +152,7 @@ enclave {
         ocall_buffer_get
         (
             [in]         struct nexus_uuid   * metadata_uuid,
+                         nexus_io_mode_t       mode,
             [out]        size_t              * buffer_size,
             [user_check] struct nexus_volume * volume
         );
@@ -160,7 +161,7 @@ enclave {
          * Frees an allocated buffer
          * @param buffer_uuid
          */
-        void
+        int
         ocall_buffer_put
         (
             [in]         struct nexus_uuid   * metadata_uuid,

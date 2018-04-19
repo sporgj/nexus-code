@@ -165,6 +165,12 @@ buffer_manager_get(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
     return buf;
 }
 
+struct __buf *
+buffer_manager_find(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
+{
+    return nexus_htable_search(buf_manager->buffers_table, (uintptr_t)uuid);
+}
+
 void
 buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {

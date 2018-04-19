@@ -1,5 +1,6 @@
 static uint8_t *
 __read_from_disk(struct nexus_datastore * datastore,
+                 struct lock_manager    * lock_manager,
                  struct nexus_uuid      * uuid,
                  nexus_io_mode_t          mode,
                  size_t                 * p_size)
@@ -27,14 +28,14 @@ __read_from_disk(struct nexus_datastore * datastore,
 
     // add it to the lock manager
     if (mode & NEXUS_FWRITE) {
-        ret = lock_manager_add(sgx_backend->lock_manager, uuid, file_handle));
+        ret = lock_manager_add(lock_manager, uuid, file_handle);
 
         if (ret != 0) {
             log_error("could not store locked file\n");
             goto out_err;
         }
     } else {
-        nexus_datastore_fclose(uuid, file_handle);
+        nexus_datastore_fclose(datastore, file_handle);
     }
 
     return addr;
@@ -72,7 +73,7 @@ io_buffer_get(struct nexus_uuid   * uuid,
         goto read_datastore;
     }
 
-    ret = nexus_datastore_stat_uuid(volume->metadata_store, uuid, &stat);
+    ret = nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat);
 
     if (ret != 0) {
         log_error("could not stat metadata file\n");
@@ -86,14 +87,14 @@ io_buffer_get(struct nexus_uuid   * uuid,
     }
 
 read_datastore:
-    addr = __read_from_disk(volume, uuid, mode, p_size);
+    addr = __read_from_disk(volume->metadata_store, sgx_backend->lock_manager, uuid, mode, p_size);
 
     if (addr == NULL) {
         log_error("reading from disk FAILED\n");
         goto out_err;
     }
 
-    if (buffer_manager_add(sgx_backend->buf_manager, addr, size, uuid)) {
+    if (buffer_manager_add(sgx_backend->buf_manager, addr, *p_size, uuid)) {
         nexus_free(addr);
 
         log_error("buffer_manager_add FAILED\n");
@@ -115,10 +116,10 @@ __flush_metadata(struct lock_manager    * lock_manager,
                  struct nexus_datastore * datastore,
                  struct __buf           * buf)
 {
-    struct nexus_file_handle * file_handle = lock_manager_del(sgx_backend->lock_manager, uuid);
+    struct nexus_file_handle * file_handle = lock_manager_del(lock_manager, &buf->uuid);
 
     if (file_handle) {
-        ret = nexus_datastore_fwrite(datastore, file_handle, buf->addr, buf->size);
+        int ret = nexus_datastore_fwrite(datastore, file_handle, buf->addr, buf->size);
 
         nexus_datastore_fclose(datastore, file_handle);
 
@@ -150,7 +151,7 @@ io_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
 
     ret = __flush_metadata(sgx_backend->lock_manager, volume->metadata_store, buf);
 
-    buffer_manager_put(sgx_backend->buf_manager, buf);
+    __buffer_manager_put(sgx_backend->buf_manager, buf);
 
     return ret;
 }
@@ -158,12 +159,9 @@ io_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
 uint8_t *
 io_buffer_alloc(size_t size, struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
-    struct sgx_backend       * sgx_backend = (struct sgx_backend *)volume->private_data;
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
-    // check if the lock manager already has a locked file
-    locked_item = __lock_manager_get(sgx_backend->lock_manager, uuid);
-
-    if (lock_manager_find(sgx_backend->lock_manager) == NULL) {
+    if (lock_manager_find(sgx_backend->lock_manager, uuid) == NULL) {
         struct nexus_file_handle * file_handle = NULL;
 
         file_handle = nexus_datastore_fopen(volume->metadata_store, uuid, NULL, NEXUS_FWRITE);
@@ -181,7 +179,5 @@ io_buffer_alloc(size_t size, struct nexus_uuid * uuid, struct nexus_volume * vol
         }
     }
 
-    return buffer_manager_alloc(sgx_backend->buf_manager, uuid, size);
-out_err:
-    return NULL;
+    return buffer_manager_alloc(sgx_backend->buf_manager, size, uuid);
 }
