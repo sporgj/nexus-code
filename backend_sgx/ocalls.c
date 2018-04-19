@@ -1,7 +1,5 @@
 #include "internal.h"
 
-#include "io.c"
-
 // -------------------------- utilities -----------------------
 
 void *
@@ -35,25 +33,24 @@ ocall_print(char * str)
 uint8_t *
 ocall_buffer_alloc(size_t size, struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
-
-    return buffer_manager_alloc(sgx_backend->buf_manager, size, uuid);
+    return io_buffer_alloc(size, uuid, volume);
 }
 
 uint8_t *
 ocall_buffer_get(struct nexus_uuid   * uuid,
                  nexus_io_mode_t       mode,
                  size_t              * p_size,
+                 size_t              * p_timestamp,
                  struct nexus_volume * volume)
 {
 
-    return io_buffer_get(uuid, mode, p_size, volume);
+    return io_buffer_get(uuid, mode, p_size, p_timestamp, volume);
 }
 
 int
-ocall_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
+ocall_buffer_put(struct nexus_uuid * uuid, size_t * p_timestamp, struct nexus_volume * volume)
 {
-    return io_buffer_put(uuid, volume);
+    return io_buffer_put(uuid, p_timestamp, volume);
 }
 
 int
@@ -90,4 +87,19 @@ ocall_buffer_rename(struct nexus_uuid   * from_uuid,
                     struct nexus_volume * volume)
 {
     return nexus_datastore_rename_uuid(volume->metadata_store, from_uuid, NULL, to_uuid, NULL);
+}
+
+int
+ocall_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
+{
+    struct nexus_stat stat_info;
+
+    if (nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_info)) {
+        log_error("could not stat metadata file\n");
+        return -1;
+    }
+
+    *timestamp = stat_info.timestamp;
+
+    return 0;
 }

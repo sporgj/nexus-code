@@ -268,11 +268,11 @@ __sign_response(struct sgx_backend      * sgx_backend,
         }
     }
 
-    ret = 0;
+    return 0;
 out:
     buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
 
-    return 0;
+    return -1;
 }
 
 int

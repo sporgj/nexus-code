@@ -200,15 +200,15 @@ struct nexus_datastore_impl {
     /**
      * Acquires an exclusive lock on metadata and returns a nexus_file_handle
      */
-    struct nexus_file_handle * (*fopen_uuid)(struct nexus_uuid  * uuid,
-                                             char               * path,
-                                             nexus_io_mode_t      mode,
-                                             void               * priv_data);
+    struct nexus_file_handle * (*fopen)(struct nexus_uuid  * uuid,
+                                        char               * path,
+                                        nexus_io_mode_t      mode,
+                                        void               * priv_data);
 
     /**
      * Reads the contents of the metadata file
      */
-    int (*fread_uuid)(struct nexus_file_handle  * file_handle,
+    int (*fread)(struct nexus_file_handle  * file_handle,
                       uint8_t                  ** buf,
                       size_t                    * size,
                       void                      * priv_data);
@@ -219,7 +219,7 @@ struct nexus_datastore_impl {
      * @param size
      * @param priv_data
      */
-    int (*fwrite_uuid)(struct nexus_file_handle * file_handle,
+    int (*fwrite)(struct nexus_file_handle * file_handle,
                        uint8_t                  * buf,
                        size_t                     size,
                        void                     * priv_data);
@@ -227,7 +227,7 @@ struct nexus_datastore_impl {
     /**
      * Closes the file
      */
-    void (*fclose_uuid)(struct nexus_file_handle * file_handle, void * priv_data);
+    void (*fclose)(struct nexus_file_handle * file_handle, void * priv_data);
 
 
 

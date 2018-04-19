@@ -107,16 +107,12 @@ dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child_file
     }
 }
 
-static int
-revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
+int
+revalidate_dentry(struct nexus_dentry * dentry, nexus_io_mode_t mode)
 {
-    int ret = -1;
-
 
     if (dentry->metadata) {
-        ret = nexus_vfs_revalidate(dentry->metadata);
-
-        if (ret != 0) {
+        if (nexus_vfs_revalidate(dentry->metadata, mode)) {
             log_error("could not revalidate dentry\n");
             return -1;
         }
@@ -125,7 +121,7 @@ revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
     }
 
     // dentry->metadata = NULL
-    dentry->metadata = nexus_vfs_load(&dentry->uuid, dentry->metadata_type);
+    dentry->metadata = nexus_vfs_load(&dentry->uuid, dentry->metadata_type, mode);
 
     if (dentry->metadata == NULL) {
         log_error("could not load metadata\n");
@@ -136,6 +132,21 @@ revalidate_dentry(struct nexus_dentry * dentry, struct path_builder * builder)
     dentry->metadata->dentry = dentry;
 
     return 0;
+}
+
+struct nexus_metadata *
+dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_mode_t mode, bool revalidate)
+{
+    if (revalidate && revalidate_dentry(dentry, mode)) {
+        log_error("could revalidate dentry\n");
+        return NULL;
+    }
+
+    if (dentry->metadata) {
+        dentry->metadata->ref_count += 1;
+    }
+
+    return dentry->metadata;
 }
 
 static struct nexus_dentry *
@@ -179,7 +190,7 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
             return NULL;
         }
 
-        ret = revalidate_dentry(curr_dentry, builder);
+        ret = revalidate_dentry(curr_dentry, NEXUS_FREAD);
         if (ret != 0) {
             log_error("dentry revalidation FAILED\n");
             return NULL;
@@ -253,13 +264,6 @@ dentry_lookup(struct nexus_dentry * root_dentry, char * path)
         dentry = root_dentry;
     } else {
         dentry = walk_path(root_dentry, path, &builder);
-    }
-
-    // resolve the dentry and return
-    if (dentry && revalidate_dentry(dentry, &builder) == -1) {
-        path_builder_free(&builder);
-        log_error("revalidating dentry FAILED\n");
-        return NULL;
     }
 
     path_builder_free(&builder);

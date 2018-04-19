@@ -181,7 +181,7 @@ out_err:
 }
 
 struct nexus_filenode *
-filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
+filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t mode)
 {
     struct nexus_filenode * filenode = NULL;
 
@@ -203,22 +203,24 @@ filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
         return NULL;
     }
 
+    filenode->mode = mode;
+
     return filenode;
 }
 
 struct nexus_filenode *
-filenode_load(struct nexus_uuid * uuid)
+filenode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode)
 {
     struct nexus_filenode * filenode = NULL;
 
-    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid);
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, mode);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
         return NULL;
     }
 
-    filenode = filenode_from_crypto_buf(crypto_buffer);
+    filenode = filenode_from_crypto_buf(crypto_buffer, mode);
 
     nexus_crypto_buf_free(crypto_buffer);
 

@@ -2,7 +2,6 @@
 
 inline static int
 __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
-                struct nexus_dentry   * dentry,
                 char                  * filename_IN,
                 nexus_dirent_type_t     type_IN,
                 struct nexus_uuid     * entry_uuid)
@@ -40,14 +39,12 @@ ecall_fs_create(char                * dirpath_IN,
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_dentry * dentry = NULL;
-
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -55,7 +52,7 @@ ecall_fs_create(char                * dirpath_IN,
     }
 
     // perform the create operation
-    ret = __nxs_fs_create(metadata->dirnode, dentry, filename_IN, type_IN, &entry_uuid);
+    ret = __nxs_fs_create(metadata->dirnode, filename_IN, type_IN, &entry_uuid);
     if (ret != 0) {
         log_error("__nxs_fs_create() FAILED\n");
         goto out;
@@ -101,14 +98,12 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_dentry * dentry = NULL;
-
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR | NEXUS_FDELETE);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -116,10 +111,10 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
     }
 
 
-    dentry_delete_child(dentry, filename_IN);
-
+    dentry_delete_child(metadata->dentry, filename_IN);
 
     ret = __nxs_fs_remove(metadata, filename_IN, &entry_uuid);
+
     if (ret != 0) {
         log_error("__nxs_fs_remove() FAILED\n");
         goto out;
@@ -160,14 +155,12 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_dentry * dentry = NULL;
-
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -212,15 +205,13 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_dentry * dentry = NULL;
-
     const char * name_ptr = NULL;
     size_t name_len;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -285,14 +276,12 @@ ecall_fs_symlink(char              * dirpath_IN,
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_dentry * dentry = NULL;
-
     struct nexus_uuid entry_uuid;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, &dentry);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -384,26 +373,19 @@ ecall_fs_hardlink(char              * link_dirpath_IN,
     struct nexus_metadata * link_metadata   = NULL;
     struct nexus_metadata * target_metadata = NULL;
 
-    struct nexus_dentry * link_dentry   = NULL;
-    struct nexus_dentry * target_dentry = NULL;
-
     struct nexus_uuid link_uuid;
 
     int ret = -1;
 
 
-    (void)link_dentry;
-    (void)target_dentry;
-
-
-    link_metadata = nexus_vfs_get(link_dirpath_IN, NEXUS_DIRNODE, &link_dentry);
+    link_metadata = nexus_vfs_get(link_dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR);
 
     if (link_metadata == NULL) {
         log_error("could not get metadata\n");
         return -1;
     }
 
-    target_metadata = nexus_vfs_get(target_dirpath_IN, NEXUS_DIRNODE, &target_dentry);
+    target_metadata = nexus_vfs_get(target_dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
 
     if (target_metadata == NULL) {
         nexus_vfs_put(link_metadata);
@@ -510,8 +492,8 @@ ecall_fs_rename(char              * from_dirpath_IN,
     struct nexus_metadata * to_metadata   = NULL;
     struct nexus_metadata * tmp_metadata  = NULL;
 
-    struct nexus_dentry * from_dentry = NULL;
-    struct nexus_dentry * to_dentry   = NULL;
+    struct nexus_dentry   * from_dentry   = NULL;
+    struct nexus_dentry   * to_dentry     = NULL;
 
     struct nexus_uuid old_uuid;
     struct nexus_uuid new_uuid;
@@ -519,37 +501,52 @@ ecall_fs_rename(char              * from_dirpath_IN,
     int ret = -1;
 
 
-    // get the necessary metadata
-    from_metadata = nexus_vfs_get(from_dirpath_IN, NEXUS_DIRNODE, &from_dentry);
+    // if it's the same directory, just skip to editing the same dirnode
+    if (strncmp(from_dirpath_IN, to_dirpath_IN, NEXUS_PATH_MAX) == 0) {
+        from_metadata = nexus_vfs_get(from_dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR);
+        tmp_metadata  = from_metadata;
 
-    if (from_metadata == NULL) {
-        log_error("could not get metadata (%s)\n", from_dirpath_IN);
+        goto do_rename;
+    }
+
+    // get the necessary metadata
+    from_dentry = nexus_vfs_lookup(from_dirpath_IN);
+    to_dentry   = nexus_vfs_lookup(to_dirpath_IN);
+
+    if (from_dentry == NULL || to_dentry == NULL) {
+        log_error("could not find dentry\n");
         return -1;
     }
 
-    to_metadata = nexus_vfs_get(to_dirpath_IN, NEXUS_DIRNODE, &to_dentry);
 
-    if (to_metadata == NULL) {
+    // if they are the same dentry...
+    if (from_dentry == to_dentry) {
+        from_metadata = dentry_get_metadata(from_dentry, NEXUS_FRDWR, true);
+        tmp_metadata  = from_metadata;
+
+        goto do_rename;
+    }
+
+    from_metadata = dentry_get_metadata(from_dentry, NEXUS_FRDWR, true);
+    to_metadata   = dentry_get_metadata(to_dentry, NEXUS_FRDWR, true);
+    tmp_metadata  = to_metadata;
+
+do_rename:
+    if (from_metadata == NULL) {
+        log_error("could not get source metadata\n");
+        return -1;
+    }
+
+    if (tmp_metadata == NULL) {
         nexus_vfs_put(from_metadata);
 
-        log_error("could not get metadata (%s)\n", to_dirpath_IN);
+        log_error("could not get destination metadata\n");
         return -1;
     }
 
-    dentry_delete_child(from_dentry, oldname_IN);
-    dentry_delete_child(to_dentry, newname_IN);
 
-    // if it's the same dirnode
-    if (nexus_metadata_compare(from_metadata, to_metadata) == 0) {
-        nexus_vfs_put(to_metadata);
-
-        to_metadata = NULL;
-
-        tmp_metadata = from_metadata;
-    } else {
-        tmp_metadata = to_metadata;
-    }
-
+    dentry_delete_child(from_metadata->dentry, oldname_IN);
+    dentry_delete_child(tmp_metadata->dentry, newname_IN);
 
     ret = __nxs_fs_rename(from_metadata->dirnode,
                           oldname_IN,
@@ -592,16 +589,5 @@ out:
         nexus_vfs_put(to_metadata);
     }
 
-    return ret;
-}
-
-
-int
-ecall_fs_readdir(char * dirpath)
-{
-    int ret = -1;
-
-    ret = 0;
-out:
     return ret;
 }

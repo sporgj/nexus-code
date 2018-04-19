@@ -20,6 +20,7 @@
 #include "buffer_manager.h"
 #include "lock_manager.h"
 #include "key_buffer.h"
+#include "io.h"
 
 
 struct sgx_backend {

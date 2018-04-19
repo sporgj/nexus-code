@@ -77,12 +77,12 @@ __nxs_fs_crypto(char              * filepath_IN,
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_dentry * dentry = NULL;
+    nexus_io_mode_t io_mode = (mode == NEXUS_ENCRYPT) ? NEXUS_FREAD : NEXUS_FRDWR;
 
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(filepath_IN, NEXUS_FILENODE, &dentry);
+    metadata = nexus_vfs_get(filepath_IN, NEXUS_FILENODE, io_mode);
 
     if (metadata == NULL) {
         log_error("could not get metadata (%s)\n", filepath_IN);
@@ -107,7 +107,7 @@ __nxs_fs_crypto(char              * filepath_IN,
                              mode);
 
     if (ret != 0) {
-        log_error("chunk encryption failed\n");
+        log_error("chunk processing failed\n");
         goto out;
     }
 

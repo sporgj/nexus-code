@@ -38,14 +38,24 @@ buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct ne
 
 /**
  * Creates a new buffer from the address and size. The buffer keeps a reference
- * to addr.
+ * to addr. The new buffer gets timestamped with the current time.
+ *
  * @param addr is the malloced address
  * @param size
  * @param uuid
  * @return 0 on success
  */
 int
-buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid);
+buffer_manager_add(struct buffer_manager  * buf_manager,
+                   uint8_t                * addr,
+                   size_t                   size,
+                   struct nexus_uuid      * uuid);
+
+struct __buf *
+__buffer_manager_add(struct buffer_manager * buf_manager,
+                     uint8_t               * addr,
+                     size_t                  size,
+                     struct nexus_uuid     * uuid);
 
 struct __buf *
 buffer_manager_find(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);

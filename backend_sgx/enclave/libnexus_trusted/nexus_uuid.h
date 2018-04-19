@@ -45,3 +45,18 @@ bool nexus_uuid_is_valid(struct nexus_uuid * uuid);
 
 uint32_t
 nexus_uuid_hash(struct nexus_uuid * uuid);
+
+
+// used for hashtable key
+
+static inline uint32_t
+__uuid_hasher(uintptr_t key)
+{
+    return nexus_uuid_hash((struct nexus_uuid *)key);
+}
+
+static inline int
+__uuid_equals(uintptr_t key1, uintptr_t key2)
+{
+    return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
+}

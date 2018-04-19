@@ -67,7 +67,7 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
 
 
     if ((size < sgx_backend->volume_chunk_size) && (size + offset != filesize)) {
-        log_error("invalid encryption arguments (offset=%zu, size=%zu < filesize=%zu)\n",
+        log_error("invalid decryption arguments (offset=%zu, size=%zu < filesize=%zu)\n",
                   offset,
                   size,
                   filesize);

@@ -14,7 +14,12 @@ ecall_init_enclave(struct nexus_volume * volume)
 {
     global_volume = volume;
 
+    if (buffer_layer_init() != 0) {
+        return -1;
+    }
+
     if (nexus_vfs_init() != 0) {
+        buffer_layer_exit();
         return -1;
     }
 

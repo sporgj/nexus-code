@@ -1,6 +1,13 @@
 #pragma once
 #include <nexus_uuid.h>
 
+int
+buffer_layer_init();
+
+int
+buffer_layer_exit();
+
+
 /**
  * Allocates a new buffer of the given size and acquires a reference to the buffek
  * @param total_size
@@ -10,6 +17,14 @@
 void *
 buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid);
 
+/**
+ * Checks if the metadata has changed since the last time the buffer
+ * checked the backend.
+ *
+ * @return -1 if the check could not be done (ocall failure)
+ */
+int
+buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload);
 
 /**
  * Acquires a reference to an externally allocated buffer
@@ -18,7 +33,7 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid);
  * @return the address to the external buffer.
  */
 void *
-buffer_layer_get(struct nexus_uuid * uuid, size_t * size);
+buffer_layer_get(struct nexus_uuid * uuid, nexus_io_mode_t mode, size_t * size);
 
 /**
  * Drops reference to a specified buffer
@@ -27,26 +42,6 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size);
  */
 int
 buffer_layer_put(struct nexus_uuid * uuid);
-
-/**
- * Locks the metadata file on disk
- */
-int
-buffer_layer_lock(struct nexus_uuid * uuid);
-
-/**
- * Unlocks the previously locked file
- */
-int
-buffer_layer_unlock(struct nexus_uuid * uuid);
-
-/**
- * Flushes the buffer layer to the metadata
- * @param uuid
- * @return 0 on success
- */
-int
-buffer_layer_flush(struct nexus_uuid * uuid);
 
 /**
  * Creates an empty file on the datastore

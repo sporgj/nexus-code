@@ -197,7 +197,7 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
 
 
     // get the supernode
-    supernode_crypto_buf = nexus_crypto_buf_create(supernode_bufuuid_in);
+    supernode_crypto_buf = nexus_crypto_buf_create(supernode_bufuuid_in, NEXUS_FREAD);
 
     if (supernode_crypto_buf == NULL) {
         log_error("could not create crypto buffer\n");

@@ -47,8 +47,6 @@ struct nexus_crypto_buf {
 
     struct nexus_uuid           uuid;
 
-    bool                        has_lock; // if the UUID was locked
-
     uint8_t                   * external_addr;
     size_t                      external_size;
 
@@ -71,17 +69,10 @@ nexus_crypto_buf_new(size_t size, uint32_t version, struct nexus_uuid * uuid)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
-    if (buffer_layer_lock(uuid)) {
-        log_error("could not lock uuid in untrusted memory\n");
-        return NULL;
-    }
-
     crypto_buf = nexus_malloc(sizeof(struct nexus_crypto_buf));
 
     crypto_buf->internal_addr = nexus_malloc(size);
     crypto_buf->internal_size = size;
-
-    crypto_buf->has_lock      = true;
 
     crypto_buf->version       = version;
 
@@ -91,14 +82,14 @@ nexus_crypto_buf_new(size_t size, uint32_t version, struct nexus_uuid * uuid)
 }
 
 struct nexus_crypto_buf *
-nexus_crypto_buf_create(struct nexus_uuid * buf_uuid)
+nexus_crypto_buf_create(struct nexus_uuid * buf_uuid, nexus_io_mode_t mode)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
     void   * external_addr = NULL;
     size_t   external_size = 0;
 
-    external_addr = buffer_layer_get(buf_uuid, &external_size);
+    external_addr = buffer_layer_get(buf_uuid, mode, &external_size);
 
     if (external_addr == NULL) {
         log_error("Could not retrieve external addr for buffer\n");
@@ -111,8 +102,6 @@ nexus_crypto_buf_create(struct nexus_uuid * buf_uuid)
 
     crypto_buf->external_addr = external_addr;
     crypto_buf->external_size = external_size;
-
-    crypto_buf->has_lock      = false;
 
     // get the version
     if (external_size >= __get_header_len()) {
@@ -133,21 +122,12 @@ nexus_crypto_buf_free(struct nexus_crypto_buf * crypto_buf)
 {
     assert(crypto_buf != NULL);
 
-    if (crypto_buf->external_addr) {
-        buffer_layer_put(&(crypto_buf->uuid));
-    }
-
-
     if (crypto_buf->internal_addr) {
         nexus_free(crypto_buf->internal_addr);
     }
 
     // free the crypto context
     nexus_crypto_ctx_free(&(crypto_buf->crypto_ctx));
-
-    if (crypto_buf->has_lock) {
-        buffer_layer_unlock(&(crypto_buf->uuid));
-    }
 
     nexus_free(crypto_buf);
 }
@@ -488,5 +468,5 @@ nexus_crypto_buf_flush(struct nexus_crypto_buf * buf)
         return -1;
     }
 
-    return buffer_layer_flush(&buf->uuid);
+    return buffer_layer_put(&buf->uuid);
 }

@@ -154,6 +154,7 @@ enclave {
             [in]         struct nexus_uuid   * metadata_uuid,
                          nexus_io_mode_t       mode,
             [out]        size_t              * buffer_size,
+            [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );
 
@@ -165,36 +166,7 @@ enclave {
         ocall_buffer_put
         (
             [in]         struct nexus_uuid   * metadata_uuid,
-            [user_check] struct nexus_volume * volume
-        );
-
-        /**
-         * Locks the metadata object
-         * @param metadata_uuid
-         * @param volume
-         */
-        int
-        ocall_buffer_lock
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
-            [user_check] struct nexus_volume * volume
-        );
-
-        int
-        ocall_buffer_unlock
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
-            [user_check] struct nexus_volume * volume
-        );
-
-        /**
-         * Writes back the content of the modified buffer
-         * @return 0 on success
-         */
-        int
-        ocall_buffer_flush
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
+            [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );
 
@@ -225,6 +197,14 @@ enclave {
         (
             [in]         struct nexus_uuid   * from_uuid,
             [in]         struct nexus_uuid   * to_uuid,
+            [user_check] struct nexus_volume * volume
+        );
+
+        int
+        ocall_buffer_stattime
+        (
+            [in]         struct nexus_uuid   * uuid,
+            [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );
 

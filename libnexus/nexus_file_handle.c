@@ -81,12 +81,12 @@ nexus_file_handle_read(struct nexus_file_handle * file_handle, uint8_t ** p_buf,
     buf = nexus_malloc(size);
 
     rewind(file_handle->file_ptr);
-    nbytes = fwrite(buf, 1, size, file_handle->file_ptr);
+    nbytes = fread(buf, 1, size, file_handle->file_ptr);
 
     file_handle->touched = true;
 
     if (nbytes != (int) size) {
-        log_error("could not write file (%s). tried=%d, actual=%d\n",
+        log_error("could not read file (%s). tried=%d, actual=%d\n",
                   file_handle->filepath,
                   (int)size,
                   nbytes);
@@ -102,21 +102,20 @@ nexus_file_handle_read(struct nexus_file_handle * file_handle, uint8_t ** p_buf,
 int
 nexus_file_handle_write(struct nexus_file_handle * file_handle, uint8_t * buf, size_t size)
 {
-    FILE * fd  = NULL;
-
     int nbytes = -1;
 
     // only reopen the file if opened in read mode
     if (file_handle->touched) {
-        fd = freopen(NULL, "wb", file_handle->file_ptr);
+        FILE * fd = freopen(NULL, "wb", file_handle->file_ptr);
 
         if (fd == NULL) {
             log_error("could not reopen locked file (%s) in raw mode\n", file_handle->filepath);
             return -1;
         }
+
+        file_handle->file_ptr = fd;
     }
 
-    file_handle->file_ptr = fd;
     file_handle->touched  = true;
 
     nbytes = fwrite(buf, 1, size, file_handle->file_ptr);

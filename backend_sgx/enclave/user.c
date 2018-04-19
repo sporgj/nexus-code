@@ -191,7 +191,7 @@ __parse_usertable(struct nexus_usertable * usertable, uint8_t * buffer, size_t b
 }
 
 struct nexus_usertable *
-nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
+nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_mode_t mode, struct nexus_mac * mac)
 {
     struct nexus_usertable * usertable = NULL;
 
@@ -203,7 +203,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, struct nexus_mac * mac)
     int ret = -1;
 
 
-    crypto_buffer = nexus_crypto_buf_create(uuid);
+    crypto_buffer = nexus_crypto_buf_create(uuid, mode);
 
     if (crypto_buffer == NULL) {
         log_error("buffer_layer_read_datastore FAILED\n");

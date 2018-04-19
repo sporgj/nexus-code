@@ -10,18 +10,6 @@ static size_t                 metadata_objects_count   = 0;
 
 static struct nexus_dentry    root_dentry;
 
-
-uint32_t
-__hasher(uintptr_t key)
-{
-    return nexus_uuid_hash((struct nexus_uuid *)key);
-}
-
-int __equals(uintptr_t key1, uintptr_t key2)
-{
-    return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
-}
-
 void
 __freer(uintptr_t element, uintptr_t key)
 {
@@ -37,7 +25,7 @@ nexus_vfs_init()
 {
     global_supernode = NULL;
 
-    metadata_objects_list = nexus_lru_create(LRU_CAPACITY, __hasher, __equals, __freer);
+    metadata_objects_list = nexus_lru_create(LRU_CAPACITY, __uuid_hasher, __uuid_equals, __freer);
 
     metadata_objects_count = 0;
 
@@ -66,7 +54,7 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
         supernode_free(global_supernode);
     }
 
-    global_supernode = supernode_from_crypto_buffer(supernode_crypto_buf);
+    global_supernode = supernode_from_crypto_buffer(supernode_crypto_buf, NEXUS_FREAD);
 
     if (global_supernode == NULL) {
         log_error("supernode_from_buffer FAILED\n");
@@ -116,32 +104,37 @@ nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type
     return metadata;
 }
 
-struct nexus_metadata *
-nexus_vfs_get(char * filepath, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry)
+struct nexus_dentry *
+nexus_vfs_lookup(char * filepath)
 {
-    struct nexus_metadata * metadata = NULL;
+    return dentry_lookup(&root_dentry, filepath);
+}
 
-    struct nexus_dentry   * dentry   = dentry_lookup(&root_dentry, filepath);
+struct nexus_metadata *
+nexus_vfs_get(char * filepath, nexus_metadata_type_t type, nexus_io_mode_t mode)
+{
+    struct nexus_dentry * dentry = dentry_lookup(&root_dentry, filepath);
 
     if (dentry == NULL) {
         log_error("dentry_lookup FAILED\n");
         return NULL;
     }
 
-    *path_dentry = dentry;
+    if (revalidate_dentry(dentry, mode)) {
+        log_error("could not revalidate metadata dentry\n");
+        return NULL;
+    }
 
-    metadata = dentry->metadata;
+    dentry->metadata->ref_count += 1;
 
-    // TODO increase usage count
-
-    return metadata;
+    return dentry->metadata;
 }
 
 
 void
 nexus_vfs_put(struct nexus_metadata * metadata)
 {
-    // TODO
+    metadata->ref_count -= 1;
 }
 
 void
@@ -152,17 +145,24 @@ nexus_vfs_drop(struct nexus_metadata * metadata)
 }
 
 int
-nexus_vfs_revalidate(struct nexus_metadata * metadata)
+nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_mode_t mode)
 {
-    // TODO stat the metadata store and check if the metadata is old
+    bool should_reload = true;
+
+    buffer_layer_revalidate(&metadata->uuid, &should_reload);
+
+    if (should_reload) {
+        return nexus_metadata_reload(metadata, mode);
+    }
+
     return 0;
 }
 
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type)
+nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_mode_t mode)
 {
     // search cache for contents
-    struct nexus_metadata * metadata = nexus_metadata_load(uuid, type);
+    struct nexus_metadata * metadata = nexus_metadata_load(uuid, type, mode);
 
     if (metadata == NULL) {
         log_error("loading data into VFS failed\n");

@@ -1,3 +1,6 @@
+#include "internal.h"
+#include <time.h>
+
 static uint8_t *
 __read_from_disk(struct nexus_datastore * datastore,
                  struct lock_manager    * lock_manager,
@@ -54,6 +57,7 @@ uint8_t *
 io_buffer_get(struct nexus_uuid   * uuid,
               nexus_io_mode_t       mode,
               size_t              * p_size,
+              size_t              * p_timestamp,
               struct nexus_volume * volume)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
@@ -64,8 +68,6 @@ io_buffer_get(struct nexus_uuid   * uuid,
 
     struct nexus_stat    stat;
 
-    int                  ret         = -1;
-
 
     buf = buffer_manager_get(sgx_backend->buf_manager, uuid);
 
@@ -73,16 +75,16 @@ io_buffer_get(struct nexus_uuid   * uuid,
         goto read_datastore;
     }
 
-    ret = nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat);
-
-    if (ret != 0) {
+    if (nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat)) {
         log_error("could not stat metadata file\n");
         goto out_err;
     }
 
     // if nothing changed, just return the buffer
     if (stat.timestamp <= buf->timestamp) {
-        *p_size = buf->size;
+        *p_timestamp = buf->timestamp;
+        *p_size      = buf->size;
+
         return buf->addr;
     }
 
@@ -94,18 +96,22 @@ read_datastore:
         goto out_err;
     }
 
-    if (buffer_manager_add(sgx_backend->buf_manager, addr, *p_size, uuid)) {
+    buf = __buffer_manager_add(sgx_backend->buf_manager, addr, *p_size, uuid);
+
+    if (buf == NULL) {
         nexus_free(addr);
 
-        log_error("buffer_manager_add FAILED\n");
+        log_error("__buffer_manager_add FAILED\n");
         goto out_err;
     }
+
+    *p_timestamp = buf->timestamp;
 
     return addr;
 
 out_err:
     if (buf) {
-        __buffer_manager_put(sgx_backend->buf_manager, buf);
+        buffer_manager_put(sgx_backend->buf_manager, &buf->uuid);
     }
 
     return NULL;
@@ -127,13 +133,16 @@ __flush_metadata(struct lock_manager    * lock_manager,
             log_error("could not write data file\n");
             return -1;
         }
+
+        // the last time we "synced" buffer
+        buf->timestamp = time(NULL);
     }
 
     return 0;
 }
 
 int
-io_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
+io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
 
@@ -151,7 +160,9 @@ io_buffer_put(struct nexus_uuid * uuid, struct nexus_volume * volume)
 
     ret = __flush_metadata(sgx_backend->lock_manager, volume->metadata_store, buf);
 
-    __buffer_manager_put(sgx_backend->buf_manager, buf);
+    buffer_manager_put(sgx_backend->buf_manager, &buf->uuid);
+
+    *timestamp = buf->timestamp;
 
     return ret;
 }

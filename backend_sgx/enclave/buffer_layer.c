@@ -1,5 +1,91 @@
 #include "enclave_internal.h"
 
+
+struct __timestamp {
+    struct nexus_uuid uuid;
+    size_t            timestamp;
+};
+
+
+struct nexus_hashtable * timestamp_htable = NULL;
+
+
+int
+buffer_layer_init()
+{
+    timestamp_htable = nexus_create_htable(127, __uuid_hasher, __uuid_equals);
+
+    return 0;
+}
+
+int
+buffer_layer_exit()
+{
+    nexus_free_htable(timestamp_htable, 1, 0);
+    return 0;
+}
+
+static void
+__update_timestamp(struct nexus_uuid * uuid, size_t timestamp)
+{
+    struct __timestamp * tstamp = NULL;
+
+    tstamp = (struct __timestamp *)nexus_htable_search(timestamp_htable, (uintptr_t)uuid);
+
+    if (tstamp == NULL) {
+        tstamp =  nexus_malloc(sizeof(struct __timestamp));
+
+        tstamp->timestamp = timestamp;
+        nexus_uuid_copy(uuid, &tstamp->uuid);
+
+        nexus_htable_insert(timestamp_htable, (uintptr_t)&tstamp->uuid, (uintptr_t)tstamp);
+
+        return;
+    }
+
+    tstamp->timestamp = timestamp;
+}
+
+static void
+__remove_timestamp(struct nexus_uuid * uuid)
+{
+    struct __timestamp * tstamp = NULL;
+
+    tstamp = (struct __timestamp *)nexus_htable_remove(timestamp_htable, (uintptr_t)uuid, 0);
+
+    nexus_free(tstamp);
+}
+
+int
+buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
+{
+    struct __timestamp * tstamp    = NULL;
+
+    size_t stat_timestamp;
+
+    int err = -1;
+    int ret = -1;
+
+    // check if we have a timestamp
+    tstamp = (struct __timestamp *)nexus_htable_search(timestamp_htable, (uintptr_t)uuid);
+
+    if (tstamp == NULL) {
+        *should_reload = true;
+        return 0;
+    }
+
+    err = ocall_buffer_stattime(&ret, uuid, &stat_timestamp, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_stat FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    *should_reload = stat_timestamp > tstamp->timestamp;
+
+    return 0;
+}
+
 void *
 buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
 {
@@ -23,19 +109,23 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
 }
 
 void *
-buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
+buffer_layer_get(struct nexus_uuid * uuid, nexus_io_mode_t mode, size_t * size)
 {
     uint8_t * external_addr = NULL;
+
+    size_t    timestamp     = 0;
 
     int err = -1;
 
 
-    err = ocall_buffer_get(&external_addr, uuid, size, global_volume);
+    err = ocall_buffer_get(&external_addr, uuid, mode, size, &timestamp, global_volume);
 
     if (err || external_addr == NULL) {
         log_error("ocall_buffer_get FAILED (err=%d)\n", err);
         return NULL;
     }
+
+    __update_timestamp(uuid, timestamp);
 
     return external_addr;
 }
@@ -43,7 +133,19 @@ buffer_layer_get(struct nexus_uuid * uuid, size_t * size)
 int
 buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
-    ocall_buffer_put(buffer_uuid, global_volume);
+    size_t timestamp = 0;
+
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_put(&ret, buffer_uuid, &timestamp, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    __update_timestamp(buffer_uuid, timestamp);
 
     return 0;
 }
@@ -72,76 +174,11 @@ buffer_layer_delete(struct nexus_uuid * uuid)
 
     err = ocall_buffer_del(&ret, uuid, global_volume);
 
+    __remove_timestamp(uuid);
+
     // XXX: what do to about err?
     (void) err;
     (void) ret;
-}
-
-int
-buffer_layer_copy(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
-{
-    // get a reference and copy the uuid
-    void * buffer = NULL;
-    size_t buflen = 0;
-
-    buffer = buffer_layer_get(from_uuid, &buflen);
-
-    if (buffer == NULL) {
-        log_error("could not acquire reference to buffer\n");
-        return -1;
-    }
-
-    nexus_uuid_copy(from_uuid, to_uuid);
-
-    return 0;
-}
-
-int
-buffer_layer_lock(struct nexus_uuid * uuid)
-{
-    int err = -1;
-    int ret = -1;
-
-    err = ocall_buffer_lock(&ret, uuid, global_volume);
-
-    if (err || ret) {
-        log_error("ocall_buffer_lock FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-buffer_layer_unlock(struct nexus_uuid * uuid)
-{
-    int err = -1;
-    int ret = -1;
-
-    err = ocall_buffer_unlock(&ret, uuid, global_volume);
-
-    if (err || ret) {
-        log_error("ocall_buffer_unlock FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-buffer_layer_flush(struct nexus_uuid * uuid)
-{
-    int err = -1;
-    int ret = -1;
-
-    err = ocall_buffer_flush(&ret, uuid, global_volume);
-
-    if (err || ret) {
-        log_error("ocall_buffer_flush FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    return 0;
 }
 
 int

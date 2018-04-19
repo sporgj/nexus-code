@@ -21,7 +21,7 @@
 #include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_raw_file.h>
-#include <nexus_locked_file.h>
+#include <nexus_file_handle.h>
 #include <nexus_util.h>
 #include <nexus_types.h>
 
@@ -431,16 +431,12 @@ err_out:
 }
 
 
-struct nexus_locked_file *
-flat_open_locked(struct nexus_uuid  * uuid,
-                 char               * path,
-                 uint8_t           ** buf,
-                 uint32_t           * size,
-                 void               * priv_data)
+struct nexus_file_handle *
+flat_fopen(struct nexus_uuid * uuid, char * path, nexus_io_mode_t mode, void * priv_data)
 {
     struct flat_datastore    * datastore   = priv_data;
 
-    struct nexus_locked_file * locked_file = NULL;
+    struct nexus_file_handle * file_handle = NULL;
 
     char                     * filepath    = NULL;
 
@@ -453,31 +449,34 @@ flat_open_locked(struct nexus_uuid  * uuid,
     }
 
 
-    locked_file = nexus_open_locked_file(filepath, buf, (size_t *)size);
+    file_handle = nexus_file_handle_open(filepath, mode);
 
     nexus_free(filepath);
 
-    if (locked_file == NULL) {
-        log_error("nexus_open_locked_file FAILED\n");
+    if (file_handle == NULL) {
+        log_error("nexus_open_file_handle FAILED\n");
 	return NULL;
     }
 
-    return locked_file;
+    return file_handle;
 }
 
 int
-flat_write_locked(struct nexus_locked_file * locked_file,
-                  uint8_t                  * buf,
-                  uint32_t                   size,
-                  void                     * priv_data)
+flat_fread(struct nexus_file_handle * file_handle, uint8_t ** buf, size_t * size, void * priv_data)
 {
-    return nexus_write_locked_file(locked_file, buf, size);
+    return nexus_file_handle_read(file_handle, buf, size);
+}
+
+int
+flat_fwrite(struct nexus_file_handle * file_handle, uint8_t * buf, size_t size, void * priv_data)
+{
+    return nexus_file_handle_write(file_handle, buf, size);
 }
 
 void
-flat_close_locked(struct nexus_locked_file * locked_file, void * priv_data)
+flat_fclose(struct nexus_file_handle * file_handle, void * priv_data)
 {
-    nexus_close_locked_file(locked_file);
+    nexus_file_handle_close(file_handle);
 }
 
 
@@ -495,9 +494,10 @@ static struct nexus_datastore_impl flat_datastore = {
     .update_uuid = flat_update_uuid,
     .del_uuid    = flat_del_uuid,
 
-    .open_uuid   = flat_open_locked,
-    .write_uuid  = flat_write_locked,
-    .close_uuid  = flat_close_locked,
+    .fopen       = flat_fopen,
+    .fread       = flat_fread,
+    .fwrite      = flat_fwrite,
+    .fclose      = flat_fclose,
 
     .hardlink_uuid = flat_hardlink_uuid,
     .rename_uuid   = flat_rename_uuid

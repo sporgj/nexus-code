@@ -4,6 +4,7 @@ struct nexus_metadata *
 nexus_metadata_new(struct nexus_uuid     * uuid,
                    void                  * obj,
                    nexus_metadata_type_t   type,
+                   nexus_io_mode_t         mode,
                    uint32_t                version)
 {
     struct nexus_metadata * metadata = nexus_malloc(sizeof(struct nexus_metadata));
@@ -18,6 +19,8 @@ nexus_metadata_new(struct nexus_uuid     * uuid,
     } else if (type == NEXUS_FILENODE) {
         metadata->filenode = (struct nexus_filenode *)obj;
     }
+
+    metadata->mode = mode;
 
     return metadata;
 }
@@ -48,14 +51,17 @@ nexus_metadata_compare(struct nexus_metadata * metadata1, struct nexus_metadata 
 }
 
 static void *
-__read_object(struct nexus_uuid * uuid, nexus_metadata_type_t type, uint32_t * version)
+__read_object(struct nexus_uuid     * uuid,
+              nexus_metadata_type_t   type,
+              nexus_io_mode_t         mode,
+              uint32_t              * version)
 {
     void                    * object     = NULL;
 
     struct nexus_crypto_buf * crypto_buf = NULL;
 
 
-    crypto_buf = nexus_crypto_buf_create(uuid);
+    crypto_buf = nexus_crypto_buf_create(uuid, mode);
 
     if (crypto_buf == NULL) {
         log_error("could not read crypto_buf\n");
@@ -76,10 +82,10 @@ __read_object(struct nexus_uuid * uuid, nexus_metadata_type_t type, uint32_t * v
     } else {
         switch (type) {
         case NEXUS_DIRNODE:
-            object = dirnode_from_crypto_buf(crypto_buf);
+            object = dirnode_from_crypto_buf(crypto_buf, mode);
             break;
         case NEXUS_FILENODE:
-            object = filenode_from_crypto_buf(crypto_buf);
+            object = filenode_from_crypto_buf(crypto_buf, mode);
             break;
         }
     }
@@ -89,22 +95,51 @@ __read_object(struct nexus_uuid * uuid, nexus_metadata_type_t type, uint32_t * v
     return object;
 }
 
-struct nexus_metadata *
-nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type)
+int
+nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_mode_t mode)
 {
     void    * object = NULL;
 
     uint32_t version = 0;
 
 
-    object = __read_object(uuid, type, &version);
+    object = __read_object(&metadata->uuid, metadata->type, mode, &version);
+
+    if (object == NULL) {
+        log_error("could not reload metadata object\n");
+    }
+
+    // throw the old object and set the new
+    switch (metadata->type) {
+    case NEXUS_DIRNODE:
+        dirnode_free(metadata->dirnode);
+        break;
+    case NEXUS_FILENODE:
+        filenode_free(metadata->filenode);
+        break;
+    }
+
+    metadata->object = object;
+
+    return 0;
+}
+
+struct nexus_metadata *
+nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_mode_t mode)
+{
+    void    * object = NULL;
+
+    uint32_t version = 0;
+
+
+    object = __read_object(uuid, type, mode, &version);
 
     if (object == NULL) {
         log_error("reading metadata object FAILED\n");
         return NULL;
     }
 
-    return nexus_metadata_new(uuid, object, type, version);
+    return nexus_metadata_new(uuid, object, type, mode, version);
 }
 
 int

@@ -49,7 +49,7 @@ __supernode_buflen(struct nexus_supernode * supernode)
 }
 
 struct nexus_supernode *
-supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
+supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t mode)
 {
     struct nexus_supernode * supernode = NULL;
 
@@ -82,7 +82,7 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer)
     {
         struct nexus_mac usertable_mac;
 
-        supernode->usertable = nexus_usertable_load(&supernode->usertable_uuid, &usertable_mac);
+        supernode->usertable = nexus_usertable_load(&supernode->usertable_uuid, mode, &usertable_mac);
 
         if (supernode->usertable == NULL) {
             log_error("could not load usertable\n");
@@ -108,21 +108,21 @@ err:
 }
 
 struct nexus_supernode *
-supernode_load(struct nexus_uuid * uuid)
+supernode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode)
 {
     struct nexus_supernode * supernode = NULL;
 
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
 
-    crypto_buffer = nexus_crypto_buf_create(uuid);
+    crypto_buffer = nexus_crypto_buf_create(uuid, mode);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
         return NULL;
     }
 
-    supernode = supernode_from_crypto_buffer(crypto_buffer);
+    supernode = supernode_from_crypto_buffer(crypto_buffer, mode);
 
     nexus_crypto_buf_free(crypto_buffer);
 

@@ -26,9 +26,13 @@ typedef enum {
     NEXUS_LNK = 3   /* symlink      */
 } nexus_dirent_type_t;
 
+
 typedef enum {
-    NEXUS_FREAD = 0x01,
-    NEXUS_FWRITE = 0x02
+    NEXUS_FREAD          = 0x00000001,
+    NEXUS_FWRITE         = 0x00000002,
+    NEXUS_FRDWR          = NEXUS_FREAD | NEXUS_FWRITE,
+
+    NEXUS_FDELETE        = 0x00000004
 } nexus_io_mode_t;
 
 

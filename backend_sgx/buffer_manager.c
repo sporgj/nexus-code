@@ -1,5 +1,7 @@
 #include "internal.h"
 
+#include <time.h>
+
 #include <nexus_hashtable.h>
 
 #define HASHTABLE_SIZE 127
@@ -59,12 +61,13 @@ buffer_manager_init()
 void
 buffer_manager_destroy(struct buffer_manager * buf_manager)
 {
+    // TODO: free buf->addr
     // only free the values
     nexus_free_htable(buf_manager->buffers_table, 1, 0);
     nexus_free(buf_manager);
 }
 
-int
+static struct __buf *
 __alloc_buf(struct buffer_manager * buf_manager,
             uint8_t               * addr,
             size_t                  size,
@@ -79,6 +82,8 @@ __alloc_buf(struct buffer_manager * buf_manager,
     buf->refcount = 1;
     buf->on_disk  = on_disk;
 
+    buf->timestamp = time(NULL);
+
     nexus_uuid_copy(uuid, &buf->uuid);
 
     // insert in the htable
@@ -87,9 +92,9 @@ __alloc_buf(struct buffer_manager * buf_manager,
 
         uintptr_t      key     = (uintptr_t)&buf->uuid;
 
-        int ret = -1;
+        int            ret     = -1;
 
-        // XXX, for now, we remove the old and add the new
+        // XXX, for now, we remove the old and add the new.
         old_buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, key, 0);
 
         if (old_buf) {
@@ -107,43 +112,39 @@ __alloc_buf(struct buffer_manager * buf_manager,
 
     buf_manager->table_size += 1;
 
-    return 0;
+    return buf;
 cleanup:
     nexus_free(buf);
 
-    return -1;
+    return NULL;
 }
 
 uint8_t *
 buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct nexus_uuid * buf_uuid)
 {
-    uint8_t * addr = NULL;
+    uint8_t * addr = nexus_malloc(size);
 
-    int ret = -1;
-
-    addr = nexus_malloc(size);
-
-    // TODO invalidate existing entry
-
-    ret = __alloc_buf(buf_manager, addr, size, buf_uuid, false);
-    if (ret != 0) {
-        goto cleanup;
+    // FIXME. At this point, allocating a buffer (usually for writing) erases any cached read data.
+    // a better solution is to associate each buf with a "write buffer".
+    if (__alloc_buf(buf_manager, addr, size, buf_uuid, false) == NULL) {
+        nexus_free(addr);
+        return NULL;
     }
 
     return addr;
-cleanup:
-    nexus_free(addr);
-
-    return NULL;
 }
 
+
+struct __buf *
+__buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid)
+{
+    return __alloc_buf(buf_manager, addr, size, uuid, true);
+}
 
 int
 buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid)
 {
-    int ret = __alloc_buf(buf_manager, addr, size, uuid, true);
-
-    if (ret != 0) {
+    if (__alloc_buf(buf_manager, addr, size, uuid, true) == NULL) {
         return -1;
     }
 

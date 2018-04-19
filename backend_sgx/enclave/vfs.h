@@ -40,7 +40,11 @@ nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type
  * @return metadata
  */
 struct nexus_metadata *
-nexus_vfs_get(char * path, nexus_metadata_type_t type, struct nexus_dentry ** path_dentry);
+nexus_vfs_get(char * path, nexus_metadata_type_t type, nexus_io_mode_t mode);
+
+// lookup the dentry
+struct nexus_dentry *
+nexus_vfs_lookup(char * filepath);
 
 /**
  * puts back a metadata onto the VFS
@@ -61,7 +65,7 @@ nexus_vfs_drop(struct nexus_metadata * metadata);
  * @return 0 on success
  */
 int
-nexus_vfs_revalidate(struct nexus_metadata * metadata);
+nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_mode_t mode);
 
 
 
@@ -71,8 +75,9 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata);
  * @param uuid_path
  */
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid * metadata_uuid, nexus_metadata_type_t metadata_type);
-
+nexus_vfs_load(struct nexus_uuid     * metadata_uuid,
+               nexus_metadata_type_t   metadata_type,
+               nexus_io_mode_t         mode );
 
 void
 nexus_vfs_delete(struct nexus_uuid * metadata_uuid);
