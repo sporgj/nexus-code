@@ -7,6 +7,7 @@
  */
 #pragma once
 
+#include <stdint.h>
 
 #include <nexus_fs.h>
 #include <nexus_uuid.h>
@@ -72,7 +73,7 @@ struct nexus_file_handle *
 nexus_datastore_fopen(struct nexus_datastore    * datastore,
                       struct nexus_uuid         * uuid,
                       char                      * path,
-                      nexus_io_mode_t             mode);
+                      nexus_io_flags_t            flags);
 
 int
 nexus_datastore_fread(struct nexus_datastore    * datastore,
@@ -202,7 +203,7 @@ struct nexus_datastore_impl {
      */
     struct nexus_file_handle * (*fopen)(struct nexus_uuid  * uuid,
                                         char               * path,
-                                        nexus_io_mode_t      mode,
+                                        nexus_io_flags_t     flags,
                                         void               * priv_data);
 
     /**

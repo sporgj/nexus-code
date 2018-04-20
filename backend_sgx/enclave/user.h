@@ -52,7 +52,7 @@ nexus_usertable_copy_uuid(struct nexus_usertable * usertable, struct nexus_uuid 
  * @return usertable
  */
 struct nexus_usertable *
-nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_mode_t mode, struct nexus_mac * mac);
+nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_mac * mac);
 
 int
 nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac);

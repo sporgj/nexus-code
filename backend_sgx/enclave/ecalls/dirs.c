@@ -44,7 +44,7 @@ ecall_fs_create(char                * dirpath_IN,
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -103,7 +103,7 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR | NEXUS_FDELETE);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR | NEXUS_FDELETE);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -160,7 +160,7 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -184,16 +184,13 @@ out:
 
 inline static int
 __nxs_fs_filldir(struct nexus_metadata * metadata,
-                 char                  * dirpath_IN,
                  struct nexus_uuid     * uuid,
                  const char           ** name_ptr,
                  size_t                * name_len)
 {
-    struct nexus_dirnode * dirnode = metadata->dirnode;
-
     nexus_dirent_type_t type;
 
-    if (dirnode_find_by_uuid(dirnode, uuid, &type, name_ptr, name_len)) {
+    if (dirnode_find_by_uuid(metadata->dirnode, uuid, &type, name_ptr, name_len)) {
         return -1;
     }
 
@@ -211,14 +208,14 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
         return -1;
     }
 
-    ret = __nxs_fs_filldir(metadata, dirpath_IN, uuid, &name_ptr, &name_len);
+    ret = __nxs_fs_filldir(metadata, uuid, &name_ptr, &name_len);
     if (ret != 0) {
         goto out;
     }
@@ -250,17 +247,13 @@ out:
 
 int
 __nxs_fs_symlink(struct nexus_metadata * metadata,
-                 char                  * dirpath_IN,
                  char                  * link_name,
                  char                  * symlink_target,
                  struct nexus_uuid     * entry_uuid)
 {
-    struct nexus_dirnode * dirnode = metadata->dirnode;
-
-
     nexus_uuid_gen(entry_uuid);
 
-    if (dirnode_add_link(dirnode, link_name, symlink_target, entry_uuid)) {
+    if (dirnode_add_link(metadata->dirnode, link_name, symlink_target, entry_uuid)) {
         log_error("could not add link to dirnode\n");
         return -1;
     }
@@ -281,7 +274,7 @@ ecall_fs_symlink(char              * dirpath_IN,
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -289,7 +282,7 @@ ecall_fs_symlink(char              * dirpath_IN,
     }
 
 
-    ret = __nxs_fs_symlink(metadata, dirpath_IN, linkname_IN, targetpath_IN, &entry_uuid);
+    ret = __nxs_fs_symlink(metadata, linkname_IN, targetpath_IN, &entry_uuid);
 
     if (ret != 0) {
         log_error("symlink operation failed\n");
@@ -378,14 +371,19 @@ ecall_fs_hardlink(char              * link_dirpath_IN,
     int ret = -1;
 
 
-    link_metadata = nexus_vfs_get(link_dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR);
+    link_metadata = nexus_vfs_get(link_dirpath_IN, NEXUS_FRDWR);
 
     if (link_metadata == NULL) {
         log_error("could not get metadata\n");
         return -1;
     }
 
-    target_metadata = nexus_vfs_get(target_dirpath_IN, NEXUS_DIRNODE, NEXUS_FREAD);
+    if (strncmp(link_dirpath_IN, target_dirpath_IN, NEXUS_PATH_MAX) == 0) {
+        target_metadata = nexus_metadata_get(link_metadata);
+        goto do_hardlink;
+    }
+
+    target_metadata = nexus_vfs_get(target_dirpath_IN, NEXUS_FREAD);
 
     if (target_metadata == NULL) {
         nexus_vfs_put(link_metadata);
@@ -393,6 +391,7 @@ ecall_fs_hardlink(char              * link_dirpath_IN,
         return -1;
     }
 
+do_hardlink:
     ret = __nxs_fs_hardlink(link_metadata->dirnode,
                             link_name_IN,
                             target_metadata->dirnode,
@@ -503,7 +502,7 @@ ecall_fs_rename(char              * from_dirpath_IN,
 
     // if it's the same directory, just skip to editing the same dirnode
     if (strncmp(from_dirpath_IN, to_dirpath_IN, NEXUS_PATH_MAX) == 0) {
-        from_metadata = nexus_vfs_get(from_dirpath_IN, NEXUS_DIRNODE, NEXUS_FRDWR);
+        from_metadata = nexus_vfs_get(from_dirpath_IN, NEXUS_FRDWR);
         tmp_metadata  = from_metadata;
 
         goto do_rename;

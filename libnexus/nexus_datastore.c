@@ -90,7 +90,7 @@ nexus_datastores_init()
 
 struct nexus_datastore *
 nexus_datastore_create(char             * name,
-		       nexus_json_obj_t   cfg)
+                       nexus_json_obj_t   cfg)
 {
     struct nexus_datastore      * datastore = NULL;
     struct nexus_datastore_impl * impl      = NULL;
@@ -122,7 +122,7 @@ nexus_datastore_create(char             * name,
 
 int
 nexus_datastore_delete(char             * name,
-		       nexus_json_obj_t   cfg)
+                       nexus_json_obj_t   cfg)
 {
     struct nexus_datastore_impl * impl = NULL;
 
@@ -147,7 +147,7 @@ nexus_datastore_delete(char             * name,
 
 struct nexus_datastore *
 nexus_datastore_open(char             * name,
-		     nexus_json_obj_t   cfg)
+                     nexus_json_obj_t   cfg)
 {
     struct nexus_datastore      * datastore = NULL;
     struct nexus_datastore_impl * impl      = NULL;
@@ -218,34 +218,34 @@ nexus_datastore_put_uuid(struct nexus_datastore     * datastore,
 
 struct nexus_file_handle *
 nexus_datastore_fopen(struct nexus_datastore   * datastore,
-                           struct nexus_uuid        * uuid,
-                           char                     * path,
-                           nexus_io_mode_t            mode)
+                      struct nexus_uuid        * uuid,
+                      char                     * path,
+                      nexus_io_flags_t           flags)
 {
-    return datastore->impl->fopen(uuid, path, mode, datastore->priv_data);
+    return datastore->impl->fopen(uuid, path, flags, datastore->priv_data);
 }
 
 int
 nexus_datastore_fread(struct nexus_datastore    * datastore,
-                           struct nexus_file_handle  * file_handle,
-                           uint8_t                  ** buf,
-                           size_t                    * size)
+                      struct nexus_file_handle  * file_handle,
+                      uint8_t                  ** buf,
+                      size_t                    * size)
 {
     return datastore->impl->fread(file_handle, buf, size, datastore->priv_data);
 }
 
 int
 nexus_datastore_fwrite(struct nexus_datastore   * datastore,
-                           struct nexus_file_handle  * file_handle,
-                           uint8_t                   * buf,
-                           size_t                      size)
+                       struct nexus_file_handle  * file_handle,
+                       uint8_t                   * buf,
+                       size_t                      size)
 {
     return datastore->impl->fwrite(file_handle, buf, size, datastore->priv_data);
 }
 
 void
 nexus_datastore_fclose(struct nexus_datastore   * datastore,
-                            struct nexus_file_handle * file_handle)
+                       struct nexus_file_handle * file_handle)
 {
     return datastore->impl->fclose(file_handle, datastore->priv_data);
 }

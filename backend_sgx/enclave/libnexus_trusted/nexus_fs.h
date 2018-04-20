@@ -22,7 +22,7 @@ typedef enum {
     NEXUS_FRDWR          = NEXUS_FREAD | NEXUS_FWRITE,
 
     NEXUS_FDELETE        = 0x00000004
-} nexus_io_mode_t;
+} nexus_io_flags_t;
 
 
 struct nexus_stat {

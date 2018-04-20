@@ -39,7 +39,7 @@ struct nexus_supernode {
  * @return NULL on failure
  */
 struct nexus_supernode *
-supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t mode);
+supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t mode);
 
 /**
  * Loads a supernode from UUID
@@ -47,7 +47,7 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_m
  * @return supernode
  */
 struct nexus_supernode *
-supernode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode);
+supernode_load(struct nexus_uuid * uuid, nexus_io_flags_t mode);
 
 /**
  * Instantiates a new supernode and generates both its uuid and the root uuid

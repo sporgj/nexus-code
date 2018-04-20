@@ -82,14 +82,14 @@ nexus_crypto_buf_new(size_t size, uint32_t version, struct nexus_uuid * uuid)
 }
 
 struct nexus_crypto_buf *
-nexus_crypto_buf_create(struct nexus_uuid * buf_uuid, nexus_io_mode_t mode)
+nexus_crypto_buf_create(struct nexus_uuid * buf_uuid, nexus_io_flags_t flags)
 {
     struct nexus_crypto_buf * crypto_buf = NULL;
 
     void   * external_addr = NULL;
     size_t   external_size = 0;
 
-    external_addr = buffer_layer_get(buf_uuid, mode, &external_size);
+    external_addr = buffer_layer_get(buf_uuid, flags, &external_size);
 
     if (external_addr == NULL) {
         log_error("Could not retrieve external addr for buffer\n");

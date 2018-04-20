@@ -109,7 +109,7 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
 }
 
 void *
-buffer_layer_get(struct nexus_uuid * uuid, nexus_io_mode_t mode, size_t * size)
+buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size)
 {
     uint8_t * external_addr = NULL;
 
@@ -118,7 +118,7 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_mode_t mode, size_t * size)
     int err = -1;
 
 
-    err = ocall_buffer_get(&external_addr, uuid, mode, size, &timestamp, global_volume);
+    err = ocall_buffer_get(&external_addr, uuid, flags, size, &timestamp, global_volume);
 
     if (err || external_addr == NULL) {
         log_error("ocall_buffer_get FAILED (err=%d)\n", err);

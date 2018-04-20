@@ -28,7 +28,7 @@ struct nexus_dirnode {
 
     size_t                  bucket_count;
 
-    nexus_io_mode_t         mode;
+    nexus_io_flags_t         mode;
 
 
     struct nexus_acl        dir_acl;
@@ -58,10 +58,10 @@ dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
  * @return
  */
 struct nexus_dirnode *
-dirnode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode);
+dirnode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
 
 struct nexus_dirnode *
-dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf, nexus_io_mode_t mode);
+dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf, nexus_io_flags_t flags);
 
 /**
  * Writes dirnode to datastore

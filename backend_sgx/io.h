@@ -5,7 +5,7 @@ io_buffer_alloc(size_t size, struct nexus_uuid * uuid, struct nexus_volume * vol
 
 uint8_t *
 io_buffer_get(struct nexus_uuid   * uuid,
-              nexus_io_mode_t       mode,
+              nexus_io_flags_t      flags,
               size_t              * p_size,
               size_t              * timestamp,
               struct nexus_volume * volume);

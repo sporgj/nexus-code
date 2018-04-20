@@ -23,24 +23,14 @@ nexus_vfs_deinit();
 int
 nexus_vfs_mount(struct nexus_crypto_buf * crypto_buf);
 
-
-/**
- * Creates a new metadata object
- * @param parent_dentry
- * @param type of metadata
- */
-struct nexus_metadata *
-nexus_vfs_create(struct nexus_dentry * parent_dentry, nexus_metadata_type_t type);
-
 /**
  * Converts a path into a metadata object
  * @param path
- * @param type the metadata type
  * @param dentry is the dentry corresponding to this path
  * @return metadata
  */
 struct nexus_metadata *
-nexus_vfs_get(char * path, nexus_metadata_type_t type, nexus_io_mode_t mode);
+nexus_vfs_get(char * path, nexus_io_flags_t flags);
 
 // lookup the dentry
 struct nexus_dentry *
@@ -65,7 +55,7 @@ nexus_vfs_drop(struct nexus_metadata * metadata);
  * @return 0 on success
  */
 int
-nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_mode_t mode);
+nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags);
 
 
 
@@ -77,7 +67,7 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_mode_t mode);
 struct nexus_metadata *
 nexus_vfs_load(struct nexus_uuid     * metadata_uuid,
                nexus_metadata_type_t   metadata_type,
-               nexus_io_mode_t         mode );
+               nexus_io_flags_t         flags );
 
 void
 nexus_vfs_delete(struct nexus_uuid * metadata_uuid);

@@ -4,7 +4,7 @@ struct nexus_metadata *
 nexus_metadata_new(struct nexus_uuid     * uuid,
                    void                  * obj,
                    nexus_metadata_type_t   type,
-                   nexus_io_mode_t         mode,
+                   nexus_io_flags_t         flags,
                    uint32_t                version)
 {
     struct nexus_metadata * metadata = nexus_malloc(sizeof(struct nexus_metadata));
@@ -20,7 +20,7 @@ nexus_metadata_new(struct nexus_uuid     * uuid,
         metadata->filenode = (struct nexus_filenode *)obj;
     }
 
-    metadata->mode = mode;
+    metadata->mode = flags;
 
     return metadata;
 }
@@ -44,16 +44,10 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     nexus_free(metadata);
 }
 
-int
-nexus_metadata_compare(struct nexus_metadata * metadata1, struct nexus_metadata * metadata2)
-{
-    return nexus_uuid_compare(&metadata1->uuid, &metadata2->uuid);
-}
-
 static void *
 __read_object(struct nexus_uuid     * uuid,
               nexus_metadata_type_t   type,
-              nexus_io_mode_t         mode,
+              nexus_io_flags_t        flags,
               uint32_t              * version)
 {
     void                    * object     = NULL;
@@ -61,7 +55,7 @@ __read_object(struct nexus_uuid     * uuid,
     struct nexus_crypto_buf * crypto_buf = NULL;
 
 
-    crypto_buf = nexus_crypto_buf_create(uuid, mode);
+    crypto_buf = nexus_crypto_buf_create(uuid, flags);
 
     if (crypto_buf == NULL) {
         log_error("could not read crypto_buf\n");
@@ -82,10 +76,10 @@ __read_object(struct nexus_uuid     * uuid,
     } else {
         switch (type) {
         case NEXUS_DIRNODE:
-            object = dirnode_from_crypto_buf(crypto_buf, mode);
+            object = dirnode_from_crypto_buf(crypto_buf, flags);
             break;
         case NEXUS_FILENODE:
-            object = filenode_from_crypto_buf(crypto_buf, mode);
+            object = filenode_from_crypto_buf(crypto_buf, flags);
             break;
         }
     }
@@ -96,14 +90,14 @@ __read_object(struct nexus_uuid     * uuid,
 }
 
 int
-nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_mode_t mode)
+nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 {
     void    * object = NULL;
 
     uint32_t version = 0;
 
 
-    object = __read_object(&metadata->uuid, metadata->type, mode, &version);
+    object = __read_object(&metadata->uuid, metadata->type, flags, &version);
 
     if (object == NULL) {
         log_error("could not reload metadata object\n");
@@ -125,7 +119,7 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_mode_t mode)
 }
 
 struct nexus_metadata *
-nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_mode_t mode)
+nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t mode)
 {
     void    * object = NULL;
 
@@ -162,4 +156,24 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     }
 
     return ret;
+}
+
+struct nexus_metadata *
+nexus_metadata_get(struct nexus_metadata * metadata)
+{
+    if (metadata) {
+        metadata->ref_count += 1;
+    }
+
+    return metadata;
+}
+
+/**
+ * Decrements the ref count of the metadata object
+ * @param metadata
+ */
+void
+nexus_metadata_put(struct nexus_metadata * metadata)
+{
+    metadata->ref_count -= 1;
 }

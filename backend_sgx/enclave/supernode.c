@@ -49,7 +49,7 @@ __supernode_buflen(struct nexus_supernode * supernode)
 }
 
 struct nexus_supernode *
-supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t mode)
+supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t mode)
 {
     struct nexus_supernode * supernode = NULL;
 
@@ -108,7 +108,7 @@ err:
 }
 
 struct nexus_supernode *
-supernode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode)
+supernode_load(struct nexus_uuid * uuid, nexus_io_flags_t mode)
 {
     struct nexus_supernode * supernode = NULL;
 

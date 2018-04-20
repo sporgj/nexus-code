@@ -152,7 +152,7 @@ enclave {
         ocall_buffer_get
         (
             [in]         struct nexus_uuid   * metadata_uuid,
-                         nexus_io_mode_t       mode,
+                         nexus_io_flags_t       mode,
             [out]        size_t              * buffer_size,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume

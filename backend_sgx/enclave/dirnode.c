@@ -344,7 +344,7 @@ out_err:
 }
 
 struct nexus_dirnode *
-dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t mode)
+dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t flags)
 {
     struct nexus_dirnode * dirnode = NULL;
 
@@ -367,24 +367,24 @@ dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t
         return NULL;
     }
 
-    dirnode->mode = mode;
+    dirnode->mode = flags;
 
     return dirnode;
 }
 
 struct nexus_dirnode *
-dirnode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode)
+dirnode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 {
     struct nexus_dirnode * dirnode = NULL;
 
-    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, mode);
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, flags);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
         return NULL;
     }
 
-    dirnode = dirnode_from_crypto_buf(crypto_buffer, mode);
+    dirnode = dirnode_from_crypto_buf(crypto_buffer, flags);
 
     nexus_crypto_buf_free(crypto_buffer);
 

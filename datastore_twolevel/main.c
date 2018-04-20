@@ -258,7 +258,7 @@ err:
 }
 
 struct nexus_file_handle *
-twolevel_fopen(struct nexus_uuid * uuid, char * path, nexus_io_mode_t mode, void * priv_data)
+twolevel_fopen(struct nexus_uuid * uuid, char * path, nexus_io_flags_t flags, void * priv_data)
 {
     struct twolevel_datastore * datastore   = priv_data;
 
@@ -275,7 +275,7 @@ twolevel_fopen(struct nexus_uuid * uuid, char * path, nexus_io_mode_t mode, void
     }
 
 
-    file_handle = nexus_file_handle_open(filepath, mode);
+    file_handle = nexus_file_handle_open(filepath, flags);
 
     nexus_free(filepath);
 

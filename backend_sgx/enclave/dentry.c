@@ -108,11 +108,11 @@ dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child_file
 }
 
 int
-revalidate_dentry(struct nexus_dentry * dentry, nexus_io_mode_t mode)
+revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 {
 
     if (dentry->metadata) {
-        if (nexus_vfs_revalidate(dentry->metadata, mode)) {
+        if (nexus_vfs_revalidate(dentry->metadata, flags)) {
             log_error("could not revalidate dentry\n");
             return -1;
         }
@@ -121,7 +121,7 @@ revalidate_dentry(struct nexus_dentry * dentry, nexus_io_mode_t mode)
     }
 
     // dentry->metadata = NULL
-    dentry->metadata = nexus_vfs_load(&dentry->uuid, dentry->metadata_type, mode);
+    dentry->metadata = nexus_vfs_load(&dentry->uuid, dentry->metadata_type, flags);
 
     if (dentry->metadata == NULL) {
         log_error("could not load metadata\n");
@@ -135,18 +135,14 @@ revalidate_dentry(struct nexus_dentry * dentry, nexus_io_mode_t mode)
 }
 
 struct nexus_metadata *
-dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_mode_t mode, bool revalidate)
+dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool revalidate)
 {
-    if (revalidate && revalidate_dentry(dentry, mode)) {
+    if (revalidate && revalidate_dentry(dentry, flags)) {
         log_error("could revalidate dentry\n");
         return NULL;
     }
 
-    if (dentry->metadata) {
-        dentry->metadata->ref_count += 1;
-    }
-
-    return dentry->metadata;
+    return nexus_metadata_get(dentry->metadata);
 }
 
 static struct nexus_dentry *

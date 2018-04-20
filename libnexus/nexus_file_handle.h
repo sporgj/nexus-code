@@ -9,13 +9,17 @@
 struct nexus_file_handle {
     FILE            * file_ptr;
     char            * filepath;
-    nexus_io_mode_t   mode;
+    nexus_io_flags_t   mode;
     bool              touched;
 };
 
-
+/**
+ * Creates a new file handle
+ * @param filepath
+ * @param mode
+ */
 struct nexus_file_handle *
-nexus_file_handle_open(char * filepath, nexus_io_mode_t mode);
+nexus_file_handle_open(char * filepath, nexus_io_flags_t mode);
 
 void
 nexus_file_handle_close(struct nexus_file_handle * file_handle);

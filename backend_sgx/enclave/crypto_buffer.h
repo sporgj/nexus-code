@@ -21,7 +21,7 @@ struct nexus_crypto_buf;
  * @return nexus_crypto_buf
  */
 struct nexus_crypto_buf *
-nexus_crypto_buf_create(struct nexus_uuid * uuid, nexus_io_mode_t mode);
+nexus_crypto_buf_create(struct nexus_uuid * uuid, nexus_io_flags_t flags);
 
 /**
  * Creates a new crypto buffer which will encrypt a metadata buffer of size.

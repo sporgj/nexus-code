@@ -1,11 +1,12 @@
 #include "internal.h"
 #include <time.h>
+#include <nexus_datastore.h>
 
 static uint8_t *
 __read_from_disk(struct nexus_datastore * datastore,
                  struct lock_manager    * lock_manager,
                  struct nexus_uuid      * uuid,
-                 nexus_io_mode_t          mode,
+                 nexus_io_flags_t         flags,
                  size_t                 * p_size)
 {
     struct nexus_file_handle * file_handle = NULL;
@@ -15,7 +16,7 @@ __read_from_disk(struct nexus_datastore * datastore,
     int ret = -1;
 
 
-    file_handle = nexus_datastore_fopen(datastore, uuid, NULL, mode);
+    file_handle = nexus_datastore_fopen(datastore, uuid, NULL, flags);
 
     if (file_handle == NULL) {
         log_error("could not open locked file\n");
@@ -30,7 +31,7 @@ __read_from_disk(struct nexus_datastore * datastore,
     }
 
     // add it to the lock manager
-    if (mode & NEXUS_FWRITE) {
+    if (flags & NEXUS_FWRITE) {
         ret = lock_manager_add(lock_manager, uuid, file_handle);
 
         if (ret != 0) {
@@ -55,7 +56,7 @@ out_err:
 
 uint8_t *
 io_buffer_get(struct nexus_uuid   * uuid,
-              nexus_io_mode_t       mode,
+              nexus_io_flags_t      flags,
               size_t              * p_size,
               size_t              * p_timestamp,
               struct nexus_volume * volume)
@@ -89,7 +90,7 @@ io_buffer_get(struct nexus_uuid   * uuid,
     }
 
 read_datastore:
-    addr = __read_from_disk(volume->metadata_store, sgx_backend->lock_manager, uuid, mode, p_size);
+    addr = __read_from_disk(volume->metadata_store, sgx_backend->lock_manager, uuid, flags, p_size);
 
     if (addr == NULL) {
         log_error("reading from disk FAILED\n");

@@ -432,7 +432,7 @@ err_out:
 
 
 struct nexus_file_handle *
-flat_fopen(struct nexus_uuid * uuid, char * path, nexus_io_mode_t mode, void * priv_data)
+flat_fopen(struct nexus_uuid * uuid, char * path, nexus_io_flags_t flags, void * priv_data)
 {
     struct flat_datastore    * datastore   = priv_data;
 
@@ -449,7 +449,7 @@ flat_fopen(struct nexus_uuid * uuid, char * path, nexus_io_mode_t mode, void * p
     }
 
 
-    file_handle = nexus_file_handle_open(filepath, mode);
+    file_handle = nexus_file_handle_open(filepath, flags);
 
     nexus_free(filepath);
 

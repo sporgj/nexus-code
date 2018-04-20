@@ -14,7 +14,7 @@
 
 
 static char *
-__get_fopen_str_flags(nexus_io_mode_t mode)
+__get_fopen_str_flags(nexus_io_flags_t mode)
 {
     if (mode & NEXUS_FREAD) {
         return "rb";
@@ -24,7 +24,7 @@ __get_fopen_str_flags(nexus_io_mode_t mode)
 }
 
 struct nexus_file_handle *
-nexus_file_handle_open(char * filepath, nexus_io_mode_t mode)
+nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 {
     struct nexus_file_handle * file_handle = nexus_malloc(sizeof(struct nexus_file_handle));
 

@@ -133,14 +133,11 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
 struct nexus_filenode *
 filenode_from_buffer(uint8_t * buffer, size_t bytes_left)
 {
-    struct nexus_filenode * filenode        = NULL;
+    struct nexus_filenode * filenode        = nexus_malloc(sizeof(struct nexus_filenode));;
 
-    struct chunk_entry    * new_chunk_entry = NULL;
+    size_t                  size            = 0;
 
     uint8_t               * input_ptr       = NULL;
-
-
-    filenode = nexus_malloc(sizeof(struct nexus_filenode));
 
 
     input_ptr = __parse_filenode_header(filenode, buffer, bytes_left);
@@ -154,14 +151,10 @@ filenode_from_buffer(uint8_t * buffer, size_t bytes_left)
     bytes_left -= sizeof(struct __filenode_hdr);
 
     for (size_t i = 0; i < filenode->nchunks; i++) {
-        size_t size     = 0;
-        int    ret      = -1;
 
-        new_chunk_entry = nexus_malloc(sizeof(struct chunk_entry));
+        struct chunk_entry    * new_chunk_entry = nexus_malloc(sizeof(struct chunk_entry));
 
-        ret = __parse_chunk_entry(new_chunk_entry, input_ptr, bytes_left, &size);
-
-        if (ret != 0) {
+        if (__parse_chunk_entry(new_chunk_entry, input_ptr, bytes_left, &size) != 0) {
             log_error("could not parse chunk entry (num=%d)\n", i);
             nexus_free(new_chunk_entry);
             goto out_err;
@@ -181,7 +174,7 @@ out_err:
 }
 
 struct nexus_filenode *
-filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_t mode)
+filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t flags)
 {
     struct nexus_filenode * filenode = NULL;
 
@@ -203,24 +196,24 @@ filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_mode_
         return NULL;
     }
 
-    filenode->mode = mode;
+    filenode->mode = flags;
 
     return filenode;
 }
 
 struct nexus_filenode *
-filenode_load(struct nexus_uuid * uuid, nexus_io_mode_t mode)
+filenode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 {
-    struct nexus_filenode * filenode = NULL;
+    struct nexus_filenode   * filenode      = NULL;
 
-    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, mode);
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, flags);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
         return NULL;
     }
 
-    filenode = filenode_from_crypto_buf(crypto_buffer, mode);
+    filenode = filenode_from_crypto_buf(crypto_buffer, flags);
 
     nexus_crypto_buf_free(crypto_buffer);
 
@@ -244,9 +237,7 @@ __serialize_chunk_entry(struct chunk_entry * chunk_entry,
 static uint8_t *
 __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
 {
-    struct __filenode_hdr * header = NULL;
-
-    header = (struct __filenode_hdr *)buffer;
+    struct __filenode_hdr * header = (struct __filenode_hdr *)buffer;
 
     header->nchunks       = filenode->nchunks;
     header->log2chunksize = filenode->log2chunksize;
@@ -263,12 +254,9 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
 int
 filenode_serialize(struct nexus_filenode * filenode, size_t bytes_left, uint8_t * buffer)
 {
-    struct chunk_entry   * curr_chunk_entry = NULL;
+    size_t    size        = 0;
 
-    uint8_t              * output_ptr       = NULL;
-
-
-    output_ptr = __serialize_filenode_header(filenode, buffer);
+    uint8_t * output_ptr  =  __serialize_filenode_header(filenode, buffer);
 
     if (output_ptr == NULL) {
         log_error("could not parse filenode header\n");
@@ -279,15 +267,9 @@ filenode_serialize(struct nexus_filenode * filenode, size_t bytes_left, uint8_t 
     bytes_left -= sizeof(struct __filenode_hdr);
 
     for (size_t i = 0; i < filenode->nchunks; i++) {
-        size_t      size = 0;
-        int         ret  = -1;
+        struct chunk_entry * curr_chunk_entry = nexus_list_get(&filenode->chunk_list, i);
 
-        curr_chunk_entry = nexus_list_get(&filenode->chunk_list, i);
-
-
-        ret = __serialize_chunk_entry(curr_chunk_entry, output_ptr, bytes_left, &size);
-
-        if (ret != 0) {
+        if (__serialize_chunk_entry(curr_chunk_entry, output_ptr, bytes_left, &size)) {
             log_error("serializing chunk entry (num=%d)\n", i);
             return -1;
         }
@@ -314,7 +296,8 @@ filenode_store(struct nexus_uuid     * uuid,
 
     serialized_buflen = __get_filenode_size(filenode);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &filenode->my_uuid);
+    crypto_buffer     = nexus_crypto_buf_new(serialized_buflen, version, uuid);
+
     if (!crypto_buffer) {
         goto out;
     }
