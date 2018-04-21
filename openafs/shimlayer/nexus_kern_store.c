@@ -115,9 +115,8 @@ nexus_store_transfer(struct nexus_volume * vol,
 {
     struct osi_file * fp = NULL;
 
-    int nbytes_uploaded = 0;
-    int nbytes          = 0;
-    int size            = 0;
+    int nbytes = 0;
+    int size   = 0;
 
     int ret = -1;
 
@@ -150,7 +149,7 @@ nexus_store_transfer(struct nexus_volume * vol,
 
 
     // ship the data to the fileserver
-    ret = nexus_store_upload(afs_call, nexus_databuffer_ptr, nbytes, &nbytes_uploaded);
+    ret = nexus_store_upload(afs_call, nexus_databuffer_ptr, nbytes, transferred);
 
     if (ret != 0) {
         NEXUS_ERROR("nexus_store_upload FAILED\n");

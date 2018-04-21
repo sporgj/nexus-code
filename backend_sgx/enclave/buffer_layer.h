@@ -33,7 +33,7 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload);
  * @return the address to the external buffer.
  */
 void *
-buffer_layer_get(struct nexus_uuid * uuid, nexus_io_mode_t flags, size_t * size);
+buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size);
 
 /**
  * Drops reference to a specified buffer
