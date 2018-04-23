@@ -1,4 +1,4 @@
-#include <nexus_uuid.h>
+#include "enclave_internal.h"
 
 
 static inline void
@@ -17,7 +17,7 @@ __init_dir_entry(struct dir_entry * dir_entry)
     INIT_LIST_HEAD(&dir_entry->bckt_list);
 }
 
-static struct dir_entry *
+struct dir_entry *
 __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char * filename)
 {
     struct dir_entry  * new_dir_entry = nexus_malloc(sizeof(struct dir_entry));
@@ -38,7 +38,7 @@ __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char *
     return new_dir_entry;
 }
 
-static void
+void
 __free_dir_entry(struct dir_entry * dir_entry)
 {
     nexus_free(dir_entry);
@@ -111,7 +111,7 @@ bucket_from_record(size_t capacity, struct __bucket_rec * _rec)
 }
 
 struct __bucket_rec *
-__bucket_to_record(struct dir_bucket * bucket, uint8_t * output_ptr)
+bucket_to_record(struct dir_bucket * bucket, uint8_t * output_ptr)
 {
     struct __bucket_rec * _rec = (struct __bucket_rec *)output_ptr;
 
@@ -125,7 +125,9 @@ __bucket_to_record(struct dir_bucket * bucket, uint8_t * output_ptr)
 }
 
 int
-bucket_load_from_buffer(struct dir_bucket * bucket, struct nexus_dirnode * dirnode, uint8_t * input_ptr)
+bucket_load_from_buffer(struct dir_bucket    * bucket,
+                        struct nexus_dirnode * dirnode,
+                        uint8_t              * input_ptr)
 {
 
     for (size_t i = 0; i < bucket->num_items; i++) {
@@ -136,6 +138,8 @@ bucket_load_from_buffer(struct dir_bucket * bucket, struct nexus_dirnode * dirno
         list_add_tail(&new_dir_entry->bckt_list, &bucket->dir_entries);
 
         new_dir_entry->bucket = bucket;
+
+        __dirnode_index_direntry(dirnode, new_dir_entry);
     }
 
 
@@ -143,16 +147,14 @@ bucket_load_from_buffer(struct dir_bucket * bucket, struct nexus_dirnode * dirno
 }
 
 /**
- * Loads a bucket from the datastore and validates the mac
+ * Loads a bucket from the datastore
  */
 int
 bucket_load_from_uuid(struct dir_bucket    * bucket,
                       struct nexus_dirnode * dirnode,
                       struct nexus_mac     * mac)
 {
-    struct nexus_crypto_buf * crypto_buffer = NULL;
-
-    crypto_buffer = nexus_crypto_buf_create(&bucket->uuid, dirnode->mode);
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(&bucket->uuid, dirnode->mode);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");
@@ -184,12 +186,6 @@ out_err:
     nexus_crypto_buf_free(crypto_buffer);
 
     return -1;
-}
-
-void
-bucket_delete(struct dir_bucket * bucket)
-{
-    buffer_layer_delete(&bucket->uuid);
 }
 
 int

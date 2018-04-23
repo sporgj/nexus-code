@@ -88,6 +88,7 @@ objs := nexus_enclave_t.o \
 	volumekey.o \
 	metadata.o \
 	dirnode.o \
+	bucket.o \
 	filenode.o \
 	supernode.o \
 	main.o

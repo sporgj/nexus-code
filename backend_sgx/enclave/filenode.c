@@ -31,16 +31,29 @@ get_chunk_count(struct nexus_filenode * filenode, size_t file_size)
 }
 
 
+static void
+__add_chunk_entry(struct nexus_filenode * filenode)
+{
+    struct chunk_entry * chunk_entry = nexus_malloc(sizeof(struct chunk_entry));
+
+    nexus_crypto_ctx_generate(&chunk_entry->crypto_ctx);
+
+    nexus_list_append(&filenode->chunk_list, chunk_entry);
+}
 
 static void
 __free_chunk_entry(void * element)
 {
-    free(element);
+    struct chunk_entry * chunk_entry = (struct chunk_entry *)element;
+
+    nexus_crypto_ctx_free(&chunk_entry->crypto_ctx);
+
+    nexus_free(chunk_entry);
 }
 
 
 static inline void
-__set_dirty(struct nexus_filenode * filenode)
+__set_filenode_dirty(struct nexus_filenode * filenode)
 {
     if (filenode->metadata) {
         filenode->metadata->is_dirty = true;
@@ -81,9 +94,7 @@ filenode_init(struct nexus_filenode * filenode, size_t log2chunksize)
 struct nexus_filenode *
 filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
-    struct nexus_filenode * filenode = NULL;
-
-    filenode = nexus_malloc(sizeof(struct nexus_filenode));
+    struct nexus_filenode * filenode = nexus_malloc(sizeof(struct nexus_filenode));
 
     nexus_uuid_copy(root_uuid, &filenode->root_uuid);
     nexus_uuid_copy(my_uuid, &filenode->my_uuid);
@@ -378,14 +389,11 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
     }
 
     while (difference > 0) {
-        struct chunk_entry * chunk_entry = nexus_malloc(sizeof(struct chunk_entry));
-
-        nexus_list_append(&filenode->chunk_list, chunk_entry);
-
+        __add_chunk_entry(filenode);
         difference--;
     }
 
-    __set_dirty(filenode);
+    __set_filenode_dirty(filenode);
 
     return 0;
 }

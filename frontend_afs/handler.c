@@ -495,9 +495,6 @@ handle_encrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         filesize = encrypt_cmd[4].val;
     }
 
-    printf("\n:: Encryption ::\n");
-    nexus_hexdump(global_databuf_addr, min(buflen, 32));
-
     ret = nexus_fs_encrypt(mounted_volume,
                            path,
                            global_databuf_addr,
@@ -510,8 +507,6 @@ handle_encrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         printf("encrypting (%s) FAILED\n", path);
         return -1;
     }
-
-    nexus_hexdump(global_databuf_addr, min(buflen, 32));
 
     ret = asprintf((char **)resp_buf, "\"code\" : 0");
 
@@ -556,9 +551,6 @@ handle_decrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
     }
 
 
-    printf("\n:: Decryption ::\n");
-    nexus_hexdump(global_databuf_addr, min(buflen, 32));
-
     ret = nexus_fs_decrypt(mounted_volume,
                            path,
                            global_databuf_addr,
@@ -571,8 +563,6 @@ handle_decrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         printf("decrypting (%s) FAILED\n", path);
         return -1;
     }
-
-    nexus_hexdump(global_databuf_addr, min(buflen, 32));
 
     ret = asprintf((char **)resp_buf, "\"code\" : 0");
 

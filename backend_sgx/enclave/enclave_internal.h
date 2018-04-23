@@ -34,6 +34,7 @@
 #include "metadata.h"
 #include "dentry.h"
 #include "dirnode.h"
+#include "bucket.h"
 #include "filenode.h"
 
 #include <nexus_volume.h>

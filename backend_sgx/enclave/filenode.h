@@ -77,5 +77,6 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize);
  * @param offset
  * @return nexus_crypto_ctx.
  */
+// TODO change API to prevent misuse
 struct nexus_crypto_ctx *
 filenode_get_chunk(struct nexus_filenode * filenode, size_t offset);

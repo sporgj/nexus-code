@@ -18,6 +18,46 @@
 
 struct nexus_metadata;
 
+
+/* directory entry buffer on disk */
+struct __dir_rec {
+    uint16_t            rec_len;
+
+    nexus_dirent_type_t type;
+
+    struct nexus_uuid   uuid;
+
+    uint16_t            name_len;
+
+    char                name[NEXUS_NAME_MAX]; // XXX: waste of space...
+} __attribute__((packed));
+
+
+// the list of all dir_entries in the dirnode
+struct __hashed_name {
+    struct hashmap_entry     hash_entry;
+
+    char                   * name; // the filename
+};
+
+struct __hashed_uuid {
+    struct hashmap_entry     hash_entry;
+
+    struct nexus_uuid      * uuid;
+};
+
+
+struct dir_entry {
+    struct dir_bucket      * bucket;
+
+    struct __dir_rec         dir_rec;
+
+    struct __hashed_name     filename_hash;
+    struct __hashed_uuid     fileuuid_hash;
+
+    struct list_head         bckt_list;
+};
+
 struct nexus_dirnode {
     struct nexus_uuid       my_uuid;
     struct nexus_uuid       root_uuid;
@@ -54,6 +94,12 @@ struct nexus_dirnode {
  */
 struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
+
+void
+__dirnode_index_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
+
+void
+__dirnode_forget_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
 
 /**
  * Loads the dirnode at specified address

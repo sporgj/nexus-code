@@ -4,7 +4,7 @@ struct nexus_metadata *
 nexus_metadata_new(struct nexus_uuid     * uuid,
                    void                  * obj,
                    nexus_metadata_type_t   type,
-                   nexus_io_flags_t         flags,
+                   nexus_io_flags_t        flags,
                    uint32_t                version)
 {
     struct nexus_metadata * metadata = nexus_malloc(sizeof(struct nexus_metadata));
