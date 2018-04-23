@@ -33,16 +33,29 @@ struct __dir_rec {
 } __attribute__((packed));
 
 
+// the list of all dir_entries in the dirnode
+struct __hashed_name {
+    struct hashmap_entry     hash_entry;
+
+    char                   * name; // the filename
+};
+
+struct __hashed_uuid {
+    struct hashmap_entry     hash_entry;
+
+    struct nexus_uuid      * uuid;
+};
+
+
 struct dir_entry {
-    struct dir_bucket * bucket;
+    struct dir_bucket      * bucket;
 
-    struct __dir_rec    dir_rec;
+    struct __dir_rec         dir_rec;
 
-    // the list of all dir_entries in the dirnode
-    struct list_head    dir_list;
+    struct __hashed_name     filename_hash;
+    struct __hashed_uuid     fileuuid_hash;
 
-    // the list of all dir_entries in a specific bucket
-    struct list_head    bckt_list;
+    struct list_head         bckt_list;
 };
 
 
@@ -107,26 +120,6 @@ __set_clean(struct nexus_dirnode * dirnode)
 }
 
 
-static struct dir_entry *
-__find_by_name(struct nexus_dirnode * dirnode, const char * fname)
-{
-    struct list_head * pos = NULL;
-
-    size_t len = strlen(fname);
-
-    list_for_each(pos, &dirnode->dir_entry_list) {
-        struct dir_entry * dir_entry = list_entry(pos, struct dir_entry, dir_list);
-        struct __dir_rec * dir_rec   = &dir_entry->dir_rec;
-
-        if ((dir_rec->name_len == len) && (memcmp(dir_rec->name, fname, len) == 0)) {
-            return dir_entry;
-        }
-    }
-
-    return NULL;
-}
-
-
 static void
 __free_symlink_entry(void * el)
 {
@@ -180,9 +173,7 @@ __parse_acls(struct nexus_dirnode * dirnode, uint8_t * input_ptr, size_t bytes_l
         return NULL;
     }
 
-    input_ptr += nexus_acl_size(&dirnode->dir_acl);
-
-    return input_ptr;
+    return (input_ptr + nexus_acl_size(&dirnode->dir_acl));
 }
 
 static uint8_t *
@@ -396,18 +387,8 @@ dirnode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 size_t
 dirnode_readdir_total_size(struct nexus_dirnode * dirnode)
 {
-    size_t size = 0;
-
-    struct list_head * pos = NULL;
-
-    list_for_each(pos, &dirnode->dir_entry_list) {
-        struct dir_entry * dir_entry = list_entry(pos, struct dir_entry, dir_list);
-
-        // readdirs will contain pairs of names and UUIDs
-        size += (dir_entry->dir_rec.name_len + sizeof(struct nexus_uuid));
-    }
-
-    return size;
+    // TODO
+    return 0;
 }
 
 
@@ -734,6 +715,53 @@ __get_available_bucket(struct nexus_dirnode * dirnode)
     return bucket;
 }
 
+static int
+__filename_htable_cmp(const void                 * data,
+                      const struct __hashed_name * entry1,
+                      const struct __hashed_name * entry2,
+                      const void                 * keydata)
+{
+    return strncmp(entry1->name, entry2->name, NEXUS_NAME_MAX);
+}
+
+static int
+__fileuuid_htable_cmp(const void                 * data,
+                      const struct __hashed_uuid * entry1,
+                      const struct __hashed_uuid * entry2,
+                      const void                 * keydata)
+{
+    return nexus_uuid_compare(entry1->uuid, entry2->uuid);
+}
+
+static struct dir_entry *
+__dir_entry_from_hashed_filename(struct __hashed_name * hashed_filename)
+{
+    return container_of(hashed_filename, struct dir_entry, filename_hash);
+}
+
+static struct dir_entry *
+__dir_entry_from_hashed_fileuuid(struct __hashed_uuid * hashed_fileuuid)
+{
+    return container_of(hashed_fileuuid, struct dir_entry, fileuuid_hash);
+}
+
+
+static void
+__dirnode_index_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry)
+{
+    hashmap_put(&dirnode->filename_hashmap, &dir_entry->filename_hash);
+    hashmap_put(&dirnode->fileuuid_hashmap, &dir_entry->fileuuid_hash);
+}
+
+static void
+__dirnode_forget_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry)
+{
+    __hashmap_remove_entry(&dirnode->filename_hashmap, &dir_entry->filename_hash.hash_entry);
+    __hashmap_remove_entry(&dirnode->fileuuid_hashmap, &dir_entry->fileuuid_hash.hash_entry);
+}
+
+
+
 
 void
 __dirnode_add_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry)
@@ -746,7 +774,7 @@ __dirnode_add_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_en
 
     // add it to the main list
     {
-        list_add_tail(&dir_entry->dir_list, &dirnode->dir_entry_list);
+        __dirnode_index_direntry(dirnode, dir_entry);
 
         dirnode->dir_entry_count  += 1;
         dirnode->dir_entry_buflen += dir_entry->dir_rec.rec_len;
@@ -766,7 +794,7 @@ __dirnode_del_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_en
     bucket->is_dirty = true;
 
     {
-        list_del(&dir_entry->dir_list);
+        __dirnode_forget_direntry(dirnode, dir_entry);
 
         dirnode->dir_entry_count  -= 1;
         dirnode->dir_entry_buflen -= dir_entry->dir_rec.rec_len;
@@ -787,7 +815,8 @@ __remove_and_free_bucket(void * el)
 static void
 dirnode_init(struct nexus_dirnode * dirnode)
 {
-    INIT_LIST_HEAD(&dirnode->dir_entry_list);
+    hashmap_init(&dirnode->filename_hashmap, (hashmap_cmp_fn) __filename_htable_cmp, NULL, 16); 
+    hashmap_init(&dirnode->fileuuid_hashmap, (hashmap_cmp_fn) __fileuuid_htable_cmp, NULL, 16); 
 
     nexus_list_init(&dirnode->bucket_list);
     nexus_list_set_deallocator(&dirnode->bucket_list, __remove_and_free_bucket);
@@ -818,13 +847,29 @@ dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 void
 dirnode_free(struct nexus_dirnode * dirnode)
 {
-    struct list_head * dir_entry_list = &dirnode->dir_entry_list;
+    // delete the dir_entries
+    {
+        struct dir_entry    * dir_entry = NULL;
 
-    while (!list_empty(dir_entry_list)) {
-        struct dir_entry * dir_entry = list_first_entry(dir_entry_list, struct dir_entry, dir_list);
+        struct hashmap_iter   iter;
 
-        __dirnode_del_direntry(dirnode, dir_entry);
+        hashmap_iter_init(&dirnode->filename_hashmap, &iter);
+
+        do {
+            struct __hashed_name * tmp = hashmap_iter_next(&iter);
+
+            if (tmp == NULL) {
+                break;
+            }
+
+            dir_entry = __dir_entry_from_hashed_filename(tmp);
+
+            __dirnode_del_direntry(dirnode, dir_entry);
+        } while(true);
     }
+
+    hashmap_free(&dirnode->filename_hashmap, 0);
+    hashmap_free(&dirnode->fileuuid_hashmap, 0);
 
     nexus_list_destroy(&dirnode->symlink_list);
 
@@ -833,6 +878,24 @@ dirnode_free(struct nexus_dirnode * dirnode)
     nexus_acl_free(&dirnode->dir_acl);
 
     nexus_free(dirnode);
+}
+
+static struct dir_entry *
+__find_by_name(struct nexus_dirnode * dirnode, char * fname)
+{
+    struct __hashed_name * rst_hname = NULL;
+    struct __hashed_name   tmp_hname;
+
+    hashmap_entry_init(&tmp_hname.hash_entry, strhash(fname));
+    tmp_hname.name = fname;
+
+    rst_hname = hashmap_get(&dirnode->filename_hashmap, &tmp_hname, NULL);
+
+    if (rst_hname == NULL) {
+        return NULL;
+    }
+
+    return __dir_entry_from_hashed_filename(rst_hname);
 }
 
 int
@@ -897,17 +960,19 @@ dirnode_add_link(struct nexus_dirnode * dirnode,
 static struct dir_entry *
 __find_by_uuid(struct nexus_dirnode * dirnode, struct nexus_uuid * uuid)
 {
-    struct list_head * pos = NULL;
+    struct __hashed_uuid * rst_huuid = NULL;
+    struct __hashed_uuid   tmp_huuid;
 
-    list_for_each(pos, &dirnode->dir_entry_list) {
-        struct dir_entry * dir_entry = list_entry(pos, struct dir_entry, dir_list);
+    hashmap_entry_init(&tmp_huuid.hash_entry, memhash(uuid, sizeof(struct nexus_uuid)));
+    tmp_huuid.uuid = uuid;
 
-        if (nexus_uuid_compare(&dir_entry->dir_rec.uuid, uuid) == 0) {
-            return dir_entry;
-        }
+    rst_huuid = hashmap_get(&dirnode->fileuuid_hashmap, &tmp_huuid, NULL);
+
+    if (rst_huuid == NULL) {
+        return NULL;
     }
 
-    return NULL;
+    return __dir_entry_from_hashed_fileuuid(rst_huuid);
 }
 
 int

@@ -4,7 +4,16 @@
 static inline void
 __init_dir_entry(struct dir_entry * dir_entry)
 {
-    INIT_LIST_HEAD(&dir_entry->dir_list);
+    struct __hashed_name * filename_hash = &dir_entry->filename_hash;
+    struct __hashed_uuid * fileuuid_hash = &dir_entry->fileuuid_hash;
+
+    filename_hash->name = dir_entry->dir_rec.name;
+    fileuuid_hash->uuid = &dir_entry->dir_rec.uuid;
+
+    hashmap_entry_init(&filename_hash->hash_entry, strhash(filename_hash->name));
+    hashmap_entry_init(&fileuuid_hash->hash_entry,
+                       memhash(fileuuid_hash->uuid, sizeof(struct nexus_uuid)));
+
     INIT_LIST_HEAD(&dir_entry->bckt_list);
 }
 
@@ -125,8 +134,6 @@ bucket_load_from_buffer(struct dir_bucket * bucket, struct nexus_dirnode * dirno
         input_ptr = __parse_dir_entry(&new_dir_entry, input_ptr);
 
         list_add_tail(&new_dir_entry->bckt_list, &bucket->dir_entries);
-
-        list_add_tail(&new_dir_entry->dir_list, &dirnode->dir_entry_list);
 
         new_dir_entry->bucket = bucket;
     }

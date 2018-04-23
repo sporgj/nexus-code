@@ -14,6 +14,8 @@
 #include <nexus_uuid.h>
 #include <nexus_list.h>
 
+#include "libnexus_trusted/hashmap.h"
+
 struct nexus_metadata;
 
 struct nexus_dirnode {
@@ -28,14 +30,15 @@ struct nexus_dirnode {
 
     size_t                  bucket_count;
 
-    nexus_io_flags_t         mode;
+    nexus_io_flags_t        mode;
 
 
     struct nexus_acl        dir_acl;
 
     struct nexus_list       symlink_list;
 
-    struct list_head        dir_entry_list;
+    struct hashmap          filename_hashmap;
+    struct hashmap          fileuuid_hashmap;
 
     struct nexus_list       bucket_list;
 

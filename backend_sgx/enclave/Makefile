@@ -57,7 +57,8 @@ nexus_trusted_objs := \
 	nexus_util.o \
 	nexus_key.o \
 	nexus_encode.o \
-	nexus_uuid.o
+	nexus_uuid.o \
+	hashmap.o
 
 trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
