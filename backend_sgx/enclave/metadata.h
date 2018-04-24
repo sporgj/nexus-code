@@ -22,7 +22,7 @@ struct nexus_metadata {
 
     nexus_metadata_type_t        type;
 
-    nexus_io_flags_t              mode;
+    nexus_io_flags_t             flags;
 
     uint32_t                     version;
 

@@ -11,16 +11,10 @@ nexus_metadata_new(struct nexus_uuid     * uuid,
 
     nexus_uuid_copy(uuid, &metadata->uuid);
 
+    metadata->object  = obj;
     metadata->type    = type;
+    metadata->flags   = flags;
     metadata->version = version;
-
-    if (type == NEXUS_DIRNODE) {
-        metadata->dirnode = (struct nexus_dirnode *) obj;
-    } else if (type == NEXUS_FILENODE) {
-        metadata->filenode = (struct nexus_filenode *)obj;
-    }
-
-    metadata->mode = flags;
 
     return metadata;
 }
@@ -119,21 +113,21 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 }
 
 struct nexus_metadata *
-nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t mode)
+nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t flags)
 {
     void    * object = NULL;
 
     uint32_t version = 0;
 
 
-    object = __read_object(uuid, type, mode, &version);
+    object = __read_object(uuid, type, flags, &version);
 
     if (object == NULL) {
         log_error("reading metadata object FAILED\n");
         return NULL;
     }
 
-    return nexus_metadata_new(uuid, object, type, mode, version);
+    return nexus_metadata_new(uuid, object, type, flags, version);
 }
 
 int

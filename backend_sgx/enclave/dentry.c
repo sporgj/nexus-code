@@ -36,9 +36,7 @@ create_dentry(struct nexus_dentry * parent,
               const char          * name,
               nexus_dirent_type_t   type)
 {
-    struct nexus_dentry * dentry = NULL;
-
-    dentry = d_alloc(parent, uuid, name, type);
+    struct nexus_dentry * dentry = d_alloc(parent, uuid, name, type);
 
     list_add_tail(&dentry->siblings, &parent->children);
 

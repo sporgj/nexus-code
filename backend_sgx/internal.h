@@ -18,7 +18,6 @@
 
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
-#include "lock_manager.h"
 #include "key_buffer.h"
 #include "io.h"
 
@@ -29,8 +28,6 @@ struct sgx_backend {
     size_t volume_chunk_size;
 
     struct buffer_manager * buf_manager;
-
-    struct lock_manager * lock_manager;
 
     struct nexus_volume * volume;
 

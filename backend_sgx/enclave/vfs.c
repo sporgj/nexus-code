@@ -116,15 +116,39 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 struct nexus_metadata *
 nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t flags)
 {
-    // search cache for contents
-    struct nexus_metadata * metadata = nexus_metadata_load(uuid, type, flags);
+    struct nexus_metadata * metadata  = NULL;
+
+    struct nexus_uuid     * real_uuid = uuid;
+
+    // check if we are loading a hardlink
+    if (type == NEXUS_FILENODE) {
+        struct nexus_uuid * tmp_uuid = supernode_get_reallink(global_supernode, uuid);
+
+        if (tmp_uuid != NULL) {
+            real_uuid = tmp_uuid;
+        }
+    }
+
+    // try loading from cache
+    metadata = nexus_lru_get(metadata_objects_list, real_uuid);
+
+    if (metadata) {
+        if (nexus_vfs_revalidate(metadata, flags) == 0) {
+            return metadata;
+        }
+
+        // XXX: should we return -1 on FAILED revalidation ?
+    }
+
+    // otherwise, load from disk
+    metadata = nexus_metadata_load(real_uuid, type, flags);
 
     if (metadata == NULL) {
         log_error("loading data into VFS failed\n");
         return NULL;
     }
 
-    nexus_lru_put(metadata_objects_list, uuid, metadata);
+    nexus_lru_put(metadata_objects_list, real_uuid, metadata);
 
     return metadata;
 }

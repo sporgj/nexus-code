@@ -91,15 +91,8 @@ buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
 {
     uint8_t * external_addr = NULL;
 
-    int err = -1;
+    int err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_volume);
 
-
-    if (uuid == NULL) {
-        log_error("uuid argument null\n");
-        return NULL;
-    }
-
-    err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_volume);
     if (err || external_addr == NULL) {
         log_error("could not allocate space for crypto_buffer (err=%d)\n", err);
         return NULL;
@@ -166,31 +159,64 @@ buffer_layer_new(struct nexus_uuid * uuid)
     return 0;
 }
 
-void
+int
 buffer_layer_delete(struct nexus_uuid * uuid)
 {
-    int err = -1;
-    int ret = -1;
+    struct nexus_uuid * tmp_uuid  = NULL;
 
-    err = ocall_buffer_del(&ret, uuid, global_volume);
+    struct nexus_uuid * real_uuid = uuid;
 
-    __remove_timestamp(uuid);
 
-    // XXX: what do to about err?
-    (void) err;
-    (void) ret;
+    // delete link from supernode
+    {
+        bool modified = supernode_del_hardlink(global_supernode, uuid, &tmp_uuid);
+
+        if (modified) {
+            // we are dealing with an actual hardlink
+            if (supernode_store(global_supernode, NULL)) {
+                log_error("could not store supernode\n");
+                return -1;
+            }
+
+            // if we deleted a hardlink, but the real file has more links...
+            if (tmp_uuid == NULL) {
+                return 0;
+            }
+
+            real_uuid = tmp_uuid;
+        }
+    }
+
+    __remove_timestamp(real_uuid);
+
+    {
+        int err = -1;
+        int ret = -1;
+
+        err = ocall_buffer_del(&ret, real_uuid, global_volume);
+
+        // XXX: what do to about err?
+        (void) ret;
+
+        if (err) {
+            log_error("ocall_buffer_del FAILED\n");
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 int
-buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_uuid)
+buffer_layer_hardlink(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid)
 {
-    int err = -1;
-    int ret = -1;
+    if (supernode_add_hardlink(global_supernode, src_uuid, dst_uuid)) {
+        log_error("could not add hardlink to supernode\n");
+        return -1;
+    }
 
-    err = ocall_buffer_hardlink(&ret, link_uuid, target_uuid, global_volume);
-
-    if (err || ret) {
-        log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);
+    if (supernode_store(global_supernode, NULL)) {
+        log_error("stores the supernode\n");
         return -1;
     }
 
@@ -200,14 +226,28 @@ buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_
 int
 buffer_layer_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
 {
-    int err = -1;
-    int ret = -1;
+    bool is_real_file = true; // we assume we are renaming a "real file"
+    bool modified     = false;
 
-    err = ocall_buffer_rename(&ret, from_uuid, to_uuid, global_volume);
+    modified = supernode_rename_link(global_supernode, from_uuid, to_uuid, &is_real_file);
 
-    if (err || ret) {
-        log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
+    if (modified) {
+        if (supernode_store(global_supernode, NULL)) {
+            log_error("supernode_store FAILED\n");
+            return -1;
+        }
+    }
+
+    if (is_real_file) {
+        int ret = -1;
+        int err = -1;
+
+        err = ocall_buffer_rename(&ret, from_uuid, to_uuid, global_volume);
+
+        if (err || ret) {
+            log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);
+            return -1;
+        }
     }
 
     return 0;

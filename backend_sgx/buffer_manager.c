@@ -18,7 +18,7 @@ struct buffer_manager {
 static bool
 conditional_remove_func(uintptr_t value)
 {
-    struct __buf * buf = (struct __buf *)value;
+    struct metadata_buf * buf = (struct metadata_buf *)value;
 
     buf->refcount -= 1;
 
@@ -32,7 +32,7 @@ conditional_remove_func(uintptr_t value)
 }
 
 void
-free_buf(struct __buf * buf)
+free_buf(struct metadata_buf * buf)
 {
     nexus_free(buf->addr);
     nexus_free(buf);
@@ -41,9 +41,7 @@ free_buf(struct __buf * buf)
 struct buffer_manager *
 buffer_manager_init()
 {
-    struct buffer_manager * buf_manager = NULL;
-
-    buf_manager = nexus_malloc(sizeof(struct buffer_manager));
+    struct buffer_manager * buf_manager = nexus_malloc(sizeof(struct buffer_manager));
 
     buf_manager->buffers_table = nexus_create_htable(HASHTABLE_SIZE,
                                                      uuid_hash_func,
@@ -67,48 +65,56 @@ buffer_manager_destroy(struct buffer_manager * buf_manager)
     nexus_free(buf_manager);
 }
 
-static struct __buf *
+static struct metadata_buf *
 __alloc_buf(struct buffer_manager * buf_manager,
             uint8_t               * addr,
             size_t                  size,
             struct nexus_uuid     * uuid,
             bool                    on_disk)
 {
-    struct __buf * buf = nexus_malloc(sizeof(struct __buf));
+    struct metadata_buf       * buf         = NULL;
 
-    buf->addr = addr;
-    buf->size = size;
+    struct nexus_file_handle  * locked_file = NULL;
 
-    buf->refcount = 1;
-    buf->on_disk  = on_disk;
+    buf = nexus_malloc(sizeof(struct metadata_buf));
 
-    buf->timestamp = time(NULL);
+    buf->addr                 = addr;
+    buf->size                 = size;
+
+    buf->refcount             = 1;
+    buf->on_disk              = on_disk;
+
+    buf->timestamp            = time(NULL);
 
     nexus_uuid_copy(uuid, &buf->uuid);
 
     // insert in the htable
     {
-        struct __buf * old_buf = NULL;
+        struct metadata_buf * old_buf = NULL;
 
-        uintptr_t      key     = (uintptr_t)&buf->uuid;
+        uintptr_t      key            = (uintptr_t)&buf->uuid;
 
-        int            ret     = -1;
+        int            ret            = -1;
 
         // XXX, for now, we remove the old and add the new.
-        old_buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, key, 0);
+        old_buf = (struct metadata_buf *)nexus_htable_remove(buf_manager->buffers_table, key, 0);
 
         if (old_buf) {
+            locked_file = old_buf->locked_file;
+
             free_buf(old_buf);
             buf_manager->table_size -= 1;
         }
 
-        ret = nexus_htable_insert( buf_manager->buffers_table, key, (uintptr_t)buf);
+        ret = nexus_htable_insert(buf_manager->buffers_table, key, (uintptr_t)buf);
 
         if (ret == 0) {
             log_error("nexus_htable_insert FAILED\n");
             goto cleanup;
         }
     }
+
+    buf->locked_file = locked_file;
 
     buf_manager->table_size += 1;
 
@@ -117,6 +123,21 @@ cleanup:
     nexus_free(buf);
 
     return NULL;
+}
+
+struct metadata_buf *
+__buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct nexus_uuid * buf_uuid)
+{
+    uint8_t             * addr = nexus_malloc(size);
+
+    struct metadata_buf * buf  = __alloc_buf(buf_manager, addr, size, buf_uuid, false);
+
+    if (buf == NULL) {
+        nexus_free(addr);
+        return NULL;
+    }
+
+    return buf;
 }
 
 uint8_t *
@@ -134,15 +155,20 @@ buffer_manager_alloc(struct buffer_manager * buf_manager, size_t size, struct ne
     return addr;
 }
 
-
-struct __buf *
-__buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid)
+struct metadata_buf *
+__buffer_manager_add(struct buffer_manager * buf_manager,
+                     uint8_t               * addr,
+                     size_t                  size,
+                     struct nexus_uuid     * uuid)
 {
     return __alloc_buf(buf_manager, addr, size, uuid, true);
 }
 
 int
-buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t size, struct nexus_uuid * uuid)
+buffer_manager_add(struct buffer_manager   * buf_manager,
+                   uint8_t                 * addr,
+                   size_t                    size,
+                   struct nexus_uuid       * uuid)
 {
     if (__alloc_buf(buf_manager, addr, size, uuid, true) == NULL) {
         return -1;
@@ -151,12 +177,13 @@ buffer_manager_add(struct buffer_manager * buf_manager, uint8_t * addr, size_t s
     return 0;
 }
 
-struct __buf *
+struct metadata_buf *
 buffer_manager_get(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {
-    struct __buf * buf = NULL;
+    struct metadata_buf * buf = NULL;
 
     buf = nexus_htable_search(buf_manager->buffers_table, (uintptr_t)uuid);
+
     if (buf == NULL) {
         return NULL;
     }
@@ -166,7 +193,7 @@ buffer_manager_get(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
     return buf;
 }
 
-struct __buf *
+struct metadata_buf *
 buffer_manager_find(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {
     return nexus_htable_search(buf_manager->buffers_table, (uintptr_t)uuid);
@@ -175,9 +202,9 @@ buffer_manager_find(struct buffer_manager * buf_manager, struct nexus_uuid * uui
 void
 buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {
-    struct __buf * buf = NULL;
+    struct metadata_buf * buf = NULL;
 
-    buf = (struct __buf *)nexus_htable_cond_remove(buf_manager->buffers_table,
+    buf = (struct metadata_buf *)nexus_htable_cond_remove(buf_manager->buffers_table,
                                                    (uintptr_t)uuid,
                                                    0,
                                                    conditional_remove_func);
@@ -192,9 +219,11 @@ buffer_manager_put(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
 void
 buffer_manager_del(struct buffer_manager * buf_manager, struct nexus_uuid * uuid)
 {
-    struct __buf * buf = NULL;
+    struct metadata_buf * buf = NULL;
 
-    buf = (struct __buf *)nexus_htable_remove(buf_manager->buffers_table, (uintptr_t)uuid, 0);
+    buf = (struct metadata_buf *)nexus_htable_remove(buf_manager->buffers_table,
+                                                     (uintptr_t)uuid,
+                                                     0);
 
     if (buf == NULL) {
         return;

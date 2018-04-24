@@ -54,7 +54,7 @@ buffer_layer_new(struct nexus_uuid * uuid);
  * Deletes a metadata buffer
  * @param uuid
  */
-void
+int
 buffer_layer_delete(struct nexus_uuid * uuid);
 
 /**
@@ -64,7 +64,7 @@ buffer_layer_delete(struct nexus_uuid * uuid);
  * @return 0 on success
  */
 int
-buffer_layer_hardlink(struct nexus_uuid * link_uuid, struct nexus_uuid * target_uuid);
+buffer_layer_hardlink(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid);
 
 /**
  * Renames a metadata object on disk

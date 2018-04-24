@@ -18,7 +18,9 @@ nexus_fetch_download(struct rx_call * afs_call, caddr_t buf, int bytes_left)
     while (bytes_left > 0) {
         size = MIN(MAX_FILESERVER_TRANSFER_BYTES, bytes_left);
 
-        if ((nbytes = rx_Read(afs_call, buf, size)) != size) {
+        nbytes = rx_Read(afs_call, buf, size);
+
+        if (nbytes != size) {
             NEXUS_ERROR("afs_server exp=%d, act=%d\n", size, (int)nbytes);
             ret = -1;
             goto out;
