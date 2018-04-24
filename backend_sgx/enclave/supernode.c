@@ -421,7 +421,10 @@ supernode_add_hardlink(struct nexus_supernode * supernode,
     real_uuid = supernode_get_reallink(supernode, dst_uuid);
 
     if (real_uuid == NULL) {
+        // then we are hardlinking on a normal file
         real_uuid = dst_uuid;
+        // add a spare hardlink (count = 2, for metadata)
+        __add_hardlink(supernode, real_uuid, real_uuid);
     }
 
     return __add_hardlink(supernode, src_uuid, real_uuid);
