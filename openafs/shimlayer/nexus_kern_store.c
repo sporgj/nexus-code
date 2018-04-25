@@ -18,12 +18,12 @@ nexus_store_upload(struct rx_call * afs_call, uint8_t * buffer, int tlen, int * 
     *byteswritten = 0;
 
     /* send the data to the server */
-    RX_AFS_GUNLOCK();
-
     while (bytes_left > 0) {
         size = MIN(MAX_FILESERVER_TRANSFER_BYTES, bytes_left);
 
+        RX_AFS_GUNLOCK();
 	nbytes = rx_Write(afs_call, buf, size);
+        RX_AFS_GLOCK();
 
         if (nbytes != size) {
             NEXUS_ERROR("afs_server exp=%d, act=%d\n", tlen, (int)nbytes);
@@ -37,7 +37,6 @@ nexus_store_upload(struct rx_call * afs_call, uint8_t * buffer, int tlen, int * 
     }
 
 out:
-    RX_AFS_GLOCK();
     return ret;
 }
 
@@ -55,8 +54,13 @@ nexus_store_encrypt(struct nexus_volume * vol,
 
     int    ret       = 0;
 
-
-    cmd_str = kasprintf(GFP_KERNEL, generic_databuf_command, AFS_OP_ENCRYPT, path, offset, buflen, filesize);
+    cmd_str = kasprintf(GFP_KERNEL,
+                        generic_databuf_command,
+                        AFS_OP_ENCRYPT,
+                        path,
+                        offset,
+                        buflen,
+                        filesize);
 
     if (cmd_str == NULL) {
 	NEXUS_ERROR("Could not create command string\n");
@@ -159,7 +163,7 @@ nexus_store_transfer(struct nexus_volume * vol,
     return 0;
 }
 
-int
+nexus_ret_t
 nexus_kern_store(struct vcache          * avc,
                  struct dcache         ** dclist,
                  afs_size_t               bytes,
@@ -174,29 +178,24 @@ nexus_kern_store(struct vcache          * avc,
                  struct storeOps        * ops,
                  void                   * rock)
 {
-    struct nexus_volume * vol = NULL;
+    struct nexus_volume * vol           = NULL;
 
-    unsigned long flags = 0;
+    unsigned long         flags         = 0;
 
-    int filesize     = avc->f.m.Length;
-    int offset       = base;
+    int                   filesize      = avc->f.m.Length;
+    int                   offset        = base;
 
-    int bytes_stored = 0;
-    int nbytes       = 0;
+    int                   bytes_stored  = 0;
+    int                   nbytes        = 0;
+    int                   i             = 0;
 
-    afs_uint32 i = 0;
-
-    int ret = -1;
+    int                   ret           = NEXUS_RET_ERROR;
 
 
     vol = nexus_get_volume(path);
 
     if (vol == NULL) {
-        if (ops) {
-            (*ops->destroy)(&rock, ret);
-        }
-
-        return -1;
+        return NEXUS_RET_NOOP;
     }
 
     spin_lock_irqsave(nexus_databuffer_lock, flags);
@@ -236,6 +235,10 @@ out:
 
     if (ops) {
         ret = (*ops->destroy)(&rock, ret);
+    }
+
+    if (ret) {
+        *doProcessFS = 0;
     }
 
     nexus_put_volume(vol);

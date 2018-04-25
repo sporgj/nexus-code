@@ -61,7 +61,7 @@ __set_filenode_dirty(struct nexus_filenode * filenode)
 }
 
 static inline void
-__set_clean(struct nexus_filenode * filenode)
+__set_filenode_clean(struct nexus_filenode * filenode)
 {
     if (filenode->metadata) {
         filenode->metadata->is_dirty = false;
@@ -345,7 +345,7 @@ filenode_store(struct nexus_uuid     * uuid,
         goto out;
     }
 
-    __set_clean(filenode);
+    __set_filenode_clean(filenode);
 
     ret = 0;
 out:

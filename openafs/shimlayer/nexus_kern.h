@@ -19,6 +19,13 @@ typedef enum {
 } nexus_fs_obj_type_t;
 
 
+typedef enum {
+    NEXUS_RET_OK    =  0,
+    NEXUS_RET_ERROR = -1,
+    NEXUS_RET_NOOP  = -2    // when it is not a nexus volume
+} nexus_ret_t;
+
+
 
 
 char * nexus_get_path_from_dentry(struct dentry * dentry);
@@ -32,7 +39,7 @@ char * nexus_get_path_from_vcache(struct vcache * vcache);
 #define NEXUS_CHUNK_SIZE (1 << NEXUS_CHUNK_LOG)
 
 
- 
+
 static inline size_t
 NEXUS_CHUNK_BASE(size_t offset)
 {
@@ -177,7 +184,7 @@ nexus_kern_symlink(struct dentry * dentry,
  * @param store_ops functions current store operation (AFS)
  * @param store_ops_data the data related to the store operation (AFS)
  */
-int
+nexus_ret_t
 nexus_kern_store(struct vcache *         vcache,
                  struct dcache **        dirty_dcaches,
                  afs_size_t              total_size,
@@ -202,7 +209,7 @@ nexus_kern_store(struct vcache *         vcache,
  * @param rx_call RPC context with the server
  * @param filepath
  */
-int
+nexus_ret_t
 nexus_kern_fetch(struct afs_conn *      afs_conn,
                  struct rx_connection * rxconn,
                  struct osi_file *      fp,

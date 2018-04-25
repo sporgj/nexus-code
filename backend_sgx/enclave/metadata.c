@@ -1,5 +1,25 @@
 #include "enclave_internal.h"
 
+static inline void
+__set_metadata_object(struct nexus_metadata * metadata, void * object)
+{
+    struct nexus_dirnode  * dirnode  = NULL;
+    struct nexus_filenode * filenode = NULL;
+
+    metadata->object = object;
+
+    switch (metadata->type) {
+    case NEXUS_DIRNODE:
+        dirnode = object;
+        dirnode->metadata = metadata;
+        break;
+    case NEXUS_FILENODE:
+        filenode = object;
+        filenode->metadata = metadata;
+        break;
+    }
+}
+
 struct nexus_metadata *
 nexus_metadata_new(struct nexus_uuid     * uuid,
                    void                  * obj,
@@ -9,12 +29,13 @@ nexus_metadata_new(struct nexus_uuid     * uuid,
 {
     struct nexus_metadata * metadata = nexus_malloc(sizeof(struct nexus_metadata));
 
-    nexus_uuid_copy(uuid, &metadata->uuid);
-
-    metadata->object  = obj;
     metadata->type    = type;
     metadata->flags   = flags;
     metadata->version = version;
+
+    nexus_uuid_copy(uuid, &metadata->uuid);
+
+    __set_metadata_object(metadata, obj);
 
     return metadata;
 }
@@ -95,6 +116,7 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 
     if (object == NULL) {
         log_error("could not reload metadata object\n");
+        return -1;
     }
 
     // throw the old object and set the new
@@ -107,7 +129,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
         break;
     }
 
-    metadata->object = object;
+    metadata->flags = flags;
+    __set_metadata_object(metadata, object);
 
     return 0;
 }
@@ -134,6 +157,10 @@ int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
     int ret = -1;
+
+    if (!metadata->is_dirty) {
+        return 0;
+    }
 
     switch (metadata->type) {
     case NEXUS_DIRNODE:

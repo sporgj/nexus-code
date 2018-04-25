@@ -668,14 +668,17 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
 #ifndef UKERNEL
 		if ( (is_nexus_file == 0) ||
 		     (code          != 0) ) {
-		    goto post_nexus;
+		    goto skip_nexus;
 		}
 
 		acall = ((struct rxfs_storeVariables*)rock)->call;
                 ret = nexus_kern_store(avc, dclist, bytes, anewDV, &doProcessFS,
                                        &OutStatus, nchunks, nomore, acall, path,
                                        base, ops, rock);
-		if (ret == 0) {
+
+		if (ret == NEXUS_RET_NOOP) {
+		    goto skip_nexus;
+		} else if (ret == NEXUS_RET_OK) {
 		    // then we can proceed
 		    code = 0;
 		    goto post_dcache_store;
@@ -684,10 +687,8 @@ afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
 		/* the next iteration should skip it altogether */
 		is_nexus_file = 0;
 		goto restart;
-post_nexus:
+skip_nexus:
 #endif
-		/**/
-		
 		if ( !code ) {
 		    code = afs_CacheStoreDCaches(avc, dclist, bytes, anewDV,
 			                         &doProcessFS, &OutStatus,
@@ -1264,18 +1265,25 @@ restart:
 
     acall = ((struct rxfs_fetchVariables*) rock)->call;
     nexus_ret = nexus_kern_fetch(tc, rxconn, fP, base, adc, avc, length, acall, path);
-    
-    if (nexus_ret == 0) {
+
+    if (nexus_ret == NEXUS_RET_NOOP) {
+	goto skip_nexus;
+    } else if (nexus_ret == NEXUS_RET_NOOP) {
 	code = 0;
 	goto done;
-    }
+    } else {
+	is_nexus_file = 0;
 
-    is_nexus_file = 0;
-    goto restart;
+	// close the connection and restart
+	if (ops) {
+            (*ops->destroy)(&rock, -1);
+	}
+
+        goto restart;
+    }
 
 skip_nexus:
 #endif
-    /**/
 
     if ( !code ) do {
 	if (avc->f.states & CForeign) {

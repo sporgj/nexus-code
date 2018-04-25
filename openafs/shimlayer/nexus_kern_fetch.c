@@ -13,12 +13,13 @@ nexus_fetch_download(struct rx_call * afs_call, caddr_t buf, int bytes_left)
     int ret = 0;
 
     /* send the data to the server */
-    RX_AFS_GUNLOCK();
 
     while (bytes_left > 0) {
         size = MIN(MAX_FILESERVER_TRANSFER_BYTES, bytes_left);
 
+        RX_AFS_GUNLOCK();
         nbytes = rx_Read(afs_call, buf, size);
+        RX_AFS_GLOCK();
 
         if (nbytes != size) {
             NEXUS_ERROR("afs_server exp=%d, act=%d\n", size, (int)nbytes);
@@ -31,7 +32,6 @@ nexus_fetch_download(struct rx_call * afs_call, caddr_t buf, int bytes_left)
     }
 
 out:
-    RX_AFS_GLOCK();
     return ret;
 }
 
@@ -50,7 +50,13 @@ nexus_fetch_decrypt(struct nexus_volume * vol,
     int    ret       = 0;
 
 
-    cmd_str = kasprintf(GFP_KERNEL, generic_databuf_command, AFS_OP_DECRYPT, path, offset, buflen, filesize);
+    cmd_str = kasprintf(GFP_KERNEL,
+                        generic_databuf_command,
+                        AFS_OP_DECRYPT,
+                        path,
+                        offset,
+                        buflen,
+                        filesize);
 
     if (cmd_str == NULL) {
         NEXUS_ERROR("Could not create command string\n");
@@ -97,7 +103,7 @@ out:
     return ret;
 }
 
-int
+nexus_ret_t
 nexus_kern_fetch(struct afs_conn      * tc,
                  struct rx_connection * rxconn,
                  struct osi_file      * fp,
@@ -108,19 +114,19 @@ nexus_kern_fetch(struct afs_conn      * tc,
                  struct rx_call       * acall,
                  char                 * path)
 {
-    struct nexus_volume * vol = NULL;
+    struct nexus_volume * vol         = NULL;
 
-    unsigned long flags = 0;
+    unsigned long flags               = 0;
 
-    int filesize = avc->f.m.Length;
+    int filesize                      = avc->f.m.Length;
 
-    int ret = -1;
+    int ret                           = NEXUS_RET_ERROR;
 
 
     vol = nexus_get_volume(path);
 
     if (vol == NULL) {
-        return -1;
+        return NEXUS_RET_NOOP;
     }
 
     spin_lock_irqsave(nexus_databuffer_lock, flags);
@@ -141,11 +147,23 @@ nexus_kern_fetch(struct afs_conn      * tc,
         goto out;
     }
 
-    if (adc) {
-        adc->validPos = base;
+
+    // write the chunk file
+    {
+        int nbytes = afs_osi_Write(fp, -1, nexus_databuffer_ptr, size);
+
+        if (nbytes != size) {
+            ret = NEXUS_RET_ERROR;
+
+            NEXUS_ERROR("could not write decrypted contents to chunk file\n");
+            goto out;
+        }
     }
 
-    ret = 0;
+    adc->validPos = base + size;
+    afs_osi_Wakeup(&adc->validPos);
+
+    ret = NEXUS_RET_OK;
 out:
     spin_unlock_irqrestore(nexus_databuffer_lock, flags);
 

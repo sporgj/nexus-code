@@ -48,22 +48,14 @@ nexus_crypto_ctx_parse(struct nexus_crypto_ctx * crypto_ctx, uint8_t * buffer, s
 
     int                           ret = -1;
 
-
-    ret = __nexus_key_from_buf(&(crypto_ctx->key),
-                               NEXUS_RAW_128_KEY,
-                               buf->key,
-                               GCM128_KEY_SIZE);
+    ret = __nexus_key_from_buf(&(crypto_ctx->key), NEXUS_RAW_128_KEY, buf->key, GCM128_KEY_SIZE);
 
     if (ret != 0) {
         log_error("could not parse key from buffer\n");
         return -1;
     }
 
-
-    ret = __nexus_key_from_buf(&(crypto_ctx->iv),
-                               NEXUS_RAW_128_KEY,
-                               buf->key,
-                               GCM128_KEY_SIZE);
+    ret = __nexus_key_from_buf(&(crypto_ctx->iv), NEXUS_RAW_128_KEY, buf->iv, GCM128_KEY_SIZE);
 
     if (ret != 0) {
         log_error("could not parse IV from buffer\n");
