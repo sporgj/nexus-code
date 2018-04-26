@@ -117,6 +117,8 @@ sgx_backend_fs_filldir(struct nexus_volume  * volume,
 {
     struct sgx_backend * sgx_backend = NULL;
 
+    char filename[NEXUS_NAME_MAX] = { 0 };
+
     struct nexus_uuid uuid;
 
     int err = -1;
@@ -131,12 +133,14 @@ sgx_backend_fs_filldir(struct nexus_volume  * volume,
         return -1;
     }
 
-    err = ecall_fs_filldir(sgx_backend->enclave_id, &ret, dirpath, &uuid, plain_name);
+    err = ecall_fs_filldir(sgx_backend->enclave_id, &ret, dirpath, &uuid, filename);
 
     if (err) {
         log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
         return -1;
     }
+
+    *plain_name = strndup(filename, NEXUS_NAME_MAX);
 
     return ret;
 }

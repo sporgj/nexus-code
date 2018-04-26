@@ -15,6 +15,9 @@
 
 struct nexus_volume;
 
+#define NEXUS_NAME_MAX  256
+#define NEXUS_PATH_MAX  1024
+
 
 /*
  *  These are probably just going to be passthrough functions...
@@ -37,7 +40,7 @@ typedef enum {
 
 
 struct nexus_dirent {
-    char                name[NAME_MAX];
+    char                name[NEXUS_NAME_MAX];
     nexus_dirent_type_t type;
 };
 

@@ -198,7 +198,7 @@ __nxs_fs_filldir(struct nexus_metadata * metadata,
 }
 
 int
-ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_out)
+ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char filename_out[NEXUS_NAME_MAX])
 {
     struct nexus_metadata * metadata = NULL;
 
@@ -221,22 +221,7 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char ** filename_o
     }
 
     // copy out the filename
-    {
-        char * untrusted_addr = NULL;
-
-        int    err            = ocall_calloc((void **)&untrusted_addr, name_len);
-
-        if (err || untrusted_addr == NULL) {
-            ret = -1;
-
-            log_error("allocation error \n");
-            goto out;
-        }
-
-        memcpy(untrusted_addr, name_ptr, name_len);
-
-        *filename_out = untrusted_addr;
-    }
+    strncpy(filename_out, name_ptr, NEXUS_NAME_MAX);
 
     ret = 0;
 out:
@@ -363,12 +348,12 @@ ecall_fs_hardlink(char              * src_dirpath_IN,
                   char              * dst_name_IN,
                   struct nexus_uuid * entry_uuid_out)
 {
-    struct nexus_metadata * dst_metadata   = NULL;
+    struct nexus_metadata * dst_metadata = NULL;
     struct nexus_metadata * src_metadata = NULL;
 
-    struct nexus_uuid dst_uuid;
+    struct nexus_uuid       dst_uuid;
 
-    int ret = -1;
+    int                     ret          = -1;
 
 
     dst_metadata = nexus_vfs_get(dst_dirpath_IN, NEXUS_FRDWR);
