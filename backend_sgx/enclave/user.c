@@ -25,11 +25,11 @@ struct __table_hdr {
 
 
 struct nexus_usertable {
-    uint32_t version;
+    uint32_t          version;
 
-    uint64_t auto_increment;
-    uint64_t user_count;
-    uint64_t total_size;
+    uint64_t          auto_increment;
+    uint64_t          user_count;
+    uint64_t          total_size;
 
     struct nexus_uuid my_uuid;
 
@@ -69,21 +69,14 @@ nexus_usertable_copy_uuid(struct nexus_usertable * usertable, struct nexus_uuid 
 struct nexus_usertable *
 nexus_usertable_create(char * user_pubkey)
 {
-    struct nexus_usertable * usertable = NULL;
-
-    struct nexus_user * owner = NULL;
-
-
-    usertable = nexus_malloc(sizeof(struct nexus_usertable));
+    struct nexus_usertable * usertable = nexus_malloc(sizeof(struct nexus_usertable));
 
     nexus_uuid_gen(&usertable->my_uuid);
 
 
     // initialize the owner
-    owner = &usertable->owner;
-
-    owner->user_id = 0;
-    nexus_hash_generate(&owner->pubkey_hash, user_pubkey, strlen(user_pubkey));
+    usertable->owner.user_id = NEXUS_ROOT_USER;
+    nexus_hash_generate(&usertable->owner.pubkey_hash, user_pubkey, strlen(user_pubkey));
 
 
     init_userlist(usertable);
@@ -165,10 +158,7 @@ __parse_usertable_header(struct nexus_usertable * usertable, uint8_t * buffer, s
 int
 __parse_usertable(struct nexus_usertable * usertable, uint8_t * buffer, size_t buflen)
 {
-    uint8_t * input_ptr = NULL;
-
-    /// parse the buffers here
-    input_ptr = __parse_usertable_header(usertable, buffer, buflen);
+    uint8_t * input_ptr = __parse_usertable_header(usertable, buffer, buflen);
 
     if (input_ptr == NULL) {
         log_error("parsing the header failed\n");
@@ -193,7 +183,7 @@ __parse_usertable(struct nexus_usertable * usertable, uint8_t * buffer, size_t b
 struct nexus_usertable *
 nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_mac * mac)
 {
-    struct nexus_usertable * usertable = NULL;
+    struct nexus_usertable  * usertable     = NULL;
 
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -242,9 +232,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
 static uint8_t *
 __serialize_usertable_header(struct nexus_usertable * usertable, uint8_t * buffer)
 {
-    struct __table_hdr * header = NULL;
-
-    header = (struct __table_hdr *)buffer;
+    struct __table_hdr * header = (struct __table_hdr *)buffer;
 
     memset(header, 0, sizeof(struct __table_hdr));
 
@@ -262,9 +250,7 @@ __serialize_usertable_header(struct nexus_usertable * usertable, uint8_t * buffe
 static int
 __serialize_usertable(struct nexus_usertable * usertable, uint8_t * buffer)
 {
-    uint8_t * output_ptr = NULL;
-
-    output_ptr = __serialize_usertable_header(usertable, buffer);
+    uint8_t * output_ptr = __serialize_usertable_header(usertable, buffer);
 
     if (output_ptr == NULL) {
         log_error("__serialize_usertable_header FAILED\n");

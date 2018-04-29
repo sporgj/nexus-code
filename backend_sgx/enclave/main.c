@@ -1,12 +1,15 @@
 #include "enclave_internal.h"
 
 // the sealing key used in protecting volumekeys
-struct nexus_volume * global_volume = NULL;
+struct nexus_volume * global_volume             = NULL;
 
 // TODO: make this per-instance configurable
-size_t global_chunk_size = NEXUS_CHUNK_SIZE;
+size_t                global_chunk_size         = NEXUS_CHUNK_SIZE;
 
-size_t global_log2chunk_size = 0;
+size_t                global_log2chunk_size     = 0;
+
+
+nexus_uid_t           global_user_id            = 0;
 
 
 int
@@ -48,6 +51,8 @@ nexus_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
     if (user == NULL) {
         return -1;
     }
+
+    global_user_id = user->user_id;
 
     return 0;
 }

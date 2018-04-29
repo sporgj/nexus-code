@@ -97,4 +97,4 @@ nexus_acl_remove(struct nexus_acl * nexus_acl, nexus_uid_t uid);
  * @return true on success
  */
 bool
-nexus_acl_check(struct nexus_acl * nexus_acl, nexus_perm_t perm);
+nexus_acl_is_authorized(struct nexus_acl * nexus_acl, nexus_perm_t perm);

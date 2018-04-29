@@ -94,7 +94,7 @@ supernode_init(struct nexus_supernode * supernode)
 }
 
 struct nexus_supernode *
-supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t mode)
+supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t mode)
 {
     struct nexus_supernode * supernode = nexus_malloc(sizeof(struct nexus_supernode));
 
@@ -142,8 +142,6 @@ supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_f
         }
     }
 
-    supernode->version = nexus_crypto_buf_version(crypto_buffer);
-
     return supernode;
 err:
     supernode_free(supernode);
@@ -166,7 +164,7 @@ supernode_load(struct nexus_uuid * uuid, nexus_io_flags_t mode)
         return NULL;
     }
 
-    supernode = supernode_from_crypto_buffer(crypto_buffer, mode);
+    supernode = supernode_from_crypto_buf(crypto_buffer, mode);
 
     nexus_crypto_buf_free(crypto_buffer);
 
@@ -242,7 +240,7 @@ __serialize_hardlinks(struct nexus_supernode * supernode, uint8_t * buffer)
 }
 
 int
-supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
+supernode_store(struct nexus_supernode * supernode, int version, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -262,7 +260,7 @@ supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
     serialized_buflen = __supernode_buflen(supernode);
 
     // allocates the crypto buffer
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, supernode->version, &supernode->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &supernode->my_uuid);
     if (!crypto_buffer) {
         goto out;
     }
@@ -305,8 +303,6 @@ supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac)
         log_error("metadata_write FAILED\n");
         goto out;
     }
-
-    supernode->version += 1;
 
     __supernode_set_clean(supernode);
 

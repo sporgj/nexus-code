@@ -3,12 +3,17 @@
 static inline void
 __set_metadata_object(struct nexus_metadata * metadata, void * object)
 {
-    struct nexus_dirnode  * dirnode  = NULL;
-    struct nexus_filenode * filenode = NULL;
+    struct nexus_supernode * supernode = NULL;
+    struct nexus_dirnode   * dirnode   = NULL;
+    struct nexus_filenode  * filenode  = NULL;
 
     metadata->object = object;
 
     switch (metadata->type) {
+    case NEXUS_SUPERNODE:
+        supernode = object;
+        supernode->metadata = metadata;
+        break;
     case NEXUS_DIRNODE:
         dirnode = object;
         dirnode->metadata = metadata;
@@ -44,6 +49,8 @@ void
 nexus_metadata_free(struct nexus_metadata * metadata)
 {
     switch (metadata->type) {
+    case NEXUS_SUPERNODE:
+        supernode_free(metadata->supernode);
     case NEXUS_DIRNODE:
         dirnode_free(metadata->dirnode);
         break;
@@ -81,6 +88,9 @@ __read_object(struct nexus_uuid     * uuid,
 
     if (*version == 0) {
         switch (type) {
+        case NEXUS_SUPERNODE:
+            log_error("supernode cannot be version 0\n");
+            break;
         case NEXUS_DIRNODE:
             object = dirnode_create(&global_supernode->root_uuid, uuid);
             break;
@@ -90,6 +100,9 @@ __read_object(struct nexus_uuid     * uuid,
         }
     } else {
         switch (type) {
+        case NEXUS_SUPERNODE:
+            object = supernode_from_crypto_buf(crypto_buf, flags);
+            break;
         case NEXUS_DIRNODE:
             object = dirnode_from_crypto_buf(crypto_buf, flags);
             break;
@@ -121,6 +134,9 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 
     // throw the old object and set the new
     switch (metadata->type) {
+    case NEXUS_SUPERNODE:
+        supernode_free(metadata->supernode);
+        break;
     case NEXUS_DIRNODE:
         dirnode_free(metadata->dirnode);
         break;
@@ -163,6 +179,9 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     }
 
     switch (metadata->type) {
+    case NEXUS_SUPERNODE:
+        ret = supernode_store(metadata->supernode, metadata->version, NULL);
+        break;
     case NEXUS_DIRNODE:
         ret = dirnode_store(&metadata->uuid, metadata->dirnode, metadata->version, NULL);
         break;

@@ -12,6 +12,7 @@ struct nexus_dentry;
 
 
 typedef enum {
+    NEXUS_SUPERNODE,
     NEXUS_DIRNODE,
     NEXUS_FILENODE
 } nexus_metadata_type_t;
@@ -33,12 +34,13 @@ struct nexus_metadata {
     bool                         is_dirty;
 
     union {
-        struct nexus_dirnode   * dirnode;
-        struct nexus_filenode  * filenode;
-        void                   * object;
+        struct nexus_supernode   * supernode;
+        struct nexus_dirnode     * dirnode;
+        struct nexus_filenode    * filenode;
+        void                     * object;
     };
 
-    struct nexus_dentry        * dentry;  // dentry pointing to metadata
+    struct nexus_dentry          * dentry;  // dentry pointing to metadata
 };
 
 

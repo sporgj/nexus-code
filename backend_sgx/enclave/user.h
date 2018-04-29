@@ -4,7 +4,11 @@
 
 #include <nexus_hash.h>
 
-#define NEXUS_MAX_NAMELEN 25
+
+#define NEXUS_MAX_NAMELEN     25
+
+#define NEXUS_ROOT_USER       0
+
 
 
 typedef uint64_t              nexus_uid_t;

@@ -22,8 +22,6 @@ struct nexus_metadata;
 
 
 struct nexus_supernode {
-    uint32_t                   version;
-
     struct nexus_uuid          my_uuid;
     struct nexus_uuid          root_uuid;
 
@@ -46,7 +44,7 @@ struct nexus_supernode {
  * @return NULL on failure
  */
 struct nexus_supernode *
-supernode_from_crypto_buffer(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t mode);
+supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_t mode);
 
 /**
  * Loads a supernode from UUID
@@ -68,10 +66,12 @@ supernode_create(char * user_pubkey);
 /**
  * Writes the supernode to the backing store
  * @param supernode
+ * @param version
+ * @param mac
  * @return 0 on success
  */
 int
-supernode_store(struct nexus_supernode * supernode, struct nexus_mac * mac);
+supernode_store(struct nexus_supernode * supernode, int version, struct nexus_mac * mac);
 
 void
 supernode_free(struct nexus_supernode * supernode);

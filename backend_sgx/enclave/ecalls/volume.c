@@ -27,7 +27,7 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
             goto out;
         }
 
-        ret = supernode_store(supernode, NULL);
+        ret = supernode_store(supernode, 0, NULL);
         if (ret) {
             log_error("storing the supernode FAILED\n");
             goto out;

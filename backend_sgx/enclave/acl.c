@@ -101,10 +101,7 @@ __nexus_acl_from_buffer(struct nexus_acl * nexus_acl, uint8_t * buffer, size_t b
 int
 nexus_acl_to_buffer(struct nexus_acl * nexus_acl, uint8_t * buffer)
 {
-    uint8_t * output_ptr = NULL;
-
-
-    output_ptr = __serialize_acl_header(nexus_acl, buffer);
+    uint8_t * output_ptr = __serialize_acl_header(nexus_acl, buffer);
 
     if (output_ptr == NULL) {
         log_error("could not parse ACL header\n");
@@ -159,19 +156,10 @@ nexus_acl_size(struct nexus_acl * nexus_acl)
     return sizeof(struct __acl_header) + (nexus_acl->count * sizeof(struct nexus_acl_entry));
 }
 
-bool
-is_action_allowed(struct nexus_acl * nexus_acl, nexus_uid_t uid)
-{
-    // TODO
-    return true;
-}
-
 static struct nexus_acl_entry *
 add_acl_entry(struct nexus_acl * nexus_acl, nexus_uid_t uid)
 {
-    struct nexus_acl_entry * acl_entry = NULL;
-
-    acl_entry = nexus_malloc(sizeof(struct nexus_acl_entry));
+    struct nexus_acl_entry * acl_entry = nexus_malloc(sizeof(struct nexus_acl_entry));
 
     acl_entry->uid = uid;
 
@@ -185,9 +173,7 @@ add_acl_entry(struct nexus_acl * nexus_acl, nexus_uid_t uid)
 static struct nexus_list_iterator *
 find_acl_entry(struct nexus_acl * nexus_acl, nexus_uid_t uid)
 {
-    struct nexus_list_iterator * iter = NULL;
-
-    iter = list_iterator_new(&nexus_acl->acls);
+    struct nexus_list_iterator * iter = list_iterator_new(&nexus_acl->acls);
 
     while (list_iterator_is_valid(iter)) {
         struct nexus_acl_entry * acl_entry = list_iterator_get(iter);
@@ -202,25 +188,12 @@ find_acl_entry(struct nexus_acl * nexus_acl, nexus_uid_t uid)
     return NULL;
 }
 
-bool
-is_acl_operation_allowed(struct nexus_acl * nexus_acl)
-{
-    // TODO check against the currently authenticated user
-    return true;
-}
-
 int
 nexus_acl_set(struct nexus_acl * nexus_acl, nexus_uid_t uid, nexus_perm_t perm)
 {
-    struct nexus_list_iterator * acl_iter  = NULL;
+    struct nexus_list_iterator * acl_iter  = find_acl_entry(nexus_acl, uid);
 
     struct nexus_acl_entry     * acl_entry = NULL;
-
-    if (!is_acl_operation_allowed(nexus_acl)) {
-        return -1;
-    }
-
-    acl_iter = find_acl_entry(nexus_acl, uid);
 
     if (acl_iter == NULL) {
         acl_entry = add_acl_entry(nexus_acl, uid);
@@ -237,15 +210,9 @@ nexus_acl_set(struct nexus_acl * nexus_acl, nexus_uid_t uid, nexus_perm_t perm)
 int
 nexus_acl_unset(struct nexus_acl * nexus_acl, nexus_uid_t uid, nexus_perm_t perm)
 {
-    struct nexus_list_iterator * acl_iter  = NULL;
+    struct nexus_list_iterator * acl_iter  = find_acl_entry(nexus_acl, uid);
 
     struct nexus_acl_entry     * acl_entry = NULL;
-
-    if (!is_acl_operation_allowed(nexus_acl)) {
-        return -1;
-    }
-
-    acl_iter = find_acl_entry(nexus_acl, uid);
 
     // if there is no user, the unset is a no-op
     if (acl_iter == NULL) {
@@ -264,13 +231,7 @@ nexus_acl_unset(struct nexus_acl * nexus_acl, nexus_uid_t uid, nexus_perm_t perm
 int
 nexus_acl_remove(struct nexus_acl * nexus_acl, nexus_uid_t uid)
 {
-    struct nexus_list_iterator * acl_iter  = NULL;
-
-    if (!is_acl_operation_allowed(nexus_acl)) {
-        return -1;
-    }
-
-    acl_iter = find_acl_entry(nexus_acl, uid);
+    struct nexus_list_iterator * acl_iter = find_acl_entry(nexus_acl, uid);
 
     if (acl_iter == NULL) {
         return 0;
@@ -286,8 +247,27 @@ nexus_acl_remove(struct nexus_acl * nexus_acl, nexus_uid_t uid)
 }
 
 bool
-nexus_acl_check(struct nexus_acl * nexus_acl, nexus_perm_t perm)
+nexus_acl_is_authorized(struct nexus_acl * nexus_acl, nexus_perm_t perm)
 {
-    // TODO
-    return true;
+    struct nexus_acl_entry     * acl_entry = NULL;
+
+    struct nexus_list_iterator * acl_iter  = NULL;
+
+
+    if (global_user_id == NEXUS_ROOT_USER) {
+        return true;
+    }
+
+
+    acl_iter = find_acl_entry(nexus_acl, global_user_id);
+
+    if (acl_iter == NULL) {
+        return false;
+    }
+
+    acl_entry = list_iterator_get(acl_iter);
+
+    list_iterator_free(acl_iter);
+
+    return ((acl_entry->perm & perm) != 0);
 }

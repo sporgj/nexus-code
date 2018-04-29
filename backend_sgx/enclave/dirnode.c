@@ -845,6 +845,11 @@ dirnode_add(struct nexus_dirnode * dirnode,
 {
     struct dir_entry * new_dir_entry = NULL;
 
+    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_CREATE)) {
+        log_error("not authorized to create files\n");
+        return -1;
+    }
+
     // check for existing entry.
     // XXX: typical filesystems perform a lookup to check if the file exists before
     // adding the file. Consider caching dirnode lookups
@@ -923,7 +928,15 @@ dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
 {
     struct __dir_rec * dir_rec   = NULL;
 
-    struct dir_entry * dir_entry = __find_by_uuid(dirnode, uuid);
+    struct dir_entry * dir_entry = NULL;
+
+    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_LOOKUP)) {
+        log_error("not authorized to create files\n");
+        return -1;
+    }
+
+
+    dir_entry = __find_by_uuid(dirnode, uuid);
 
     if (dir_entry == NULL) {
         return -1;
@@ -944,7 +957,14 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      nexus_dirent_type_t  * type,
                      struct nexus_uuid    * entry_uuid)
 {
-    struct dir_entry * dir_entry = __find_by_name(dirnode, filename);
+    struct dir_entry * dir_entry = NULL;
+
+    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_LOOKUP)) {
+        log_error("not authorized to create files\n");
+        return -1;
+    }
+
+    dir_entry = __find_by_name(dirnode, filename);
 
     if (dir_entry == NULL) {
         return -1;
@@ -1033,7 +1053,14 @@ __dirnode_remove(struct nexus_dirnode * dirnode,
                  nexus_dirent_type_t  * type,
                  struct nexus_uuid    * entry_uuid)
 {
-    struct dir_entry * dir_entry = __find_by_name(dirnode, filename);
+    struct dir_entry * dir_entry = NULL;
+
+    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_DELETE)) {
+        log_error("not authorized to create files\n");
+        return -1;
+    }
+
+    dir_entry = __find_by_name(dirnode, filename);
 
     if (dir_entry == NULL) {
         return -1;

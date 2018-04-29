@@ -169,22 +169,19 @@ buffer_layer_delete(struct nexus_uuid * uuid)
 
     // delete link from supernode
     {
-        bool modified = supernode_del_hardlink(global_supernode, uuid, &tmp_uuid);
+        supernode_del_hardlink(global_supernode, uuid, &tmp_uuid);
 
-        if (modified) {
-            // we are dealing with an actual hardlink
-            if (supernode_store(global_supernode, NULL)) {
-                log_error("could not store supernode\n");
-                return -1;
-            }
-
-            // if we deleted a hardlink, but the real file has more links...
-            if (tmp_uuid == NULL) {
-                return 0;
-            }
-
-            real_uuid = tmp_uuid;
+        if (nexus_metadata_store(global_supernode_metadata)) {
+            log_error("could not store supernode\n");
+            return -1;
         }
+
+        // if the delete operation didn't affect an on-disk links
+        if (tmp_uuid == NULL) {
+            return 0;
+        }
+
+        real_uuid = tmp_uuid;
     }
 
     __remove_timestamp(real_uuid);
@@ -215,7 +212,7 @@ buffer_layer_hardlink(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid
         return -1;
     }
 
-    if (supernode_store(global_supernode, NULL)) {
+    if (nexus_metadata_store(global_supernode_metadata)) {
         log_error("stores the supernode\n");
         return -1;
     }
@@ -227,15 +224,12 @@ int
 buffer_layer_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
 {
     bool is_real_file = true; // we assume we are renaming a "real file"
-    bool modified     = false;
 
-    modified = supernode_rename_link(global_supernode, from_uuid, to_uuid, &is_real_file);
+    supernode_rename_link(global_supernode, from_uuid, to_uuid, &is_real_file);
 
-    if (modified) {
-        if (supernode_store(global_supernode, NULL)) {
-            log_error("supernode_store FAILED\n");
-            return -1;
-        }
+    if (nexus_metadata_store(global_supernode_metadata)) {
+        log_error("supernode_store FAILED\n");
+        return -1;
     }
 
     if (is_real_file) {

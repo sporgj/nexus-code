@@ -3,9 +3,11 @@
 #define LRU_CAPACITY    (256)
 
 
-struct nexus_supernode      * global_supernode         = NULL;
+struct nexus_supernode      * global_supernode                = NULL;
 
-static struct nexus_lru     * metadata_objects_list    = NULL;
+struct nexus_metadata       * global_supernode_metadata       = NULL;
+
+static struct nexus_lru     * metadata_objects_list           = NULL;
 
 static struct nexus_dentry    root_dentry;
 
@@ -45,18 +47,31 @@ int
 nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
 {
     // if we are doing a remount
-    if (global_supernode) {
-        supernode_free(global_supernode);
+    if (global_supernode_metadata) {
+        nexus_metadata_free(global_supernode_metadata);
     }
 
-    global_supernode = supernode_from_crypto_buffer(supernode_crypto_buf, NEXUS_FREAD);
+    global_supernode = supernode_from_crypto_buf(supernode_crypto_buf, NEXUS_FREAD);
 
     if (global_supernode == NULL) {
         log_error("supernode_from_buffer FAILED\n");
         return -1;
     }
 
+
+    global_supernode_metadata = nexus_metadata_new(&global_supernode->my_uuid,
+                                                   global_supernode,
+                                                   NEXUS_SUPERNODE,
+                                                   NEXUS_FREAD,
+                                                   nexus_crypto_buf_version(supernode_crypto_buf));
+
+    if (global_supernode_metadata == NULL) {
+        log_error("could not create metadata\n");
+        goto out_err;
+    }
+
     // initialize the root nexus dentry
+    // TODO add code to cleanup root dentry
     memset(&root_dentry, 0, sizeof(struct nexus_dentry));
     INIT_LIST_HEAD(&root_dentry.children);
     nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.uuid);
@@ -64,6 +79,11 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
     root_dentry.metadata_type = NEXUS_DIRNODE;
 
     return 0;
+
+out_err:
+    supernode_free(global_supernode);
+    global_supernode = NULL;
+    return -1;
 }
 
 struct nexus_dentry *
