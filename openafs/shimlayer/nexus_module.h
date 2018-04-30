@@ -44,23 +44,18 @@ extern struct task_struct * nexus_daemon;
 
 extern const char * generic_databuf_command;
 
-extern spinlock_t * nexus_databuffer_lock;
-extern char       * nexus_databuffer_ptr;
-extern size_t       nexus_databuffer_size;
+extern struct nexus_io_buffer {
+    bool                    in_use;
+
+    char                  * buffer;
+
+    size_t                  size;
+
+    wait_queue_head_t       waitq;
+
+    struct page           * pages;
+} nexus_iobuf;
 
 // initialization routine called after device is mounted
 int nexus_kern_init(void);
 
-
-/* Is that what this thing is?? */
-struct kern_xfer_context {
-    int              id;
-    int              xfer_size;
-    int              offset;
-    int              buflen;
-    int              total_size;
-    char           * uaddr;
-    char           * buffer;
-    char           * path;
-    struct rx_call * afs_call;
-};

@@ -26,10 +26,7 @@ const char * generic_databuf_command = "{\n"
 struct task_struct * nexus_daemon  = NULL;
 
 /* data buffer stuff */
-spinlock_t * nexus_databuffer_lock = NULL;
-char       * nexus_databuffer_ptr  = NULL;
-
-static struct page * nexus_databuf_pages = 0;
+struct nexus_io_buffer nexus_iobuf;
 
 
 /* major & minor numbers for our modules */
@@ -184,7 +181,7 @@ nexus_mmap(struct file *filp, struct vm_area_struct *vma)
     uaddr = vma->vm_start;
 
     for (i = vma->vm_pgoff; i < NEXUS_DATABUF_PAGES; i++) {
-        struct page * page = nexus_databuf_pages + i;
+        struct page * page = nexus_iobuf.pages + i;
 
         int err = vm_insert_page(vma, uaddr, page);
 
@@ -244,24 +241,25 @@ __alloc_mod_memory(void)
 {
     int i = 0;
 
-    nexus_databuf_pages = alloc_pages(GFP_KERNEL, NEXUS_DATABUF_ORDER);
+    struct page * pages = alloc_pages(GFP_KERNEL, NEXUS_DATABUF_ORDER);
 
-    if (nexus_databuf_pages == NULL) {
+    if (pages == NULL) {
 	printk(KERN_ERR "could not allocate pages (order=%d)\n", NEXUS_DATABUF_ORDER);
 	return -ENOMEM;
     }
 
     // pin the pages
     for (; i < NEXUS_DATABUF_PAGES; i++) {
-	struct page * page = nexus_databuf_pages + i;
-
-        get_page(page);
+        get_page(pages + i);
     }
 
-    nexus_databuffer_ptr  = page_address(nexus_databuf_pages);
-    nexus_databuffer_lock = nexus_kmalloc(sizeof(spinlock_t), GFP_KERNEL);
+    nexus_iobuf.buffer = page_address(pages);
+    nexus_iobuf.size   = NEXUS_DATABUF_PAGES * PAGE_SIZE;
+    nexus_iobuf.pages  = pages;
 
-    spin_lock_init(nexus_databuffer_lock);
+    init_waitqueue_head(&(nexus_iobuf.waitq));
+
+    mutex_init(&(nexus_iobuf.mutex));
 
     return 0;
 }
@@ -272,16 +270,12 @@ __free_mod_memory(void)
     int i = 0;
 
     for (; i < NEXUS_DATABUF_PAGES; i++) {
-	struct page * page = nexus_databuf_pages + i;
-
-        put_page(page);
+        put_page(nexus_iobuf.pages + i);
     }
 
-    __free_pages(nexus_databuf_pages, NEXUS_DATABUF_ORDER);
+    __free_pages(nexus_iobuf.pages, NEXUS_DATABUF_ORDER);
 
-    nexus_databuffer_ptr  = NULL;
-    // XXX: check if the lock is unused?
-    nexus_kfree(nexus_databuffer_lock);
+    memset(&nexus_iobuf, 0, sizeof(struct nexus_io_buffer));
 }
 
 /**

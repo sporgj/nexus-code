@@ -133,7 +133,7 @@ nexus_store_transfer(struct nexus_volume * vol,
     // this operation accounts for small chunks
     size = MIN(tdc->f.chunkBytes, NEXUS_DATABUF_SIZE);
 
-    nbytes = afs_osi_Read(fp, -1, nexus_databuffer_ptr, size);
+    nbytes = afs_osi_Read(fp, -1, nexus_iobuf.buffer, size);
 
     osi_UFSClose(fp);
 
@@ -153,7 +153,7 @@ nexus_store_transfer(struct nexus_volume * vol,
 
 
     // ship the data to the fileserver
-    ret = nexus_store_upload(afs_call, nexus_databuffer_ptr, nbytes, transferred);
+    ret = nexus_store_upload(afs_call, nexus_iobuf.buffer, nbytes, transferred);
 
     if (ret != 0) {
         NEXUS_ERROR("nexus_store_upload FAILED\n");
@@ -180,8 +180,6 @@ nexus_kern_store(struct vcache          * avc,
 {
     struct nexus_volume * vol           = NULL;
 
-    unsigned long         flags         = 0;
-
     int                   filesize      = avc->f.m.Length;
     int                   offset        = base;
 
@@ -198,7 +196,25 @@ nexus_kern_store(struct vcache          * avc,
         return NEXUS_RET_NOOP;
     }
 
-    spin_lock_irqsave(nexus_databuffer_lock, flags);
+
+    while (nexus_iobuf.in_use == true) {
+        DEFINE_WAIT(wait);
+
+        wake_up_interruptible(&(nexus_iobuf.waitq));
+
+        prepare_to_wait(&(nexus_iobuf.waitq), &wait, TASK_INTERRUPTIBLE);
+
+        AFS_GUNLOCK(); // drop the lock to allow the running process to continue
+
+        schedule();
+
+        finish_wait(&(nexus_iobuf.waitq), &wait);
+
+        AFS_GLOCK();
+    }
+
+
+    nexus_iobuf.in_use = true;
 
     avc->f.truncPos = AFS_NOTRUNC;
 
@@ -230,8 +246,9 @@ nexus_kern_store(struct vcache          * avc,
     if (*doProcessFS) {
         hadd32(*anewDV, 1);
     }
+
 out:
-    spin_unlock_irqrestore(nexus_databuffer_lock, flags);
+    nexus_iobuf.in_use = false;
 
     if (ops) {
         ret = (*ops->destroy)(&rock, ret);

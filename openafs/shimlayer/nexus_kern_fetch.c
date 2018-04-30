@@ -116,8 +116,6 @@ nexus_kern_fetch(struct afs_conn      * tc,
 {
     struct nexus_volume * vol         = NULL;
 
-    unsigned long flags               = 0;
-
     int filesize                      = avc->f.m.Length;
 
     int ret                           = NEXUS_RET_ERROR;
@@ -129,10 +127,28 @@ nexus_kern_fetch(struct afs_conn      * tc,
         return NEXUS_RET_NOOP;
     }
 
-    spin_lock_irqsave(nexus_databuffer_lock, flags);
+
+    while (nexus_iobuf.in_use == true) {
+        DEFINE_WAIT(wait);
+
+        wake_up_interruptible(&(nexus_iobuf.waitq));
+
+        prepare_to_wait(&(nexus_iobuf.waitq), &wait, TASK_INTERRUPTIBLE);
+
+        AFS_GUNLOCK(); // drop the lock to allow the running process to continue
+
+        schedule();
+
+        finish_wait(&(nexus_iobuf.waitq), &wait);
+
+        AFS_GLOCK();
+    }
+
+
+    nexus_iobuf.in_use = true;
 
     // size < nexus_chunk_size
-    ret = nexus_fetch_download(acall, nexus_databuffer_ptr, size);
+    ret = nexus_fetch_download(acall, nexus_iobuf.buffer, size);
 
     if (ret != 0) {
         NEXUS_ERROR("could not download data\n");
@@ -150,7 +166,7 @@ nexus_kern_fetch(struct afs_conn      * tc,
 
     // write the chunk file
     {
-        int nbytes = afs_osi_Write(fp, -1, nexus_databuffer_ptr, size);
+        int nbytes = afs_osi_Write(fp, -1, nexus_iobuf.buffer, size);
 
         if (nbytes != size) {
             ret = NEXUS_RET_ERROR;
@@ -165,7 +181,7 @@ nexus_kern_fetch(struct afs_conn      * tc,
 
     ret = NEXUS_RET_OK;
 out:
-    spin_unlock_irqrestore(nexus_databuffer_lock, flags);
+    nexus_iobuf.in_use = false;
 
     nexus_put_volume(vol);
 
