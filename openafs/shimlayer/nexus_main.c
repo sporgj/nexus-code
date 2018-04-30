@@ -259,8 +259,6 @@ __alloc_mod_memory(void)
 
     init_waitqueue_head(&(nexus_iobuf.waitq));
 
-    mutex_init(&(nexus_iobuf.mutex));
-
     return 0;
 }
 

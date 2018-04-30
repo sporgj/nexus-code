@@ -196,19 +196,13 @@ nexus_kern_store(struct vcache          * avc,
         return NEXUS_RET_NOOP;
     }
 
-
     while (nexus_iobuf.in_use == true) {
-        DEFINE_WAIT(wait);
-
-        wake_up_interruptible(&(nexus_iobuf.waitq));
-
-        prepare_to_wait(&(nexus_iobuf.waitq), &wait, TASK_INTERRUPTIBLE);
-
         AFS_GUNLOCK(); // drop the lock to allow the running process to continue
 
-        schedule();
-
-        finish_wait(&(nexus_iobuf.waitq), &wait);
+        if (wait_event_interruptible(nexus_iobuf.waitq, nexus_iobuf.in_use == false)) {
+            nexus_put_volume(vol);
+            return NEXUS_RET_ERROR;
+        }
 
         AFS_GLOCK();
     }
@@ -249,6 +243,7 @@ nexus_kern_store(struct vcache          * avc,
 
 out:
     nexus_iobuf.in_use = false;
+    wake_up_interruptible(&nexus_iobuf.waitq);
 
     if (ops) {
         ret = (*ops->destroy)(&rock, ret);
