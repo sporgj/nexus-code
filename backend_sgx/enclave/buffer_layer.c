@@ -166,11 +166,10 @@ buffer_layer_delete(struct nexus_uuid * uuid)
 
     struct nexus_uuid * real_uuid = uuid;
 
+    bool modified = supernode_del_hardlink(global_supernode, uuid, &tmp_uuid);
 
     // delete link from supernode
-    {
-        supernode_del_hardlink(global_supernode, uuid, &tmp_uuid);
-
+    if (modified) {
         if (nexus_metadata_store(global_supernode_metadata)) {
             log_error("could not store supernode\n");
             return -1;

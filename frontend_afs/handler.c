@@ -71,6 +71,11 @@ handle_create(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
         goto out;
     }
 
+    log_trace("[%s] %s/%s -> %s\n",
+              (type == NEXUS_REG ? "touch" : "mkdir"),
+              dirpath,
+              fname,
+              nexus_name);
 
     ret = asprintf((char **)resp_buf, generic_success_rsp_str, nexus_name);
 
@@ -125,6 +130,8 @@ handle_remove(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
         goto out;
     }
 
+    log_trace("[delete] %s/%s -> %s\n", dirpath, fname, nexus_name);
+
 
     ret = asprintf((char **)resp_buf, generic_success_rsp_str, nexus_name);
 
@@ -176,6 +183,8 @@ handle_lookup(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
     if (ret != 0) {
         goto out;
     }
+
+    log_trace("[lookup] %s/%s -> %s\n", dirpath, fname, nexus_name);
 
 
     ret = asprintf((char **)resp_buf, generic_success_rsp_str, nexus_name);
@@ -229,6 +238,8 @@ handle_filldir(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
     if (ret != 0) {
         goto out;
     }
+
+    log_trace("[filldir] %s/%s (%s)\n", dirpath, nexus_name, real_name);
 
 
     ret = asprintf((char **)resp_buf, "\"code\" : 0, \"real_name\" : \"%s\"", real_name);
@@ -293,6 +304,8 @@ handle_symlink(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
 
             goto out;
         }
+
+        log_trace("[symlink] %s/%s -> %s (%s)\n", dirpath, linkname, target, nexus_name);
 
         nexus_free(dirpath);
         nexus_free(linkname);
@@ -359,6 +372,13 @@ handle_hardlink(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_
                                 tget_dirpath,
                                 tget_filename,
                                 &nexus_name);
+
+        log_trace("[hardlink] %s/%s -> %s/%s (%s)\n",
+                  link_dirpath,
+                  link_filename,
+                  tget_dirpath,
+                  tget_filename,
+                  nexus_name);
 
         nexus_free(link_dirpath);
         nexus_free(link_filename);
@@ -439,6 +459,13 @@ handle_rename(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_si
         goto out;
     }
 
+    log_trace("[rename] %s/%s (%s) -> %s/%s (%s)\n",
+              old_dirpath,
+              old_filename,
+              old_nexus_name,
+              new_dirpath,
+              new_filename,
+              new_nexus_name);
 
     ret = asprintf((char **)resp_buf,
                    "\"code\" : 0, \"old_nexus_name\" : \"%s\", \"new_nexus_name\" : \"%s\"",

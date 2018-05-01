@@ -70,8 +70,6 @@ struct nexus_dirnode {
 
     size_t                  bucket_count;
 
-    nexus_io_flags_t        mode;
-
 
     struct nexus_acl        dir_acl;
 
@@ -134,15 +132,6 @@ dirnode_store(struct   nexus_uuid    * uuid,
 
 int
 dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode);
-
-/**
- * Creates a nexus_dirnode from a buffer
- * @param buffer
- * @param buflen
- * @return dirnode
- */
-struct nexus_dirnode *
-dirnode_from_buffer(uint8_t * buffer, size_t buflen);
 
 void
 dirnode_free(struct nexus_dirnode * dirnode);

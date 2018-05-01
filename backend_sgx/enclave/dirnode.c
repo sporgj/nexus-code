@@ -168,7 +168,7 @@ __load_bucket0(struct nexus_dirnode * dirnode, uint8_t * input_ptr)
 }
 
 static int
-__load_other_buckets(struct nexus_dirnode * dirnode)
+__load_other_buckets(struct nexus_dirnode * dirnode, nexus_io_flags_t flags)
 {
     struct nexus_list_iterator * iter = list_iterator_new(&dirnode->bucket_list);
 
@@ -184,7 +184,7 @@ __load_other_buckets(struct nexus_dirnode * dirnode)
 
         struct nexus_mac    mac;
 
-        if (bucket_load_from_uuid(bucket, dirnode, &mac)) {
+        if (bucket_load_from_uuid(bucket, dirnode, flags, &mac)) {
             log_error("bucket_load_from_uuid FAILED\n");
             goto out_err;
         }
@@ -209,8 +209,8 @@ out_err:
 }
 
 
-struct nexus_dirnode *
-dirnode_from_buffer(uint8_t * buffer, size_t buflen)
+static struct nexus_dirnode *
+dirnode_from_buffer(uint8_t * buffer, size_t buflen, nexus_io_flags_t flags)
 {
     struct nexus_dirnode * dirnode   = nexus_malloc(sizeof(struct nexus_dirnode));
 
@@ -225,7 +225,6 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
 
 
     dirnode_init(dirnode);
-
 
     /* parse the main bucket info first */
     input_ptr = __parse_acls(dirnode, input_ptr, buflen);
@@ -259,7 +258,7 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen)
     }
 
 
-    if (__load_other_buckets(dirnode)) {
+    if (__load_other_buckets(dirnode, flags)) {
         log_error("could not load dirnode buckets\n");
         goto out_err;
     }
@@ -289,14 +288,12 @@ dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_
         return NULL;
     }
 
-    dirnode = dirnode_from_buffer(buffer, buflen);
+    dirnode = dirnode_from_buffer(buffer, buflen, flags);
 
     if (dirnode == NULL) {
         log_error("__parse_dirnode FAILED\n");
         return NULL;
     }
-
-    dirnode->mode = flags;
 
     return dirnode;
 }
@@ -451,7 +448,7 @@ __store_other_buckets(struct nexus_dirnode * dirnode, struct __bucket_rec * reco
         if (bucket_store(bucket)) {
             list_iterator_free(iter);
 
-            log_error("bucket_load_from_uuid FAILED\n");
+            log_error("bucket_load_from_uuid FAILED (num = %d)\n", i);
             return -1;
         }
 
@@ -491,6 +488,8 @@ __delete_empty_dirnode_buckets(struct nexus_dirnode * dirnode)
 
         list_iterator_next(iter);
     }
+
+    list_iterator_free(iter);
 }
 
 
@@ -501,8 +500,6 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
 
     uint8_t             * output_ptr     = NULL;
 
-
-    __delete_empty_dirnode_buckets(dirnode);
 
 
     output_ptr = __serialize_dirnode_header(dirnode, buffer);
@@ -559,17 +556,22 @@ dirnode_store(struct nexus_uuid    * uuid,
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
-    size_t                    bucket0_size  = __get_bucket0_size(dirnode);
+    size_t                    bucket0_size  = 0;
 
     int                       ret           = -1;
 
+
+
+    __delete_empty_dirnode_buckets(dirnode);
+
+
+    bucket0_size  = __get_bucket0_size(dirnode);
 
     crypto_buffer = nexus_crypto_buf_new(bucket0_size, version, uuid);
 
     if (crypto_buffer == NULL) {
         return -1;
     }
-
 
     // write to the buffer
     {

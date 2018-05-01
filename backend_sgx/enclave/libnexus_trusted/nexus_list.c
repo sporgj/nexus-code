@@ -50,16 +50,16 @@ nexus_list_get(struct nexus_list * list, size_t pos) {
     struct list_head * curr = head->next;
     struct list_node * node = NULL;
 
-    if (list_empty(head)) {
-        return NULL;
-    }
-
     for (size_t i = 0; i < pos; i++) {
         if (curr == head) {
             return NULL;
         }
 
         curr = curr->next;
+    }
+
+    if (curr == head) {
+      return NULL;
     }
 
     node = list_entry(curr, struct list_node, node);

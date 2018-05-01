@@ -78,6 +78,7 @@ bucket_load_from_buffer(struct dir_bucket * bucket, struct nexus_dirnode * dirno
 int
 bucket_load_from_uuid(struct dir_bucket    * bucket,
                       struct nexus_dirnode * dirnode,
+                      nexus_io_flags_t       flags,
                       struct nexus_mac     * mac);
 
 int

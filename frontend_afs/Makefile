@@ -22,6 +22,10 @@ libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid\
 
 LDFLAGS := -L$(SGX_SDK)/lib64
 
+ifeq ($(TRACE), 1)
+	CFLAGS += -DTRACE
+endif
+
 ifeq ($(SGX_MODE), SIM)
 	libs += -lsgx_urts_sim -lsgx_uae_service_sim
 else ifeq ($(SGX_MODE), HW)

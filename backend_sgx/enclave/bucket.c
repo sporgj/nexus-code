@@ -152,9 +152,10 @@ bucket_load_from_buffer(struct dir_bucket    * bucket,
 int
 bucket_load_from_uuid(struct dir_bucket    * bucket,
                       struct nexus_dirnode * dirnode,
+                      nexus_io_flags_t       flags,
                       struct nexus_mac     * mac)
 {
-    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(&bucket->uuid, dirnode->mode);
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(&bucket->uuid, flags);
 
     if (crypto_buffer == NULL) {
         log_error("metadata_read FAILED\n");

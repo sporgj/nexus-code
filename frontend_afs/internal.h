@@ -8,6 +8,13 @@
 #include <nexus_volume.h>
 #include <nexus_datastore.h>
 
+
+#ifdef TRACE
+#define log_trace(fmt, ...) fprintf(stderr, ". " fmt, ##__VA_ARGS__)
+#else
+#define log_trace(fmt, ...)
+#endif
+
 extern struct nexus_volume * mounted_volume;
 
 extern char * datastore_path;

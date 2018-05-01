@@ -35,14 +35,12 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 	goto out;
     }
 
-#if 0
     if (mode & NEXUS_FWRITE) {
         if (flock(fileno(file_handle->file_ptr), LOCK_EX)) {
             log_error("could not lock file (%s)", filepath);
             goto out;
         }
     }
-#endif
 
     file_handle->mode     = mode;
     file_handle->filepath = strndup(filepath, PATH_MAX);
