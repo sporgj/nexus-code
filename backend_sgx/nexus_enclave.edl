@@ -10,7 +10,8 @@ enclave {
          */
         public int ecall_init_enclave
         (
-            [user_check] struct nexus_volume * volume
+            [user_check] struct nexus_volume * volume,
+            [user_check] struct nexus_heap   * heap
         );
 
 
@@ -153,7 +154,7 @@ enclave {
         ocall_buffer_get
         (
             [in]         struct nexus_uuid   * metadata_uuid,
-                         nexus_io_flags_t       mode,
+                         nexus_io_flags_t      mode,
             [out]        size_t              * buffer_size,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
@@ -167,6 +168,8 @@ enclave {
         ocall_buffer_put
         (
             [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] uint8_t             * heap_ptr,
+                         size_t                buflen,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );

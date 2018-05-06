@@ -281,65 +281,47 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
-    size_t serialized_buflen = 0;
+    uint8_t                 * output_buffer = NULL;
 
-    int ret = -1;
+    size_t                    buffer_size   = nexus_usertable_buflen(usertable);
 
 
-    serialized_buflen = nexus_usertable_buflen(usertable);
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, usertable->version, &usertable->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(buffer_size, usertable->version, &usertable->my_uuid);
 
-    if (!crypto_buffer) {
+    if (crypto_buffer == NULL) {
         log_error("could not initialize crypto buffer\n");
-        goto out;
+        return -1;
     }
 
     // XXX: this pattern is common amongst all metadata. At some point, we will
     // have to refactor this.
-    {
-        uint8_t * output_buffer = NULL;
+    output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
 
-        size_t    buffer_size   = 0;
-
-
-        output_buffer = nexus_crypto_buf_get(crypto_buffer, &buffer_size, NULL);
-        if (output_buffer == NULL) {
-            log_error("could not get the crypto_buffer buffer\n");
-            goto out;
-        }
-
-        ret = __serialize_usertable(usertable, output_buffer);
-        if (ret != 0) {
-            log_error("dirnode_serialize() FAILED\n");
-            goto out;
-        }
-
-        ret = nexus_crypto_buf_put(crypto_buffer, mac);
-        if (ret != 0) {
-            log_error("nexus_crypto_buf_put FAILED\n");
-            goto out;
-        }
+    if (output_buffer == NULL) {
+        log_error("could not get the crypto_buffer buffer\n");
+        goto out_err;
     }
 
-    // flush the buffer to the backend
-    ret = nexus_crypto_buf_flush(crypto_buffer);
-
-    if (ret) {
-        log_error("metadata_write FAILED\n");
-        goto out;
+    if (__serialize_usertable(usertable, output_buffer)) {
+        log_error("dirnode_serialize() FAILED\n");
+        goto out_err;
     }
 
+    if (nexus_crypto_buf_put(crypto_buffer, mac)) {
+        log_error("nexus_crypto_buf_put FAILED\n");
+        goto out_err;
+    }
 
     usertable->version += 1;
 
-    ret = 0;
-out:
-    if (crypto_buffer) {
-        nexus_crypto_buf_free(crypto_buffer);
-    }
+    nexus_crypto_buf_free(crypto_buffer);
 
-    return ret;
+    return 0;
+out_err:
+    nexus_crypto_buf_free(crypto_buffer);
+
+    return -1;
 }
 
 struct nexus_user *

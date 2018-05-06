@@ -8,6 +8,7 @@
 #include <nexus_uuid.h>
 #include <nexus_key.h>
 #include <nexus_fs.h>
+#include <nexus_heap.h>
 
 #define NONCE_SIZE 64
 

@@ -1,5 +1,9 @@
 #include "internal.h"
 
+#include <sys/mman.h>
+
+#define  HEAP_SIZE      (1 << 25)
+
 int
 uuid_equal_func(uintptr_t key1, uintptr_t key2)
 {
@@ -17,6 +21,10 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
 {
     if (sgx_backend->buf_manager) {
         buffer_manager_destroy(sgx_backend->buf_manager);
+    }
+
+    if (sgx_backend->mmap_ptr) {
+        munmap(sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
 
     nexus_free(sgx_backend);
@@ -52,6 +60,27 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
         }
 
         sgx_backend->buf_manager = buf_manager;
+    }
+
+
+    // initialze the heap
+    {
+        sgx_backend->mmap_len = HEAP_SIZE;
+
+        sgx_backend->mmap_ptr = mmap(0,
+                                     sgx_backend->mmap_len,
+                                     PROT_READ | PROT_WRITE,
+                                     MAP_PRIVATE | MAP_ANONYMOUS,
+                                     -1,
+                                     0);
+
+        if (sgx_backend->mmap_ptr == MAP_FAILED) {
+            log_error("could not mmap %zu bytes\n", sgx_backend->mmap_len);
+            goto out;
+        }
+
+
+        nexus_heap_init(&sgx_backend->heap_manager, sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
 
     sgx_backend->volume_chunk_size = NEXUS_CHUNK_SIZE;

@@ -11,6 +11,7 @@
 #include <nexus_util.h>
 #include <nexus_volume.h>
 #include <nexus_user_data.h>
+#include <nexus_heap.h>
 
 #include <sgx_urts.h>
 
@@ -23,15 +24,23 @@
 
 
 struct sgx_backend {
-    sgx_enclave_id_t enclave_id;
+    sgx_enclave_id_t              enclave_id;
 
-    size_t volume_chunk_size;
+    size_t                        volume_chunk_size;
 
-    struct buffer_manager * buf_manager;
+    struct buffer_manager       * buf_manager;
 
-    struct nexus_volume * volume;
 
-    char * enclave_path;
+    struct nexus_heap             heap_manager;
+
+    uint8_t                     * mmap_ptr;
+
+    size_t                        mmap_len;
+
+
+    struct nexus_volume         * volume;
+
+    char                        * enclave_path;
 };
 
 

@@ -303,7 +303,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 
     return crypto_buf->internal_addr;
 
- err:
+err:
     if (buf_hdr) nexus_free(buf_hdr);
 
     nexus_free(crypto_buf->internal_addr);
@@ -398,8 +398,7 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     // if we have no space allocated...
     if (crypto_buf->external_addr == NULL) {
         crypto_buf->external_size = __get_header_len() + crypto_buf->internal_size;
-        crypto_buf->external_addr = buffer_layer_alloc(crypto_buf->external_size,
-                                                       &crypto_buf->uuid);
+        crypto_buf->external_addr = nexus_heap_malloc(global_heap, crypto_buf->external_size);
 
         if (crypto_buf->external_addr == NULL) {
             log_error("buffer_layer_alloc FAILED\n");
@@ -416,9 +415,8 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     buf_hdr = __serialize_header(crypto_buf);
 
     if (buf_hdr == NULL) {
-        crypto_buf->version -= 1;
         log_error("serializing header FAILED\n");
-        return -1;
+        goto out;
     }
 
 
@@ -439,34 +437,28 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
             log_error("crypto_gcm_encrypt FAILED\n");
             goto out;
         }
-    }
 
-    nexus_mac_to_buf(&(crypto_buf->crypto_ctx.mac), buf_hdr->gcm_hdr.mac);
+        nexus_mac_to_buf(&(crypto_buf->crypto_ctx.mac), buf_hdr->gcm_hdr.mac);
+    }
 
 
     /* Finally copy the header out to the external buffer */
     memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
 
 
-
-    ret = 0;
+    ret = buffer_layer_put(&crypto_buf->uuid, crypto_buf->external_addr, crypto_buf->external_size);
 out:
-    nexus_free(buf_hdr);
+    nexus_heap_free(global_heap, crypto_buf->external_addr);
+
+    crypto_buf->external_addr = NULL;
+
+    if (buf_hdr) {
+        nexus_free(buf_hdr);
+    }
 
     if (ret) {
         crypto_buf->version -= 1;
     }
 
     return ret;
-}
-
-int
-nexus_crypto_buf_flush(struct nexus_crypto_buf * buf)
-{
-    if (buf->external_addr == NULL) {
-        log_error("crypto_buf has no external allocations\n");
-        return -1;
-    }
-
-    return buffer_layer_put(&buf->uuid);
 }

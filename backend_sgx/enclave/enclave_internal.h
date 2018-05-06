@@ -47,6 +47,7 @@
 #include <nexus_util.h>
 #include <nexus_list.h>
 #include <nexus_lru.h>
+#include <nexus_heap.h>
 #include <nexus_hashtable.h>
 
 
@@ -67,6 +68,10 @@ extern struct nexus_key            * global_volumekey;
 extern struct nexus_supernode      * global_supernode;
 
 extern struct nexus_metadata       * global_supernode_metadata;
+
+
+extern struct nexus_heap           * global_heap;
+
 
 extern nexus_uid_t                   global_user_id;
 

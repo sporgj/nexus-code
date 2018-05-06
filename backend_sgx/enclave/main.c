@@ -8,14 +8,17 @@ size_t                global_chunk_size         = NEXUS_CHUNK_SIZE;
 
 size_t                global_log2chunk_size     = 0;
 
+struct nexus_heap   * global_heap               = NULL;
 
 nexus_uid_t           global_user_id            = 0;
 
 
 int
-ecall_init_enclave(struct nexus_volume * volume)
+ecall_init_enclave(struct nexus_volume * volume, struct nexus_heap * heap)
 {
     global_volume = volume;
+
+    global_heap   = heap;
 
     if (buffer_layer_init() != 0) {
         return -1;

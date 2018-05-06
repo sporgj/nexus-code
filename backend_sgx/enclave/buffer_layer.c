@@ -87,21 +87,6 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 }
 
 void *
-buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid)
-{
-    uint8_t * external_addr = NULL;
-
-    int err = ocall_buffer_alloc(&external_addr, total_size, uuid, global_volume);
-
-    if (err || external_addr == NULL) {
-        log_error("could not allocate space for crypto_buffer (err=%d)\n", err);
-        return NULL;
-    }
-
-    return external_addr;
-}
-
-void *
 buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size)
 {
     uint8_t * external_addr = NULL;
@@ -124,14 +109,14 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
 }
 
 int
-buffer_layer_put(struct nexus_uuid * buffer_uuid)
+buffer_layer_put(struct nexus_uuid * buffer_uuid, uint8_t * buffer, size_t buflen)
 {
     size_t timestamp = 0;
 
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_put(&ret, buffer_uuid, &timestamp, global_volume);
+    err = ocall_buffer_put(&ret, buffer_uuid, buffer, buflen, &timestamp, global_volume);
 
     if (err || ret) {
         log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);

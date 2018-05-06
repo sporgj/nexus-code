@@ -11,6 +11,10 @@ io_buffer_get(struct nexus_uuid   * uuid,
               struct nexus_volume * volume);
 
 int
-io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume);
+io_buffer_put(struct nexus_uuid   * uuid,
+              uint8_t             * heap_ptr,
+              size_t                size,
+              size_t              * timestamp,
+              struct nexus_volume * volume);
 
 

@@ -339,12 +339,6 @@ filenode_store(struct nexus_uuid     * uuid,
         }
     }
 
-    ret = nexus_crypto_buf_flush(crypto_buffer);
-    if (ret) {
-        log_error("metadata_write FAILED\n");
-        goto out;
-    }
-
     __set_filenode_clean(filenode);
 
     ret = 0;

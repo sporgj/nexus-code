@@ -31,7 +31,7 @@ init_enclave(struct sgx_backend * backend)
         }
     }
 
-    err = ecall_init_enclave(backend->enclave_id, &ret, backend->volume);
+    err = ecall_init_enclave(backend->enclave_id, &ret, backend->volume, &backend->heap_manager);
 
     if (err || ret) {
         log_error("ecall_init_enclave() FAILED\n");
@@ -177,7 +177,6 @@ __sign_response(struct sgx_backend      * sgx_backend,
                 uint8_t                 * signature_buf,
                 size_t                  * signature_len)
 {
-    struct nexus_uuid * supernode_uuid   = NULL;
     uint8_t           * supernode_buffer = NULL;
     size_t              supernode_buflen = 0;
 
@@ -188,27 +187,16 @@ __sign_response(struct sgx_backend      * sgx_backend,
 
     /* 1 - Read the supernode from the backend */
     {
-        supernode_uuid = &(sgx_backend->volume->supernode_uuid);
+        size_t timestamp = 0;
 
-        ret = nexus_datastore_get_uuid(sgx_backend->volume->metadata_store,
-                                       supernode_uuid,
-                                       NULL,
-                                       &supernode_buffer,
-                                       (uint32_t *)&supernode_buflen);
+        supernode_buffer = io_buffer_get(&(sgx_backend->volume->supernode_uuid),
+                                         NEXUS_FREAD,
+                                         &supernode_buflen,
+                                         &timestamp,
+                                         sgx_backend->volume);
 
-        if (ret) {
-            log_error("nexus_datastore_get_uuid FAILED\n");
-            return -1;
-        }
-
-        ret = buffer_manager_add(sgx_backend->buf_manager,
-                                 supernode_buffer,
-                                 supernode_buflen,
-                                 supernode_uuid);
-
-        if (ret != 0) {
-            nexus_free(supernode_buffer);
-            log_error("could not read the supernode\n");
+        if (supernode_buffer == NULL) {
+            log_error("io_buffer_get FAILED\n");
             return -1;
         }
     }
@@ -270,7 +258,6 @@ __sign_response(struct sgx_backend      * sgx_backend,
 
     return 0;
 out:
-    buffer_manager_put(sgx_backend->buf_manager, supernode_uuid);
 
     return -1;
 }

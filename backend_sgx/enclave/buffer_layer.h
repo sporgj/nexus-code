@@ -7,16 +7,6 @@ buffer_layer_init();
 int
 buffer_layer_exit();
 
-
-/**
- * Allocates a new buffer of the given size and acquires a reference to the buffek
- * @param total_size
- * @param uuid
- * @return the address to the buffer
- */
-void *
-buffer_layer_alloc(size_t total_size, struct nexus_uuid * uuid);
-
 /**
  * Checks if the metadata has changed since the last time the buffer
  * checked the backend.
@@ -38,10 +28,12 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
 /**
  * Drops reference to a specified buffer
  * @param uuid
+ * @param buffer
+ * @param buflen
  * @return 0 on success
  */
 int
-buffer_layer_put(struct nexus_uuid * uuid);
+buffer_layer_put(struct nexus_uuid * uuid, uint8_t * buffer, size_t buflen);
 
 /**
  * Creates an empty file on the datastore

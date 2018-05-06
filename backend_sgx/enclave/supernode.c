@@ -297,13 +297,6 @@ supernode_store(struct nexus_supernode * supernode, int version, struct nexus_ma
         }
     }
 
-    // flush the buffer to the backend
-    ret = nexus_crypto_buf_flush(crypto_buffer);
-    if (ret) {
-        log_error("metadata_write FAILED\n");
-        goto out;
-    }
-
     __supernode_set_clean(supernode);
 
     ret = 0;

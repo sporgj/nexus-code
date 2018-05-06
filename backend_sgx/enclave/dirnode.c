@@ -604,14 +604,6 @@ dirnode_store(struct nexus_uuid    * uuid,
         }
     }
 
-
-    ret = nexus_crypto_buf_flush(crypto_buffer);
-
-    if (ret) {
-        log_error("metadata_write FAILED\n");
-        goto out;
-    }
-
     __dirnode_set_clean(dirnode);
 
 

@@ -229,7 +229,7 @@ bucket_store(struct dir_bucket * bucket)
     crypto_buffer = nexus_crypto_buf_new(bucket->size_bytes, 0, &bucket->uuid);
 
     if (crypto_buffer == NULL) {
-        log_error("metadata_read FAILED\n");
+        log_error("could not create crypto buffer FAILED\n");
         return -1;
     }
 
@@ -247,11 +247,6 @@ bucket_store(struct dir_bucket * bucket)
 
     if (nexus_crypto_buf_put(crypto_buffer, &bucket->mac)) {
         log_error("crypto_buf_put FAILED\n");
-        goto out_err;
-    }
-
-    if (nexus_crypto_buf_flush(crypto_buffer)) {
-        log_error("could not flush crypto_buf\n");
         goto out_err;
     }
 

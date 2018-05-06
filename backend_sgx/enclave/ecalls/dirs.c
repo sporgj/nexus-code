@@ -259,7 +259,7 @@ ecall_fs_symlink(char              * dirpath_IN,
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
