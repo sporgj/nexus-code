@@ -169,6 +169,26 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
     return nexus_metadata_new(uuid, object, type, flags, version);
 }
 
+// FIXME: this is temporary until a more stable solution to hardlinks/rename
+// is found.
+static int
+__metadata_store_supernode(struct nexus_metadata * metadata)
+{
+    struct nexus_supernode * supernode = metadata->supernode;
+
+    uint8_t * buffer = NULL;
+    size_t    buflen = 0;
+
+    buffer = buffer_layer_get(&supernode->my_uuid, NEXUS_FWRITE, &buflen);
+
+    if (buffer == NULL) {
+        log_error("buffer_layer_get FAILED\n");
+        return -1;
+    }
+
+    return supernode_store(metadata->supernode, metadata->version, NULL);
+}
+
 int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
@@ -180,7 +200,7 @@ nexus_metadata_store(struct nexus_metadata * metadata)
 
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
-        ret = supernode_store(metadata->supernode, metadata->version, NULL);
+        ret = __metadata_store_supernode(metadata);
         break;
     case NEXUS_DIRNODE:
         ret = dirnode_store(&metadata->uuid, metadata->dirnode, metadata->version, NULL);

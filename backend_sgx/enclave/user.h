@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include <nexus_hash.h>
+#include <nexus_list.h>
 
 
 #define NEXUS_MAX_NAMELEN     25
@@ -26,6 +27,20 @@ struct nexus_user {
     nexus_uid_t               user_id;
 
     pubkey_hash_t             pubkey_hash;
+};
+
+struct nexus_usertable {
+    uint32_t          version;
+
+    uint64_t          auto_increment;
+    uint64_t          user_count;
+    uint64_t          total_size;
+
+    struct nexus_uuid my_uuid;
+
+    struct nexus_user owner;
+
+    struct nexus_list userlist;
 };
 
 /**

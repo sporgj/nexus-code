@@ -24,21 +24,6 @@ struct __table_hdr {
 } __attribute__((packed));
 
 
-struct nexus_usertable {
-    uint32_t          version;
-
-    uint64_t          auto_increment;
-    uint64_t          user_count;
-    uint64_t          total_size;
-
-    struct nexus_uuid my_uuid;
-
-    struct nexus_user owner;
-
-    struct nexus_list userlist;
-};
-
-
 static void
 free_user(void * element)
 {

@@ -77,7 +77,7 @@ __nxs_fs_crypto(char              * filepath_IN,
 {
     struct nexus_metadata * metadata = NULL;
 
-    nexus_io_flags_t io_mode = (mode == NEXUS_ENCRYPT) ? NEXUS_FREAD : NEXUS_FRDWR;
+    nexus_io_flags_t io_mode = (mode == NEXUS_ENCRYPT) ? NEXUS_FRDWR : NEXUS_FREAD;
 
     int ret = -1;
 

@@ -189,6 +189,8 @@ nexus_heap_malloc(struct nexus_heap * heap, size_t size)
         found = get_best_fit(temp, size);
     } while (found == NULL);
 
+    index -= 1;
+
     if ((found->size - size) > (overhead + MIN_ALLOC_SIZE)) {
         node_t * split = (node_t *)(((char *)found + overhead) + size);
 
@@ -205,7 +207,7 @@ nexus_heap_malloc(struct nexus_heap * heap, size_t size)
     }
 
     found->hole = 0;
-    remove_node(get_bin_from_size(heap, found->size), found);
+    remove_node(get_bin_from_index(heap, index), found);
 
     found->prev = NULL;
     found->next = NULL;

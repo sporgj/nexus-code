@@ -130,12 +130,18 @@ io_buffer_put(struct nexus_uuid   * uuid,
 
         buffer_manager_add(sgx_backend->buf_manager, metadata_buf);
 
-        metadata_buf->locked_file = nexus_datastore_fopen(volume->metadata_store, uuid, NULL, NEXUS_FWRITE);
+        metadata_buf->locked_file = nexus_datastore_fopen(volume->metadata_store,
+                                                          uuid,
+                                                          NULL,
+                                                          NEXUS_FWRITE);
 
         if (metadata_buf->locked_file == NULL) {
             log_error("nexus_datastore_fopen FAILED\n");
             return -1;
         }
+    } else if (metadata_buf->locked_file == NULL) {
+        log_error("no locked file on metadata\n");
+        return -1;
     }
 
     if (nexus_datastore_fwrite(volume->metadata_store, metadata_buf->locked_file, heap_ptr, size)) {

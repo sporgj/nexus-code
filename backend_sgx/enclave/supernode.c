@@ -250,11 +250,23 @@ supernode_store(struct nexus_supernode * supernode, int version, struct nexus_ma
 
 
     // first write out the usertable
-    ret = nexus_usertable_store(supernode->usertable, &supernode->usertable_mac);
+    {
+        uint8_t * tmp_buffer = NULL;
+        size_t    tmp_buflen = 0;
 
-    if (ret != 0) {
-        log_error("writing usertable FAILED\n");
-        return -1;
+        tmp_buffer = buffer_layer_get(&supernode->usertable->my_uuid, NEXUS_FWRITE, &tmp_buflen);
+
+        if (tmp_buffer == NULL) {
+            log_error("buffer_layer_get FAILED\n");
+            return -1;
+        }
+
+        ret = nexus_usertable_store(supernode->usertable, &supernode->usertable_mac);
+
+        if (ret != 0) {
+            log_error("writing usertable FAILED\n");
+            return -1;
+        }
     }
 
     serialized_buflen = __supernode_buflen(supernode);
