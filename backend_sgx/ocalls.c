@@ -31,12 +31,9 @@ ocall_print(char * str)
 // ------------------- Buffer Management ---------------------------
 
 uint8_t *
-ocall_buffer_alloc(size_t size, struct nexus_uuid * uuid, struct nexus_volume * volume)
+ocall_buffer_alloc(struct nexus_uuid * uuid, size_t size, struct nexus_volume * volume)
 {
-#if 0
-    return io_buffer_alloc(size, uuid, volume);
-#endif
-    return NULL;
+    return io_buffer_alloc(uuid, size, volume);
 }
 
 uint8_t *
@@ -52,12 +49,16 @@ ocall_buffer_get(struct nexus_uuid   * uuid,
 
 int
 ocall_buffer_put(struct nexus_uuid   * uuid,
-                 uint8_t             * heap_ptr,
-                 size_t                datalen,
                  size_t              * p_timestamp,
                  struct nexus_volume * volume)
 {
-    return io_buffer_put(uuid, heap_ptr, datalen, p_timestamp, volume);
+    return io_buffer_put(uuid, p_timestamp, volume);
+}
+
+int
+ocall_buffer_lock(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
+{
+    return (io_buffer_lock(metadata_uuid, volume) == NULL);
 }
 
 int

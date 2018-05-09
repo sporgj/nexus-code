@@ -184,7 +184,7 @@ __load_other_buckets(struct nexus_dirnode * dirnode, nexus_io_flags_t flags)
 
         struct nexus_mac    mac;
 
-        if (bucket_load_from_uuid(bucket, dirnode, flags, &mac)) {
+        if (bucket_load_from_uuid(bucket, dirnode, NEXUS_FREAD, &mac)) {
             log_error("bucket_load_from_uuid FAILED\n");
             goto out_err;
         }
@@ -420,9 +420,6 @@ __store_other_buckets(struct nexus_dirnode * dirnode, struct __bucket_rec * reco
 {
     struct nexus_list_iterator * iter = list_iterator_new(&dirnode->bucket_list);
 
-    uint8_t * tmp_buffer = NULL;
-    size_t    tmp_buflen = 0;
-
     int i   = 0;
 
 
@@ -437,17 +434,6 @@ __store_other_buckets(struct nexus_dirnode * dirnode, struct __bucket_rec * reco
         if (!bucket->is_dirty) {
             goto skip;
         }
-
-        // open the file in untrusted memory
-        tmp_buffer = buffer_layer_get(&bucket->uuid, NEXUS_FWRITE, &tmp_buflen);
-
-        if (tmp_buffer == NULL) {
-            log_error("buffer_layer_get FAILED\n");
-            return -1;
-        }
-
-        buffer = buffer_layer_get(&bucket->my_uuid, NEXUS_FWRITE, &buflen);
-
 
         // store the bucket and write the mac into its matching record
         if (bucket_store(bucket)) {

@@ -398,7 +398,8 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     // if we have no space allocated...
     if (crypto_buf->external_addr == NULL) {
         crypto_buf->external_size = __get_header_len() + crypto_buf->internal_size;
-        crypto_buf->external_addr = nexus_heap_malloc(global_heap, crypto_buf->external_size);
+        crypto_buf->external_addr = buffer_layer_alloc(&crypto_buf->uuid,
+                                                       crypto_buf->external_size);
 
         if (crypto_buf->external_addr == NULL) {
             log_error("buffer_layer_alloc FAILED\n");
@@ -446,12 +447,8 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
 
 
-    ret = buffer_layer_put(&crypto_buf->uuid, crypto_buf->external_addr, crypto_buf->external_size);
+    ret = buffer_layer_put(&crypto_buf->uuid);
 out:
-    nexus_heap_free(global_heap, crypto_buf->external_addr);
-
-    crypto_buf->external_addr = NULL;
-
     if (buf_hdr) {
         nexus_free(buf_hdr);
     }

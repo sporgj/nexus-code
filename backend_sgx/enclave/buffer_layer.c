@@ -86,6 +86,38 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
     return 0;
 }
 
+uint8_t *
+buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
+{
+    int       err  = -1;
+    uint8_t * addr = NULL;
+
+    err = ocall_buffer_alloc(&addr, uuid, size, global_volume);
+
+    if (err || addr == NULL) {
+        log_error("ocall_buffer_alloc FAILED (err=%d)\n", err);
+        return NULL;
+    }
+
+    return addr;
+}
+
+int
+buffer_layer_lock(struct nexus_uuid * uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_lock(&ret, uuid, global_volume);
+
+    if (err || ret) {
+        log_error("ocall_buffer_lock FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
 void *
 buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size)
 {
@@ -109,14 +141,14 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
 }
 
 int
-buffer_layer_put(struct nexus_uuid * buffer_uuid, uint8_t * buffer, size_t buflen)
+buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
     size_t timestamp = 0;
 
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_put(&ret, buffer_uuid, buffer, buflen, &timestamp, global_volume);
+    err = ocall_buffer_put(&ret, buffer_uuid, &timestamp, global_volume);
 
     if (err || ret) {
         log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);

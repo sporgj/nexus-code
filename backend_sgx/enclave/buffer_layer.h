@@ -7,6 +7,12 @@ buffer_layer_init();
 int
 buffer_layer_exit();
 
+uint8_t *
+buffer_layer_alloc(struct nexus_uuid * uuid, size_t size);
+
+int
+buffer_layer_lock(struct nexus_uuid * uuid);
+
 /**
  * Checks if the metadata has changed since the last time the buffer
  * checked the backend.
@@ -33,7 +39,7 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
  * @return 0 on success
  */
 int
-buffer_layer_put(struct nexus_uuid * uuid, uint8_t * buffer, size_t buflen);
+buffer_layer_put(struct nexus_uuid * uuid);
 
 /**
  * Creates an empty file on the datastore

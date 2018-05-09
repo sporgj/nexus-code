@@ -10,8 +10,6 @@ __alloc_metadata_buf(struct nexus_uuid * uuid)
 
     nexus_uuid_copy(uuid, &buf->uuid);
 
-    buf->addr = nexus_malloc(1);
-
     return buf;
 }
 
@@ -115,36 +113,26 @@ read_datastore:
 }
 
 int
-io_buffer_put(struct nexus_uuid   * uuid,
-              uint8_t             * heap_ptr,
-              size_t                size,
-              size_t              * timestamp,
-              struct nexus_volume * volume)
+io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
 {
     struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
 
     struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
-    if (metadata_buf == NULL) {
-        metadata_buf = __alloc_metadata_buf(uuid);
+    int ret = -1;
 
-        buffer_manager_add(sgx_backend->buf_manager, metadata_buf);
 
-        metadata_buf->locked_file = nexus_datastore_fopen(volume->metadata_store,
-                                                          uuid,
-                                                          NULL,
-                                                          NEXUS_FWRITE);
-
-        if (metadata_buf->locked_file == NULL) {
-            log_error("nexus_datastore_fopen FAILED\n");
-            return -1;
-        }
-    } else if (metadata_buf->locked_file == NULL) {
+    if (metadata_buf == NULL || metadata_buf->locked_file == NULL) {
         log_error("no locked file on metadata\n");
         return -1;
     }
 
-    if (nexus_datastore_fwrite(volume->metadata_store, metadata_buf->locked_file, heap_ptr, size)) {
+    ret = nexus_datastore_fwrite(volume->metadata_store,
+                                 metadata_buf->locked_file,
+                                 metadata_buf->addr,
+                                 metadata_buf->size);
+
+    if (ret != 0) {
         nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
         metadata_buf->locked_file = NULL;
 
@@ -153,11 +141,59 @@ io_buffer_put(struct nexus_uuid   * uuid,
     }
 
     nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
-    metadata_buf->locked_file = NULL;
 
-    __update_metadata_buf(metadata_buf, heap_ptr, size, true);
+    metadata_buf->locked_file = NULL;
 
     *timestamp = metadata_buf->timestamp;
 
     return 0;
+}
+
+struct metadata_buf *
+io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
+{
+    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
+
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+
+    if (metadata_buf == NULL) {
+        metadata_buf = __alloc_metadata_buf(uuid);
+        buffer_manager_add(sgx_backend->buf_manager, metadata_buf);
+    }
+
+
+    if (metadata_buf->locked_file == NULL) {
+        metadata_buf->locked_file = nexus_datastore_fopen(volume->metadata_store,
+                                                          uuid,
+                                                          NULL,
+                                                          NEXUS_FWRITE);
+
+        if (metadata_buf->locked_file == NULL) {
+            log_error("nexus_datastore_fopen FAILED\n");
+            return NULL;
+        }
+    }
+
+    return metadata_buf;
+}
+
+uint8_t *
+io_buffer_alloc(struct nexus_uuid * uuid, size_t size, struct nexus_volume * volume)
+{
+    uint8_t             * addr         = NULL;
+
+    struct metadata_buf * metadata_buf = io_buffer_lock(uuid, volume);
+
+    if (metadata_buf == NULL) {
+        log_error("could not lock metadata\n");
+        return NULL;
+    }
+
+    addr = nexus_malloc(size);
+
+    __update_metadata_buf(metadata_buf, addr, size, false);
+
+    metadata_buf->timestamp = 0;
+
+    return addr;
 }

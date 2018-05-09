@@ -31,8 +31,8 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
     file_handle->file_ptr = fopen(filepath, __get_fopen_str_flags(mode));
 
     if (file_handle->file_ptr == NULL) {
-	log_error("could not open file (%s)\n", filepath);
-	goto out;
+        log_error("could not open file (%s)\n", filepath);
+        goto out;
     }
 
     if (mode & NEXUS_FWRITE) {
@@ -47,11 +47,11 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 
     return file_handle;
 out:
-    nexus_free(file_handle);
-
     if (file_handle->file_ptr) {
-	fclose(file_handle->file_ptr);
+        fclose(file_handle->file_ptr);
     }
+
+    nexus_free(file_handle);
 
     return NULL;
 }

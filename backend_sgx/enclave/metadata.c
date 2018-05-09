@@ -7,22 +7,34 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     struct nexus_dirnode   * dirnode   = NULL;
     struct nexus_filenode  * filenode  = NULL;
 
-    metadata->object = object;
-
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
+        if (metadata->supernode) {
+            supernode_free(metadata->supernode);
+        }
+
         supernode = object;
         supernode->metadata = metadata;
         break;
     case NEXUS_DIRNODE:
+        if (metadata->dirnode) {
+            dirnode_free(metadata->dirnode);
+        }
+
         dirnode = object;
         dirnode->metadata = metadata;
         break;
     case NEXUS_FILENODE:
+        if (metadata->filenode) {
+            filenode_free(metadata->filenode);
+        }
+
         filenode = object;
         filenode->metadata = metadata;
         break;
     }
+
+    metadata->object = object;
 }
 
 struct nexus_metadata *
@@ -132,19 +144,6 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
         return -1;
     }
 
-    // throw the old object and set the new
-    switch (metadata->type) {
-    case NEXUS_SUPERNODE:
-        supernode_free(metadata->supernode);
-        break;
-    case NEXUS_DIRNODE:
-        dirnode_free(metadata->dirnode);
-        break;
-    case NEXUS_FILENODE:
-        filenode_free(metadata->filenode);
-        break;
-    }
-
     metadata->flags = flags;
     __set_metadata_object(metadata, object);
 
@@ -169,26 +168,6 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
     return nexus_metadata_new(uuid, object, type, flags, version);
 }
 
-// FIXME: this is temporary until a more stable solution to hardlinks/rename
-// is found.
-static int
-__metadata_store_supernode(struct nexus_metadata * metadata)
-{
-    struct nexus_supernode * supernode = metadata->supernode;
-
-    uint8_t * buffer = NULL;
-    size_t    buflen = 0;
-
-    buffer = buffer_layer_get(&supernode->my_uuid, NEXUS_FWRITE, &buflen);
-
-    if (buffer == NULL) {
-        log_error("buffer_layer_get FAILED\n");
-        return -1;
-    }
-
-    return supernode_store(metadata->supernode, metadata->version, NULL);
-}
-
 int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
@@ -200,7 +179,7 @@ nexus_metadata_store(struct nexus_metadata * metadata)
 
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
-        ret = __metadata_store_supernode(metadata);
+        ret = supernode_store(metadata->supernode, metadata->version, NULL);
         break;
     case NEXUS_DIRNODE:
         ret = dirnode_store(&metadata->uuid, metadata->dirnode, metadata->version, NULL);

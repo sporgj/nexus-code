@@ -124,14 +124,12 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 {
     bool should_reload = true;
 
-    if (flags & NEXUS_FWRITE) {
-        return nexus_metadata_reload(metadata, flags);
-    }
-
     buffer_layer_revalidate(&metadata->uuid, &should_reload);
 
     if (should_reload) {
         return nexus_metadata_reload(metadata, flags);
+    } else if (flags & NEXUS_FWRITE) {
+        return buffer_layer_lock(&metadata->uuid);
     }
 
     return 0;
