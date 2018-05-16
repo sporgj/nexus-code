@@ -9,7 +9,8 @@
 struct nexus_file_handle {
     FILE            * file_ptr;
     char            * filepath;
-    nexus_io_flags_t   mode;
+    bool              is_locked;
+    nexus_io_flags_t  mode;
     bool              touched;
 };
 

@@ -26,8 +26,8 @@ fd = open('/home/briand/results/microbm-'+timestr+'.txt', 'w')
 def gen(workload):
     folder = workload
     gz_file = workload+'.tar.gz'
+    gz_path = '/home/briand/ucafs/bench/ucafs-workloads/'+gz_file
     cv_file = workload+'-compress.tar.gz'
-    gz_path = '/home/briand/ucafs/bench/ucafs-workloads/'+gz_file 
 
     # extract tar
     tar1 = tarx_cmd.format(gz_path)
@@ -89,7 +89,7 @@ for load in workloads:
     fd.writelines(['#', load, '\n'])
     fd.flush()
 
-    for i in range(25):
+    for i in range(10):
         run_test(load)
 
 fd.close()

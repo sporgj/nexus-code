@@ -1268,7 +1268,7 @@ restart:
 
     if (nexus_ret == NEXUS_RET_NOOP) {
 	goto skip_nexus;
-    } else if (nexus_ret == NEXUS_RET_NOOP) {
+    } else if (nexus_ret == NEXUS_RET_OK) {
 	code = 0;
 	goto done;
     } else {

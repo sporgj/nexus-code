@@ -1,8 +1,11 @@
 #!/usr/bin/python3
-import logging, os
+import logging, os, subprocess
+
 logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
+tarc_cmd = 'tar -cf {:} {:}'
 
 def units(un):
     c = un[-1]
@@ -52,6 +55,9 @@ def create_dataset(dset):
         fpath = '{:}/{:07d}'.format(path, i)
         with open(fpath, 'wb') as fout:
             fout.write(os.urandom(file_size))
+
+    tarprog = tarc_cmd.format(dir_name, dir_name + '.tar.gz')
+    subprocess.check_output(tarprog, shell=True)
 
     logger.info('Finished')
 

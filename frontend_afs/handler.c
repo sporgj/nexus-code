@@ -577,7 +577,6 @@ handle_decrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         filesize = decrypt_cmd[4].val;
     }
 
-
     ret = nexus_fs_decrypt(mounted_volume,
                            path,
                            global_databuf_addr,

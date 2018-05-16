@@ -174,14 +174,13 @@ nexus_kern_store(struct vcache          * avc,
                  int                      nomore,
                  struct rx_call         * afs_call,
                  char                   * path,
-                 int                      base,
+                 int                      offset,
                  struct storeOps        * ops,
                  void                   * rock)
 {
     struct nexus_volume * vol           = NULL;
 
-    int                   filesize      = avc->f.m.Length;
-    int                   offset        = base;
+    size_t                filesize      = MIN(avc->f.m.Length, avc->f.truncPos);
 
     int                   bytes_stored  = 0;
     int                   nbytes        = 0;

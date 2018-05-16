@@ -11,6 +11,6 @@ fi
 for i in `seq 1 6`
 do
   echo "--------------- $start MB ----------------"
-  sudo bonnie++ -u $name -s $start -r $(($start/2)) -n 0
+  sudo bonnie++ -u $name -s $start -r $(($start/2)) -q -x 10 -n 0
   let start=start*2
 done

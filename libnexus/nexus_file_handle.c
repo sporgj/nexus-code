@@ -37,9 +37,12 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 
     if (mode & NEXUS_FWRITE) {
         if (flock(fileno(file_handle->file_ptr), LOCK_EX)) {
-            log_error("could not lock file (%s)", filepath);
+            log_error("could not lock file (%s)\n", filepath);
+            perror("strerror: ");
             goto out;
         }
+
+        file_handle->is_locked = true;
     }
 
     file_handle->mode     = mode;
@@ -59,6 +62,10 @@ out:
 void
 nexus_file_handle_close(struct nexus_file_handle * file_handle)
 {
+    if (file_handle->is_locked) {
+        flock(fileno(file_handle->file_ptr), LOCK_UN);
+    }
+
     fclose(file_handle->file_ptr); // closing the file should release the lock
 
     nexus_free(file_handle->filepath);
