@@ -144,6 +144,51 @@ io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume 
 
     metadata_buf->locked_file = NULL;
 
+    metadata_buf->timestamp = time(NULL);
+
+    *timestamp = metadata_buf->timestamp;
+
+    return 0;
+}
+
+int
+io_buffer_flush(struct nexus_uuid   * uuid,
+                uint8_t             * buffer,
+                size_t                size,
+                size_t              * timestamp,
+                struct nexus_volume * volume)
+{
+    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
+
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+
+    int ret = -1;
+
+
+    if (metadata_buf == NULL || metadata_buf->locked_file == NULL) {
+        log_error("no locked file on metadata\n");
+        return -1;
+    }
+
+    ret = nexus_datastore_fwrite(volume->metadata_store,
+                                 metadata_buf->locked_file,
+                                 buffer,
+                                 size);
+
+    if (ret != 0) {
+        nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
+        metadata_buf->locked_file = NULL;
+
+        log_error("could not write metadata file\n");
+        return -1;
+    }
+
+    nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
+
+    __update_metadata_buf(metadata_buf, buffer, size, true);
+
+    metadata_buf->locked_file = NULL;
+
     *timestamp = metadata_buf->timestamp;
 
     return 0;

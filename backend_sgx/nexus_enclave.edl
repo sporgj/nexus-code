@@ -180,6 +180,16 @@ enclave {
         );
 
         int
+        ocall_buffer_flush
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] uint8_t             * buffer,
+                         size_t                size,
+            [out]        size_t              * timestamp,
+            [user_check] struct nexus_volume * volume
+        );
+
+        int
         ocall_buffer_new
         (
             [in]         struct nexus_uuid   * metadata_uuid,

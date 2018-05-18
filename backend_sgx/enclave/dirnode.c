@@ -6,7 +6,6 @@
 
 // This is how the dirnode will be serialized onto a buffer
 struct __dirnode_hdr {
-    struct nexus_uuid   my_uuid;
     struct nexus_uuid   root_uuid;
 
     uint32_t            symlink_count;
@@ -69,6 +68,15 @@ __dirnode_set_clean(struct nexus_dirnode * dirnode)
 }
 
 
+static inline void
+__clear_last_failed_lookup(struct nexus_dirnode * dirnode)
+{
+    if (dirnode->last_failed_lookup) {
+        free(dirnode->last_failed_lookup);
+        dirnode->last_failed_lookup = NULL;
+    }
+}
+
 
 static void
 __free_symlink_entry(void * el)
@@ -89,7 +97,6 @@ __parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t 
         return NULL;
     }
 
-    nexus_uuid_copy(&header->my_uuid, &dirnode->my_uuid);
     nexus_uuid_copy(&header->root_uuid, &dirnode->root_uuid);
 
     dirnode->symlink_count    = header->symlink_count;
@@ -314,6 +321,8 @@ dirnode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 
     nexus_crypto_buf_free(crypto_buffer);
 
+    nexus_uuid_copy(uuid, &dirnode->my_uuid);
+
     return dirnode;
 }
 
@@ -325,7 +334,6 @@ __serialize_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer)
 {
     struct __dirnode_hdr * header = (struct __dirnode_hdr *)buffer;
 
-    nexus_uuid_copy(&dirnode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&dirnode->root_uuid, &header->root_uuid);
 
     header->symlink_count    = dirnode->symlink_count;
@@ -801,6 +809,9 @@ dirnode_free(struct nexus_dirnode * dirnode)
 
     nexus_acl_free(&dirnode->dir_acl);
 
+
+    __clear_last_failed_lookup(dirnode);
+
     nexus_free(dirnode);
 }
 
@@ -810,12 +821,22 @@ __find_by_name(struct nexus_dirnode * dirnode, char * fname)
     struct __hashed_name * rst_hname = NULL;
     struct __hashed_name   tmp_hname;
 
+    if (dirnode->last_failed_lookup) {
+        // if it equals the last failed lookup, return early
+        if ((strncmp(dirnode->last_failed_lookup, fname, NEXUS_NAME_MAX) == 0)) {
+            return NULL;
+        }
+
+        __clear_last_failed_lookup(dirnode);
+    }
+
     hashmap_entry_init(&tmp_hname.hash_entry, strhash(fname));
     tmp_hname.name = fname;
 
     rst_hname = hashmap_get(&dirnode->filename_hashmap, &tmp_hname, NULL);
 
     if (rst_hname == NULL) {
+        dirnode->last_failed_lookup = strndup(fname, NEXUS_NAME_MAX);
         return NULL;
     }
 
@@ -841,6 +862,8 @@ dirnode_add(struct nexus_dirnode * dirnode,
     if (__find_by_name(dirnode, filename)) {
         return -1;
     }
+
+    __clear_last_failed_lookup(dirnode);
 
     new_dir_entry = __new_dir_entry(entry_uuid, type, filename);
 

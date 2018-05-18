@@ -97,6 +97,7 @@ key_buffer_put(struct nexus_key * key, nexus_key_type_t protected_key_type)
         ret = ocall_calloc((void **) &key_buffer->key_str, protected_len + 1);
 
         if (ret != 0 || key_buffer->key_str == NULL) {
+            ret = -1;
             log_error("ocall_calloc FAILED (err=%d)\n", ret);
             goto out;
         }

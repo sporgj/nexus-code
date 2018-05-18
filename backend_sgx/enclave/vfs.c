@@ -12,9 +12,11 @@ static struct nexus_lru     * metadata_objects_list           = NULL;
 static struct nexus_dentry    root_dentry;
 
 void
-__freer(uintptr_t element, uintptr_t key)
+__lru_shrinker(uintptr_t element, uintptr_t key)
 {
     struct nexus_metadata * metadata = (struct nexus_metadata *) element;
+
+    buffer_layer_evict(&metadata->uuid);
 
     nexus_metadata_free(metadata);
 }
@@ -26,7 +28,10 @@ nexus_vfs_init()
 {
     global_supernode = NULL;
 
-    metadata_objects_list = nexus_lru_create(LRU_CAPACITY, __uuid_hasher, __uuid_equals, __freer);
+    metadata_objects_list = nexus_lru_create(LRU_CAPACITY,
+                                             __uuid_hasher,
+                                             __uuid_equals,
+                                             __lru_shrinker);
 
     return 0;
 }

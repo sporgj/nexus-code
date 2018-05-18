@@ -535,6 +535,12 @@ handle_encrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         return -1;
     }
 
+    log_trace("[encrypt] %s (offset=%zu, buflen=%zu, filesize=%zu)\n",
+              path,
+              offset,
+              buflen,
+              filesize);
+
     ret = asprintf((char **)resp_buf, "\"code\" : 0");
 
     if (ret == -1) {
@@ -589,6 +595,12 @@ handle_decrypt(nexus_json_obj_t json_obj, uint8_t ** resp_buf, uint32_t * resp_s
         printf("decrypting (%s) FAILED\n", path);
         return -1;
     }
+
+    log_trace("[decrypt] %s (offset=%zu, buflen=%zu, filesize=%zu)\n",
+              path,
+              offset,
+              buflen,
+              filesize);
 
     ret = asprintf((char **)resp_buf, "\"code\" : 0");
 

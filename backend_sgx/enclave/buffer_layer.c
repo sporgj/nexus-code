@@ -1,19 +1,26 @@
 #include "enclave_internal.h"
 
 
-struct __timestamp {
-    struct nexus_uuid uuid;
-    size_t            timestamp;
+struct metadata_info {
+    struct nexus_uuid      uuid;
+
+    nexus_io_flags_t       flags;
+
+    size_t                 timestamp;
+
+    uint8_t              * tmp_buffer; // used for "flush" operations
+
+    size_t                 tmp_buflen;
 };
 
 
-struct nexus_hashtable * timestamp_htable = NULL;
+static struct nexus_hashtable * metadata_info_htable = NULL;
 
 
 int
 buffer_layer_init()
 {
-    timestamp_htable = nexus_create_htable(127, __uuid_hasher, __uuid_equals);
+    metadata_info_htable = nexus_create_htable(17, __uuid_hasher, __uuid_equals);
 
     return 0;
 }
@@ -21,45 +28,43 @@ buffer_layer_init()
 int
 buffer_layer_exit()
 {
-    nexus_free_htable(timestamp_htable, 1, 0);
+    nexus_free_htable(metadata_info_htable, 1, 0);
     return 0;
 }
 
 static void
-__update_timestamp(struct nexus_uuid * uuid, size_t timestamp)
+__update_timestamp(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t flags)
 {
-    struct __timestamp * tstamp = NULL;
+    struct metadata_info * info = NULL;
 
-    tstamp = (struct __timestamp *)nexus_htable_search(timestamp_htable, (uintptr_t)uuid);
+    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
 
-    if (tstamp == NULL) {
-        tstamp =  nexus_malloc(sizeof(struct __timestamp));
+    if (info == NULL) {
+        info =  nexus_malloc(sizeof(struct metadata_info));
 
-        tstamp->timestamp = timestamp;
-        nexus_uuid_copy(uuid, &tstamp->uuid);
+        nexus_uuid_copy(uuid, &info->uuid);
 
-        nexus_htable_insert(timestamp_htable, (uintptr_t)&tstamp->uuid, (uintptr_t)tstamp);
-
-        return;
+        nexus_htable_insert(metadata_info_htable, (uintptr_t)&info->uuid, (uintptr_t)info);
     }
 
-    tstamp->timestamp = timestamp;
+    info->timestamp = timestamp;
+    info->flags     = flags;
 }
 
-static void
-__remove_timestamp(struct nexus_uuid * uuid)
+void
+buffer_layer_evict(struct nexus_uuid * uuid)
 {
-    struct __timestamp * tstamp = NULL;
+    struct metadata_info * info = NULL;
 
-    tstamp = (struct __timestamp *)nexus_htable_remove(timestamp_htable, (uintptr_t)uuid, 0);
+    info = (struct metadata_info *)nexus_htable_remove(metadata_info_htable, (uintptr_t)uuid, 0);
 
-    nexus_free(tstamp);
+    nexus_free(info);
 }
 
 int
 buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 {
-    struct __timestamp * tstamp    = NULL;
+    struct metadata_info * info    = NULL;
 
     size_t stat_timestamp;
 
@@ -67,9 +72,9 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
     int ret = -1;
 
     // check if we have a timestamp
-    tstamp = (struct __timestamp *)nexus_htable_search(timestamp_htable, (uintptr_t)uuid);
+    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
 
-    if (tstamp == NULL) {
+    if (info == NULL) {
         *should_reload = true;
         return 0;
     }
@@ -81,7 +86,7 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
         return -1;
     }
 
-    *should_reload = stat_timestamp > tstamp->timestamp;
+    *should_reload = stat_timestamp > info->timestamp;
 
     return 0;
 }
@@ -89,8 +94,26 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 uint8_t *
 buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 {
+    struct metadata_info * info = NULL;
+
     int       err  = -1;
     uint8_t * addr = NULL;
+
+    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
+
+    if (info && info->flags & NEXUS_FWRITE) {
+        uint8_t * buffer = nexus_heap_malloc(global_heap, size);
+
+        if (buffer == NULL) {
+            log_error("could not allocate memory (size=%zu)\n", size);
+            return NULL;
+        }
+
+        info->tmp_buffer = buffer;
+        info->tmp_buflen = size;
+
+        return buffer;
+    }
 
     err = ocall_buffer_alloc(&addr, uuid, size, global_volume);
 
@@ -115,6 +138,8 @@ buffer_layer_lock(struct nexus_uuid * uuid)
         return -1;
     }
 
+    __update_timestamp(uuid, 0, NEXUS_FWRITE);
+
     return 0;
 }
 
@@ -135,7 +160,7 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
         return NULL;
     }
 
-    __update_timestamp(uuid, timestamp);
+    __update_timestamp(uuid, timestamp, flags);
 
     return external_addr;
 }
@@ -143,19 +168,42 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
 int
 buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
+    struct metadata_info * info = NULL;
+
     size_t timestamp = 0;
 
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_put(&ret, buffer_uuid, &timestamp, global_volume);
+    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
+                                                       (uintptr_t)buffer_uuid);
 
-    if (err || ret) {
-        log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
+    if (info && info->tmp_buffer) {
+        err = ocall_buffer_flush(&ret,
+                                 buffer_uuid,
+                                 info->tmp_buffer,
+                                 info->tmp_buflen,
+                                 &timestamp,
+                                 global_volume);
+
+        nexus_heap_free(global_heap, info->tmp_buffer);
+        info->tmp_buffer = NULL;
+        info->tmp_buflen = 0;
+
+        if (err || ret) {
+            log_error("ocall_buffer_flush FAILED (err=%d, ret=%d)\n", err, ret);
+            return -1;
+        }
+    } else {
+        err = ocall_buffer_put(&ret, buffer_uuid, &timestamp, global_volume);
+
+        if (err || ret) {
+            log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);
+            return -1;
+        }
     }
 
-    __update_timestamp(buffer_uuid, timestamp);
+    __update_timestamp(buffer_uuid, timestamp, NEXUS_FREAD);
 
     return 0;
 }
@@ -200,7 +248,7 @@ buffer_layer_delete(struct nexus_uuid * uuid)
         real_uuid = tmp_uuid;
     }
 
-    __remove_timestamp(real_uuid);
+    buffer_layer_evict(real_uuid);
 
     {
         int err = -1;

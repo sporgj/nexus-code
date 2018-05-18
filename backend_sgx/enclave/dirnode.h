@@ -70,6 +70,7 @@ struct nexus_dirnode {
 
     size_t                  bucket_count;
 
+    char                  * last_failed_lookup; // TODO could be made into a list
 
     struct nexus_acl        dir_acl;
 

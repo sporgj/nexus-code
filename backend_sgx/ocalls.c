@@ -56,6 +56,16 @@ ocall_buffer_put(struct nexus_uuid   * uuid,
 }
 
 int
+ocall_buffer_flush(struct nexus_uuid   * uuid,
+                   uint8_t             * buffer,
+                   size_t                size,
+                   size_t              * p_timestamp,
+                   struct nexus_volume * volume)
+{
+    return io_buffer_flush(uuid, buffer, size, p_timestamp, volume);
+}
+
+int
 ocall_buffer_lock(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 {
     return (io_buffer_lock(metadata_uuid, volume) == NULL);

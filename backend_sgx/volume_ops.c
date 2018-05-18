@@ -149,7 +149,6 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     }
 
 
-    // copy the volumekey from the buffer_manager
     ret = key_buffer_derive(&volkey_keybuf, &volume->vol_key);
 
     if (ret != 0) {

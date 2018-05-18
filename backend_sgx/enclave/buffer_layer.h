@@ -14,6 +14,13 @@ int
 buffer_layer_lock(struct nexus_uuid * uuid);
 
 /**
+ * Removes the metadata from the buffer layer cache
+ * @param uuid
+ */
+void
+buffer_layer_evict(struct nexus_uuid * uuid);
+
+/**
  * Checks if the metadata has changed since the last time the buffer
  * checked the backend.
  *
