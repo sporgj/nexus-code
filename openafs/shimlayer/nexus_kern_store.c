@@ -43,7 +43,7 @@ out:
 static int
 nexus_store_encrypt(struct nexus_volume * vol,
                     char                * path,
-                    size_t                offset,
+                    int                   offset,
                     size_t                buflen,
                     size_t                filesize)
 {
@@ -105,6 +105,10 @@ out:
         nexus_kfree(cmd_str);
     }
 
+    if (resp_data) {
+        nexus_kfree(resp_data);
+    }
+
     return ret;
 }
 
@@ -113,7 +117,7 @@ nexus_store_transfer(struct nexus_volume * vol,
                      struct rx_call      * afs_call,
                      struct dcache       * tdc,
                      char                * path,
-                     size_t                offset,
+                     int                   offset,
                      size_t                filesize,
                      int                 * transferred)
 {

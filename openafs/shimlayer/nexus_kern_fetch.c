@@ -38,7 +38,7 @@ out:
 static int
 nexus_fetch_decrypt(struct nexus_volume * vol,
                     char                * path,
-                    size_t                offset,
+                    int                   offset,
                     size_t                buflen,
                     size_t                filesize)
 {
@@ -100,6 +100,10 @@ out:
         nexus_kfree(cmd_str);
     }
 
+    if (resp_data) {
+        nexus_kfree(resp_data);
+    }
+
     return ret;
 }
 
@@ -127,6 +131,10 @@ nexus_kern_fetch(struct afs_conn      * tc,
         return NEXUS_RET_NOOP;
     }
 
+    if (adc) {
+        adc->validPos = base;
+    }
+
 
     while (nexus_iobuf.in_use == true) {
         AFS_GUNLOCK(); // drop the lock to allow the running process to continue
@@ -151,7 +159,7 @@ nexus_kern_fetch(struct afs_conn      * tc,
     }
 
 
-    ret = nexus_fetch_decrypt(vol, path, base, size, filesize);
+    ret = nexus_fetch_decrypt(vol, path, (int)base, size, filesize);
 
     if (ret != 0) {
         NEXUS_ERROR("could not decrypt file contents\n");
