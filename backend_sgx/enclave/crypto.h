@@ -12,20 +12,17 @@
 #define GCM128_KEY_SIZE (16)
 #define GCM128_IV_SIZE  (16)
 
+#define AES_BLOCK_SIZE  (16)
+
 
 #define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
 
 
 uint8_t *
-crypto_aes_ecb_encrypt(struct nexus_key * key,
-                       uint8_t          * in_buf,
-                       size_t             data_size);
-
+crypto_aes_encrypt_key(struct nexus_key * key_encryption_key, struct nexus_key * secret_key);
 
 uint8_t *
-crypto_aes_ecb_decrypt(struct nexus_key * key,
-                       uint8_t          * in_buf,
-                       size_t             data_size);
+crypto_aes_decrypt_key(struct nexus_key * key_encryption_key, struct nexus_key * secret_key);
 
 
 

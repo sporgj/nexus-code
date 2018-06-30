@@ -78,7 +78,7 @@ nexus_alt64_decode(char * alt64_str, uint8_t ** dst, uint32_t * dst_len)
         out_buf[(i * 3) + 0] = ((vals[0] & 0x3f) << 2) | ((vals[1] & 0x30) >> 4);
 
 
-        if ((padding == 1) || (i != num_chunks - 1)){
+        if ((padding <= 1) || (i != num_chunks - 1)) {
             out_buf[(i * 3) + 1] = ((vals[1] & 0x0f) << 4) | ((vals[2] & 0x3c) >> 2);
         }
 
@@ -210,7 +210,7 @@ nexus_base64_decode(char * base64_str, uint8_t ** dst, uint32_t * dst_len)
         out_buf[(i * 3) + 0] = ((vals[0] & 0x3f) << 2) | ((vals[1] & 0x30) >> 4);
 
 
-        if ((padding == 1) || (i != num_chunks - 1)){
+        if ((padding <= 1) || (i != num_chunks - 1)) {
             out_buf[(i * 3) + 1] = ((vals[1] & 0x0f) << 4) | ((vals[2] & 0x3c) >> 2);
         }
 

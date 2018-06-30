@@ -10,33 +10,17 @@
 
 int
 __crypto_aes_ecb_encrypt(struct nexus_key * key,
-                         size_t             data_size,
                          uint8_t          * in_buf,
-                         uint8_t          * out_buf)
+                         uint8_t          * out_buf,
+                         size_t             block_count)
 {
     mbedtls_aes_context aes_context;
     mbedtls_aes_init(&aes_context);
 
-    int bit_length = 0;
+    mbedtls_aes_setkey_enc(&aes_context, key->key, nexus_key_bits(key));
 
-    if (key->type == NEXUS_RAW_128_KEY) {
-        bit_length = 128;
-    } else if (key->type == NEXUS_RAW_256_KEY) {
-        bit_length = 256;
-    } else {
-        log_error("invalid key type (%s) for AES ECB\n", nexus_key_type_to_str(key->type));
-        return -1;
-    }
-
-    mbedtls_aes_setkey_enc(&aes_context, key->key, bit_length);
-
-    {
-        size_t i  = 0;
-
-        while (i < data_size) {
-            mbedtls_aes_crypt_ecb(&aes_context, MBEDTLS_AES_ENCRYPT, in_buf + i, out_buf + i);
-            i += 16;
-        }
+    for (size_t i = 0; i < block_count * AES_BLOCK_SIZE; i += AES_BLOCK_SIZE) {
+        mbedtls_aes_crypt_ecb(&aes_context, MBEDTLS_AES_ENCRYPT, in_buf + i, out_buf + i);
     }
 
     mbedtls_aes_free(&aes_context);
@@ -45,17 +29,25 @@ __crypto_aes_ecb_encrypt(struct nexus_key * key,
 }
 
 uint8_t *
-crypto_aes_ecb_encrypt(struct nexus_key * key,
-                       uint8_t          * in_buf,
-                       size_t             data_size)
+crypto_aes_encrypt_key(struct nexus_key * key_encryption_key, struct nexus_key * secret_key)
 {
     uint8_t * out_buf = NULL;
 
     int ret = 0;
 
-    out_buf = nexus_malloc(data_size);
-
-    ret = __crypto_aes_ecb_encrypt(key, data_size, in_buf, out_buf);
+    switch (secret_key->type) {
+    case NEXUS_RAW_128_KEY:
+        out_buf = nexus_malloc(16);
+        ret     = __crypto_aes_ecb_encrypt(key_encryption_key, secret_key->key, out_buf, 1);
+        break;
+    case NEXUS_RAW_256_KEY:
+        out_buf = nexus_malloc(32);
+        ret     = __crypto_aes_ecb_encrypt(key_encryption_key, secret_key->key, out_buf, 2);
+        break;
+    default:
+        log_error("incorrect secret_key type\n");
+        return NULL;
+    }
 
     if (ret == -1) {
         log_error("Could not encrypt buffer\n");
@@ -69,33 +61,17 @@ crypto_aes_ecb_encrypt(struct nexus_key * key,
 
 int
 __crypto_aes_ecb_decrypt(struct nexus_key * key,
-                         size_t             data_size,
                          uint8_t          * in_buf,
-                         uint8_t          * out_buf)
+                         uint8_t          * out_buf,
+                         size_t             block_count)
 {
     mbedtls_aes_context aes_context;
     mbedtls_aes_init(&aes_context);
 
-    int bit_length = 0;
+    mbedtls_aes_setkey_dec(&aes_context, key->key, nexus_key_bits(key));
 
-    if (key->type == NEXUS_RAW_128_KEY) {
-        bit_length = 128;
-    } else if (key->type == NEXUS_RAW_256_KEY) {
-        bit_length = 256;
-    } else {
-        log_error("invalid key type (%s) for AES ECB\n", nexus_key_type_to_str(key->type));
-        return -1;
-    }
-
-    mbedtls_aes_setkey_dec(&aes_context, key->key, bit_length);
-
-    {
-        size_t i  = 0;
-
-        while (i < data_size) {
-            mbedtls_aes_crypt_ecb(&aes_context, MBEDTLS_AES_DECRYPT, in_buf + i, out_buf + i);
-            i += 16;
-        }
+    for (size_t i = 0; i < block_count * AES_BLOCK_SIZE; i += AES_BLOCK_SIZE) {
+        mbedtls_aes_crypt_ecb(&aes_context, MBEDTLS_AES_DECRYPT, in_buf + i, out_buf + i);
     }
 
     mbedtls_aes_free(&aes_context);
@@ -104,17 +80,25 @@ __crypto_aes_ecb_decrypt(struct nexus_key * key,
 }
 
 uint8_t *
-crypto_aes_ecb_decrypt(struct nexus_key * key,
-                       uint8_t          * in_buf,
-                       size_t             data_size)
+crypto_aes_decrypt_key(struct nexus_key * key_encryption_key, struct nexus_key * secret_key)
 {
     uint8_t * out_buf = NULL;
 
     int ret = 0;
 
-    out_buf = nexus_malloc(data_size);
-
-    ret = __crypto_aes_ecb_decrypt(key, data_size, in_buf, out_buf);
+    switch (secret_key->type) {
+    case NEXUS_WRAPPED_128_KEY:
+        out_buf = nexus_malloc(16);
+        ret     = __crypto_aes_ecb_decrypt(key_encryption_key, secret_key->key, out_buf, 1);
+        break;
+    case NEXUS_WRAPPED_256_KEY:
+        out_buf = nexus_malloc(32);
+        ret     = __crypto_aes_ecb_decrypt(key_encryption_key, secret_key->key, out_buf, 2);
+        break;
+    default:
+        log_error("incorrect secret_key type\n");
+        return NULL;
+    }
 
     if (ret == -1) {
         log_error("Could not decrypt buffer\n");
