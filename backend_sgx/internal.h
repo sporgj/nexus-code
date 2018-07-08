@@ -13,6 +13,8 @@
 #include <nexus_user_data.h>
 #include <nexus_heap.h>
 
+#include <nexus_probes.h>
+
 #include <sgx_urts.h>
 
 #include "nexus_enclave_u.h"
@@ -37,6 +39,8 @@ struct sgx_backend {
 
     size_t                        mmap_len;
 
+
+    struct nexus_ringbuf        * dirty_queue;
 
     struct nexus_volume         * volume;
 

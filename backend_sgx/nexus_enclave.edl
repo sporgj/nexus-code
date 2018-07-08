@@ -10,8 +10,9 @@ enclave {
          */
         public int ecall_init_enclave
         (
-            [user_check] struct nexus_volume * volume,
-            [user_check] struct nexus_heap   * heap
+            [user_check] struct nexus_volume    * volume,
+            [user_check] struct nexus_heap      * heap,
+            [user_check] struct nexus_ringbuf   * ringbuf
         );
 
 
@@ -131,20 +132,6 @@ enclave {
 
     untrusted {
         // ---------------- metadata management --------------------------
-
-        /**
-         * Creates a new untrusted buffer
-         * @param size is the size of the new buffer
-         * @param uuid [out] the uuid of the new allocation
-         */
-        uint8_t *
-        ocall_buffer_alloc
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
-                         size_t                size,
-            [user_check] struct nexus_volume * volume
-        );
-
         int
         ocall_buffer_lock
         (
@@ -152,39 +139,12 @@ enclave {
             [user_check] struct nexus_volume * volume
         );
 
-        /**
-         * Returns the untrusted pointer to the buffer
-         * @param buffer_uuid
-         * @return NULL on failure
-         */
         uint8_t *
         ocall_buffer_get
         (
             [in]         struct nexus_uuid   * metadata_uuid,
                          nexus_io_flags_t      mode,
             [out]        size_t              * buffer_size,
-            [out]        size_t              * timestamp,
-            [user_check] struct nexus_volume * volume
-        );
-
-        /**
-         * Frees an allocated buffer
-         * @param buffer_uuid
-         */
-        int
-        ocall_buffer_put
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
-            [out]        size_t              * timestamp,
-            [user_check] struct nexus_volume * volume
-        );
-
-        int
-        ocall_buffer_flush
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
-            [user_check] uint8_t             * buffer,
-                         size_t                size,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );

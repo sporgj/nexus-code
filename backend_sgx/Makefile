@@ -16,6 +16,7 @@ endif
 
 INCLUDES := -I../libnexus \
             -I$(SGX_SDK)/include \
+            -I../probes \
             -I../mbedtls-2.6.0/include
 
 CFLAGS   := -W -Wall -Werror \
@@ -30,6 +31,9 @@ else
 	CFLAGS += -O2
 endif
 
+ifeq ($(TRACE), 1)
+	CFLAGS += -finstrument-functions
+endif
 
 
 LDFLAGS  := -L$(SGX_SDK)/lib64  \
@@ -63,7 +67,7 @@ build = \
                 $2; \
         fi
 
-static_lib := backend_sgx.a
+static_lib :=  backend_sgx.a
 
 all: $(static_lib)
 	make -C enclave DEBUG=$(DEBUG)
@@ -79,8 +83,11 @@ all: $(static_lib)
 nexus_enclave_u.c: $(edl_src)
 	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --untrusted --untrusted-dir ./ $(edl_src)
 
+.PHONY: libnexus_probes
+libnexus_probes:
+	make -C ../probes
 
-$(static_lib):  $(objs)
+$(static_lib): libnexus_probes $(objs)
 	$(call build,AR,$(AR) rcs $@ $(objs))
 
 

@@ -267,6 +267,27 @@ twolevel_fopen(struct nexus_uuid * uuid, char * path, nexus_io_flags_t flags, vo
     char                      * filepath    = NULL;
 
 
+    // we will first try opening the path without mkdir
+#if 0
+    {
+        filepath = __get_full_path(datastore, uuid);
+
+        if (filepath == NULL) {
+            log_error("could not get filename\n");
+            return NULL;
+        }
+
+        file_handle = nexus_file_handle_open(filepath, flags);
+
+        nexus_free(filepath);
+
+        if (file_handle != NULL) {
+            return file_handle;
+        }
+    }
+#endif
+
+    // try again using mkdir
     filepath = __make_full_path(datastore, uuid);
 
     if (filepath == NULL) {

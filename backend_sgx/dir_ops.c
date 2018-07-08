@@ -36,10 +36,20 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_CREATE);
+
     err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, plain_name, type, &uuid);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_CREATE);
 
     if (err || ret) {
         log_error("ecall_fs_create() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -65,10 +75,20 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_REMOVE);
+
     err = ecall_fs_remove(sgx_backend->enclave_id, &ret, dirpath, plain_name, &uuid);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_REMOVE);
 
     if (err || ret) {
         log_error("ecall_fs_remove() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -94,7 +114,11 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_LOOKUP);
+
     err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, &uuid);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_LOOKUP);
 
     if (err) {
         log_error("ecall_fs_lookup() FAILED. (err=0x%x, ret=%d)\n", err, ret);
@@ -133,7 +157,11 @@ sgx_backend_fs_filldir(struct nexus_volume  * volume,
         return -1;
     }
 
+    BACKEND_SGX_ECALL_START(ECALL_FILLDIR);
+
     err = ecall_fs_filldir(sgx_backend->enclave_id, &ret, dirpath, &uuid, filename);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_FILLDIR);
 
     if (err) {
         log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
@@ -163,10 +191,20 @@ sgx_backend_fs_symlink(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_SYMLINK);
+
     err = ecall_fs_symlink(sgx_backend->enclave_id, &ret, dirpath, link_name, target_path, &uuid);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_SYMLINK);
 
     if (err || ret) {
         log_error("ecall_fs_symlink() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -194,6 +232,8 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_HARDLINK);
+
     err = ecall_fs_hardlink(sgx_backend->enclave_id,
                             &ret,
                             link_dirpath,
@@ -202,8 +242,16 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
                             target_name,
                             &uuid);
 
+    BACKEND_SGX_ECALL_FINISH(ECALL_HARDLINK);
+
     if (err || ret) {
         log_error("ecall_fs_hardlink() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -232,6 +280,8 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_RENAME);
+
     err = ecall_fs_rename(sgx_backend->enclave_id,
                           &ret,
                           from_dirpath,
@@ -241,8 +291,16 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                           &old_uuid,
                           &new_uuid);
 
+    BACKEND_SGX_ECALL_FINISH(ECALL_RENAME);
+
     if (err || ret) {
         log_error("ecall_fs_rename() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 

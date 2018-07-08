@@ -11,7 +11,7 @@ args = parser.parse_args()
 gbl_rounds = int(args.rounds)
 
 base_url = 'git@bonino.cs.pitt.edu'
-repos = ['redis.git', 'julia.git', 'node.git']
+repos = ['node.git']
 
 for rp in repos:
     url = ':'.join([base_url, rp])

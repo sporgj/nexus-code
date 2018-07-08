@@ -30,6 +30,7 @@ objs :=	nexus_main.o \
 	nexus_file_handle.o \
 	nexus_json.o \
 	nexus_heap.o \
+	nexus_ringbuf.o \
 	xxhash.o
 
 
@@ -59,6 +60,9 @@ all: libnexus.a
 
 libnexus.a: $(objs) nxjson.c nxjson.h
 	$(call build,AR,$(AR) rcs $@ $(objs))
+
+test: test.c libnexus.a
+	gcc $(CFLAGS) $(INCLUDES) test.c libnexus.a -o test
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \

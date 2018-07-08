@@ -30,6 +30,8 @@ sgx_backend_fs_encrypt(struct nexus_volume * volume,
         return -1;
     }
 
+    BACKEND_SGX_ECALL_START(ECALL_ENCRYPT);
+
     err = ecall_fs_encrypt(sgx_backend->enclave_id,
                            &ret,
                            filepath,
@@ -39,8 +41,15 @@ sgx_backend_fs_encrypt(struct nexus_volume * volume,
                            size,
                            filesize);
 
+    BACKEND_SGX_ECALL_FINISH(ECALL_ENCRYPT);
+
     if (err || ret) {
         log_error("ecall_fs_encrypt (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -75,6 +84,8 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
         return -1;
     }
 
+    BACKEND_SGX_ECALL_START(ECALL_DECRYPT);
+
     err = ecall_fs_decrypt(sgx_backend->enclave_id,
                            &ret,
                            filepath,
@@ -84,8 +95,15 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
                            size,
                            filesize);
 
+    BACKEND_SGX_ECALL_FINISH(ECALL_DECRYPT);
+
     if (err || ret) {
         log_error("ecall_fs_decrypt (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    if (io_manager_flush_dirty(sgx_backend)) {
+        log_error("flushing buffers failed\n");
         return -1;
     }
 
