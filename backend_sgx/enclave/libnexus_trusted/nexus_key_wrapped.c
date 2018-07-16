@@ -111,13 +111,13 @@ __wrap_key(struct nexus_key * wrapped_key, struct nexus_key * raw_key)
 static int
 __unwrap_key(struct nexus_key * unwrapped_key, struct nexus_key * wrapped_key)
 {
-    struct __wrapped_keydata * keydata = wrapped_key->key;
+    struct __wrapped_keydata  * keydata     = wrapped_key->key;
 
-    size_t    rawkey_size = 0;
+    size_t                      rawkey_size = 0;
 
-    uint8_t * rawkey_key  = NULL;
+    uint8_t                   * rawkey_key  = NULL;
 
-    int       ret         = -1;
+    int                         ret         = -1;
 
 
     if (wrapped_key->uuid == NULL) {
