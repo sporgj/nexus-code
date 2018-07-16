@@ -23,12 +23,14 @@ endif
 INCLUDE := -I$(SGX_SDK)/include \
 	-I$(SGX_SDK)/include/tlibc \
 	-I$(SGX_SDK)/include/stlport \
+	-I$(LIBGCC_PATH) \
 	-Imbedtls/include \
 	-Ilibnexus_trusted \
 	-I..
 
-CFLAGS  += -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector\
-           -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
+CFLAGS  += -nostdinc \
+	-fvisibility=hidden -fpie -fPIC -fstack-protector -mpclmul -maes -mavx -w \
+	-W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
 
 
 
@@ -46,6 +48,18 @@ SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 
 
 crypto_lib := mbedtls/library/libmbedcrypto.a
+
+SIV_PATH := libnexus_trusted/gcm-siv
+gcmsiv_sources := \
+	GCM_SIV.c \
+	polyval.c \
+	enc_msg_x4.c \
+	enc_msg_x8.c \
+	dec_msg_htable_x6.c \
+	key_expands_and_enc.c
+
+_gcmsiv_objects := $(subst .c,.o,$(gcmsiv_sources))
+gcmsiv_objs := $(foreach o,$(_gcmsiv_objects),$(SIV_PATH)/$(o))
 
 nexus_trusted_objs := \
 	nexus_log.o \
@@ -73,6 +87,7 @@ ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))
 
 
 objs := nexus_enclave_t.o \
+	$(gcmsiv_objs) \
 	$(trusted_objs) \
 	$(ecall_objs) \
 	buffer_layer.o \

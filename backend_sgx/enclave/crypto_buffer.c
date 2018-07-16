@@ -17,10 +17,11 @@
    Data
 */
 
+#define GCM128_WRAPPED_KEY_SIZE  (GCM128_KEY_SIZE + GCM128_TAG_SIZE)
 
 struct __gcm_header {
-    uint8_t                     key[GCM128_KEY_SIZE];
-    uint8_t                      iv[GCM128_IV_SIZE];
+    uint8_t                     ekey[GCM128_WRAPPED_KEY_SIZE];
+    uint8_t                     iv[GCM128_IV_SIZE];
     uint8_t                     mac[NEXUS_MAC_SIZE];
 } __attribute__((packed));
 
@@ -167,15 +168,18 @@ __parse_gcm128_context(struct nexus_crypto_buf  * crypto_buf,
 
     ret = __nexus_key_from_buf(&wrapped_key,
                                NEXUS_WRAPPED_128_KEY,
-                               buf_hdr->gcm_hdr.key,
-                               GCM128_KEY_SIZE);
+                               &buf_hdr->gcm_hdr.ekey,
+                               GCM128_WRAPPED_KEY_SIZE);
 
     if (ret == -1) {
         log_error("Error retrieving wrapped key from GCM header\n");
         goto err;
     }
 
+    nexus_key_set_uuid(&wrapped_key, &crypto_buf->uuid);
+
     ret = __nexus_derive_key(&(crypto_ctx->key), NEXUS_RAW_128_KEY, &wrapped_key);
+
     nexus_free_key(&wrapped_key);
 
     if (ret == -1) {
@@ -321,6 +325,8 @@ __serialize_gcm128_context(struct nexus_crypto_buf * crypto_buf, struct crypto_b
 
 
 
+    nexus_key_set_uuid(&crypto_ctx->key, &crypto_buf->uuid);
+
     wrapped_key = nexus_derive_key(NEXUS_WRAPPED_128_KEY, &(crypto_ctx->key));
 
     if (wrapped_key == NULL) {
@@ -329,7 +335,7 @@ __serialize_gcm128_context(struct nexus_crypto_buf * crypto_buf, struct crypto_b
     }
 
     // EKEY is sealed in the buffer
-    ret_ptr = nexus_key_to_buf(wrapped_key, buf_hdr->gcm_hdr.key, GCM128_KEY_SIZE);
+    ret_ptr = nexus_key_to_buf(wrapped_key, &buf_hdr->gcm_hdr.ekey, GCM128_WRAPPED_KEY_SIZE);
 
     if (ret_ptr == NULL) {
         log_error("Could not serialize wrapped key\n");

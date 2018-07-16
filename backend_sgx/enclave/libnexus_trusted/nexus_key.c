@@ -20,6 +20,10 @@
 void
 nexus_free_key(struct nexus_key * key)
 {
+    if (key->uuid) {
+        nexus_free(key->uuid);
+    }
+
     switch (key->type) {
     case NEXUS_RAW_128_KEY:
     case NEXUS_RAW_256_KEY:
@@ -87,6 +91,18 @@ nexus_create_key(nexus_key_type_t key_type)
 err:
     nexus_free(key);
     return NULL;
+}
+
+int
+nexus_key_set_uuid(struct nexus_key * key, struct nexus_uuid * uuid)
+{
+    if (key->uuid) {
+        nexus_free(key->uuid);
+    }
+
+    key->uuid = nexus_uuid_clone(uuid);
+
+    return key->uuid == NULL;
 }
 
 int

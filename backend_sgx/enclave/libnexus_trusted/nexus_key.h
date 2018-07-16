@@ -24,6 +24,8 @@ typedef enum {
 struct nexus_key {
     nexus_key_type_t type;
 
+    struct nexus_uuid * uuid;  // associated UUID
+
     void * key;
 };
 
@@ -40,6 +42,9 @@ nexus_generate_key(struct nexus_key * key, nexus_key_type_t key_type);
 /* initializes key to a type, call nexus_generate_key() to fill contents */
 int
 nexus_init_key(struct nexus_key * key, nexus_key_type_t key_type);
+
+int
+nexus_key_set_uuid(struct nexus_key * key, struct nexus_uuid * uuid);
 
 
 /* Use this to generate a public key from a private key */

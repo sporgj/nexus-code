@@ -14,6 +14,8 @@
 
 #define AES_BLOCK_SIZE  (16)
 
+#define GCM128_TAG_SIZE (16)
+
 
 #define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
 
