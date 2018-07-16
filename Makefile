@@ -43,7 +43,7 @@ build = \
 
 
 
-all: mbedtls backends datastores libnexus frontends
+all: mbedtls backends datastores libnexus_probes libnexus frontends
 
 
 
@@ -69,6 +69,9 @@ libnexus:
 	$(call build,BUILDING, make -C $@)
 	$(call build,AR,$(AR) -M < libnexus.mri)
 
+libnexus_probes:
+	$(call build,BUILDING, make -C probes)
+	@cp probes/libnexus_probes.a ./build
 
 mbedtls:
 	make -C $(nexus_home)/mbedtls-2.6.0/library SHARED=1
@@ -79,9 +82,10 @@ mbedtls:
 clean:
 	make -C $(nexus_home)/libnexus clean
 	make -C $(nexus_home)/mbedtls-2.6.0/library clean
+	make -C $(nexus_home)/probes clean
 	$(foreach frontend,  $(nexus_frontends), make -C $(nexus_home)/$(frontend)  clean;)
 	$(foreach backend,   $(nexus_backends),  make -C $(nexus_home)/$(backend)   clean;)
-	$(foreach datastore, $(nexus_backends),  make -C $(nexus_home)/$(datastore) clean;)
+	$(foreach datastore, $(nexus_datastore),  make -C $(nexus_home)/$(datastore) clean;)
 
 
 .PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) datastores $(nexus_datastores) clean mbedtls

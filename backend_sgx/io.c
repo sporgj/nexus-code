@@ -33,12 +33,12 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
     buf->timestamp = time(NULL);
 }
 
-uint8_t *
-io_buffer_get(struct nexus_uuid   * uuid,
-              nexus_io_flags_t      flags,
-              size_t              * p_size,
-              size_t              * p_timestamp,
-              struct nexus_volume * volume)
+static inline uint8_t *
+__io_buffer_get(struct nexus_uuid   * uuid,
+                nexus_io_flags_t      flags,
+                size_t              * p_size,
+                size_t              * p_timestamp,
+                struct nexus_volume * volume)
 {
     struct sgx_backend       * sgx_backend  = (struct sgx_backend *)volume->private_data;
 
@@ -112,15 +112,35 @@ read_datastore:
     return metadata_buf->addr;
 }
 
-int
-io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
+uint8_t *
+io_buffer_get(struct nexus_uuid   * uuid,
+              nexus_io_flags_t      flags,
+              size_t              * p_size,
+              size_t              * p_timestamp,
+              struct nexus_volume * volume)
 {
-    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
+    uint8_t * result = NULL;
 
-    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+    BACKEND_SGX_IOBUF_START(IOBUF_GET);
+
+    result = __io_buffer_get(uuid, flags, p_size, p_timestamp, volume);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_GET);
+
+    return result;
+}
+
+static int
+__io_buffer_put_request(struct nexus_ioreq * ioreq, struct sgx_backend * sgx_backend)
+{
+    struct nexus_volume * volume       = sgx_backend->volume;
+
+    struct metadata_buf * metadata_buf = NULL;
 
     int ret = -1;
 
+
+    metadata_buf = buffer_manager_find(sgx_backend->buf_manager, &ioreq->uuid);
 
     if (metadata_buf == NULL || metadata_buf->locked_file == NULL) {
         log_error("no locked file on metadata\n");
@@ -129,8 +149,8 @@ io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume 
 
     ret = nexus_datastore_fwrite(volume->metadata_store,
                                  metadata_buf->locked_file,
-                                 metadata_buf->addr,
-                                 metadata_buf->size);
+                                 ioreq->buffer,
+                                 ioreq->buflen);
 
     if (ret != 0) {
         nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
@@ -142,60 +162,17 @@ io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume 
 
     nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
 
+    __update_metadata_buf(metadata_buf, ioreq->buffer, ioreq->buflen, true);
+
     metadata_buf->locked_file = NULL;
 
-    metadata_buf->timestamp = time(NULL);
-
-    *timestamp = metadata_buf->timestamp;
+    ioreq->timestamp = metadata_buf->timestamp;
 
     return 0;
 }
 
-int
-io_buffer_flush(struct nexus_uuid   * uuid,
-                uint8_t             * buffer,
-                size_t                size,
-                size_t              * timestamp,
-                struct nexus_volume * volume)
-{
-    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
-
-    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
-
-    int ret = -1;
-
-
-    if (metadata_buf == NULL || metadata_buf->locked_file == NULL) {
-        log_error("no locked file on metadata\n");
-        return -1;
-    }
-
-    ret = nexus_datastore_fwrite(volume->metadata_store,
-                                 metadata_buf->locked_file,
-                                 buffer,
-                                 size);
-
-    if (ret != 0) {
-        nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
-        metadata_buf->locked_file = NULL;
-
-        log_error("could not write metadata file\n");
-        return -1;
-    }
-
-    nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
-
-    __update_metadata_buf(metadata_buf, buffer, size, true);
-
-    metadata_buf->locked_file = NULL;
-
-    *timestamp = metadata_buf->timestamp;
-
-    return 0;
-}
-
-struct metadata_buf *
-io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
+static inline struct metadata_buf *
+__io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
     struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
 
@@ -222,23 +199,138 @@ io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
     return metadata_buf;
 }
 
-uint8_t *
-io_buffer_alloc(struct nexus_uuid * uuid, size_t size, struct nexus_volume * volume)
+struct metadata_buf *
+io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
 {
-    uint8_t             * addr         = NULL;
+    struct metadata_buf * result = NULL;
 
-    struct metadata_buf * metadata_buf = io_buffer_lock(uuid, volume);
+    BACKEND_SGX_IOBUF_START(IOBUF_LOCK);
 
-    if (metadata_buf == NULL) {
-        log_error("could not lock metadata\n");
-        return NULL;
+    result = __io_buffer_lock(uuid, volume);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_LOCK);
+
+    return result;
+}
+
+int
+io_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
+{
+    int result = -1;
+
+    BACKEND_SGX_IOBUF_START(IOBUF_NEW);
+
+    result = nexus_datastore_new_uuid(volume->metadata_store, metadata_uuid, NULL);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_NEW);
+
+    return result;
+}
+
+int
+io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
+{
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)volume->private_data;
+
+    int result = -1;
+
+
+    buffer_manager_del(sgx_backend->buf_manager, metadata_uuid);
+
+    BACKEND_SGX_IOBUF_START(IOBUF_DEL);
+
+    result = nexus_datastore_del_uuid(volume->metadata_store, metadata_uuid, NULL);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_DEL);
+
+    return result;
+}
+
+int
+io_buffer_hardlink(struct nexus_uuid   * link_uuid,
+                   struct nexus_uuid   * target_uuid,
+                   struct nexus_volume * volume)
+{
+    int result = -1;
+
+    BACKEND_SGX_IOBUF_START(IOBUF_HARDLINK);
+
+    result = nexus_datastore_hardlink_uuid(volume->metadata_store,
+                                           link_uuid,
+                                           NULL,
+                                           target_uuid,
+                                           NULL);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_HARDLINK);
+
+    return result;
+}
+
+int
+io_buffer_rename(struct nexus_uuid   * from_uuid,
+                 struct nexus_uuid   * to_uuid,
+                 struct nexus_volume * volume)
+{
+    int result = -1;
+
+    BACKEND_SGX_IOBUF_START(IOBUF_RENAME);
+
+    result = nexus_datastore_rename_uuid(volume->metadata_store, from_uuid, NULL, to_uuid, NULL);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_RENAME);
+
+    return result;
+}
+
+int
+io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
+{
+    struct nexus_stat stat_info;
+
+    int result = -1;
+
+    BACKEND_SGX_IOBUF_START(IOBUF_STAT);
+
+    result = nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_info);
+
+    BACKEND_SGX_IOBUF_FINISH(IOBUF_STAT);
+
+    if (result) {
+        log_error("could not stat metadata file\n");
+        return -1;
     }
 
-    addr = nexus_malloc(size);
 
-    __update_metadata_buf(metadata_buf, addr, size, false);
+    *timestamp = stat_info.timestamp;
 
-    metadata_buf->timestamp = 0;
+    return 0;
+}
 
-    return addr;
+int
+io_manager_flush_dirty(struct sgx_backend * backend)
+{
+    struct nexus_ioreq ioreq;
+
+    int                ret = -1;
+
+    while (true) {
+        if (!nexus_ringbuf_get(backend->dirty_queue, &ioreq)) {
+            return 0;
+        }
+
+        BACKEND_SGX_IOBUF_START(IOBUF_PUT);
+
+        ret = __io_buffer_put_request(&ioreq, backend);
+
+        BACKEND_SGX_IOBUF_FINISH(IOBUF_PUT);
+
+        nexus_heap_free(&backend->heap_manager, ioreq.buffer);
+
+        if (ret != 0) {
+            log_error("io_buffer_put_request FAILED\n");
+            return -1;
+        }
+    }
+
+    return 0;
 }

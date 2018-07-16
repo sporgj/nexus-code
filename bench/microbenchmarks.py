@@ -1,8 +1,8 @@
 #!/usr/bin/python3.5
 import subprocess, time, os
 #workloads = ['large_file_small_dir', 'medium_file_medium_dir', 'small_file_large_dir']
-#workloads = ['medium_file_medium_dir', 'small_file_large_dir']
-workloads = ['large_file_small_dir']
+workloads = ['medium_file_medium_dir', 'small_file_large_dir']
+#workloads = ['large_file_small_dir']
 
 tar_files = [wrk + '-workload.tar' for wrk in workloads]
 gz_files = [wrk + '-workload.tar.gz' for wrk in workloads]
@@ -72,7 +72,7 @@ def run_test(workload):
         i += 1
 
         vals.append(t1)
-    
+
     data = fmt.format(*vals)
     fd.writelines([data, '\n'])
     fd.flush()
@@ -89,7 +89,7 @@ for load in workloads:
     fd.writelines(['#', load, '\n'])
     fd.flush()
 
-    for i in range(10):
+    for i in range(6):
         run_test(load)
 
 fd.close()

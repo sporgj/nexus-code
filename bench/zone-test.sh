@@ -1,5 +1,5 @@
 #!/bin/bash
-num=1
+num=0
 
 while [ $num -lt 10 ]; do
   sudo bash -c "echo 3 > /proc/sys/vm/drop_caches"

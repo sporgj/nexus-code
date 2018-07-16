@@ -9,6 +9,7 @@
 #include <nexus_key.h>
 #include <nexus_fs.h>
 #include <nexus_heap.h>
+#include <nexus_ringbuf.h>
 
 #define NONCE_SIZE 64
 
@@ -28,4 +29,24 @@ struct nexus_key_buffer {
     size_t key_len;
 
     char * key_str;
+};
+
+
+// displaying the write buffer
+struct nexus_ioreq {
+    struct nexus_uuid   uuid;
+
+    size_t              buflen;
+    uint8_t           * buffer;
+
+    bool                completed;
+
+    size_t              timestamp;
+};
+
+
+struct nexus_iochan {
+    struct nexus_ringbuf * dirty; // list of dirty requests
+
+    struct nexus_ringbuf * clean; // list of completed requests
 };

@@ -1,8 +1,8 @@
 #!/bin/bash
-num=1
+num=8
 
-while [ $num -lt 10 ]; do
+while [ $num -lt 9 ]; do
   sudo bash -c "echo 3 > /proc/sys/vm/drop_caches"
-  ~/iozone-current/iozone3 -aU -g -i 0,1,2 -e -c -r 4k 32m
-  let num+=1
+  sudo bonnie++ -u briand -q -x 10 -s 0 -r 0 -n $num
+  let num*=2
 done

@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -6,36 +6,32 @@
  * redistribute, and modify it as specified in the file "PETLAB_LICENSE".
  */
 
-
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <getopt.h>
 
-#include <sys/ioctl.h>
-#include <sys/epoll.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/epoll.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <nexus.h>
+#include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_util.h>
-#include <nexus_json.h>
 
 #include "handler.h"
 
 static const char * nexus_prog_version = "Nexus Admin Shell 0.1";
 
-
-
 struct nexus_cmd {
     char * name;
-    int (*handler)(int argc, char ** argv);   
+    int (*handler)(int argc, char ** argv);
     char * desc;
 };
-
 
 int
 init_main(int argc, char ** argv)
@@ -46,21 +42,20 @@ init_main(int argc, char ** argv)
     return 0;
 }
 
+extern int
+create_volume_main(int argc, char ** argv);
+extern int
+delete_volume_main(int argc, char ** argv);
+// extern int       ls_path_main(int argc, char ** argv);
+extern int
+create_file_main(int argc, char ** argv);
 
-extern int create_volume_main(int argc, char ** argv);
-extern int delete_volume_main(int argc, char ** argv);
-//extern int       ls_path_main(int argc, char ** argv);
-extern int   create_file_main(int argc, char ** argv);
-
-static struct nexus_cmd cmds[] = {
-    {"init"         , init_main          , "Initialize Nexus Environment" },
-    {"create"       , create_volume_main , "Create a Nexus Volume"        },
-    {"delete"       , delete_volume_main , "Delete a Nexus Volume"        },
-    //    {"ls"           , ls_path_main       , "'ls' a path"                  },
-    {"create_file"  , create_file_main   , "Create a new file"            },
-    {0, 0, 0}
-};
-
+static struct nexus_cmd cmds[] = { { "init", init_main, "Initialize Nexus Environment" },
+                                   { "create", create_volume_main, "Create a Nexus Volume" },
+                                   { "delete", delete_volume_main, "Delete a Nexus Volume" },
+                                   //    {"ls"           , ls_path_main       , "'ls' a path" },
+                                   { "create_file", create_file_main, "Create a new file" },
+                                   { 0, 0, 0 } };
 
 void
 usage(void)
@@ -72,15 +67,12 @@ usage(void)
     printf("Commands:\n");
 
     while (cmds[i].name) {
-	printf("\t%-17s -- %s\n", cmds[i].name, cmds[i].desc);
-	i++;
+        printf("\t%-17s -- %s\n", cmds[i].name, cmds[i].desc);
+        i++;
     }
 
     return;
-    
 }
-
-
 
 int
 main(int argc, char ** argv)
@@ -89,36 +81,32 @@ main(int argc, char ** argv)
     int ret   = 0;
     int found = 0;
 
-   if (argc < 2) {
-	usage();
-	exit(-1);
+    if (argc < 2) {
+        usage();
+        exit(-1);
     }
-    
 
-
-    
     while (cmds[i].name) {
 
-    	if (strncmp(cmds[i].name, argv[1], strlen(argv[1])) == 0) {
+        if (strncmp(cmds[i].name, argv[1], strlen(argv[1])) == 0) {
 
-	    found = 1;
-	    
-	    nexus_init();
-	    ret = cmds[i].handler(argc - 1, &argv[1]);
-	    nexus_deinit();
+            found = 1;
 
-	    break;
-	}
+            nexus_init();
+            ret = cmds[i].handler(argc - 1, &argv[1]);
+            nexus_deinit();
 
-	i++;
+            break;
+        }
+
+        i++;
     }
 
     if (found == 0) {
-	usage();
-	exit(-1);
+        usage();
+        exit(-1);
     }
 
-    
 #if 0
 
        // initialize libnexus and mount the volume
@@ -136,7 +124,5 @@ main(int argc, char ** argv)
     }
 #endif
 
-
-    
     return ret;
 }

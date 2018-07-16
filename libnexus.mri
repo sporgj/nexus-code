@@ -5,6 +5,7 @@ addlib ./build/backend_clear.a
 addlib ./build/backend_sgx.a
 addlib ./build/datastore_flat.a
 addlib ./build/datastore_twolevel.a
+addlib ./build/libnexus_probes.a
 save
 end
 

@@ -32,7 +32,7 @@ buffer_layer_exit()
     return 0;
 }
 
-static void
+static struct metadata_info *
 __update_timestamp(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t flags)
 {
     struct metadata_info * info = NULL;
@@ -49,6 +49,8 @@ __update_timestamp(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t 
 
     info->timestamp = timestamp;
     info->flags     = flags;
+
+    return info;
 }
 
 void
@@ -96,31 +98,44 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 {
     struct metadata_info * info = NULL;
 
-    int       err  = -1;
-    uint8_t * addr = NULL;
+    uint8_t              * addr = nexus_heap_malloc(global_heap, size);
+
+    if (addr == NULL) {
+        log_error("could not allocate memory (size=%zu)\n", size);
+        return NULL;
+    }
+
 
     info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
 
+    // this means that the file has been requested in a previous get with FWRITE
     if (info && info->flags & NEXUS_FWRITE) {
-        uint8_t * buffer = nexus_heap_malloc(global_heap, size);
-
-        if (buffer == NULL) {
-            log_error("could not allocate memory (size=%zu)\n", size);
-            return NULL;
-        }
-
-        info->tmp_buffer = buffer;
+        info->tmp_buffer = addr;
         info->tmp_buflen = size;
 
-        return buffer;
+        return addr;
     }
 
-    err = ocall_buffer_alloc(&addr, uuid, size, global_volume);
+    /* this branch accounts for metadata which have not been written to disk.
+     * Examples include: newly created chunks */
 
-    if (err || addr == NULL) {
-        log_error("ocall_buffer_alloc FAILED (err=%d)\n", err);
-        return NULL;
+    // lock the file and insert into metadata table
+    {
+        int ret = -1;
+        int err = ocall_buffer_lock(&ret, uuid, global_volume);
+
+        if (err || ret) {
+            nexus_heap_free(global_heap, addr);
+
+            log_error("ocall_buffer_alloc FAILED (err=%d, ret=%d)\n", err, ret);
+            return NULL;
+        }
     }
+
+    info = __update_timestamp(uuid, 0, NEXUS_FWRITE);
+
+    info->tmp_buffer = addr;
+    info->tmp_buflen = size;
 
     return addr;
 }
@@ -170,21 +185,51 @@ buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
     struct metadata_info * info = NULL;
 
+    struct nexus_ioreq     ioreq;
+
+    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
+                                                       (uintptr_t)buffer_uuid);
+
+    if (info == NULL) {
+        log_error("could not find uuid in metadata table\n");
+        return -1;
+    }
+
+    // initialize the iobuf
+    memset(&ioreq, 0, sizeof(struct nexus_ioreq));
+
+    nexus_uuid_copy(buffer_uuid, &ioreq.uuid);
+
+    ioreq.buflen = info->tmp_buflen;
+    ioreq.buffer = info->tmp_buffer;
+
+    if (!nexus_ringbuf_put(global_ioreq_queue, &ioreq)) {
+        log_error("could not put buffer in dirty queue\n");
+        return -1;
+    }
+
+    return 0;
+
+#if 0
+    struct metadata_info * info = NULL;
+
+    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
+                                                       (uintptr_t)buffer_uuid);
+
+
+
     size_t timestamp = 0;
 
     int err = -1;
     int ret = -1;
 
-    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
-                                                       (uintptr_t)buffer_uuid);
-
     if (info && info->tmp_buffer) {
-        err = ocall_buffer_flush(&ret,
-                                 buffer_uuid,
-                                 info->tmp_buffer,
-                                 info->tmp_buflen,
-                                 &timestamp,
-                                 global_volume);
+        err = ocall_buffer_put_buffer(&ret,
+                                      buffer_uuid,
+                                      info->tmp_buffer,
+                                      info->tmp_buflen,
+                                      &timestamp,
+                                      global_volume);
 
         nexus_heap_free(global_heap, info->tmp_buffer);
         info->tmp_buffer = NULL;
@@ -204,6 +249,7 @@ buffer_layer_put(struct nexus_uuid * buffer_uuid)
     }
 
     __update_timestamp(buffer_uuid, timestamp, NEXUS_FREAD);
+#endif
 
     return 0;
 }
