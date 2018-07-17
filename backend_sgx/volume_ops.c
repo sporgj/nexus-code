@@ -34,8 +34,7 @@ init_enclave(struct sgx_backend * backend)
     err = ecall_init_enclave(backend->enclave_id,
                              &ret,
                              backend->volume,
-                             &backend->heap_manager,
-                             backend->dirty_queue);
+                             &backend->heap_manager);
 
     if (err || ret) {
         log_error("ecall_init_enclave() FAILED\n");
@@ -158,12 +157,6 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     if (ret != 0) {
         log_error("key_buffer_derive() FAILED\n");
         goto out;
-    }
-
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
-        return -1;
     }
 
     ret = 0;

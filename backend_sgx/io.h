@@ -12,16 +12,12 @@ io_buffer_get(struct nexus_uuid   * uuid,
               size_t              * p_size,
               size_t              * timestamp,
               struct nexus_volume * volume);
-
 int
-io_buffer_put(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume);
-
-int
-io_buffer_put_buffer(struct nexus_uuid   * uuid,
-                     uint8_t             * buffer,
-                     size_t                size,
-                     size_t              * timestamp,
-                     struct nexus_volume * volume);
+io_buffer_put(struct nexus_uuid   * uuid,
+              uint8_t             * buffer,
+              size_t                size,
+              size_t              * timestamp,
+              struct nexus_volume * volume);
 
 struct metadata_buf *
 io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume);

@@ -30,8 +30,16 @@ typedef enum {
 
 
 
-#ifndef TRACE
-#define DECALL_PROBE 0
-#endif
+#ifdef DTRACE_ENABLED
 
 #include "backend_sgx.probes.h"
+
+#else
+
+#define BACKEND_SGX_ECALL_START(...)     (void)0
+#define BACKEND_SGX_ECALL_FINISH(...)    (void)0
+
+#define BACKEND_SGX_IOBUF_START(...)     (void)0
+#define BACKEND_SGX_IOBUF_FINISH(...)    (void)0
+
+#endif

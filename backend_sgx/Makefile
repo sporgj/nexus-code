@@ -24,6 +24,10 @@ CFLAGS   := -W -Wall -Werror \
             -D_GNU_SOURCE \
             -std=gnu11 -fPIC
 
+ifeq ($(DTRACE_ENABLED), 1)
+	CFLAGS += -DDTRACE_ENABLED
+endif
+
 # setup debug info
 ifeq ($(DEBUG), 1)
 	CFLAGS += -O0 -g3

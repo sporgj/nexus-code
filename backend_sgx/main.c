@@ -83,9 +83,6 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
         nexus_heap_init(&sgx_backend->heap_manager, sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
 
-    // write ringbuf
-    sgx_backend->dirty_queue = nexus_ringbuf_create(sizeof(struct nexus_ioreq), 10);
-
     sgx_backend->volume_chunk_size = NEXUS_CHUNK_SIZE;
 
     return sgx_backend;

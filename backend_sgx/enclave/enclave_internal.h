@@ -72,8 +72,6 @@ extern struct nexus_metadata       * global_supernode_metadata;
 
 extern struct nexus_heap           * global_heap;
 
-extern struct nexus_ringbuf        * global_ioreq_queue;
-
 
 extern nexus_uid_t                   global_user_id;
 

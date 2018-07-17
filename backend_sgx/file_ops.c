@@ -48,11 +48,6 @@ sgx_backend_fs_encrypt(struct nexus_volume * volume,
         return -1;
     }
 
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
-        return -1;
-    }
-
     return 0;
 }
 
@@ -99,11 +94,6 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
 
     if (err || ret) {
         log_error("ecall_fs_decrypt (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
         return -1;
     }
 

@@ -46,7 +46,7 @@ build = \
         fi
 
 
-all: nexus-afs frontend_afs.a
+all: ../libnexus.a nexus-afs frontend_afs.a
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)

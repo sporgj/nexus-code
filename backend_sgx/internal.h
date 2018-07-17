@@ -40,8 +40,6 @@ struct sgx_backend {
     size_t                        mmap_len;
 
 
-    struct nexus_ringbuf        * dirty_queue;
-
     struct nexus_volume         * volume;
 
     char                        * enclave_path;

@@ -47,12 +47,6 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
         return -1;
     }
 
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
-        return -1;
-    }
-
     *nexus_name = nexus_uuid_to_alt64(&uuid);
 
     return 0;
@@ -83,12 +77,6 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
 
     if (err || ret) {
         log_error("ecall_fs_remove() FAILED. (err=0x%x, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -202,12 +190,6 @@ sgx_backend_fs_symlink(struct nexus_volume  * volume,
         return -1;
     }
 
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
-        return -1;
-    }
-
     *nexus_name = nexus_uuid_to_alt64(&uuid);
 
     return 0;
@@ -246,12 +228,6 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
 
     if (err || ret) {
         log_error("ecall_fs_hardlink() FAILED. (err=0x%x, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
         return -1;
     }
 
@@ -295,12 +271,6 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
 
     if (err || ret) {
         log_error("ecall_fs_rename() FAILED. (err=0x%x, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-
-    if (io_manager_flush_dirty(sgx_backend)) {
-        log_error("flushing buffers failed\n");
         return -1;
     }
 

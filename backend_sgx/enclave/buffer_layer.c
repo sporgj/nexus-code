@@ -185,73 +185,36 @@ buffer_layer_put(struct nexus_uuid * buffer_uuid)
 {
     struct metadata_info * info = NULL;
 
-    struct nexus_ioreq     ioreq;
-
     info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
                                                        (uintptr_t)buffer_uuid);
-
-    if (info == NULL) {
-        log_error("could not find uuid in metadata table\n");
-        return -1;
-    }
-
-    // initialize the iobuf
-    memset(&ioreq, 0, sizeof(struct nexus_ioreq));
-
-    nexus_uuid_copy(buffer_uuid, &ioreq.uuid);
-
-    ioreq.buflen = info->tmp_buflen;
-    ioreq.buffer = info->tmp_buffer;
-
-    if (!nexus_ringbuf_put(global_ioreq_queue, &ioreq)) {
-        log_error("could not put buffer in dirty queue\n");
-        return -1;
-    }
-
-    return 0;
-
-#if 0
-    struct metadata_info * info = NULL;
-
-    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
-                                                       (uintptr_t)buffer_uuid);
-
-
 
     size_t timestamp = 0;
 
-    int err = -1;
-    int ret = -1;
-
     if (info && info->tmp_buffer) {
-        err = ocall_buffer_put_buffer(&ret,
-                                      buffer_uuid,
-                                      info->tmp_buffer,
-                                      info->tmp_buflen,
-                                      &timestamp,
-                                      global_volume);
+        int ret = -1;
+        int err = ocall_buffer_put(&ret,
+                                   buffer_uuid,
+                                   info->tmp_buffer,
+                                   info->tmp_buflen,
+                                   &timestamp,
+                                   global_volume);
 
         nexus_heap_free(global_heap, info->tmp_buffer);
+
         info->tmp_buffer = NULL;
         info->tmp_buflen = 0;
-
-        if (err || ret) {
-            log_error("ocall_buffer_flush FAILED (err=%d, ret=%d)\n", err, ret);
-            return -1;
-        }
-    } else {
-        err = ocall_buffer_put(&ret, buffer_uuid, &timestamp, global_volume);
 
         if (err || ret) {
             log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);
             return -1;
         }
+
+        __update_timestamp(buffer_uuid, timestamp, NEXUS_FREAD);
+
+        return 0;
     }
 
-    __update_timestamp(buffer_uuid, timestamp, NEXUS_FREAD);
-#endif
-
-    return 0;
+    return -1;
 }
 
 int

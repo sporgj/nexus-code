@@ -9,3 +9,5 @@ DEBUG := 1
 
 # to enable compiler intrinsics
 LIBGCC_PATH := $(shell gcc -print-file-name=include)
+
+DTRACE_ENABLED := 0

@@ -13,19 +13,14 @@ struct nexus_heap   * global_heap               = NULL;
 nexus_uid_t           global_user_id            = 0;
 
 
-struct nexus_ringbuf * global_ioreq_queue       = NULL;
-
 
 int
 ecall_init_enclave(struct nexus_volume  * volume,
-                   struct nexus_heap    * heap,
-                   struct nexus_ringbuf * ringbuf)
+                   struct nexus_heap    * heap)
 {
     global_volume      = volume;
 
     global_heap        = heap;
-
-    global_ioreq_queue = ringbuf;
 
     if (buffer_layer_init() != 0) {
         return -1;
