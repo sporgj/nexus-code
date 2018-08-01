@@ -162,9 +162,13 @@ cscope:
 	$(call build,FILELIST,(echo \-k; echo \-q; $(cscope-all-sources)) > cscope.files)
 	$(call build,MAKE,cscope -b)
 
-
+.PHONY: clean
 clean:
 	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o
+
+.PHONY: distclean
+distclean: clean
+	make -C mbedtls clean
 
 
 .PHONY: all clean

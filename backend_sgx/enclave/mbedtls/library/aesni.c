@@ -53,6 +53,12 @@ int mbedtls_aesni_has_support( unsigned int what )
     static int done = 0;
     static unsigned int c = 0;
 
+#ifdef UCAFS_AESNI_HAS_SUPPORT
+    if (1) {
+        return 1;
+    }
+#endif
+
     if( ! done )
     {
         asm( "movl  $1, %%eax   \n\t"
