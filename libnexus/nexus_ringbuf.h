@@ -19,7 +19,7 @@ struct nexus_ringbuf {
 
 
 struct nexus_ringbuf *
-nexus_ringbuf_create(size_t size, size_t capacity);
+nexus_ringbuf_create(size_t item_size, size_t capacity);
 
 void
 nexus_ringbuf_destroy(struct nexus_ringbuf * ringbuf);
