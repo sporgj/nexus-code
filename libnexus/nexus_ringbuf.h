@@ -25,7 +25,7 @@ void
 nexus_ringbuf_destroy(struct nexus_ringbuf * ringbuf);
 
 bool
-nexus_ringbuf_put(struct nexus_ringbuf * ringbuf, void * data);
+nexus_ringbuf_enqueue(struct nexus_ringbuf * ringbuf, void * data);
 
 bool
-nexus_ringbuf_get(struct nexus_ringbuf * ringbuf, void * dest);
+nexus_ringbuf_dequeue(struct nexus_ringbuf * ringbuf, void * dest);
