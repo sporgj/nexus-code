@@ -19,13 +19,13 @@ struct nexus_ringbuf {
 
 
 struct nexus_ringbuf *
-nexus_ringbuf_create(size_t size, size_t capacity);
+nexus_ringbuf_create(size_t item_size, size_t capacity);
 
 void
 nexus_ringbuf_destroy(struct nexus_ringbuf * ringbuf);
 
 bool
-nexus_ringbuf_put(struct nexus_ringbuf * ringbuf, void * data);
+nexus_ringbuf_enqueue(struct nexus_ringbuf * ringbuf, void * data);
 
 bool
-nexus_ringbuf_get(struct nexus_ringbuf * ringbuf, void * dest);
+nexus_ringbuf_dequeue(struct nexus_ringbuf * ringbuf, void * dest);

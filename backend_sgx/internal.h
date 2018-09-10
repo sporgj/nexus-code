@@ -22,6 +22,7 @@
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
 #include "key_buffer.h"
+#include "fs.h"
 #include "io.h"
 
 
@@ -38,6 +39,9 @@ struct sgx_backend {
     uint8_t                     * mmap_ptr;
 
     size_t                        mmap_len;
+
+
+    struct fs_manager           * fs_manager;
 
 
     struct nexus_volume         * volume;

@@ -5,11 +5,11 @@
 
 
 struct nexus_ringbuf *
-nexus_ringbuf_create(size_t size, size_t capacity)
+nexus_ringbuf_create(size_t item_size, size_t capacity)
 {
     struct nexus_ringbuf * ringbuf = nexus_malloc(sizeof(struct nexus_ringbuf));
 
-    size_t total_size  = size * capacity;
+    size_t total_size  = item_size * capacity;
 
 
     ringbuf->__buf     = nexus_malloc(total_size);
@@ -32,18 +32,18 @@ nexus_ringbuf_destroy(struct nexus_ringbuf * ringbuf)
 }
 
 bool
-nexus_ringbuf_put(struct nexus_ringbuf * ringbuf, void * data)
+nexus_ringbuf_enqueue(struct nexus_ringbuf * ringbuf, void * data)
 {
     if (ringbuf->item_count == ringbuf->capacity) {
         return false;
     }
 
-    memcpy(ringbuf->head, data, ringbuf->item_size);
+    memcpy(ringbuf->tail, data, ringbuf->item_size);
 
-    ringbuf->head = (char *) ringbuf->head + ringbuf->item_size;
+    ringbuf->tail = (char *) ringbuf->tail + ringbuf->item_size;
 
-    if (ringbuf->head == ringbuf->end) {
-        ringbuf->head = ringbuf->__buf;
+    if (ringbuf->tail == ringbuf->end) {
+        ringbuf->tail = ringbuf->__buf;
     }
 
     ringbuf->item_count += 1;
@@ -52,18 +52,18 @@ nexus_ringbuf_put(struct nexus_ringbuf * ringbuf, void * data)
 }
 
 bool
-nexus_ringbuf_get(struct nexus_ringbuf * ringbuf, void * dest)
+nexus_ringbuf_dequeue(struct nexus_ringbuf * ringbuf, void * dest)
 {
     if (ringbuf->item_count == 0) {
         return false;
     }
 
-    memcpy(dest, ringbuf->tail, ringbuf->item_size);
+    memcpy(dest, ringbuf->head, ringbuf->item_size);
 
-    ringbuf->tail = (char *) ringbuf->tail + ringbuf->item_size;
+    ringbuf->head = (char *) ringbuf->head + ringbuf->item_size;
 
-    if (ringbuf->tail == ringbuf->end) {
-        ringbuf->tail = ringbuf->__buf;
+    if (ringbuf->head == ringbuf->end) {
+        ringbuf->head = ringbuf->__buf;
     }
 
     ringbuf->item_count -= 1;

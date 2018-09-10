@@ -22,6 +22,11 @@ struct nonce_challenge {
 };
 
 
+#define MAX_DIRENT_REQUESTS     20
+
+enum fs_op_type;
+
+
 // this will be used to transport keys across the enclave boundary
 struct nexus_key_buffer {
     nexus_key_type_t key_type;
@@ -31,8 +36,21 @@ struct nexus_key_buffer {
     char * key_str;
 };
 
+struct nexus_fsop_req {
+    size_t                  req_id;
 
-// displaying the write buffer
+    enum fs_op_type         type;
+
+    bool                    completed; // done by the untrusted portion
+
+    bool                    _ack; // done by the enclave
+
+    struct nexus_ringbuf *  dirent_requests;
+
+
+    struct list_head        node;
+};
+
 struct nexus_ioreq {
     struct nexus_uuid   uuid;
 
@@ -44,6 +62,11 @@ struct nexus_ioreq {
     size_t              timestamp;
 };
 
+
+struct nexus_dirent_req {
+    struct nexus_dirent dirent;
+    struct nexus_uuid   uuid;
+} __attribute__((packed));
 
 struct nexus_iochan {
     struct nexus_ringbuf * dirty; // list of dirty requests
