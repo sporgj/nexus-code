@@ -323,7 +323,17 @@ twolevel_fwrite(struct nexus_file_handle * file_handle,
                 size_t                     size,
                 void                     * priv_data)
 {
-    return nexus_file_handle_write(file_handle, buf, size);
+    if (nexus_file_handle_write(file_handle, buf, size)) {
+        log_error("could not write metadata file\n");
+        return -1;
+    }
+
+    if (nexus_file_handle_flush(file_handle)) {
+        log_error("could not flush metadata file\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 void

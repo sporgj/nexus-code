@@ -122,7 +122,6 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 
     ret = nexus_metadata_store(metadata);
     if (ret != 0) {
-        metadata = NULL;
         log_error("flushing metadata FAILED\n");
         goto out;
     }

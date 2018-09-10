@@ -36,6 +36,8 @@ struct nexus_key_buffer {
     char * key_str;
 };
 
+
+#if 0
 struct nexus_fsop_req {
     size_t                  req_id;
 
@@ -73,3 +75,4 @@ struct nexus_iochan {
 
     struct nexus_ringbuf * clean; // list of completed requests
 };
+#endif
