@@ -15,7 +15,7 @@ nexus_ringbuf_create(size_t item_size, size_t capacity)
     ringbuf->__buf     = nexus_malloc(total_size);
 
     ringbuf->capacity  = capacity;
-    ringbuf->item_size = size;
+    ringbuf->item_size = item_size;
 
     ringbuf->head      = ringbuf->__buf;
     ringbuf->tail      = ringbuf->__buf;
