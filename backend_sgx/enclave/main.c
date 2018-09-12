@@ -14,6 +14,12 @@ nexus_uid_t           global_user_id            = 0;
 
 
 
+void
+randombytes(void * dest, uint64_t l)
+{
+    sgx_read_rand((uint8_t *)dest, l);
+}
+
 int
 ecall_init_enclave(struct nexus_volume  * volume,
                    struct nexus_heap    * heap)

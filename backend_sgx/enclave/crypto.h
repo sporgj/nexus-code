@@ -17,6 +17,11 @@
 #define GCM128_TAG_SIZE (16)
 
 
+struct ecdh_public_key;
+struct ecdh_secret_key;
+struct ecdh_nonce;
+
+
 #define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
 
 
@@ -70,3 +75,31 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
                    struct nexus_mac        * mac,
                    uint8_t                 * aad,
                    size_t                    add_len);
+
+
+uint8_t *
+crypto_ecdh_encrypt(struct ecdh_public_key  * pk,
+                    struct ecdh_secret_key  * sk,
+                    uint8_t            * data,
+                    size_t               in_len,
+                    int                * out_len,
+                    struct ecdh_nonce       * nonce);
+
+/**
+ * Uses tweetnacl crypto_box api to generate common secret from ECDH keypair
+ */
+uint8_t *
+crypto_ecdh_decrypt(struct ecdh_public_key  * pk,
+                    struct ecdh_secret_key  * sk,
+                    uint8_t            * data,
+                    size_t               total_len,
+                    int                * plain_len,
+                    int                * offset,
+                    struct ecdh_nonce       * nonce);
+
+
+uint8_t *
+crypto_seal_data(uint8_t * data, size_t size, size_t * p_sealed_len);
+
+uint8_t *
+crypto_unseal_data(uint8_t * data, size_t size, size_t * p_unsealed_len);

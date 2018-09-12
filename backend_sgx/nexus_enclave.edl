@@ -1,4 +1,7 @@
 enclave {
+    include "sgx_report.h"
+    include "sgx_quote.h"
+    include "sgx_trts.h"
     include "sgx_backend_common.h"
 
     trusted {
@@ -12,6 +15,25 @@ enclave {
         (
             [user_check] struct nexus_volume    * volume,
             [user_check] struct nexus_heap      * heap
+        );
+
+        /**
+         * Creates a new nexus instance for this computer
+         */
+        public int ecall_new_instance
+        (
+            [in]         const sgx_target_info_t  * target_info_IN,
+            [out]        sgx_report_t             * report_out,
+            [user_check] struct ecdh_public_key   * pubkey_out,
+            [user_check] uint8_t                 ** sealed_privkey_out,
+            [user_check] size_t                   * sealed_privkey_len_out
+        );
+
+        public int ecall_mount_instance
+        (
+            [in]         struct ecdh_public_key   * pubkey_IN,
+            [user_check] uint8_t                  * sealed_privkey_in,
+                         size_t                     sealed_privkey_len
         );
 
 

@@ -11,6 +11,8 @@
 #include <nexus_heap.h>
 #include <nexus_ringbuf.h>
 
+#include "tweetnacl.h"
+
 #define NONCE_SIZE 64
 
 // XXX this is temporary
@@ -20,6 +22,16 @@
 struct nonce_challenge {
     uint8_t bytes[NONCE_SIZE];
 };
+
+
+// used for the instance creation
+struct ecdh_public_key {
+    uint8_t  bytes[crypto_box_PUBLICKEYBYTES];
+} __attribute__((packed));
+
+struct ecdh_nonce {
+    uint8_t  bytes[crypto_box_NONCEBYTES];
+} __attribute__((packed));
 
 
 #define MAX_DIRENT_REQUESTS     20

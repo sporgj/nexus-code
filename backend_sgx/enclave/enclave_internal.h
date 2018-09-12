@@ -51,6 +51,16 @@
 #include <nexus_hashtable.h>
 
 
+#include <tweetnacl.h>
+
+
+#define crypto_randombytes  randombytes
+
+struct ecdh_secret_key {
+    uint8_t  bytes[crypto_box_SECRETKEYBYTES];
+} __attribute__((packed));
+
+
 #define ocall_debug(str) \
     ocall_print("enclave> " str "\n")
 

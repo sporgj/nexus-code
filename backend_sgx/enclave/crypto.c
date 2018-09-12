@@ -278,3 +278,124 @@ out:
 
     return ret;
 }
+
+
+uint8_t *
+crypto_ecdh_encrypt(struct ecdh_public_key  * pk,
+                    struct ecdh_secret_key  * sk,
+                    uint8_t            * data,
+                    size_t               in_len,
+                    int                * out_len,
+                    struct ecdh_nonce       * nonce)
+{
+    int total_len        = crypto_box_ZEROBYTES + in_len;
+
+    uint8_t * plaintext  = nexus_malloc(total_len);
+
+    uint8_t * ciphertext = nexus_malloc(total_len);
+
+
+    memcpy(plaintext + crypto_box_ZEROBYTES, data, in_len);
+
+    // performs some salsal operation
+    if (crypto_box(ciphertext, plaintext, total_len, (uint8_t *)nonce, pk->bytes, sk->bytes)) {
+        log_error("crypto_box FAILED\n");
+        goto err;
+    }
+
+    nexus_free(plaintext);
+
+    *out_len = total_len;
+
+    return ciphertext;
+
+err:
+    nexus_free(plaintext);
+    nexus_free(ciphertext);
+
+    return NULL;
+}
+
+uint8_t *
+crypto_ecdh_decrypt(struct ecdh_public_key  * pk,
+                    struct ecdh_secret_key  * sk,
+                    uint8_t            * data,
+                    size_t               total_len,
+                    int                * plain_len,
+                    int                * offset,
+                    struct ecdh_nonce       * nonce)
+{
+    uint8_t * plaintext  = nexus_malloc(total_len);
+
+    uint8_t * ciphertext = nexus_malloc(total_len);
+
+
+    memcpy(ciphertext, data, total_len);
+
+    // runs the salsa stream cipher
+    if (crypto_box_open(plaintext, ciphertext, total_len, (uint8_t *)nonce, pk->bytes, sk->bytes)) {
+        log_error("crypto_box_open FAILED\n");
+        goto err;
+    }
+
+    nexus_free(ciphertext);
+
+    *plain_len = total_len - crypto_box_ZEROBYTES;
+    *offset = crypto_box_ZEROBYTES;
+
+    return plaintext;
+
+err:
+    nexus_free(plaintext);
+    nexus_free(ciphertext);
+
+    return NULL;
+}
+
+
+uint8_t *
+crypto_seal_data(uint8_t * data, size_t size, size_t * p_sealed_len)
+{
+    size_t              sealed_len  = sgx_calc_sealed_data_size(0, size);
+
+    sgx_sealed_data_t * sealed_data = nexus_malloc(sealed_len);
+
+    {
+        int ret = sgx_seal_data(0, NULL, size, data, sealed_len, sealed_data);
+
+        if (ret != 0) {
+            nexus_free(sealed_data);
+            log_error("sgx_seal_data() FAILED (ret=%x)\n", ret);
+            return NULL;
+        }
+    }
+
+    *p_sealed_len = sealed_len;
+
+    return (uint8_t *)sealed_data;
+}
+
+
+uint8_t *
+crypto_unseal_data(uint8_t * data, size_t size, size_t * p_unsealed_len)
+{
+    sgx_sealed_data_t * sealed_data   = (sgx_sealed_data_t *)data;
+
+    uint32_t            unsealed_len  = sgx_get_encrypt_txt_len(sealed_data);
+
+    uint8_t           * unsealed_data = nexus_malloc(unsealed_len);
+
+    {
+        int ret = sgx_unseal_data(sealed_data, NULL, 0, unsealed_data, &unsealed_len);
+
+        if (ret != 0) {
+            nexus_free(unsealed_data);
+            log_error("sgx_unseal_data FAILED (ret=%x)\n", ret);
+            return NULL;
+        }
+    }
+
+    *p_unsealed_len = unsealed_len;
+
+    return (uint8_t *)unsealed_data;
+}
