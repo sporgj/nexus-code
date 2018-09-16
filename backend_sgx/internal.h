@@ -19,11 +19,17 @@
 
 #include "nexus_enclave_u.h"
 
+#include "rootkey-exchange.h"
+
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
 #include "key_buffer.h"
 // #include "fs.h"
 #include "io.h"
+
+
+// For every run of NeXUS, there will be a unique instance
+extern struct nxs_instance * global_nxs_instance;
 
 
 struct sgx_backend {
@@ -49,6 +55,22 @@ struct sgx_backend {
     char                        * enclave_path;
 };
 
+
+// main.c
+
+int
+nxs_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id);
+
+int
+nxs_destroy_enclave(sgx_enclave_id_t enclave_id);
+
+
+// manages the instance
+int
+nxs_create_instance(char * enclave_path, char * instance_fpath);
+
+int
+nxs_load_instance(char * instance_fpath);
 
 
 int

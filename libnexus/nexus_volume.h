@@ -16,6 +16,7 @@ struct nexus_volume {
     char * volume_path;
 
     struct nexus_key vol_key;
+    struct nexus_key instance_secret_key;
     
     struct nexus_uuid vol_uuid;
     struct nexus_uuid supernode_uuid;

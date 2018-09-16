@@ -16,6 +16,33 @@ uuid_hash_func(uintptr_t key)
     return nexus_uuid_hash((struct nexus_uuid *)key);
 }
 
+int
+nxs_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id)
+{
+    sgx_launch_token_t launch_token        = { 0 };
+    int                launch_token_update = 0;
+
+    int ret = sgx_create_enclave(enclave_path,
+                                 SGX_DEBUG_FLAG,
+                                 &launch_token,
+                                 &launch_token_update,
+                                 enclave_id,
+                                 NULL);
+
+    if (ret != SGX_SUCCESS) {
+        log_error("Error, call sgx_create_enclave fail. ret=%x\n", ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+nxs_destroy_enclave(sgx_enclave_id_t enclave_id)
+{
+    return sgx_destroy_enclave(enclave_id);
+}
+
 static int
 sgx_backend_exit(struct sgx_backend * sgx_backend)
 {
@@ -46,7 +73,7 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 
     if (ret != 0) {
         log_error("sgx_backend: no 'enclave_path' in config\n");
-        return NULL;
+        goto out;
     }
 
 

@@ -12,11 +12,12 @@
 
 struct nexus_config {
     char * user_data_dir;
-    
+
     char * user_key_path;
 
     char * username;
 
+    char * instance_path;
 };
 
 

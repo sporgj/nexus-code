@@ -1,31 +1,43 @@
 #include "internal.h"
 
+#include <nexus_raw_file.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
 
 
+static int
+load_or_create_instance(struct sgx_backend * backend)
+{
+    struct nexus_stat stat;
+
+    if (nexus_stat_raw_file(nexus_config.instance_path, &stat)) {
+        nexus_printf("Instance file (%s) not found... Creating\n", nexus_config.instance_path);
+
+        if (nxs_create_instance(backend->enclave_path, nexus_config.instance_path)) {
+            log_error("could not create instance in\n");
+            return -1;
+        }
+    }
+
+    nexus_printf("Loading instance: %s\n", nexus_config.instance_path);
+
+    return nxs_load_instance(nexus_config.instance_path);
+}
+
 /* creates a new enclave */
 static int
 init_enclave(struct sgx_backend * backend)
 {
-    sgx_launch_token_t token = { 0 };
-
     int err = -1;
     int ret = -1;
 
     if (backend->enclave_id == 0) {
-        int updated = 0;
+        ret = nxs_create_enclave(backend->enclave_path, &backend->enclave_id);
 
-        ret = sgx_create_enclave(backend->enclave_path,
-                                 SGX_DEBUG_FLAG,
-                                 &token,
-                                 &updated,
-                                 &backend->enclave_id,
-                                 NULL);
-
-        if (ret != SGX_SUCCESS) {
+        if (ret != 0) {
             log_error("Could not open enclave(%s): ret=%#x\n", backend->enclave_path, ret);
             return -1;
         }
@@ -51,7 +63,7 @@ exit_enclave(struct sgx_backend * backend)
 
     log_debug("Destroying enclave (eid=%zu)", backend->enclave_id);
 
-    ret = sgx_destroy_enclave(backend->enclave_id);
+    ret = nxs_destroy_enclave(backend->enclave_id);
 
     backend->enclave_id = 0;
 
@@ -111,6 +123,12 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     struct nexus_key_buffer   volkey_keybuf;
 
     int ret = -1;
+
+
+    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
+        log_error("backend instance needs to be initialized\n");
+        return -1;
+    }
 
 
     // derive the public key string
@@ -295,6 +313,12 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         sgx_backend->volume = NULL;
 
         log_error("could not initialize the enclave\n");
+        return -1;
+    }
+
+
+    if (mount_nxs_instance(global_nxs_instance, sgx_backend->enclave_id)) {
+        log_error("could not mount nxs\n");
         return -1;
     }
 

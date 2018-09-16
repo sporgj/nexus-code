@@ -45,6 +45,7 @@ LDFLAGS  := -L$(SGX_SDK)/lib64  \
 
 libs     := -l$(sgx_urts_lib) \
             -l$(sgx_uae_lib) \
+            -lcurl \
             -lpthread
 
 EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
@@ -57,6 +58,10 @@ objs := nexus_enclave_u.o \
 	file_ops.o \
 	buffer_manager.o \
 	io.o \
+	instance.o \
+	quote.o \
+	rk_protocol.o \
+	rk_messages.o \
 	ocalls.o
 
 
