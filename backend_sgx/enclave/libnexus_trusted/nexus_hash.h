@@ -5,7 +5,7 @@
 
 struct nexus_hash {
     uint8_t bytes[CONFIG_HASH_SIZE];
-};
+} __attribute__((packed));
 
 
 void

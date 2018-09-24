@@ -112,7 +112,7 @@ __nexus_derive_key(struct nexus_key * new_key,
 {
     int ret = 0;
 
-    new_key->type = key_type;
+    nexus_init_key(new_key, key_type);
 
     switch (key_type) {
     case NEXUS_MBEDTLS_PRV_KEY:
@@ -355,7 +355,7 @@ __nexus_key_from_buf(struct nexus_key * key,
 {
     int ret = 0;
 
-    key->type = key_type;
+    nexus_init_key(key, key_type);
 
     switch (key->type) {
     case NEXUS_RAW_128_KEY:
@@ -442,7 +442,7 @@ __nexus_key_from_str(struct nexus_key * key, nexus_key_type_t key_type, char * k
 {
     int ret = 0;
 
-    key->type = key_type;
+    nexus_init_key(key, key_type);
 
     switch (key_type) {
     case NEXUS_MBEDTLS_PUB_KEY:
@@ -516,7 +516,7 @@ nexus_key_type_to_str(nexus_key_type_t type)
     size_t count = sizeof(nexus_key_descriptors) / sizeof(struct nexus_key_desc);
 
     for (size_t i = 0; i < count; i++) {
-	if (type == nexus_key_descriptors[i].type) {
+        if (type == nexus_key_descriptors[i].type) {
             return nexus_key_descriptors[i].desc;
         }
     }

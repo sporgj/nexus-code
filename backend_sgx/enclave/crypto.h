@@ -24,6 +24,12 @@ struct ecdh_nonce;
 
 #define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
 
+typedef struct nexus_hash     pubkey_hash_t;
+
+
+int
+crypto_hash_pubkey(char * pubkey, pubkey_hash_t * pubkey_hash);
+
 
 uint8_t *
 crypto_aes_encrypt_key(struct nexus_key * key_encryption_key, struct nexus_key * secret_key);

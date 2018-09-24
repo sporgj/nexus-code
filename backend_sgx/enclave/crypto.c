@@ -9,6 +9,36 @@
 
 
 int
+crypto_hash_pubkey(char * pubkey_rawstr, pubkey_hash_t * pubkey_hash)
+{
+    struct nexus_key pubkey;
+
+    if (__nexus_key_from_str(&pubkey, NEXUS_MBEDTLS_PUB_KEY, pubkey_rawstr)) {
+        log_error("could not parse public key\n");
+        return -1;
+    }
+
+    {
+        char * pubkey_str = nexus_key_to_str(&pubkey);
+
+        if (pubkey_str == NULL) {
+            nexus_free_key(&pubkey);
+
+            log_error("could not generate string from pubkey\n");
+            return -1;
+        }
+
+        nexus_hash_generate(pubkey_hash, pubkey_str, strlen(pubkey_str));
+        nexus_free(pubkey_str);
+    }
+
+    nexus_free_key(&pubkey);
+
+    return 0;
+}
+
+
+int
 __crypto_aes_ecb_encrypt(struct nexus_key * key,
                          uint8_t          * in_buf,
                          uint8_t          * out_buf,
