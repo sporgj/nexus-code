@@ -158,6 +158,22 @@ buffer_layer_lock(struct nexus_uuid * uuid)
     return 0;
 }
 
+int
+buffer_layer_unlock(struct nexus_uuid * uuid)
+{
+    int err = -1;
+    int ret = -1;
+
+    err = ocall_buffer_unlock(&ret, uuid, global_volume);
+
+    if (err) {
+        log_error("ocall_buffer_unlock FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return ret;
+}
+
 void *
 buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size)
 {

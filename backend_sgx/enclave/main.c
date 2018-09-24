@@ -10,7 +10,7 @@ size_t                global_log2chunk_size     = 0;
 
 struct nexus_heap   * global_heap               = NULL;
 
-nexus_uid_t           global_user_id            = 0;
+nexus_uid_t           global_user_id            = NEXUS_INVALID_USER_ID;
 
 
 
@@ -52,12 +52,18 @@ ecall_init_enclave(struct nexus_volume  * volume,
     return 0;
 }
 
+bool
+nexus_enclave_is_current_user_owner()
+{
+    return global_user_id == NEXUS_ROOT_USER;
+}
+
 int
-nexus_verfiy_pubkey(struct nexus_hash * user_pubkey_hash)
+nexus_verfiy_pubkey(pubkey_hash_t * user_pubkey_hash)
 {
     struct nexus_user * user = NULL;
 
-    user = nexus_usertable_find_pubkey(global_supernode->usertable, user_pubkey_hash);
+    user = nexus_usertable_find_pubkey_hash(global_supernode->usertable, user_pubkey_hash);
 
     if (user == NULL) {
         return -1;

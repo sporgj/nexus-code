@@ -115,6 +115,10 @@ void
 nexus_vfs_put(struct nexus_metadata * metadata)
 {
     nexus_metadata_put(metadata);
+
+    if (metadata->is_locked) {
+        nexus_metadata_unlock(metadata);
+    }
 }
 
 void
@@ -129,6 +133,10 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 {
     bool should_reload = true;
 
+    if (metadata->is_invalid) {
+        return nexus_metadata_reload(metadata, flags);
+    }
+
     buffer_layer_revalidate(&metadata->uuid, &should_reload);
 
     if (should_reload) {
@@ -141,6 +149,27 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 
     return 0;
 }
+
+struct nexus_supernode *
+nexus_vfs_acquire_supernode(nexus_io_flags_t flags)
+{
+    if (nexus_vfs_revalidate(global_supernode_metadata, flags)) {
+        log_error("could not revalidate supernode\n");
+        return NULL;
+    }
+
+    return (struct nexus_supernode *)global_supernode_metadata->object;
+}
+
+
+void
+nexus_vfs_release_supernode()
+{
+    if (global_supernode_metadata->is_locked) {
+        nexus_metadata_unlock(global_supernode_metadata);
+    }
+}
+
 
 struct nexus_metadata *
 nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t flags)

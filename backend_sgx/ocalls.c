@@ -57,6 +57,12 @@ ocall_buffer_lock(struct nexus_uuid * metadata_uuid, struct nexus_volume * volum
 }
 
 int
+ocall_buffer_unlock(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
+{
+    return (io_buffer_unlock(metadata_uuid, volume) == NULL);
+}
+
+int
 ocall_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 {
     return io_buffer_new(metadata_uuid, volume);

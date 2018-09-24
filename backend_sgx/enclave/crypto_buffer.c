@@ -265,7 +265,7 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
 
 
     if (crypto_buf->external_addr == NULL || crypto_buf->external_size == 0) {
-        log_error("Error: Unitialized crypto_buf\n");
+        log_error("Error: Uninitialized crypto_buf\n");
         return NULL;
     }
 

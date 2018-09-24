@@ -254,7 +254,7 @@ nexus_acl_is_authorized(struct nexus_acl * nexus_acl, nexus_perm_t perm)
     struct nexus_list_iterator * acl_iter  = NULL;
 
 
-    if (global_user_id == NEXUS_ROOT_USER) {
+    if (nexus_enclave_is_current_user_owner()) {
         return true;
     }
 

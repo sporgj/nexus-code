@@ -54,6 +54,11 @@ nexus_metadata_new(struct nexus_uuid     * uuid,
 
     __set_metadata_object(metadata, obj);
 
+
+    if (flags & NEXUS_FWRITE) {
+        metadata->is_locked = true;
+    }
+
     return metadata;
 }
 
@@ -147,6 +152,12 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     metadata->flags = flags;
     __set_metadata_object(metadata, object);
 
+    if (flags & NEXUS_FWRITE) {
+        metadata->is_locked = true;
+    }
+
+    metadata->is_invalid = false;
+
     return 0;
 }
 
@@ -192,6 +203,9 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     if (ret == 0) {
         metadata->is_dirty = false;
         metadata->version += 1;
+        metadata->is_locked = false;
+    } else {
+        metadata->is_invalid = true;
     }
 
     return ret;
@@ -215,4 +229,13 @@ void
 nexus_metadata_put(struct nexus_metadata * metadata)
 {
     metadata->ref_count -= 1;
+}
+
+void
+nexus_metadata_unlock(struct nexus_metadata * metadata)
+{
+    if (metadata->is_locked) {
+        buffer_layer_unlock(&metadata->uuid);
+        metadata->is_locked = false;
+    }
 }

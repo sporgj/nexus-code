@@ -27,7 +27,19 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
             goto out;
         }
 
+        // create the supernode file on disk
+        if (buffer_layer_new(&supernode->my_uuid)) {
+            log_error("could not create supernode file\n");
+            goto out;
+        }
+
+        if (buffer_layer_new(&supernode->usertable->my_uuid)) {
+            log_error("could not create usertable file\n");
+            goto out;
+        }
+
         ret = supernode_store(supernode, 0, NULL);
+
         if (ret) {
             log_error("storing the supernode FAILED\n");
             goto out;
@@ -45,6 +57,11 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
 
         // make the dirnode's uuid the root uuid
         nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
+
+        if (buffer_layer_new(&root_dirnode->my_uuid)) {
+            log_error("could not create root dirnode file\n");
+            goto out;
+        }
 
         ret = dirnode_store(&root_dirnode->my_uuid, root_dirnode, 0, NULL);
 
@@ -127,17 +144,12 @@ clear_auth_pubkey()
 static int
 load_auth_pubkey(char * user_pubkey_IN)
 {
-    int ret = -1;
-
-    ret = __nexus_key_from_str(&user_pubkey_key, NEXUS_MBEDTLS_PUB_KEY, user_pubkey_IN);
-    if (ret != 0) {
+    if (__nexus_key_from_str(&user_pubkey_key, NEXUS_MBEDTLS_PUB_KEY, user_pubkey_IN)) {
         log_error("could not parse the public key\n");
         return -1;
     }
 
-    nexus_hash_generate(&user_pubkey_hash, user_pubkey_IN, strlen(user_pubkey_IN));
-
-    return 0;
+    return crypto_hash_pubkey(user_pubkey_IN, &user_pubkey_hash);
 }
 
 static void

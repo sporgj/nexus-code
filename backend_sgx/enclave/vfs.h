@@ -58,6 +58,12 @@ int
 nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags);
 
 
+struct nexus_supernode *
+nexus_vfs_acquire_supernode(nexus_io_flags_t flags);
+
+
+void
+nexus_vfs_release_supernode();
 
 /**
  * Loads a metadata object from the buffer layer

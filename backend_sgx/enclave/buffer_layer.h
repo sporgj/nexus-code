@@ -13,6 +13,9 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size);
 int
 buffer_layer_lock(struct nexus_uuid * uuid);
 
+int
+buffer_layer_unlock(struct nexus_uuid * uuid);
+
 /**
  * Removes the metadata from the buffer layer cache
  * @param uuid

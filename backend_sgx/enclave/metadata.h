@@ -33,6 +33,10 @@ struct nexus_metadata {
 
     bool                         is_dirty;
 
+    bool                         is_invalid;
+
+    bool                         is_locked;
+
     union {
         struct nexus_supernode   * supernode;
         struct nexus_dirnode     * dirnode;
@@ -105,3 +109,9 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
  */
 int
 nexus_metadata_store(struct nexus_metadata * metadata);
+
+/**
+ * Unlocks a locked metadata file
+ */
+void
+nexus_metadata_unlock(struct nexus_metadata * metadata);
