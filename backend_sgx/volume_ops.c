@@ -307,18 +307,17 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     sgx_backend->volume = volume;
 
+    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
+        log_error("backend instance needs to be initialized\n");
+        return -1;
+    }
+
     if (init_enclave(sgx_backend)) {
         nexus_free(public_key_str);
 
         sgx_backend->volume = NULL;
 
         log_error("could not initialize the enclave\n");
-        return -1;
-    }
-
-
-    if (mount_nxs_instance(global_nxs_instance, sgx_backend->enclave_id)) {
-        log_error("could not mount nxs\n");
         return -1;
     }
 

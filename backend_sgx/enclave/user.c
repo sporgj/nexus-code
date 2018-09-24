@@ -32,6 +32,28 @@ free_user(void * element)
     nexus_free(user);
 }
 
+void
+__usertable_set_supernode(struct nexus_usertable * usertable, struct nexus_supernode * supernode)
+{
+    usertable->supernode = supernode;
+}
+
+static void
+__usertable_set_clean(struct nexus_usertable * usertable)
+{
+    usertable->is_dirty = false;
+}
+
+static void
+__usertable_set_dirty(struct nexus_usertable * usertable)
+{
+    usertable->is_dirty = true;
+
+    if (usertable->supernode) {
+        __supernode_set_dirty(usertable->supernode);
+    }
+}
+
 static void
 init_userlist(struct nexus_usertable * usertable)
 {
@@ -300,6 +322,8 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 
     usertable->version += 1;
 
+    __usertable_set_clean(usertable);
+
     nexus_crypto_buf_free(crypto_buffer);
 
     return 0;
@@ -309,8 +333,15 @@ out_err:
     return -1;
 }
 
-struct nexus_user *
-nexus_usertable_find_name(struct nexus_usertable * usertable, char * name)
+
+struct nexus_list_iterator *
+__nexus_usertable_get_iterator(struct nexus_usertable * usertable)
+{
+    return list_iterator_new(&usertable->userlist);
+}
+
+static struct nexus_list_iterator *
+__usertable_find_name(struct nexus_usertable * usertable, char * name)
 {
     struct nexus_list_iterator * iter = NULL;
 
@@ -320,27 +351,20 @@ nexus_usertable_find_name(struct nexus_usertable * usertable, char * name)
         struct nexus_user * user = list_iterator_get(iter);
 
         if (strncmp(user->name, name, NEXUS_MAX_NAMELEN) == 0) {
-            list_iterator_free(iter);
-            return user;
+            return iter;
         }
 
         list_iterator_next(iter);
     }
 
     list_iterator_free(iter);
-
     return NULL;
 }
 
-struct nexus_user *
-nexus_usertable_find_pubkey(struct nexus_usertable * usertable, pubkey_hash_t * pubkey_hash)
+static struct nexus_list_iterator *
+__usertable_find_pubkey_hash(struct nexus_usertable * usertable, pubkey_hash_t * pubkey_hash)
 {
     struct nexus_list_iterator * iter = NULL;
-
-    // let's see if it matches the owner
-    if (nexus_hash_compare(&usertable->owner.pubkey_hash, pubkey_hash) == 0) {
-        return &usertable->owner;
-    }
 
     iter = list_iterator_new(&usertable->userlist);
 
@@ -348,16 +372,74 @@ nexus_usertable_find_pubkey(struct nexus_usertable * usertable, pubkey_hash_t * 
         struct nexus_user * user = list_iterator_get(iter);
 
         if (nexus_hash_compare(&user->pubkey_hash, pubkey_hash) == 0) {
-            list_iterator_free(iter);
-            return user;
+            return iter;
         }
 
         list_iterator_next(iter);
     }
 
     list_iterator_free(iter);
-
     return NULL;
+}
+
+struct nexus_user *
+nexus_usertable_find_name(struct nexus_usertable * usertable, char * name)
+{
+    struct nexus_user * user = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+    iter = __usertable_find_name(usertable, name);
+
+    if (iter == NULL) {
+        return NULL;
+    }
+
+
+    user = list_iterator_get(iter);
+
+    list_iterator_free(iter);
+
+    return user;
+}
+
+struct nexus_user *
+nexus_usertable_find_pubkey_hash(struct nexus_usertable * usertable, pubkey_hash_t * pubkey_hash)
+{
+    struct nexus_user * user = NULL;
+
+    struct nexus_list_iterator * iter = NULL;
+
+    // let's see if it matches the owner
+    if (nexus_hash_compare(&usertable->owner.pubkey_hash, pubkey_hash) == 0) {
+        return &usertable->owner;
+    }
+
+    iter = __usertable_find_pubkey_hash(usertable, pubkey_hash);
+
+    if (iter == NULL) {
+        return NULL;
+    }
+
+
+    user = list_iterator_get(iter);
+
+    list_iterator_free(iter);
+
+    return user;
+}
+
+struct nexus_user *
+nexus_usertable_find_pubkey(struct nexus_usertable * usertable, char * pubkey_str)
+{
+    pubkey_hash_t pubkey_hash;
+
+    if (crypto_hash_pubkey(pubkey_str, &pubkey_hash)) {
+        log_error("could not hash pubkey\n");
+        return NULL;
+    }
+
+    return nexus_usertable_find_pubkey_hash(usertable, &pubkey_hash);
 }
 
 int
@@ -384,7 +466,7 @@ nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubk
         }
 
 
-        existing_user = nexus_usertable_find_pubkey(usertable, &pubkey_hash);
+        existing_user = nexus_usertable_find_pubkey_hash(usertable, &pubkey_hash);
 
         if (existing_user != NULL) {
             log_error("user already with specified public key already in database\n");
@@ -403,6 +485,55 @@ nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubk
     nexus_hash_copy(&pubkey_hash, &new_user->pubkey_hash);
 
     nexus_list_append(userlist, new_user);
+
+    __usertable_set_dirty(usertable);
+
+    return 0;
+}
+
+int
+nexus_usertable_remove_username(struct nexus_usertable * usertable, char * username)
+{
+    struct nexus_list_iterator * iter = __usertable_find_name(usertable, username);
+
+    if (iter == NULL) {
+        return -1;
+    }
+
+    list_iterator_del(iter);
+    list_iterator_free(iter);
+
+    usertable->user_count     -= 1;
+
+    __usertable_set_dirty(usertable);
+
+    return 0;
+}
+
+int
+nexus_usertable_remove_pubkey(struct nexus_usertable * usertable, char * pubkey_str)
+{
+    pubkey_hash_t                pubkey_hash;
+
+    struct nexus_list_iterator * iter = NULL;
+
+    if (crypto_hash_pubkey(pubkey_str, &pubkey_hash)) {
+        log_error("could not hash pubkey\n");
+        return -1;
+    }
+
+    iter = __usertable_find_pubkey_hash(usertable, &pubkey_hash);
+
+    if (iter == NULL) {
+        return -1;
+    }
+
+    list_iterator_del(iter);
+    list_iterator_free(iter);
+
+    usertable->user_count     -= 1;
+
+    __usertable_set_dirty(usertable);
 
     return 0;
 }

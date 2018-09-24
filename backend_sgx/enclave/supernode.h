@@ -37,6 +37,11 @@ struct nexus_supernode {
     struct nexus_usertable   * usertable;
 };
 
+void
+__supernode_set_clean(struct nexus_supernode * supernode);
+
+void
+__supernode_set_dirty(struct nexus_supernode * supernode);
 
 /**
  * Reads crypto_buffer

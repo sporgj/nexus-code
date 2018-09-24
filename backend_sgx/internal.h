@@ -156,6 +156,35 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
                        void                * priv_data);
 
 
+int
+sgx_backend_user_list(struct nexus_volume * volume, void * priv_data);
+
+
+int
+sgx_backend_user_add(struct nexus_volume * volume,
+                     char                * username,
+                     char                * pubkey_str,
+                     void                * priv_data);
+
+int
+sgx_backend_user_delname(struct nexus_volume * volume, char * username, void * priv_data);
+
+
+int
+sgx_backend_user_delkey(struct nexus_volume * volume, char * pubkey, void * priv_data);
+
+int
+sgx_backend_user_findname(struct nexus_volume * volume, char * username, void * priv_data);
+
+int
+sgx_backend_user_findkey(struct nexus_volume * volume, char * pubkey, void * priv_data);
+
+
+
+
+
+
+
 
 int
 uuid_equal_func(uintptr_t key1, uintptr_t key2);

@@ -56,6 +56,7 @@ objs := nexus_enclave_u.o \
 	volume_ops.o \
 	dir_ops.o \
 	file_ops.o \
+	user_ops.o \
 	buffer_manager.o \
 	io.o \
 	instance.o \

@@ -136,7 +136,14 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .fs_hardlink     = sgx_backend_fs_hardlink,
     .fs_rename       = sgx_backend_fs_rename,
     .fs_encrypt      = sgx_backend_fs_encrypt,
-    .fs_decrypt      = sgx_backend_fs_decrypt
+    .fs_decrypt      = sgx_backend_fs_decrypt,
+
+    .user_list       = sgx_backend_user_list,
+    .user_add        = sgx_backend_user_add,
+    .user_delname    = sgx_backend_user_delname,
+    .user_delkey     = sgx_backend_user_delkey,
+    .user_findname   = sgx_backend_user_findname,
+    .user_findkey    = sgx_backend_user_findkey
 };
 
 

@@ -15,6 +15,12 @@
 
 #define NONCE_SIZE 64
 
+
+#define NEXUS_MAX_NAMELEN         25
+
+#define NEXUS_PUBKEY_HASHLEN      32
+
+
 // XXX this is temporary
 #define NEXUS_CHUNK_SIZE_LOG    20
 #define NEXUS_CHUNK_SIZE        (1 << NEXUS_CHUNK_SIZE_LOG)
@@ -46,6 +52,13 @@ struct nexus_key_buffer {
     size_t key_len;
 
     char * key_str;
+};
+
+
+struct nxs_user_buffer {
+    char    name[NEXUS_MAX_NAMELEN];
+
+    uint8_t pubkey_hash[NEXUS_PUBKEY_HASHLEN];
 };
 
 

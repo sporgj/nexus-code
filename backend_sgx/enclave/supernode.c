@@ -26,7 +26,7 @@ __free_hardlink_pair(void * element)
     nexus_free(pair);
 }
 
-static void
+void
 __supernode_set_clean(struct nexus_supernode * supernode)
 {
     if (supernode->metadata) {
@@ -34,7 +34,7 @@ __supernode_set_clean(struct nexus_supernode * supernode)
     }
 }
 
-static void
+void
 __supernode_set_dirty(struct nexus_supernode * supernode)
 {
     if (supernode->metadata) {
@@ -142,6 +142,8 @@ supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flag
             log_error("the version of the usertable does not match\n");
             goto err;
         }
+
+        __usertable_set_supernode(supernode->usertable, supernode);
     }
 
     return supernode;
@@ -197,6 +199,8 @@ supernode_create(char * user_pubkey)
     }
 
     nexus_usertable_copy_uuid(supernode->usertable, &supernode->usertable_uuid);
+
+    __usertable_set_supernode(supernode->usertable, supernode);
 
     supernode_init(supernode);
 

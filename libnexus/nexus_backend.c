@@ -148,14 +148,62 @@ nexus_backend_shutdown(struct nexus_backend * backend)
 
 }
 
-
 int
 nexus_backend_fs_create(struct nexus_volume * volume,
-			char                * path,
-			nexus_dirent_type_t   type,
-			struct nexus_stat   * stat)
+                        char                * path,
+                        nexus_dirent_type_t   type,
+                        struct nexus_stat   * stat)
 {
     struct nexus_backend * backend = volume->backend;
 
     return backend->impl->fs_create(volume, path, type, stat, backend->priv_data);
+}
+
+
+int
+nexus_backend_user_list(struct nexus_volume * volume)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->user_list(volume, backend->priv_data);
+}
+
+int
+nexus_backend_user_add(struct nexus_volume * volume, char * username, char * pubkey_str)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->user_add(volume, username, pubkey_str, backend->priv_data);
+}
+
+int
+nexus_backend_user_delname(struct nexus_volume * volume, char * username)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->user_delname(volume, username, backend->priv_data);
+}
+
+int
+nexus_backend_user_delkey(struct nexus_volume * volume, char * pubkey)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->user_delkey(volume, pubkey, backend->priv_data);
+}
+
+int
+nexus_backend_user_findname(struct nexus_volume * volume, char * username)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->user_findname(volume, username, backend->priv_data);
+}
+
+int
+nexus_backend_user_findkey(struct nexus_volume * volume, char * pubkey)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    return backend->impl->user_findkey(volume, pubkey, backend->priv_data);
 }

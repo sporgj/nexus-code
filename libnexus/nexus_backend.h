@@ -52,6 +52,26 @@ nexus_backend_fs_create(struct nexus_volume * volume,
 			struct nexus_stat   * stat);
 
 
+int
+nexus_backend_user_list(struct nexus_volume * volume);
+
+int
+nexus_backend_user_add(struct nexus_volume * volume, char * username, char * pubkey_str);
+
+int
+nexus_backend_user_delname(struct nexus_volume * volume, char * username);
+
+int
+nexus_backend_user_delkey(struct nexus_volume * volume, char * pubkey);
+
+int
+nexus_backend_user_findname(struct nexus_volume * volume, char * username);
+
+int
+nexus_backend_user_findkey(struct nexus_volume * volume, char * pubkey);
+
+
+
 struct nexus_backend_impl {
     char * name;
 
@@ -64,11 +84,11 @@ struct nexus_backend_impl {
 
     int (*volume_close)(struct nexus_uuid * uuid);
 
-    int (*user_add)(struct nexus_uuid * vol_uuid,
-                    struct nexus_key  * user_pub_key,
-                    char              * user_name);
+    // int (*user_add)(struct nexus_uuid * vol_uuid,
+    //                 struct nexus_key  * user_pub_key,
+    //                 char              * user_name);
 
-    int (*user_del)(struct nexus_uuid * vol_uuid, struct nexus_key * user_name);
+    // int (*user_del)(struct nexus_uuid * vol_uuid, struct nexus_key * user_name);
 
     /**
      * Creates a new file
@@ -146,6 +166,21 @@ struct nexus_backend_impl {
                       size_t                size,
                       size_t                filesize,
                       void                * priv_data);
+
+    int (*user_list)(struct nexus_volume * volume, void * priv_data);
+
+    int (*user_add)(struct nexus_volume * volume,
+                    char *                username,
+                    char *                pubkey_str,
+                    void *                priv_data);
+
+    int (*user_delname)(struct nexus_volume * volume, char * username, void * priv_data);
+
+    int (*user_delkey)(struct nexus_volume * volume, char * pubkey, void * priv_data);
+
+    int (*user_findname)(struct nexus_volume * volume, char * username, void * priv_data);
+
+    int (*user_findkey)(struct nexus_volume * volume, char * pubkey, void * priv_data);
 };
 
 

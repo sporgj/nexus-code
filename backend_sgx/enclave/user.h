@@ -5,16 +5,20 @@
 #include <nexus_hash.h>
 #include <nexus_list.h>
 
+#include "crypto.h"
 
-#define NEXUS_MAX_NAMELEN     25
+#ifndef NEXUS_MAX_NAMELEN
+#define NEXUS_MAX_NAMELEN         25
+#endif
 
-#define NEXUS_ROOT_USER       0
+#define NEXUS_ROOT_USER           0
+
+#define NEXUS_INVALID_USER_ID     UINT64_MAX
 
 
+struct nexus_supernode;
 
 typedef uint64_t              nexus_uid_t;
-
-typedef struct nexus_hash     pubkey_hash_t;
 
 typedef uint32_t              nexus_user_flags_t;
 
@@ -36,12 +40,19 @@ struct nexus_usertable {
     uint64_t          user_count;
     uint64_t          total_size;
 
+    bool              is_dirty;
+
     struct nexus_uuid my_uuid;
 
     struct nexus_user owner;
 
     struct nexus_list userlist;
+
+    struct nexus_supernode * supernode;
 };
+
+void
+__usertable_set_supernode(struct nexus_usertable * usertable, struct nexus_supernode * supernode);
 
 /**
  * Allocates a usertable.
@@ -54,6 +65,7 @@ nexus_usertable_create(char * user_pubkey);
 
 /**
  * Frees an allocated usertable
+ *
  *
  * @param usertable
  */
@@ -76,6 +88,10 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
 int
 nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac);
 
+
+struct nexus_list_iterator *
+__nexus_usertable_get_iterator(struct nexus_usertable * usertable);
+
 /**
  * Returns user information
  * @param name
@@ -84,6 +100,9 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 struct nexus_user *
 nexus_usertable_find_name(struct nexus_usertable * usertable, char * name);
 
+struct nexus_user *
+nexus_usertable_find_pubkey_hash(struct nexus_usertable * usertable, pubkey_hash_t * pubkey_hash);
+
 /**
  * Finds a pubkey in user table
  * @param usertable
@@ -91,10 +110,16 @@ nexus_usertable_find_name(struct nexus_usertable * usertable, char * name);
  * @return nexus_user
  */
 struct nexus_user *
-nexus_usertable_find_pubkey(struct nexus_usertable * usertable, pubkey_hash_t * pubkey);
+nexus_usertable_find_pubkey(struct nexus_usertable * usertable, char * pubkey_str);
 
 /**
  * Adds a user to the usertable
  */
 int
 nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str);
+
+int
+nexus_usertable_remove_username(struct nexus_usertable * usertable, char * username);
+
+int
+nexus_usertable_remove_pubkey(struct nexus_usertable * usertable, char * pubkey_str);

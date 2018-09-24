@@ -84,6 +84,7 @@ nexus_ecall_objs := \
 	instance.o \
 	dirs.o \
 	files.o \
+	users.o \
 	volume.o
 
 ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))

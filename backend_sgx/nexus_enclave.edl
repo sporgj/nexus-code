@@ -148,6 +148,45 @@ enclave {
                          size_t                size,
                          size_t                filesize
         );
+
+
+        // ---------------------- user -----------------------
+        public int ecall_user_add
+        (
+            [in, string] char                * username_IN,
+            [in, string] char                * user_pubkey_IN
+        );
+
+        public int ecall_user_remove_username
+        (
+            [in, string] char                * username_IN
+        );
+
+        public int ecall_user_remove_pubkey
+        (
+            [in, string] char                * pubkey_str_IN
+        );
+
+        public int ecall_user_find_username
+        (
+            [in, string] char                   * username_IN,
+            [user_check] struct nxs_user_buffer * user_buffer_out
+        );
+
+        public int ecall_user_find_pubkey
+        (
+            [in, string] char                   * pubkey_IN,
+            [user_check] struct nxs_user_buffer * user_buffer_out
+        );
+
+        public int ecall_user_ls
+        (
+            [user_check] struct nxs_user_buffer * user_buffer_array_in,
+                         size_t                   user_buffer_count_IN,
+                         size_t                   offset_IN,
+            [user_check] size_t                 * total_count_out,
+            [user_check] size_t                 * result_count_out
+        );
     };
 
 
@@ -224,6 +263,7 @@ enclave {
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );
+
 
 
         // ---------------------- utilities ---------------------
