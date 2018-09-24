@@ -7,7 +7,7 @@
 
 
 struct nexus_file_handle {
-    FILE            * file_ptr;
+    int               fd;
     char            * filepath;
     bool              is_locked;
     nexus_io_flags_t  mode;

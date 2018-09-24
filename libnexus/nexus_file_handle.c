@@ -13,18 +13,28 @@
 #include "nexus_file_handle.h"
 
 
-static char *
-__get_fopen_str_flags(nexus_io_flags_t mode)
+static int
+__get_sysopen_flags(nexus_io_flags_t mode)
 {
+    int res = 0;
+
     if (mode & NEXUS_FREAD) {
         if (mode & NEXUS_FWRITE) {
-            return "rb+";
+            res = O_RDWR | O_EXCL;
+        } else {
+            res = O_RDONLY;
         }
-
-        return "rb";
+    } else if (mode & NEXUS_FWRITE) {
+        res = O_WRONLY;
     }
 
-    return "wb";
+    // by POSIX standards, having O_EXCL and O_CREAT will result in a fail
+    // if the file exists.
+    if (mode & NEXUS_FCREATE) {
+        res |= O_CREAT;
+    }
+
+    return res;
 }
 
 #define MAX_RETRIES 10
@@ -34,18 +44,19 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 {
     struct nexus_file_handle * file_handle = nexus_malloc(sizeof(struct nexus_file_handle));
 
-    file_handle->file_ptr = fopen(filepath, __get_fopen_str_flags(mode));
+    file_handle->fd = open(filepath, __get_sysopen_flags(mode));
 
-    if (file_handle->file_ptr == NULL) {
+    if (file_handle->fd < 0) {
+        nexus_free(file_handle);
         log_error("could not open file (%s)\n", filepath);
-        goto out;
+        return NULL;
     }
 
     if (mode & NEXUS_FWRITE) {
         int tries = 0;
 
 try_lock:
-        if (flock(fileno(file_handle->file_ptr), LOCK_EX)) {
+        if (flock(file_handle->fd, LOCK_EX)) {
             log_error("could not lock file [try=%d] (%s)\n", tries, filepath);
             perror("strerror: ");
 
@@ -65,9 +76,7 @@ try_lock:
 
     return file_handle;
 out:
-    if (file_handle->file_ptr) {
-        fclose(file_handle->file_ptr);
-    }
+    close(file_handle->fd);
 
     nexus_free(file_handle);
 
@@ -78,10 +87,10 @@ void
 nexus_file_handle_close(struct nexus_file_handle * file_handle)
 {
     if (file_handle->is_locked) {
-        flock(fileno(file_handle->file_ptr), LOCK_UN);
+        flock(file_handle->fd, LOCK_UN);
     }
 
-    fclose(file_handle->file_ptr);
+    close(file_handle->fd);
 
     nexus_free(file_handle->filepath);
 
@@ -93,18 +102,19 @@ nexus_file_handle_read(struct nexus_file_handle * file_handle, uint8_t ** p_buf,
 {
     uint8_t * buf = NULL;
 
-    int size      = 0;
     int nbytes    = 0;
+    int size      = lseek(file_handle->fd, 0, SEEK_END);
 
-    {
-        fseek(file_handle->file_ptr, 0, SEEK_END);
-        size = ftell(file_handle->file_ptr);
-        rewind(file_handle->file_ptr);
+    if (size < 0) {
+        log_error("could not seek to end of file\n");
     }
+
+
+    lseek(file_handle->fd, 0, SEEK_SET);
 
     buf = nexus_malloc(size);
 
-    nbytes = fread(buf, 1, size, file_handle->file_ptr);
+    nbytes = read(file_handle->fd, buf, size);
 
     file_handle->touched = true;
 
@@ -128,13 +138,12 @@ nexus_file_handle_write(struct nexus_file_handle * file_handle, uint8_t * buf, s
     int nbytes = -1;
 
     if (file_handle->touched) {
-        rewind(file_handle->file_ptr);
+        lseek(file_handle->fd, 0, SEEK_SET);
     }
 
-    // only reopen the file if opened in read mode
     file_handle->touched  = true;
 
-    nbytes = fwrite(buf, 1, size, file_handle->file_ptr);
+    nbytes = write(file_handle->fd, buf, size);
 
     if (nbytes != (int) size) {
         log_error("could not write file (%s). tried=%d, actual=%d\n",
@@ -144,7 +153,7 @@ nexus_file_handle_write(struct nexus_file_handle * file_handle, uint8_t * buf, s
         return -1;
     }
 
-    if (ftruncate(fileno(file_handle->file_ptr), size)) {
+    if (ftruncate(file_handle->fd, size)) {
         log_error("could not truncate file (%s, size=%zu)\n", file_handle->filepath, size);
         return -1;
     }
@@ -156,5 +165,5 @@ nexus_file_handle_write(struct nexus_file_handle * file_handle, uint8_t * buf, s
 int
 nexus_file_handle_flush(struct nexus_file_handle * file_handle)
 {
-    return fflush(file_handle->file_ptr);
+    return fsync(file_handle->fd);
 }
