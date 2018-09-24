@@ -50,9 +50,13 @@ delete_volume_main(int argc, char ** argv);
 extern int
 create_file_main(int argc, char ** argv);
 
+extern int
+repl_volume_main(int argc, char ** argv);
+
 static struct nexus_cmd cmds[] = { { "init", init_main, "Initialize Nexus Environment" },
                                    { "create", create_volume_main, "Create a Nexus Volume" },
                                    { "delete", delete_volume_main, "Delete a Nexus Volume" },
+                                   { "repl", repl_volume_main, "Shows the REPL command line" },
                                    //    {"ls"           , ls_path_main       , "'ls' a path" },
                                    { "create_file", create_file_main, "Create a new file" },
                                    { 0, 0, 0 } };

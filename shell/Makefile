@@ -2,7 +2,7 @@ include ../build.mk
 
 buildpath = ../build
 
-libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid -lpthread
+libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid -lpthread -lcurl -lreadline
 
 LDFLAGS := -L$(SGX_SDK)/lib64
 
@@ -27,6 +27,7 @@ AR = ar
 exec_objs :=	main.o \
 		create_volume.o \
 		delete_volume.o \
+		repl_volume.o \
 		fs.o \
 
 
