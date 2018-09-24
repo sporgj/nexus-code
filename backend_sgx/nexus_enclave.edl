@@ -160,6 +160,13 @@ enclave {
             [user_check] struct nexus_volume * volume
         );
 
+        int
+        ocall_buffer_unlock
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
+        );
+
         uint8_t *
         ocall_buffer_get
         (
