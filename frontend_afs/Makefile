@@ -18,7 +18,7 @@ execs := nexus-afs
 
 
 libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid\
-	-lpthread
+	-lpthread -lcurl
 
 LDFLAGS := -L$(SGX_SDK)/lib64
 
