@@ -1,7 +1,9 @@
 #include "enclave_internal.h"
 
 struct __filenode_hdr {
+    struct nexus_uuid         my_uuid;
     struct nexus_uuid         root_uuid;
+    struct nexus_uuid         parent_uuid;
 
     uint32_t                  nchunks;
     uint8_t                   log2chunksize;
@@ -52,18 +54,18 @@ __free_chunk_entry(void * element)
 
 
 static inline void
-__set_filenode_dirty(struct nexus_filenode * filenode)
+__filenode_set_dirty(struct nexus_filenode * filenode)
 {
     if (filenode->metadata) {
-        filenode->metadata->is_dirty = true;
+        __metadata_set_dirty(filenode->metadata);
     }
 }
 
 static inline void
-__set_filenode_clean(struct nexus_filenode * filenode)
+__filenode_set_clean(struct nexus_filenode * filenode)
 {
     if (filenode->metadata) {
-        filenode->metadata->is_dirty = false;
+        __metadata_set_clean(filenode->metadata);
     }
 }
 
@@ -79,6 +81,14 @@ filenode_set_chunksize(struct nexus_filenode * filenode, size_t log2chunksize)
 {
     filenode->log2chunksize = log2chunksize;
     filenode->chunksize     = 1 << log2chunksize;
+}
+
+void
+filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid)
+{
+    nexus_uuid_copy(parent_uuid, &filenode->parent_uuid);
+
+    __filenode_set_dirty(filenode);
 }
 
 static void
@@ -132,7 +142,9 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
     filenode->nchunks  = header->nchunks;
     filenode->filesize = header->filesize;
 
+    nexus_uuid_copy(&header->my_uuid, &filenode->my_uuid);
     nexus_uuid_copy(&header->root_uuid, &filenode->root_uuid);
+    nexus_uuid_copy(&header->parent_uuid, &filenode->parent_uuid);
 
     filenode_init(filenode, header->log2chunksize);
 
@@ -226,8 +238,6 @@ filenode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 
     nexus_crypto_buf_free(crypto_buffer);
 
-    nexus_uuid_copy(uuid, &filenode->my_uuid);
-
     return filenode;
 }
 
@@ -254,7 +264,9 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
     header->log2chunksize = filenode->log2chunksize;
     header->filesize      = filenode->filesize;
 
+    nexus_uuid_copy(&filenode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&filenode->root_uuid, &header->root_uuid);
+    nexus_uuid_copy(&filenode->parent_uuid, &header->parent_uuid);
 
     memcpy(buffer, header, sizeof(struct __filenode_hdr));
 
@@ -338,7 +350,7 @@ filenode_store(struct nexus_uuid     * uuid,
         }
     }
 
-    __set_filenode_clean(filenode);
+    __filenode_set_clean(filenode);
 
     ret = 0;
 out:
@@ -364,7 +376,7 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
     int difference = 0;
 
 
-    __set_filenode_dirty(filenode);
+    __filenode_set_dirty(filenode);
 
     if (filenode->filesize == filesize) {
         return 0;

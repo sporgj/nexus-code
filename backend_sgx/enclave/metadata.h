@@ -48,6 +48,12 @@ struct nexus_metadata {
 };
 
 
+void
+__metadata_set_clean(struct nexus_metadata * metadata);
+
+void
+__metadata_set_dirty(struct nexus_metadata * metadata);
+
 
 /**
  * Creates a new metadata

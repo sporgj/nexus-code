@@ -79,9 +79,11 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
 {
     struct nexus_dirnode * dirnode = metadata->dirnode;
 
+    struct nexus_uuid   tmp_uuid;
+
     nexus_dirent_type_t type;
 
-    if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT, NULL)) {
+    if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT, &tmp_uuid, NULL)) {
         log_error("dirnode_remove() FAILED\n");
         return -1;
     }
@@ -416,9 +418,15 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
     nexus_dirent_type_t type;
     nexus_dirent_type_t tmp_type;
 
+    struct nexus_uuid   real_uuid;
+    struct nexus_uuid   tmp_uuid;
+
     char * symlink_target = NULL;
 
-    int ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &symlink_target);
+    int ret = -1;
+
+
+    ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &real_uuid, &symlink_target);
 
     if (ret != 0) {
         log_error("could not remove (%s) from directory\n", oldname);
@@ -427,11 +435,10 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
 
 
     // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
-    ret = dirnode_remove(to_dirnode, newname, &tmp_type, new_uuid, NULL);
+    ret = dirnode_remove(to_dirnode, newname, &tmp_type, new_uuid, &tmp_uuid, NULL);
 
     if (ret == 0) {
         // this means there was an existing entry in the dirnode
-        // TODO remove uuid from vfs_metadata cache
         nexus_vfs_delete(new_uuid);
     } else {
         // we are adding a file to the destination dirnode
@@ -444,7 +451,7 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
 
         nexus_free(symlink_target);
     } else {
-        ret = dirnode_add(to_dirnode, newname, type, new_uuid);
+        ret = dirnode_add2(to_dirnode, newname, type, new_uuid, &real_uuid);
     }
 
     if (ret != 0) {

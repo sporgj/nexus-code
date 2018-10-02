@@ -8,7 +8,7 @@ __init_dir_entry(struct dir_entry * dir_entry)
     struct __hashed_uuid * fileuuid_hash = &dir_entry->fileuuid_hash;
 
     filename_hash->name = dir_entry->dir_rec.name;
-    fileuuid_hash->uuid = &dir_entry->dir_rec.uuid;
+    fileuuid_hash->uuid = &dir_entry->dir_rec.link_uuid;
 
     hashmap_entry_init(&filename_hash->hash_entry, strhash(filename_hash->name));
     hashmap_entry_init(&fileuuid_hash->hash_entry,
@@ -31,7 +31,9 @@ __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char *
 
     memcpy(dir_rec->name, filename, dir_rec->name_len);
 
-    nexus_uuid_copy(entry_uuid, &dir_rec->uuid);
+    // when creating a file, real and link UUIDs are the same
+    nexus_uuid_copy(entry_uuid, &dir_rec->link_uuid);
+    nexus_uuid_copy(entry_uuid, &dir_rec->real_uuid);
 
     __init_dir_entry(new_dir_entry);
 

@@ -331,6 +331,8 @@ buffer_layer_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
             log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);
             return -1;
         }
+
+        return nexus_crypto_buf_rename(from_uuid, to_uuid);
     }
 
     return 0;

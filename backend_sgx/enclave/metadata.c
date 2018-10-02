@@ -1,5 +1,19 @@
 #include "enclave_internal.h"
 
+
+void
+__metadata_set_clean(struct nexus_metadata * metadata)
+{
+    metadata->is_dirty = false;
+}
+
+
+void
+__metadata_set_dirty(struct nexus_metadata * metadata)
+{
+    metadata->is_dirty = true;
+}
+
 static inline void
 __set_metadata_object(struct nexus_metadata * metadata, void * object)
 {
@@ -201,7 +215,7 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     }
 
     if (ret == 0) {
-        metadata->is_dirty = false;
+        __metadata_set_clean(metadata);
         metadata->version += 1;
         metadata->is_locked = false;
     } else {
@@ -237,5 +251,80 @@ nexus_metadata_unlock(struct nexus_metadata * metadata)
     if (metadata->is_locked) {
         buffer_layer_unlock(&metadata->uuid);
         metadata->is_locked = false;
+    }
+}
+
+static int
+__get_metadata_uuids(struct nexus_metadata * metadata,
+                     struct nexus_uuid     * real_uuid,
+                     struct nexus_uuid     * parent_uuid)
+{
+    struct nexus_dirnode   * dirnode   = NULL;
+    struct nexus_filenode  * filenode  = NULL;
+
+    if (metadata->type == NEXUS_DIRNODE) {
+        dirnode = (struct nexus_dirnode *)metadata->object;
+
+        nexus_uuid_copy(&dirnode->my_uuid, real_uuid);
+        nexus_uuid_copy(&dirnode->parent_uuid, parent_uuid);
+
+        return 0;
+    } else if (metadata->type == NEXUS_FILENODE) {
+        filenode = (struct nexus_dirnode *)metadata->object;
+
+        nexus_uuid_copy(&filenode->my_uuid, real_uuid);
+        nexus_uuid_copy(&filenode->parent_uuid, parent_uuid);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+int
+nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
+{
+    struct nexus_metadata * child_metadata  = dentry->metadata;
+    struct nexus_metadata * parent_metadata = dentry->parent->metadata;
+
+    struct nexus_uuid child_real_uuid;
+    struct nexus_uuid child_parent_uuid;
+
+    if (__get_metadata_uuids(child_metadata, &child_real_uuid, &child_parent_uuid)) {
+        log_error("could not get metadata UUIDs\n");
+        return -1;
+    }
+
+    // 1 - make sure the dentry's real uuid matches the metadata's real uuid
+    if (nexus_uuid_compare(&child_real_uuid, &dentry->real_uuid)) {
+        return -1;
+    }
+
+    // 2 - make sure the child's parent uuid matches the *real uuid* of the parent
+    {
+        struct nexus_dirnode * parent_dirnode = (struct nexus_dirnode *)parent_metadata->object;
+
+        if (nexus_uuid_compare(&parent_dirnode->my_uuid, &child_parent_uuid)) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+void
+nexus_metadata_set_parent_uuid(struct nexus_metadata * metadata, struct nexus_uuid * parent_uuid)
+{
+    struct nexus_dirnode   * dirnode   = NULL;
+    struct nexus_filenode  * filenode  = NULL;
+
+    if (metadata->type == NEXUS_DIRNODE) {
+        dirnode = (struct nexus_dirnode *)metadata->object;
+
+        dirnode_set_parent(dirnode, parent_uuid);
+    } else if (metadata->type == NEXUS_FILENODE) {
+        filenode = (struct nexus_dirnode *)metadata->object;
+
+        filenode_set_parent(filenode, parent_uuid);
     }
 }

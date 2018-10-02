@@ -25,7 +25,9 @@ struct __dir_rec {
 
     nexus_dirent_type_t type;
 
-    struct nexus_uuid   uuid;
+    struct nexus_uuid   real_uuid;
+
+    struct nexus_uuid   link_uuid;
 
     uint16_t            name_len;
 
@@ -61,6 +63,7 @@ struct dir_entry {
 struct nexus_dirnode {
     struct nexus_uuid       my_uuid;
     struct nexus_uuid       root_uuid;
+    struct nexus_uuid       parent_uuid;
 
     size_t                  symlink_count;
     size_t                  symlink_buflen;
@@ -93,6 +96,9 @@ struct nexus_dirnode {
  */
 struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
+
+void
+dirnode_set_parent(struct nexus_dirnode * dirnode, struct nexus_uuid * parent_uuid);
 
 void
 __dirnode_index_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
@@ -152,6 +158,13 @@ dirnode_add(struct nexus_dirnode * dirnode,
             nexus_dirent_type_t    type,
             struct nexus_uuid    * entry_uuid);
 
+int
+dirnode_add2(struct nexus_dirnode * dirnode,
+             char                 * filename,
+             nexus_dirent_type_t    type,
+             struct nexus_uuid    * link_uuid,
+             struct nexus_uuid    * real_uuid);
+
 /**
  * adds a new link
  * @param dirnode
@@ -185,7 +198,17 @@ int
 dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      char                 * filename,
                      nexus_dirent_type_t  * type,
-                     struct nexus_uuid    * entry_uuid);
+                     struct nexus_uuid    * link_uuid);
+
+/**
+ * Overloaded find_by_name call that includes the real_uuid
+ */
+int
+__dirnode_find_by_name(struct nexus_dirnode * dirnode,
+                       char                 * filename,
+                       nexus_dirent_type_t  * type,
+                       struct nexus_uuid    * link_uuid,
+                       struct nexus_uuid    * real_uuid);
 
 /**
  * Removes an entry from the dirnode
@@ -199,5 +222,6 @@ int
 dirnode_remove(struct nexus_dirnode * dirnode,
                char                 * filename,
                nexus_dirent_type_t  * type,
-               struct nexus_uuid    * entry_uuid,
+               struct nexus_uuid    * link_uuid,
+               struct nexus_uuid    * real_uuid,
                char                ** symlink_target_path);

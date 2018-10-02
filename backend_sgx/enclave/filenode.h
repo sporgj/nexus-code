@@ -17,6 +17,9 @@ struct nexus_metadata;
 struct nexus_filenode {
     struct nexus_uuid          my_uuid;
     struct nexus_uuid          root_uuid;
+    struct nexus_uuid          parent_uuid;
+
+    struct nexus_uuid          link_uuid; // link UUID, changes on renames
 
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
@@ -30,6 +33,10 @@ struct nexus_filenode {
 
     struct nexus_metadata    * metadata;
 };
+
+
+void
+filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid);
 
 
 /**

@@ -65,6 +65,20 @@ __get_header_len()
 }
 
 
+static void
+__crypto_buffer_set_real_uuid(struct nexus_crypto_buf * crypto_buffer, struct nexus_uuid * uuid)
+{
+    nexus_uuid_copy(uuid, &crypto_buffer->uuid);
+}
+
+
+static void
+__crypto_buffer_prepare_rewrite(struct nexus_crypto_buf * crypto_buffer)
+{
+    crypto_buffer->external_addr = NULL;
+    crypto_buffer->external_size = 0;
+}
+
 struct nexus_crypto_buf *
 nexus_crypto_buf_new(size_t size, uint32_t version, struct nexus_uuid * uuid)
 {
@@ -465,3 +479,49 @@ out:
 
     return ret;
 }
+
+int
+nexus_crypto_buf_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
+{
+    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(to_uuid, NEXUS_FRDWR);
+
+    // renames now update the child metadata
+    char * buffer = NULL;
+    size_t buflen = NULL;
+
+    if (crypto_buffer == NULL) {
+        log_error("could not read crypto_buffer\n");
+    }
+
+    if (crypto_buffer->version == 0) {
+        nexus_crypto_buf_free(crypto_buffer);
+        return 0;
+    }
+
+    __crypto_buffer_set_real_uuid(crypto_buffer, from_uuid);
+
+
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+
+    if (buffer == NULL) {
+        nexus_crypto_buf_free(crypto_buffer);
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return -1;
+    }
+
+    // update and write back
+    __crypto_buffer_set_real_uuid(crypto_buffer, to_uuid);
+    __crypto_buffer_prepare_rewrite(crypto_buffer);
+
+    if (nexus_crypto_buf_put(crypto_buffer, NULL)) {
+        nexus_crypto_buf_free(crypto_buffer);
+        log_error("nexus_crypto_buf_put FAILED\n");
+        return -1;
+    }
+
+    nexus_crypto_buf_free(crypto_buffer);
+
+    return 0;
+}
+
+

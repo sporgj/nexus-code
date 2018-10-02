@@ -6,7 +6,9 @@
 
 // This is how the dirnode will be serialized onto a buffer
 struct __dirnode_hdr {
+    struct nexus_uuid   my_uuid;
     struct nexus_uuid   root_uuid;
+    struct nexus_uuid   parent_uuid;
 
     uint32_t            symlink_count;
     uint32_t            symlink_buflen;
@@ -55,7 +57,7 @@ static inline void
 __dirnode_set_dirty(struct nexus_dirnode * dirnode)
 {
     if (dirnode->metadata) {
-        dirnode->metadata->is_dirty = true;
+        __metadata_set_dirty(dirnode->metadata);
     }
 }
 
@@ -63,7 +65,7 @@ static inline void
 __dirnode_set_clean(struct nexus_dirnode * dirnode)
 {
     if (dirnode->metadata) {
-        dirnode->metadata->is_dirty = false;
+        __metadata_set_clean(dirnode->metadata);
     }
 }
 
@@ -97,7 +99,9 @@ __parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t 
         return NULL;
     }
 
+    nexus_uuid_copy(&header->parent_uuid, &dirnode->parent_uuid);
     nexus_uuid_copy(&header->root_uuid, &dirnode->root_uuid);
+    nexus_uuid_copy(&header->my_uuid, &dirnode->my_uuid);
 
     dirnode->symlink_count    = header->symlink_count;
     dirnode->symlink_buflen   = header->symlink_buflen;
@@ -216,6 +220,14 @@ out_err:
 }
 
 
+void
+dirnode_set_parent(struct nexus_dirnode * dirnode, struct nexus_uuid * parent_uuid)
+{
+    nexus_uuid_copy(parent_uuid, &dirnode->parent_uuid);
+
+    __dirnode_set_dirty(dirnode);
+}
+
 static struct nexus_dirnode *
 dirnode_from_buffer(uint8_t * buffer, size_t buflen, nexus_io_flags_t flags)
 {
@@ -321,8 +333,6 @@ dirnode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 
     nexus_crypto_buf_free(crypto_buffer);
 
-    nexus_uuid_copy(uuid, &dirnode->my_uuid);
-
     return dirnode;
 }
 
@@ -334,7 +344,9 @@ __serialize_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer)
 {
     struct __dirnode_hdr * header = (struct __dirnode_hdr *)buffer;
 
+    nexus_uuid_copy(&dirnode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&dirnode->root_uuid, &header->root_uuid);
+    nexus_uuid_copy(&dirnode->parent_uuid, &header->parent_uuid);
 
     header->symlink_count    = dirnode->symlink_count;
     header->symlink_buflen   = dirnode->symlink_buflen;
@@ -843,24 +855,25 @@ __find_by_name(struct nexus_dirnode * dirnode, char * fname)
     return __dir_entry_from_hashed_filename(rst_hname);
 }
 
-int
-dirnode_add(struct nexus_dirnode * dirnode,
-            char                 * filename,
-            nexus_dirent_type_t    type,
-            struct nexus_uuid    * entry_uuid)
+struct dir_entry *
+__dirnode_add(struct nexus_dirnode * dirnode,
+            char                   * filename,
+            nexus_dirent_type_t      type,
+            struct nexus_uuid      * entry_uuid,
+            struct nexus_uuid      * real_uuid)
 {
     struct dir_entry * new_dir_entry = NULL;
 
     if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_CREATE)) {
         log_error("not authorized to create files\n");
-        return -1;
+        return NULL;
     }
 
     // check for existing entry.
     // XXX: typical filesystems perform a lookup to check if the file exists before
     // adding the file. Consider caching dirnode lookups
     if (__find_by_name(dirnode, filename)) {
-        return -1;
+        return NULL;
     }
 
     __clear_last_failed_lookup(dirnode);
@@ -869,7 +882,38 @@ dirnode_add(struct nexus_dirnode * dirnode,
 
     __dirnode_add_direntry(dirnode, new_dir_entry);
 
-    return 0;
+    if (real_uuid) {
+        nexus_uuid_copy(real_uuid, &new_dir_entry->dir_rec.real_uuid);
+    }
+
+    return new_dir_entry;
+}
+
+int
+dirnode_add(struct nexus_dirnode * dirnode,
+            char                 * filename,
+            nexus_dirent_type_t    type,
+            struct nexus_uuid    * entry_uuid)
+{
+    if (__dirnode_add(dirnode, filename, type, entry_uuid, NULL) != NULL) {
+        return 0;
+    }
+
+    return -1;
+}
+
+int
+dirnode_add2(struct nexus_dirnode * dirnode,
+             char                 * filename,
+             nexus_dirent_type_t    type,
+             struct nexus_uuid    * entry_uuid,
+             struct nexus_uuid    * real_uuid)
+{
+    if (__dirnode_add(dirnode, filename, type, entry_uuid, real_uuid) != NULL) {
+        return 0;
+    }
+
+    return -1;
 }
 
 int
@@ -960,10 +1004,11 @@ dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
 }
 
 int
-dirnode_find_by_name(struct nexus_dirnode * dirnode,
-                     char                 * filename,
-                     nexus_dirent_type_t  * type,
-                     struct nexus_uuid    * entry_uuid)
+__dirnode_find_by_name(struct nexus_dirnode * dirnode,
+                       char                 * filename,
+                       nexus_dirent_type_t  * type,
+                       struct nexus_uuid    * link_uuid,
+                       struct nexus_uuid    * real_uuid)
 {
     struct dir_entry * dir_entry = NULL;
 
@@ -980,9 +1025,22 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
 
     *type = dir_entry->dir_rec.type;
 
-    nexus_uuid_copy(&dir_entry->dir_rec.uuid, entry_uuid);
+    nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, link_uuid);
+
+    if (real_uuid) {
+        nexus_uuid_copy(&dir_entry->dir_rec.real_uuid, real_uuid);
+    }
 
     return 0;
+}
+
+int
+dirnode_find_by_name(struct nexus_dirnode * dirnode,
+                     char                 * filename,
+                     nexus_dirent_type_t  * type,
+                     struct nexus_uuid    * link_uuid)
+{
+    return __dirnode_find_by_name(dirnode, filename, type, link_uuid, NULL);
 }
 
 static struct nexus_list_iterator *
@@ -1059,7 +1117,8 @@ static inline int
 __dirnode_remove(struct nexus_dirnode * dirnode,
                  char                 * filename,
                  nexus_dirent_type_t  * type,
-                 struct nexus_uuid    * entry_uuid)
+                 struct nexus_uuid    * link_uuid,
+                 struct nexus_uuid    * real_uuid)
 {
     struct dir_entry * dir_entry = NULL;
 
@@ -1077,7 +1136,8 @@ __dirnode_remove(struct nexus_dirnode * dirnode,
 
     *type = dir_entry->dir_rec.type;
 
-    nexus_uuid_copy(&dir_entry->dir_rec.uuid, entry_uuid);
+    nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, link_uuid);
+    nexus_uuid_copy(&dir_entry->dir_rec.real_uuid, real_uuid);
 
 
     __dirnode_del_direntry(dirnode, dir_entry);
@@ -1091,13 +1151,14 @@ int
 dirnode_remove(struct nexus_dirnode * dirnode,
                char                 * filename,
                nexus_dirent_type_t  * type,
-               struct nexus_uuid    * entry_uuid,
+               struct nexus_uuid    * link_uuid,
+               struct nexus_uuid    * real_uuid,
                char                ** symlink_target_path)
 {
-    int ret = __dirnode_remove(dirnode, filename, type, entry_uuid);
+    int ret = __dirnode_remove(dirnode, filename, type, link_uuid, real_uuid);
 
     if (*type == NEXUS_LNK) {
-        __remove_symlink(dirnode, entry_uuid, symlink_target_path);
+        __remove_symlink(dirnode, link_uuid, symlink_target_path);
     }
 
     return ret;

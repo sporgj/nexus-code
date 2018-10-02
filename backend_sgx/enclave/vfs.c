@@ -79,7 +79,9 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
     // TODO add code to cleanup root dentry
     memset(&root_dentry, 0, sizeof(struct nexus_dentry));
     INIT_LIST_HEAD(&root_dentry.children);
-    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.uuid);
+
+    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.link_uuid);
+    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.real_uuid);
 
     root_dentry.metadata_type = NEXUS_DIRNODE;
 

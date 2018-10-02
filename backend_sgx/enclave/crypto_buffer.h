@@ -69,13 +69,7 @@ int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf, struct nexus_mac * mac);
 
 /**
- * Writes the encrypted contents of the crypto buf into the buffer
- * @param buf
- * @param metadata_uuid
- * @param uuid_path
- *
- * @return 0 on success
+ * Opens a metadata file, and rewrites it with a UUID
  */
 int
-nexus_crypto_buf_flush(struct nexus_crypto_buf * buf);
-
+nexus_crypto_buf_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid);

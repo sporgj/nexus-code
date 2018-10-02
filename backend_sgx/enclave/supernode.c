@@ -30,7 +30,7 @@ void
 __supernode_set_clean(struct nexus_supernode * supernode)
 {
     if (supernode->metadata) {
-        supernode->metadata->is_dirty = false;
+        __metadata_set_clean(supernode->metadata);
     }
 }
 
@@ -38,7 +38,7 @@ void
 __supernode_set_dirty(struct nexus_supernode * supernode)
 {
     if (supernode->metadata) {
-        supernode->metadata->is_dirty = true;
+        __metadata_set_dirty(supernode->metadata);
     }
 }
 
