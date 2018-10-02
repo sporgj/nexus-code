@@ -70,7 +70,7 @@ create_file_usage()
     return;
 }
 
-static int
+int
 __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type)
 {
     char * dirpath  = NULL;
@@ -101,11 +101,55 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
 }
 
 int
+__fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_path)
+{
+    char * from_dirpath  = NULL;
+    char * from_filename = NULL;
+    char * to_dirpath    = NULL;
+    char * to_filename   = NULL;
+
+    char * nexus_name1   = NULL;
+    char * nexus_name2   = NULL;
+
+    int ret = -1;
+
+    nexus_splitpath(from_path, &from_dirpath, &from_filename);
+    nexus_splitpath(to_path, &to_dirpath, &to_filename);
+
+    ret = nexus_fs_rename(
+        vol, from_dirpath, from_filename, to_dirpath, to_filename, &nexus_name1, &nexus_name2);
+
+    if (ret != 0) {
+        log_error("rename operation\n");
+        goto out;
+    }
+
+    printf(" .rename %s/%s [%s] -> %s/%s [%s]\n",
+           from_dirpath,
+           from_filename,
+           nexus_name1,
+           to_dirpath,
+           to_filename,
+           nexus_name2);
+    fflush(stdout);
+
+    ret = 0;
+out:
+    nexus_free(from_dirpath);
+    nexus_free(from_filename);
+    nexus_free(to_dirpath);
+    nexus_free(to_filename);
+
+    nexus_free(nexus_name1);
+    nexus_free(nexus_name2);
+
+    return ret;
+}
+
+int
 create_file_main(int argc, char ** argv)
 {
     struct nexus_volume * vol = NULL;
-
-    struct nexus_stat file_stat;
 
     char * volume_path = NULL;
     char * file_path   = NULL;
@@ -137,23 +181,9 @@ create_file_main(int argc, char ** argv)
         return -1;
     }
 
-    (void)file_path;
-    (void)file_stat;
     (void)ret;
 
-    if (__fs_touch(vol, "foo", NEXUS_DIR)) {
-        return -1;
-    }
-
-    if (__fs_touch(vol, "foo/bar.txt", NEXUS_REG)) {
-        return -1;
-    }
-
-    if (__fs_touch(vol, "cow", NEXUS_DIR)) {
-        return -1;
-    }
-
-    if (__fs_touch(vol, "cow/meat.txt", NEXUS_REG)) {
+    if (__fs_touch(vol, file_path, NEXUS_REG)) {
         return -1;
     }
 
