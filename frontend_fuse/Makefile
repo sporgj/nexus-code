@@ -3,7 +3,7 @@ include ../build.mk
 buildpath = ../build
 
 libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid\
-	-lpthread -Lfuse/build/lib -lfuse3
+	-lpthread -Lfuse/build/lib -lfuse3 -lcurl
 
 LDFLAGS := -L$(SGX_SDK)/lib64
 
