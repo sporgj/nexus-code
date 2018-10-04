@@ -1,7 +1,0 @@
-{
-    "publickey": "sample_profile/sample_pubkey.key",
-    "privatekey": "sample_profile/sample_privkey.key",
-    "metadata_dir": "/afs/maatta.sgx/user/kdb/.nxs",
-    "data_dir": "/afs/maatta.sgx/user/kdb/nexus",
-    "volume_key": "../sample_volumekey"
-}

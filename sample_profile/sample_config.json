@@ -1,7 +1,0 @@
-{
-    "publickey": "sample_profile/sample_pubkey.key",
-    "privatekey": "sample_profile/sample_privkey.key",
-    "metadata_dir": "sample_profile/sample_volume",
-    "data_dir": "sample_profile/sample_volume",
-    "volume_key": "sample_profile/sample_volumekey"
-}
