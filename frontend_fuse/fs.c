@@ -894,7 +894,7 @@ start_fuse(int argc, char * argv[], char * rootDir)
         return -1;
     }
 
-    // TODO: sets the filesystem to run as a foreground process. Set this as DEBUG option
+    // sets fuse as a foreground process
     // fuse_opt_add_arg(&args, "-f");
 
 
@@ -919,11 +919,11 @@ start_fuse(int argc, char * argv[], char * rootDir)
         lo.root.next = lo.root.prev = NULL;
 
         /* Initialise the hash table and assign */
-	ret = hash_table_init(&lo.hash_table);
+        ret = hash_table_init(&lo.hash_table);
 
-	if (ret == -1) {
+        if (ret == -1) {
             goto err_out;
-	}
+        }
     }
 
     /* Initialise the spin lock for table */
@@ -943,7 +943,7 @@ start_fuse(int argc, char * argv[], char * rootDir)
         if (fuse_session_mount(se, opts.mountpoint) != 0)
             goto err_out3;
 
-        fuse_daemonize(opts.foreground);
+        fuse_daemonize(true); // opts.foreground
 
         /* Block until ctrl+c or fusermount -u */
         if (opts.singlethread) {

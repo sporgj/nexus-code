@@ -86,6 +86,7 @@ clean:
 	$(foreach frontend,  $(nexus_frontends), make -C $(nexus_home)/$(frontend)  clean;)
 	$(foreach backend,   $(nexus_backends),  make -C $(nexus_home)/$(backend)   clean;)
 	$(foreach datastore, $(nexus_datastore),  make -C $(nexus_home)/$(datastore) clean;)
+	rm -f libnexus.a
 
 
 .PHONY: debug libnexus frontends $(nexus_frontends) backends $(nexus_backends) datastores $(nexus_datastores) clean mbedtls

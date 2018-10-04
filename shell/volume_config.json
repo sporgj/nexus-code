@@ -1,0 +1,18 @@
+{
+    "metadata_store" : {
+        "name" : "TWOLEVEL",
+        "root_path" : "metadata"
+    },
+
+    "data_store" : {
+        "name" : "TWOLEVEL",
+        "root_path" : "files"
+    },
+
+    "backend" : {
+        "name" : "SGX",
+        "enclave_path": "/home/briand/nexus/build/nexus_enclave.signed.so"
+    }
+
+}
+
