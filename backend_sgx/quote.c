@@ -14,7 +14,7 @@ generate_quote(sgx_report_t * report, uint32_t * p_quote_size)
     int           ret        = -1;
 
 
-    ret = sgx_get_quote_size(NULL, &quote_len);
+    ret = sgx_calc_quote_size(NULL, 0, &quote_len);
 
     if (ret) {
         log_error("sgx_get_quote_size FAILED (ret=%x)\n", ret);

@@ -30,7 +30,7 @@ nxs_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id)
                                  NULL);
 
     if (ret != SGX_SUCCESS) {
-        log_error("Error, call sgx_create_enclave fail. ret=%x\n", ret);
+        log_error("Error, call sgx_create_enclave (%s) FAILED. ret=%x\n", enclave_path, ret);
         return -1;
     }
 
