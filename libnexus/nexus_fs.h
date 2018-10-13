@@ -13,15 +13,12 @@
 
 #include <linux/limits.h>
 
+#include "nexus_uuid.h"
+
 struct nexus_volume;
 
 #define NEXUS_NAME_MAX  256
 #define NEXUS_PATH_MAX  1024
-
-
-/*
- *  These are probably just going to be passthrough functions...
- */
 
 typedef enum {
     NEXUS_REG = 1,  /* regular file */
@@ -42,6 +39,7 @@ typedef enum {
 
 struct nexus_dirent {
     char                name[NEXUS_NAME_MAX];
+    struct nexus_uuid   uuid;
     nexus_dirent_type_t type;
 };
 
