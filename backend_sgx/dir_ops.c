@@ -162,6 +162,43 @@ sgx_backend_fs_filldir(struct nexus_volume  * volume,
 }
 
 int
+sgx_backend_fs_readdir(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       struct nexus_dirent  * dirent_buffer_array,
+                       size_t                 dirent_buffer_count,
+                       size_t                 offset,
+                       size_t               * result_count,
+                       size_t               * directory_size,
+                       void                 * priv_data)
+{
+    struct sgx_backend * sgx_backend = NULL;
+
+    int err = -1;
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend *)priv_data;
+
+
+    // TODO add ECALL_READDIR
+    err = ecall_fs_readdir(sgx_backend->enclave_id,
+                           &ret,
+                           dirpath,
+                           dirent_buffer_array,
+                           dirent_buffer_count,
+                           offset,
+                           result_count,
+                           directory_size);
+
+    if (err || ret) {
+        log_error("ecall_fs_readdir() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
 sgx_backend_fs_symlink(struct nexus_volume  * volume,
                        char                 * dirpath,
                        char                 * link_name,

@@ -232,6 +232,46 @@ out:
 }
 
 int
+ecall_fs_readdir(char                * dirpath_IN,
+                 struct nexus_dirent * dirent_buffer_array_out,
+                 size_t                dirent_buffer_count_IN,
+                 size_t                offset_IN,
+                 size_t              * result_count_out,
+                 size_t              * directory_size_out)
+{
+    struct nexus_metadata * metadata = NULL;
+
+    int ret = -1;
+
+
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+    ret = UNSAFE_dirnode_readdir(metadata->dirnode,
+                                 dirent_buffer_array_out,
+                                 dirent_buffer_count_IN,
+                                 offset_IN,
+                                 result_count_out,
+                                 directory_size_out);
+
+    if (ret != 0) {
+        log_error("could not readdir the directory\n");
+        goto out;
+    }
+
+    ret = 0;
+out:
+    nexus_vfs_put(metadata);
+
+    return ret;
+}
+
+
+int
 __nxs_fs_symlink(struct nexus_metadata * metadata,
                  char                  * link_name,
                  char                  * symlink_target,

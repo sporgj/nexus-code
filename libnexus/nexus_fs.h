@@ -122,12 +122,15 @@ nexus_fs_decrypt(struct nexus_volume * volume,
                  size_t                filesize);
 
 
-
-
 int
-nexus_fs_readdir(struct nexus_volume *  volume,
-		 char                *  path,
-		 struct nexus_dirent ** result);
+nexus_fs_readdir(struct nexus_volume  * volume,
+                 char                 * dirpath,
+                 struct nexus_dirent  * dirent_buffer_array,
+                 size_t                 dirent_buffer_count,
+                 size_t                 offset,
+                 size_t               * result_count,
+                 size_t               * directory_size);
+
 
 
 int

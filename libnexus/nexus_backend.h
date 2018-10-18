@@ -125,6 +125,15 @@ struct nexus_backend_impl {
                       char                ** plain_name,
                       void                 * priv_data);
 
+    int (*fs_readdir)(struct nexus_volume  * volume,
+                      char                 * dirpath,
+                      struct nexus_dirent  * dirent_buffer_array,
+                      size_t                 dirent_buffer_count,
+                      size_t                 offset,
+                      size_t               * result_count,
+                      size_t               * directory_size,
+                      void                 * priv_data);
+
     int (*fs_symlink)(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * link_name,

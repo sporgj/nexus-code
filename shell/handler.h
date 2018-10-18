@@ -9,6 +9,14 @@
 
 #include <stdint.h>
 
+#include <nexus_fs.h>
+
+
+int
+__fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type);
+
+int
+__fs_ls(struct nexus_volume * vol, char * dirpath);
 
 int dispatch_nexus_command(uint8_t   * cmd_buf,
 			   uint32_t    cmd_size,

@@ -13,13 +13,6 @@
 #include <nexus_util.h>
 #include <nexus_log.h>
 
-int
-nexus_fs_readdir(struct nexus_volume * volume, char * path, struct nexus_dirent ** result)
-{
-
-    return -1;
-}
-
 
 int
 nexus_fs_create(struct nexus_volume * volume,
@@ -95,6 +88,32 @@ nexus_fs_filldir(struct nexus_volume  * volume,
     }
 
     return backend->impl->fs_filldir(volume, dirpath, nexus_name, plain_name, backend->priv_data);
+}
+
+int
+nexus_fs_readdir(struct nexus_volume  * volume,
+                 char                 * dirpath,
+                 struct nexus_dirent  * dirent_buffer_array,
+                 size_t                 dirent_buffer_count,
+                 size_t                 offset,
+                 size_t               * result_count,
+                 size_t               * directory_size)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_readdir == NULL) {
+        log_error("fs_readdir NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
+    }
+
+    return backend->impl->fs_readdir(volume,
+                                     dirpath,
+                                     dirent_buffer_array,
+                                     dirent_buffer_count,
+                                     offset,
+                                     result_count,
+                                     directory_size,
+                                     backend->priv_data);
 }
 
 int

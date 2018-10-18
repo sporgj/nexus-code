@@ -57,6 +57,8 @@ struct dir_entry {
     struct __hashed_name     filename_hash;
     struct __hashed_uuid     fileuuid_hash;
 
+    struct list_head         dent_list;
+
     struct list_head         bckt_list;
 };
 
@@ -78,6 +80,8 @@ struct nexus_dirnode {
     struct nexus_acl        dir_acl;
 
     struct nexus_list       symlink_list;
+
+    struct list_head        dirents_list;
 
     struct hashmap          filename_hashmap;
     struct hashmap          fileuuid_hashmap;
@@ -199,6 +203,14 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      char                 * filename,
                      nexus_dirent_type_t  * type,
                      struct nexus_uuid    * link_uuid);
+
+int
+UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
+                       struct nexus_dirent  * dirent_buffer_array,
+                       size_t                 dirent_buffer_count,
+                       size_t                 offset,
+                       size_t               * result_count,
+                       size_t               * directory_size);
 
 /**
  * Overloaded find_by_name call that includes the real_uuid

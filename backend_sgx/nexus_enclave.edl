@@ -99,6 +99,16 @@ enclave {
             [user_check] char                  filename_out[256]
         );
 
+        public int ecall_fs_readdir
+        (
+            [in, string] char                * directory_IN,
+            [user_check] struct nexus_dirent * dirent_buffer_array_out,
+                         size_t                dirent_buffer_count_IN,
+                         size_t                offset_IN,
+            [user_check] size_t              * result_count_out,
+            [user_check] size_t              * directory_size_out
+        );
+
         public int ecall_fs_symlink
         (
             [in, string] char                * directory_IN,

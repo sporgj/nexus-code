@@ -678,6 +678,12 @@ __fileuuid_htable_cmp(const void                 * data,
 }
 
 static struct dir_entry *
+__dir_entry_from_dirents_list(struct list_head * dent_ptr)
+{
+    return container_of(dent_ptr, struct dir_entry, dent_list);
+}
+
+static struct dir_entry *
 __dir_entry_from_hashed_filename(struct __hashed_name * hashed_filename)
 {
     return container_of(hashed_filename, struct dir_entry, filename_hash);
@@ -695,6 +701,8 @@ __dirnode_index_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_
 {
     hashmap_put(&dirnode->filename_hashmap, &dir_entry->filename_hash);
     hashmap_put(&dirnode->fileuuid_hashmap, &dir_entry->fileuuid_hash);
+
+    list_add_tail(&dir_entry->dent_list, &dirnode->dirents_list);
 }
 
 void
@@ -702,6 +710,8 @@ __dirnode_forget_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir
 {
     __hashmap_remove_entry(&dirnode->filename_hashmap, &dir_entry->filename_hash.hash_entry);
     __hashmap_remove_entry(&dirnode->fileuuid_hashmap, &dir_entry->fileuuid_hash.hash_entry);
+
+    list_del(&dir_entry->dent_list);
 }
 
 
@@ -767,6 +777,8 @@ dirnode_init(struct nexus_dirnode * dirnode)
 
     nexus_list_init(&dirnode->symlink_list);
     nexus_list_set_deallocator(&dirnode->symlink_list, __free_symlink_entry);
+
+    INIT_LIST_HEAD(&dirnode->dirents_list);
 
     nexus_acl_init(&dirnode->dir_acl);
 }
@@ -1162,4 +1174,57 @@ dirnode_remove(struct nexus_dirnode * dirnode,
     }
 
     return ret;
+}
+
+int
+UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
+                       struct nexus_dirent  * dirent_buffer_array,
+                       size_t                 dirent_buffer_count,
+                       size_t                 offset,
+                       size_t               * result_count,
+                       size_t               * directory_size)
+{
+    struct list_head * curr = NULL;
+
+    struct nexus_dirent * dirent = NULL;
+
+    int pos = 0;
+
+
+    if (offset > dirnode->dir_entry_count) {
+        log_error("offset is out of range\n");
+        return -1;
+    }
+
+    list_for_each(curr, &dirnode->dirents_list) {
+        if (offset == 0) {
+            break;
+        }
+
+        offset -= 1;
+    }
+
+    dirent = dirent_buffer_array;
+
+    // copy data into the buffer
+    list_for_each(curr, &dirnode->dirents_list) {
+        struct dir_entry * dir_entry = __dir_entry_from_dirents_list(curr);
+
+        pos += 1;
+
+        if (pos == dirent_buffer_count) {
+            break;
+        }
+
+        nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, &dirent->uuid);
+        strncpy(dirent->name, dir_entry->dir_rec.name, NEXUS_NAME_MAX);
+        dirent->type = dir_entry->dir_rec.type;
+
+        dirent += 1;
+    }
+
+    *directory_size = dirnode->dir_entry_count;
+    *result_count = pos;
+
+    return 0;
 }

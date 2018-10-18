@@ -14,6 +14,7 @@ __init_dir_entry(struct dir_entry * dir_entry)
     hashmap_entry_init(&fileuuid_hash->hash_entry,
                        memhash(fileuuid_hash->uuid, sizeof(struct nexus_uuid)));
 
+    INIT_LIST_HEAD(&dir_entry->dent_list);
     INIT_LIST_HEAD(&dir_entry->bckt_list);
 }
 

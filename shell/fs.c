@@ -146,6 +146,70 @@ out:
     return ret;
 }
 
+
+static void
+print_dirent_entry(struct nexus_dirent * dirent)
+{
+    char * type_str = "FILE";
+
+    if (dirent->type == NEXUS_DIR) {
+        type_str = "DIR";
+    } else if (dirent->type == NEXUS_DIR) {
+        type_str = "LINK";
+    }
+
+    printf("%26s [%s]\n", dirent->name, type_str);
+}
+
+int
+__fs_ls(struct nexus_volume * vol, char * dirpath)
+{
+    size_t result_count   = 0;
+    size_t directory_size = 0;
+    size_t offset         = 0;
+
+    size_t dirent_buffer_count = 50;
+    size_t dirent_buffer_total = 0;
+
+    struct nexus_dirent * dirent_buffer_array = NULL;
+
+
+    dirent_buffer_total = dirent_buffer_count * sizeof(struct nexus_dirent);
+    dirent_buffer_array = nexus_malloc(dirent_buffer_total);
+
+    do {
+        if (nexus_fs_readdir(vol,
+                             dirpath,
+                             dirent_buffer_array,
+                             dirent_buffer_count,
+                             offset,
+                             &result_count,
+                             &directory_size)) {
+            log_error("nexus_fs_readdir FAILED\n");
+            nexus_free(dirent_buffer_array);
+            return -1;
+        }
+
+        if (offset == 0) {
+            printf("Directory size: %zu\n", directory_size);
+            printf("==========================\n");
+        }
+
+        for (size_t i = 0; i < result_count; i++) {
+            print_dirent_entry(&dirent_buffer_array[i]);
+        }
+
+        fflush(stdout);
+
+        offset += result_count;
+    } while (offset < directory_size);
+
+
+    nexus_free(dirent_buffer_array);
+
+    return 0;
+}
+
 int
 create_file_main(int argc, char ** argv)
 {

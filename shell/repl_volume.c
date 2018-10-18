@@ -14,6 +14,8 @@
 
 #include <wordexp.h>
 
+#include "handler.h"
+
 #define MY_ARGV_SIZE 30
 
 static int    my_argc               = 0;
@@ -190,6 +192,75 @@ handle_user_findkey(int argc, char ** argv)
     return ret;
 }
 
+
+/////////
+
+static int
+handle_fs_touch(int argc, char ** argv)
+{
+    char * filepath = NULL;
+
+    if (argc < 1) {
+        usage("fs_touch");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    filepath = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_touch(mounted_volume, filepath, NEXUS_REG);
+
+    nexus_free(filepath);
+
+    return ret;
+}
+
+static int
+handle_fs_mkdir(int argc, char ** argv)
+{
+    char * dirpath = NULL;
+
+    if (argc < 1) {
+        usage("fs_mkdir");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    dirpath = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_touch(mounted_volume, dirpath, NEXUS_DIR);
+
+    nexus_free(dirpath);
+
+    return ret;
+}
+
+static int
+handle_fs_ls(int argc, char ** argv)
+{
+    char * dirpath = NULL;
+
+    if (argc < 1) {
+        usage("fs_ls");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    dirpath = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_ls(mounted_volume, dirpath);
+
+    nexus_free(dirpath);
+
+    return ret;
+}
+
 /////////
 
 static int
@@ -290,6 +361,10 @@ static struct _cmd cmds[]
         { "user_delkey", handle_user_delkey, "Remove user by pubkey", "<pubkey_file>" },
         { "user_findname", handle_user_findname, "Find user by name", "<username>" },
         { "user_findkey", handle_user_findkey, "Find user by pubkey", "<pubkey_file>" },
+
+        { "fs_touch", handle_fs_touch, "Create a new file", "<filepath>" },
+        { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
+        { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };
 
