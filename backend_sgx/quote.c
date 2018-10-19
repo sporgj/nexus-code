@@ -5,18 +5,6 @@
 #include <curl/curl.h>
 
 
-/* This API is provided in SGX 2.0 */
-
-int
-sgx_calc_quote_size(uint8_t * revocation_list, size_t size, uint32_t * quote_len)
-    __attribute__((weak));
-
-int
-sgx_calc_quote_size(uint8_t * revocation_list, size_t size, uint32_t * quote_len)
-{
-    return sgx_get_quote_size(revocation_list, quote_len);
-}
-
 sgx_quote_t *
 generate_quote(sgx_report_t * report, uint32_t * p_quote_size)
 {
