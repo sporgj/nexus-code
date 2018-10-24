@@ -89,12 +89,10 @@ int
 sgx_backend_fs_lookup(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
-                      char                ** nexus_name,
+                      struct nexus_uuid    * uuid,
                       void                 * priv_data)
 {
     struct sgx_backend * sgx_backend = NULL;
-
-    struct nexus_uuid uuid;
 
     int err = -1;
     int ret = -1;
@@ -104,7 +102,7 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_LOOKUP);
 
-    err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, &uuid);
+    err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, uuid);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_LOOKUP);
 
@@ -113,11 +111,36 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
         return -1;
     }
 
-    if (ret == 0) {
-        *nexus_name = nexus_uuid_to_alt64(&uuid);
+    return ret;
+}
+
+int
+sgx_backend_fs_stat(struct nexus_volume * volume,
+                    char                * dirpath,
+                    char                * plain_name,
+                    struct nexus_stat   * nexus_stat,
+                    void                * priv_data)
+{
+    struct sgx_backend * sgx_backend = NULL;
+
+    int err = -1;
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend *)priv_data;
+
+    BACKEND_SGX_ECALL_START(ECALL_STAT);
+
+    err = ecall_fs_stat(sgx_backend->enclave_id, &ret, dirpath, plain_name, nexus_stat);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_STAT);
+
+    if (err) {
+        log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
+        return -1;
     }
 
-    return ret;
+    return 0;
 }
 
 int

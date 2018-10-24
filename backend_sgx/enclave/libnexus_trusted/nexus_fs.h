@@ -33,6 +33,10 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
-    size_t timestamp;
-    size_t size;
+    size_t              timestamp;
+    size_t              size;
+
+    struct nexus_uuid   uuid;
+
+    nexus_dirent_type_t type;
 };

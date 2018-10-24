@@ -1191,9 +1191,13 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
     int pos = 0;
 
 
-    if (offset > dirnode->dir_entry_count) {
-        log_error("offset is out of range\n");
-        return -1;
+    if (offset >= dirnode->dir_entry_count) {
+        // I'm not completely sure if this is the better approach. But this makes
+        // it so that applications will have to read the directory size to detect
+        // offsets that are too large.
+        *directory_size = dirnode->dir_entry_count;
+        *result_count = 0;
+        return 0;
     }
 
     list_for_each(curr, &dirnode->dirents_list) {

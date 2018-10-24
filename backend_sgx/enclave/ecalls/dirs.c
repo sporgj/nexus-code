@@ -198,6 +198,93 @@ __nxs_fs_filldir(struct nexus_metadata * metadata,
     return 0;
 }
 
+
+int
+__nxs_fs_stat(struct nexus_dirnode * dirnode, char * plain_name, struct nexus_stat * stat_info)
+{
+    struct nexus_uuid real_uuid;
+    struct nexus_uuid link_uuid;
+
+    nexus_dirent_type_t dirent_type;
+    nexus_metadata_type_t metadata_type;
+
+
+    if (__dirnode_find_by_name(dirnode, plain_name, &dirent_type, &link_uuid, &real_uuid)) {
+        return -1;
+    }
+
+    if (dirent_type == NEXUS_LNK) {
+        stat_info->size = 0;
+        stat_info->type = NEXUS_LNK;
+        return 0;
+    }
+
+    metadata_type = (dirent_type == NEXUS_REG ? NEXUS_FILENODE : NEXUS_DIRNODE);
+
+    // load the metadata and read its contents
+    {
+        struct nexus_metadata * metadata = nexus_vfs_load(&link_uuid, metadata_type, NEXUS_FREAD);
+
+        if (metadata == NULL) {
+            return -1;
+        }
+
+        if (metadata_type == NEXUS_DIRNODE) {
+            struct nexus_dirnode * dirnode = metadata->dirnode;
+
+            stat_info->size = dirnode->dir_entry_count;
+            stat_info->type = NEXUS_DIR;
+        } else {
+            struct nexus_filenode * filenode = metadata->filenode;
+
+            stat_info->size = filenode->filesize;
+            stat_info->type = NEXUS_REG;
+        }
+
+        nexus_vfs_put(metadata);
+    }
+
+    nexus_uuid_copy(&link_uuid, &stat_info->uuid);
+
+    return 0;
+}
+
+int
+ecall_fs_stat(char * dirpath_IN, char * plain_name_IN, struct nexus_stat * nexus_stat_out)
+{
+    struct nexus_metadata * metadata = NULL;
+
+    int ret = -1;
+
+
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+    if (metadata->type != NEXUS_DIRNODE) {
+        nexus_vfs_put(metadata);
+
+        log_error("the path is not a directory\n");
+        return -1;
+    }
+
+    ret = __nxs_fs_stat(metadata->dirnode, plain_name_IN, nexus_stat_out);
+
+    if (ret != 0) {
+        goto out;
+    }
+
+    ret = 0;
+out:
+    nexus_vfs_put(metadata);
+
+    return ret;
+
+}
+
 int
 ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char filename_out[NEXUS_NAME_MAX])
 {

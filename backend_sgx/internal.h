@@ -99,8 +99,15 @@ int
 sgx_backend_fs_lookup(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
-                      char                ** nexus_name,
+                      struct nexus_uuid    * uuid,
                       void                 * priv_data);
+
+int
+sgx_backend_fs_stat(struct nexus_volume * volume,
+                    char                * dirpath,
+                    char                * plain_name,
+                    struct nexus_stat   * nexus_stat,
+                    void                * priv_data);
 
 int
 sgx_backend_fs_filldir(struct nexus_volume  * volume,

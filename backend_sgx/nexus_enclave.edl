@@ -91,6 +91,13 @@ enclave {
                    [out] struct nexus_uuid   * uuid_out
         );
 
+        public int ecall_fs_stat
+        (
+            [in, string] char                * directory_IN,
+            [in, string] char                * filename_IN,
+            [user_check] struct nexus_stat   * stat_out
+        );
+
         // #define NEXUS_NAME_MAX  256
         public int ecall_fs_filldir
         (
