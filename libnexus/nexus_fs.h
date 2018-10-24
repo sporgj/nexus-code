@@ -44,8 +44,12 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
-    size_t timestamp;
-    size_t size;
+    size_t              timestamp;
+    size_t              size;
+
+    struct nexus_uuid   uuid;
+
+    nexus_dirent_type_t type;
 };
 
 /**
@@ -69,7 +73,12 @@ int
 nexus_fs_lookup(struct nexus_volume  * volume,
                 char                 * parent_dir,
                 char                 * plain_name,
-                char                ** nexus_name);
+                struct nexus_uuid    * uuid);
+int
+nexus_fs_stat(struct nexus_volume  * volume,
+              char                 * dirpath,
+              char                 * plain_name,
+              struct nexus_stat    * nexus_stat);
 
 int
 nexus_fs_filldir(struct nexus_volume  * volume,
@@ -132,11 +141,6 @@ nexus_fs_readdir(struct nexus_volume  * volume,
                  size_t               * directory_size);
 
 
-
-int
-nexus_fs_stat(struct nexus_volume * volume,
-	      char                * path,
-	      struct nexus_stat   * stat);
 
 
 int

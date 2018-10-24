@@ -14,16 +14,6 @@
 #include <nexus_log.h>
 
 
-int
-nexus_fs_create(struct nexus_volume * volume,
-		char                * path,
-		nexus_dirent_type_t   type,
-		struct nexus_stat   * stat)
-{
-    return nexus_backend_fs_create(volume, path, type, stat);
-}
-
-
 
 int
 nexus_fs_touch(struct nexus_volume  * volume,
@@ -62,7 +52,7 @@ int
 nexus_fs_lookup(struct nexus_volume  * volume,
                 char                 * dirpath,
                 char                 * plain_name,
-                char                ** nexus_name)
+                struct nexus_uuid    * uuid)
 {
     struct nexus_backend * backend = volume->backend;
 
@@ -71,7 +61,23 @@ nexus_fs_lookup(struct nexus_volume  * volume,
 	return -1;
     }
 
-    return backend->impl->fs_lookup(volume, dirpath, plain_name, nexus_name, backend->priv_data);
+    return backend->impl->fs_lookup(volume, dirpath, plain_name, uuid, backend->priv_data);
+}
+
+int
+nexus_fs_stat(struct nexus_volume  * volume,
+              char                 * dirpath,
+              char                 * plain_name,
+              struct nexus_stat    * nexus_stat)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_stat == NULL) {
+        log_error("fs_stat NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
+    }
+
+    return backend->impl->fs_stat(volume, dirpath, plain_name, nexus_stat, backend->priv_data);
 }
 
 int

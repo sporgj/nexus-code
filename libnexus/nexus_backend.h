@@ -45,12 +45,6 @@ int
 nexus_backend_open_volume(struct nexus_volume * volume);
 
 
-int
-nexus_backend_fs_create(struct nexus_volume * volume,
-			char                * path,
-			nexus_dirent_type_t   type,
-			struct nexus_stat   * stat);
-
 
 int
 nexus_backend_user_list(struct nexus_volume * volume);
@@ -116,7 +110,13 @@ struct nexus_backend_impl {
     int (*fs_lookup)(struct nexus_volume  * volume,
                      char                 * dirpath,
                      char                 * plain_name,
-                     char                ** nexus_name,
+                     struct nexus_uuid    * uuid,
+                     void                 * priv_data);
+
+    int   (*fs_stat)(struct nexus_volume  * volume,
+                     char                 * dirpath,
+                     char                 * plain_name,
+                     struct nexus_stat    * nexus_stat,
                      void                 * priv_data);
 
     int (*fs_filldir)(struct nexus_volume  * volume,
