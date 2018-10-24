@@ -2,12 +2,11 @@ include ../build.mk
 
 buildpath = ../build
 
-libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid\
-	-lpthread -Lfuse/build/lib -lfuse3 -lcurl
+libs := -Wl,--whole-archive ../libnexus.a -Wl,--no-whole-archive -luuid -lpthread -lcurl -lfuse3
 
 LDFLAGS := -L$(SGX_SDK)/lib64
 
-INCLUDES := -I../libnexus -Ifuse/include
+INCLUDES := -I../libnexus
 CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11\
          -lulockmgr -D_FILE_OFFSET_BITS=64 $(INCLUDES)
 
@@ -15,9 +14,12 @@ CC = gcc
 AR = ar
 
 
-exec_objs :=	main.o \
-		handler.o \
-		fs.o
+exec_objs := \
+	vfs.o \
+	dentry.o \
+	fuse_interface.o \
+	frontend_handler.o \
+	main.o
 
 execs := nexus-fuse
 

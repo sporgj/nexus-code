@@ -1,65 +1,19 @@
 #include <stddef.h>
 
-#include "internal.h"
+#include "nexus_fuse.h"
+
+
+struct nexus_volume * nexus_fuse_volume = NULL;
 
 
 char * volume_path = NULL;
-
-/* this is where the raw data files will be served from */
-char * datastore_path = NULL;
-
-size_t datastore_pathlen = 0;
-
-/* the currently running volume */
-struct nexus_volume * mounted_volume = NULL;
-
-
-static void *
-fuse_datastore_open(nexus_json_obj_t cfg)
-{
-    char * root_datastore_path = NULL;
-    char * volume_fullpath     = NULL;
-
-    int    ret = 0;
-
-
-    ret = nexus_json_get_string(cfg, "root_path", &root_datastore_path);
-
-    if (ret == -1) {
-        log_error("Invalid FLAT datastore config. Missing root_path\n");
-        return NULL;
-    }
-
-    volume_fullpath = get_current_dir_name();
-
-    asprintf(&datastore_path, "%s/%s", volume_fullpath, root_datastore_path);
-
-    if (datastore_path == NULL) {
-        log_error("could not generate datastore path (%s)\n", volume_fullpath);
-        nexus_free(volume_fullpath);
-        perror("strernno");
-        return NULL;
-    }
-
-    datastore_pathlen = strnlen(datastore_path, PATH_MAX);
-
-    nexus_free(volume_fullpath);
-
-    return datastore_path;
-}
-
-static int
-fuse_datastore_close(void * priv_data)
-{
-    // TODO call fuse to stop here
-    // nexus_free(volume_path);
-
-    return 0;
-}
+char * mount_path  = NULL;
 
 int
 main(int argc, char * argv[])
 {
+    int ret = -1;
+
     if (argc < 3) {
         fprintf(stdout, "usage: %s <volume_path> [fuse options] <mountpath>\n", argv[0]);
         fflush(stdout);
@@ -67,39 +21,52 @@ main(int argc, char * argv[])
     }
 
 
-    volume_path = strndup(argv[1], PATH_MAX);
-    if (volume_path == NULL) {
-        log_error("Could not get volume path\n");
-        return -1;
+    {
+        volume_path = strndup(argv[1], PATH_MAX);
+
+        if (volume_path == NULL) {
+            log_error("Could not get volume path\n");
+            return -1;
+        }
+
+        mount_path = strndup(argv[argc - 1], PATH_MAX);
+
+        if (mount_path == NULL) {
+            nexus_free(volume_path);
+            log_error("Could not get volume path\n");
+            return -1;
+        }
     }
+
 
     nexus_init();
 
-    mounted_volume = nexus_mount_volume(volume_path);
+    nexus_fuse_volume = nexus_mount_volume(volume_path);
 
-    if (mounted_volume == NULL) {
+    if (nexus_fuse_volume == NULL) {
         log_error("failed to mount '%s'\n", volume_path);
-        return -1;
+        goto out;
     }
 
-    if (datastore_path == NULL) {
-        log_error("did not initialize datastore path, check volume config\n");
-        // TODO cleanup
-        return -1;
+
+    if (vfs_init()) {
+        log_error("could not initialize the internal VFS system\n");
+        goto out;
     }
 
-    printf("Starting nexus-fuse at [%s] (pid=%d)...\n", datastore_path, (int) getpid());
+    printf("Starting nexus-fuse at [%s] (pid=%d)...\n", mount_path, (int) getpid());
+
+    argv[1] = argv[0];
+    ret = start_fuse(argc - 1, &argv[1], true, mount_path);
+
+
+out:
+    vfs_deinit();
 
     // TODO handle nexus_deinit properly
 
-    argv[1] = argv[0];
-    return start_fuse(argc - 1, &argv[1], datastore_path);
+    nexus_free(volume_path);
+    nexus_free(mount_path);
+
+    return ret;
 }
-
-static struct nexus_datastore_impl fuse_datastore = {
-    .name   = "FUSE",
-    .open   = fuse_datastore_open,
-    .close  = fuse_datastore_close
-};
-
-nexus_register_datastore(fuse_datastore);
