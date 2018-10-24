@@ -4,6 +4,7 @@ typedef enum {
     ECALL_FILLDIR       = 2,
     ECALL_CREATE        = 3,
     ECALL_LOOKUP        = 4,
+    ECALL_STAT          = 0x10,
     ECALL_REMOVE        = 5,
     ECALL_HARDLINK      = 6,
     ECALL_SYMLINK       = 7,
