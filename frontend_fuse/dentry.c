@@ -64,14 +64,19 @@ dentry_delete_and_free(struct my_dentry * dentry)
 }
 
 struct my_dentry *
-dentry_create(struct my_dentry * parent, char * name, fuse_ino_t ino)
+dentry_create(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type)
 {
     struct my_dentry * dentry = dentry_alloc();
 
-    dentry->ino = ino;
-
     strncpy(dentry->name, name, NEXUS_NAME_MAX);
     dentry->name_len = strnlen(dentry->name, NEXUS_NAME_MAX);
+
+    dentry->type = type;
+
+    if (uuid) {
+        nexus_uuid_copy(uuid, &dentry->uuid);
+        dentry->ino = nexus_uuid_hash(uuid);
+    }
 
     dentry->parent = parent;
 
@@ -122,4 +127,14 @@ dentry_get_fullpath(struct my_dentry * dentry)
     }
 
     return result;
+}
+
+char *
+dentry_get_parent_fullpath(struct my_dentry * dentry)
+{
+    if (dentry->parent == NULL) {
+        return strndup("/", NEXUS_NAME_MAX);
+    }
+
+    return dentry_get_fullpath(dentry->parent);
 }

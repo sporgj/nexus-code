@@ -33,7 +33,8 @@ vfs_init()
     }
 
 
-    root_dentry = dentry_create(NULL, "/", FUSE_ROOT_ID);
+    root_dentry = dentry_create(NULL, "", NULL, NEXUS_DIR);
+    root_dentry->ino = FUSE_ROOT_ID;
 
     if (!nexus_htable_insert(inode_hashtable, (uintptr_t)root_dentry->ino, (uintptr_t)root_dentry)) {
         nexus_free(root_dentry);
@@ -56,12 +57,18 @@ vfs_deinit()
 struct my_dentry *
 vfs_get_dentry(fuse_ino_t ino)
 {
-    return nexus_htable_search(inode_hashtable, (uintptr_t)ino);
+    struct my_dentry * result = nexus_htable_search(inode_hashtable, (uintptr_t)ino);
+
+    if (result) {
+        result->lookup_count += 1;
+    }
+
+    return result;
 }
 
 
 struct my_dentry *
-vfs_add_dentry(struct my_dentry * parent, char * name, fuse_ino_t ino)
+vfs_add_dentry(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type)
 {
     struct my_dentry * result = dentry_lookup(parent, name);
 
@@ -69,7 +76,7 @@ vfs_add_dentry(struct my_dentry * parent, char * name, fuse_ino_t ino)
         return result;
     }
 
-    result = dentry_create(parent, name, ino);
+    result = dentry_create(parent, name, uuid, type);
 
     if (!nexus_htable_insert(inode_hashtable, (uintptr_t)result->ino, (uintptr_t)result)) {
         dentry_delete_and_free(result);
@@ -79,4 +86,30 @@ vfs_add_dentry(struct my_dentry * parent, char * name, fuse_ino_t ino)
     }
 
     return result;
+}
+
+
+void
+vfs_remove_inode(fuse_ino_t ino)
+{
+    struct my_dentry * dentry = nexus_htable_search(inode_hashtable, (uintptr_t)ino);
+
+    if (dentry == NULL) {
+        return;
+    }
+
+
+    dentry->lookup_count -= 1;
+
+    if (dentry) {
+        return;
+    }
+
+
+    if (dentry->lookup_count == 0) {
+        nexus_htable_remove(inode_hashtable, (uintptr_t)ino, 0);
+    }
+
+
+    dentry_delete_and_free(dentry);
 }

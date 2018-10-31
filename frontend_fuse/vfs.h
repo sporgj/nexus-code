@@ -21,6 +21,10 @@ struct my_dentry {
 
     fuse_ino_t            ino; // pointer to unique inode number
 
+    size_t                lookup_count;
+
+    nexus_dirent_type_t   type;
+
     struct my_dentry    * parent;
 
     struct list_head      children;
@@ -28,6 +32,19 @@ struct my_dentry {
     struct list_head      siblings;
 };
 
+
+struct my_file {
+    struct my_dentry    * dentry;
+};
+
+
+struct my_dir {
+    size_t                file_count;
+
+    size_t                readdir_offset; // the current offset of READDIR operation
+
+    struct my_dentry    * dentry;
+};
 
 
 int
@@ -41,12 +58,17 @@ struct my_dentry *
 vfs_get_dentry(fuse_ino_t ino);
 
 struct my_dentry *
-vfs_add_dentry(struct my_dentry * parent, char * name, fuse_ino_t ino);
+vfs_add_dentry(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type);
+
+void
+vfs_remove_inode(fuse_ino_t ino);
 
 
+
+// dentry.c
 
 struct my_dentry *
-dentry_create(struct my_dentry * parent, char * name, fuse_ino_t ino);
+dentry_create(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type);
 
 void
 dentry_delete_and_free(struct my_dentry * dentry);
@@ -59,3 +81,6 @@ dentry_lookup(struct my_dentry * parent, const char * name);
 
 char *
 dentry_get_fullpath(struct my_dentry * dentry);
+
+char *
+dentry_get_parent_fullpath(struct my_dentry * dentry);

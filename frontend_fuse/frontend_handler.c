@@ -1,8 +1,10 @@
 #include "nexus_fuse.h"
 
-
 struct nexus_dirent *
-nexus_fuse_readdir(struct my_dentry * dentry, size_t offset, size_t * result_count, size_t * directory_size)
+nexus_fuse_readdir(struct my_dentry * dentry,
+                   size_t             offset,
+                   size_t           * result_count,
+                   size_t           * directory_size)
 {
     size_t dirent_count = 128;
 
@@ -34,15 +36,23 @@ nexus_fuse_readdir(struct my_dentry * dentry, size_t offset, size_t * result_cou
 
 
 int
-nexus_fuse_stat(struct my_dentry * dentry, char * filename, struct nexus_stat * stat)
+nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 {
-    char * dirpath = dentry_get_fullpath(dentry);
+    char * dirpath = NULL;
+
+
+    if (dentry->ino == FUSE_ROOT_ID) {
+        return nexus_fs_stat(nexus_fuse_volume, "/", stat);
+    }
+
+
+    dirpath = dentry_get_fullpath(dentry);
 
     if (dirpath == NULL) {
         return -1;
     }
 
-    if (nexus_fs_stat(nexus_fuse_volume, dirpath, filename, stat)) {
+    if (nexus_fs_stat(nexus_fuse_volume, dirpath, stat)) {
         nexus_free(dirpath);
         return -1;
     }
@@ -53,25 +63,68 @@ nexus_fuse_stat(struct my_dentry * dentry, char * filename, struct nexus_stat * 
 }
 
 int
-nexus_fuse_lookup(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
+nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_stat * nexus_stat)
 {
-    struct nexus_uuid uuid;
-
     char * dirpath = dentry_get_fullpath(dentry);
 
     if (dirpath == NULL) {
         return -1;
     }
 
-    if (nexus_fs_lookup(nexus_fuse_volume, dirpath, filename, &uuid)) {
+    if (nexus_fs_lookup(nexus_fuse_volume, dirpath, filename, nexus_stat)) {
         nexus_free(dirpath);
         return -1;
     }
 
+    nexus_free(dirpath);
+
+    return 0;
+}
+
+int
+nexus_fuse_touch(struct my_dentry  * dentry,
+                 char              * filename,
+                 nexus_dirent_type_t type,
+                 struct nexus_stat * nexus_stat)
+{
+    char * parent_dirpath = dentry_get_fullpath(dentry);
+
+    if (parent_dirpath == NULL) {
+        return -1;
+    }
+
+    if (nexus_fs_touch(nexus_fuse_volume, parent_dirpath, filename, type, &nexus_stat->uuid)) {
+        nexus_free(parent_dirpath);
+        return -1;
+    }
+
+    // setup the stat info
+    nexus_stat->type = type;
+    nexus_stat->size = 0;
+
+    nexus_free(parent_dirpath);
+
+    return 0;
+}
+
+int
+nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
+{
+    struct nexus_uuid uuid;
+    char * parent_dirpath = dentry_get_fullpath(dentry);
+
+    if (parent_dirpath == NULL) {
+        return -1;
+    }
+
+    if (nexus_fs_remove(nexus_fuse_volume, parent_dirpath, filename, &uuid)) {
+        nexus_free(parent_dirpath);
+        return -1;
+    }
 
     *ino = nexus_uuid_hash(&uuid);
 
-    nexus_free(dirpath);
+    nexus_free(parent_dirpath);
 
     return 0;
 }
