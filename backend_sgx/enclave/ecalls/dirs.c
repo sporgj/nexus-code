@@ -83,6 +83,10 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
 
     nexus_dirent_type_t type;
 
+
+    // TODO: check if it's a directory (rmdir)... if non-empty, we refuse
+    // TODO: if it's a file, we should probably drop refcount (hardlink implementation)
+
     if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT, &tmp_uuid, NULL)) {
         log_error("dirnode_remove() FAILED\n");
         return -1;
@@ -138,21 +142,23 @@ out:
 }
 
 inline static int
-__nxs_fs_lookup(struct nexus_metadata * metadata, char * filename_IN, struct nexus_uuid * uuid_OUT)
+__nxs_fs_lookup(struct nexus_dirnode * dirnode, char * filename_IN, struct nexus_stat * stat)
 {
-    struct nexus_dirnode * dirnode = metadata->dirnode;
-
+    struct nexus_uuid   uuid;
     nexus_dirent_type_t type;
 
-    if (dirnode_find_by_name(dirnode, filename_IN, &type, uuid_OUT)) {
+    if (dirnode_find_by_name(dirnode, filename_IN, &type, &uuid)) {
         return -1;
     }
+
+    stat->type = type;
+    nexus_uuid_copy(&uuid, &stat->uuid);
 
     return 0;
 }
 
 int
-ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_out)
+ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_stat * stat_out)
 {
     struct nexus_metadata * metadata = NULL;
 
@@ -168,13 +174,12 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
         return -1;
     }
 
-    ret = __nxs_fs_lookup(metadata, filename_IN, &entry_uuid);
+    ret = __nxs_fs_lookup(metadata->dirnode, filename_IN, stat_out);
+
     if (ret != 0) {
         // lookups fail very often, no need to report the error
         goto out;
     }
-
-    nexus_uuid_copy(&entry_uuid, uuid_out);
 
     ret = 0;
 out:
@@ -198,91 +203,39 @@ __nxs_fs_filldir(struct nexus_metadata * metadata,
     return 0;
 }
 
-
-int
-__nxs_fs_stat(struct nexus_dirnode * dirnode, char * plain_name, struct nexus_stat * stat_info)
+static inline void
+__nxs_fs_stat(struct nexus_metadata * metadata, struct nexus_stat * stat_info)
 {
-    struct nexus_uuid real_uuid;
-    struct nexus_uuid link_uuid;
+    if (metadata->type == NEXUS_DIRNODE) {
+        struct nexus_dirnode * dirnode = metadata->dirnode;
 
-    nexus_dirent_type_t dirent_type;
-    nexus_metadata_type_t metadata_type;
+        stat_info->size = dirnode->dir_entry_count;
+        stat_info->type = NEXUS_DIR;
+    } else {
+        struct nexus_filenode * filenode = metadata->filenode;
 
-
-    if (__dirnode_find_by_name(dirnode, plain_name, &dirent_type, &link_uuid, &real_uuid)) {
-        return -1;
+        stat_info->size = filenode->filesize;
+        stat_info->type = NEXUS_REG;
     }
 
-    if (dirent_type == NEXUS_LNK) {
-        stat_info->size = 0;
-        stat_info->type = NEXUS_LNK;
-        return 0;
-    }
-
-    metadata_type = (dirent_type == NEXUS_REG ? NEXUS_FILENODE : NEXUS_DIRNODE);
-
-    // load the metadata and read its contents
-    {
-        struct nexus_metadata * metadata = nexus_vfs_load(&link_uuid, metadata_type, NEXUS_FREAD);
-
-        if (metadata == NULL) {
-            return -1;
-        }
-
-        if (metadata_type == NEXUS_DIRNODE) {
-            struct nexus_dirnode * dirnode = metadata->dirnode;
-
-            stat_info->size = dirnode->dir_entry_count;
-            stat_info->type = NEXUS_DIR;
-        } else {
-            struct nexus_filenode * filenode = metadata->filenode;
-
-            stat_info->size = filenode->filesize;
-            stat_info->type = NEXUS_REG;
-        }
-
-        nexus_vfs_put(metadata);
-    }
-
-    nexus_uuid_copy(&link_uuid, &stat_info->uuid);
-
-    return 0;
+    nexus_uuid_copy(&metadata->uuid, &stat_info->uuid);
 }
 
 int
-ecall_fs_stat(char * dirpath_IN, char * plain_name_IN, struct nexus_stat * nexus_stat_out)
+ecall_fs_stat(char * path_IN, struct nexus_stat * nexus_stat_out)
 {
-    struct nexus_metadata * metadata = NULL;
-
-    int ret = -1;
-
-
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
+    struct nexus_metadata * metadata = nexus_vfs_get(path_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
         return -1;
     }
 
-    if (metadata->type != NEXUS_DIRNODE) {
-        nexus_vfs_put(metadata);
+    __nxs_fs_stat(metadata, nexus_stat_out);
 
-        log_error("the path is not a directory\n");
-        return -1;
-    }
-
-    ret = __nxs_fs_stat(metadata->dirnode, plain_name_IN, nexus_stat_out);
-
-    if (ret != 0) {
-        goto out;
-    }
-
-    ret = 0;
-out:
     nexus_vfs_put(metadata);
 
-    return ret;
-
+    return 0;
 }
 
 int

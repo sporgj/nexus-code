@@ -148,17 +148,6 @@ nexus_backend_shutdown(struct nexus_backend * backend)
 
 }
 
-int
-nexus_backend_fs_create(struct nexus_volume * volume,
-                        char                * path,
-                        nexus_dirent_type_t   type,
-                        struct nexus_stat   * stat)
-{
-    struct nexus_backend * backend = volume->backend;
-
-    return backend->impl->fs_create(volume, path, type, stat, backend->priv_data);
-}
-
 
 int
 nexus_backend_user_list(struct nexus_volume * volume)

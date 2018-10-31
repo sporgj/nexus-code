@@ -23,12 +23,10 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
                       nexus_dirent_type_t    type,
-                      char                ** nexus_name,
+                      struct nexus_uuid    * uuid,
                       void                 * priv_data)
 {
     struct sgx_backend * sgx_backend = NULL;
-
-    struct nexus_uuid uuid;
 
     int err = -1;
     int ret = -1;
@@ -38,7 +36,7 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_CREATE);
 
-    err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, plain_name, type, &uuid);
+    err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, plain_name, type, uuid);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_CREATE);
 
@@ -47,46 +45,11 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
         return -1;
     }
 
-    *nexus_name = nexus_uuid_to_alt64(&uuid);
-
     return 0;
 }
 
 int
 sgx_backend_fs_remove(struct nexus_volume  * volume,
-                      char                 * dirpath,
-                      char                 * plain_name,
-                      char                ** nexus_name,
-                      void                 * priv_data)
-{
-    struct sgx_backend * sgx_backend = NULL;
-
-    struct nexus_uuid uuid;
-
-    int err = -1;
-    int ret = -1;
-
-
-    sgx_backend = (struct sgx_backend *)priv_data;
-
-    BACKEND_SGX_ECALL_START(ECALL_REMOVE);
-
-    err = ecall_fs_remove(sgx_backend->enclave_id, &ret, dirpath, plain_name, &uuid);
-
-    BACKEND_SGX_ECALL_FINISH(ECALL_REMOVE);
-
-    if (err || ret) {
-        log_error("ecall_fs_remove() FAILED. (err=0x%x, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    *nexus_name = nexus_uuid_to_alt64(&uuid);
-
-    return 0;
-}
-
-int
-sgx_backend_fs_lookup(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
                       struct nexus_uuid    * uuid,
@@ -100,9 +63,38 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
 
     sgx_backend = (struct sgx_backend *)priv_data;
 
+    BACKEND_SGX_ECALL_START(ECALL_REMOVE);
+
+    err = ecall_fs_remove(sgx_backend->enclave_id, &ret, dirpath, plain_name, uuid);
+
+    BACKEND_SGX_ECALL_FINISH(ECALL_REMOVE);
+
+    if (err || ret) {
+        log_error("ecall_fs_remove() FAILED. (err=0x%x, ret=%d)\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+sgx_backend_fs_lookup(struct nexus_volume  * volume,
+                      char                 * dirpath,
+                      char                 * plain_name,
+                      struct nexus_stat    * stat,
+                      void                 * priv_data)
+{
+    struct sgx_backend * sgx_backend = NULL;
+
+    int err = -1;
+    int ret = -1;
+
+
+    sgx_backend = (struct sgx_backend *)priv_data;
+
     BACKEND_SGX_ECALL_START(ECALL_LOOKUP);
 
-    err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, uuid);
+    err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, stat);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_LOOKUP);
 
@@ -116,8 +108,7 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
 
 int
 sgx_backend_fs_stat(struct nexus_volume * volume,
-                    char                * dirpath,
-                    char                * plain_name,
+                    char                * path,
                     struct nexus_stat   * nexus_stat,
                     void                * priv_data)
 {
@@ -131,12 +122,12 @@ sgx_backend_fs_stat(struct nexus_volume * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_STAT);
 
-    err = ecall_fs_stat(sgx_backend->enclave_id, &ret, dirpath, plain_name, nexus_stat);
+    err = ecall_fs_stat(sgx_backend->enclave_id, &ret, path, nexus_stat);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_STAT);
 
     if (err) {
-        log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
+        log_error("ecall_fs_stat() FAILED. (err=0x%x)\n", err);
         return -1;
     }
 

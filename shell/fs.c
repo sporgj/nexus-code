@@ -70,11 +70,77 @@ create_file_usage()
     return;
 }
 
+
+static void
+print_stat_info(const char * path, struct nexus_stat * nexus_stat)
+{
+    char * nexus_name = nexus_uuid_to_alt64(&nexus_stat->uuid);
+    char * file_type = NULL;
+
+    switch (nexus_stat->type) {
+    case NEXUS_DIR:
+        file_type = "DIR";
+        break;
+    case NEXUS_LNK:
+        file_type = "LNK";
+    default:
+        file_type = "REG";
+    }
+
+    printf(" %s -> [%s] %s\n", path, file_type, nexus_name);
+
+    nexus_free(nexus_name);
+}
+
+int
+__fs_stat(struct nexus_volume * vol, const char * path)
+{
+    struct nexus_stat nexus_stat;
+
+    if (nexus_fs_stat(vol, (char *)path, &nexus_stat)) {
+        log_error("stat %s FAILED\n", path);
+        return -1;
+    }
+
+    print_stat_info(path, &nexus_stat);
+
+    return 0;
+}
+
+int
+__fs_lookup(struct nexus_volume * vol, const char * path)
+{
+    char * dirpath  = NULL;
+    char * filename = NULL;
+
+    struct nexus_stat nexus_stat;
+
+
+    nexus_splitpath(path, &dirpath, &filename);
+
+    if (nexus_fs_lookup(vol, dirpath, filename, &nexus_stat)) {
+        log_error("lookup %s FAILED\n", path);
+
+        nexus_free(dirpath);
+        nexus_free(filename);
+        return -1;
+    }
+
+    print_stat_info(path, &nexus_stat);
+
+    nexus_free(dirpath);
+    nexus_free(filename);
+
+    return 0;
+}
+
 int
 __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type)
 {
     char * dirpath  = NULL;
     char * filename = NULL;
+
+    struct nexus_uuid uuid;
 
     char * nexus_name = NULL;
 
@@ -82,7 +148,7 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
 
     nexus_splitpath(path, &dirpath, &filename);
 
-    ret = nexus_fs_touch(vol, dirpath, filename, type, &nexus_name);
+    ret = nexus_fs_touch(vol, dirpath, filename, type, &uuid);
 
     nexus_free(dirpath);
     nexus_free(filename);
@@ -92,9 +158,9 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
         return -1;
     }
 
+    nexus_name = nexus_uuid_to_alt64(&uuid);
     printf(" .created %s -> %s\n", path, nexus_name);
     fflush(stdout);
-
     nexus_free(nexus_name);
 
     return 0;

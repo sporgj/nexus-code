@@ -88,13 +88,12 @@ enclave {
         (
             [in, string] char                * directory_IN,
             [in, string] char                * filename_IN,
-                   [out] struct nexus_uuid   * uuid_out
+            [user_check] struct nexus_stat   * stat_out
         );
 
         public int ecall_fs_stat
         (
-            [in, string] char                * directory_IN,
-            [in, string] char                * filename_IN,
+            [in, string] char                * path_IN,
             [user_check] struct nexus_stat   * stat_out
         );
 

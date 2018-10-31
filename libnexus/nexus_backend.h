@@ -87,35 +87,27 @@ struct nexus_backend_impl {
     /**
      * Creates a new file
      */
-    int (*fs_create)(struct nexus_volume * volume,
-                     char                * path,
-                     nexus_dirent_type_t   type,
-                     struct nexus_stat   * stat,
-                     void                * priv_data);
-
-
     int (*fs_touch)(struct nexus_volume  * volume,
                     char                 * dirpath,
                     char                 * plain_name,
                     nexus_dirent_type_t    type,
-                    char                ** nexus_name,
+                    struct nexus_uuid    * uuid,
                     void                 * priv_data);
 
     int (*fs_remove)(struct nexus_volume  * volume,
                      char                 * dirpath,
                      char                 * plain_name,
-                     char                ** nexus_name,
+                     struct nexus_uuid    * uuid,
                      void                 * priv_data);
 
     int (*fs_lookup)(struct nexus_volume  * volume,
                      char                 * dirpath,
                      char                 * plain_name,
-                     struct nexus_uuid    * uuid,
+                     struct nexus_stat    * stat,
                      void                 * priv_data);
 
     int   (*fs_stat)(struct nexus_volume  * volume,
-                     char                 * dirpath,
-                     char                 * plain_name,
+                     char                 * path,
                      struct nexus_stat    * nexus_stat,
                      void                 * priv_data);
 

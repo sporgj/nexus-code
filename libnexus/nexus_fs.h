@@ -61,23 +61,22 @@ nexus_fs_touch(struct nexus_volume  * volume,
                char                 * parent_dir,
                char                 * plain_name,
                nexus_dirent_type_t    type,
-               char                ** nexus_name);
+               struct nexus_uuid    * uuid);
 
 int
 nexus_fs_remove(struct nexus_volume  * volume,
                 char                 * parent_dir,
                 char                 * plain_name,
-                char                ** nexus_name);
+                struct nexus_uuid    * uuid);
 
 int
 nexus_fs_lookup(struct nexus_volume  * volume,
                 char                 * parent_dir,
                 char                 * plain_name,
-                struct nexus_uuid    * uuid);
+                struct nexus_stat    * stat);
 int
 nexus_fs_stat(struct nexus_volume  * volume,
-              char                 * dirpath,
-              char                 * plain_name,
+              char                 * path,
               struct nexus_stat    * nexus_stat);
 
 int

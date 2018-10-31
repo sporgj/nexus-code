@@ -30,7 +30,8 @@ INCLUDE := -I$(SGX_SDK)/include \
 
 CFLAGS  += -nostdinc \
 	-fvisibility=hidden -fpie -fPIC -fstack-protector -mpclmul -maes -mavx -w \
-	-W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC
+	-W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
+	-Werror=implicit-function-declaration
 
 
 

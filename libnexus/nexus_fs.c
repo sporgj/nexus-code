@@ -20,23 +20,23 @@ nexus_fs_touch(struct nexus_volume  * volume,
                char                 * dirpath,
                char                 * plain_name,
                nexus_dirent_type_t    type,
-               char                ** nexus_name)
+               struct nexus_uuid    * uuid)
 {
     struct nexus_backend * backend = volume->backend;
 
     if (backend->impl->fs_touch == NULL) {
-	log_error("fs_touch NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+        log_error("fs_touch NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
     }
 
-    return backend->impl->fs_touch(volume, dirpath, plain_name, type, nexus_name, backend->priv_data);
+    return backend->impl->fs_touch(volume, dirpath, plain_name, type, uuid, backend->priv_data);
 }
 
 int
 nexus_fs_remove(struct nexus_volume  * volume,
                 char                 * dirpath,
                 char                 * plain_name,
-                char                ** nexus_name)
+                struct nexus_uuid    * uuid)
 {
     struct nexus_backend * backend = volume->backend;
 
@@ -45,14 +45,14 @@ nexus_fs_remove(struct nexus_volume  * volume,
 	return -1;
     }
 
-    return backend->impl->fs_remove(volume, dirpath, plain_name, nexus_name, backend->priv_data);
+    return backend->impl->fs_remove(volume, dirpath, plain_name, uuid, backend->priv_data);
 }
 
 int
 nexus_fs_lookup(struct nexus_volume  * volume,
                 char                 * dirpath,
                 char                 * plain_name,
-                struct nexus_uuid    * uuid)
+                struct nexus_stat    * stat)
 {
     struct nexus_backend * backend = volume->backend;
 
@@ -61,13 +61,12 @@ nexus_fs_lookup(struct nexus_volume  * volume,
 	return -1;
     }
 
-    return backend->impl->fs_lookup(volume, dirpath, plain_name, uuid, backend->priv_data);
+    return backend->impl->fs_lookup(volume, dirpath, plain_name, stat, backend->priv_data);
 }
 
 int
 nexus_fs_stat(struct nexus_volume  * volume,
-              char                 * dirpath,
-              char                 * plain_name,
+              char                 * path,
               struct nexus_stat    * nexus_stat)
 {
     struct nexus_backend * backend = volume->backend;
@@ -77,7 +76,7 @@ nexus_fs_stat(struct nexus_volume  * volume,
         return -1;
     }
 
-    return backend->impl->fs_stat(volume, dirpath, plain_name, nexus_stat, backend->priv_data);
+    return backend->impl->fs_stat(volume, path, nexus_stat, backend->priv_data);
 }
 
 int

@@ -18,7 +18,13 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
 int
 __fs_ls(struct nexus_volume * vol, char * dirpath);
 
-int dispatch_nexus_command(uint8_t   * cmd_buf,
-			   uint32_t    cmd_size,
-			   uint8_t  ** resp_buf,
-			   uint32_t  * resp_size);
+int
+__fs_stat(struct nexus_volume * vol, char * path);
+
+
+
+int
+dispatch_nexus_command(uint8_t    * cmd_buf,
+                       uint32_t     cmd_size,
+                       uint8_t   ** resp_buf,
+                       uint32_t   * resp_size);
