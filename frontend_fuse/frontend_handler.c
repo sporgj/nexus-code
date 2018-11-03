@@ -34,7 +34,6 @@ nexus_fuse_readdir(struct my_dentry * dentry,
     return result;
 }
 
-
 int
 nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 {
@@ -63,7 +62,70 @@ nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 }
 
 int
-nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_stat * nexus_stat)
+nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
+{
+    char * dirpath = NULL;
+
+
+    if (dentry->ino == FUSE_ROOT_ID) {
+        return nexus_fs_getattr(nexus_fuse_volume, "/", attrs);
+    }
+
+
+    dirpath = dentry_get_fullpath(dentry);
+
+    if (dirpath == NULL) {
+        return -1;
+    }
+
+    if (nexus_fs_getattr(nexus_fuse_volume, dirpath, attrs)) {
+        nexus_free(dirpath);
+        return -1;
+    }
+
+    // update the inode number
+    attrs->posix_stat.st_ino = nexus_uuid_hash(&attrs->stat_info.uuid);
+
+    nexus_free(dirpath);
+
+    return 0;
+}
+
+
+int
+nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int to_set)
+{
+    char * dirpath = NULL;
+
+    nexus_fs_attr_flags_t flags = to_set; // the to_set flags and nexus flags are the same
+
+
+    if (dentry->ino == FUSE_ROOT_ID) {
+        return nexus_fs_setattr(nexus_fuse_volume, "/", attrs, flags);
+    }
+
+
+    dirpath = dentry_get_fullpath(dentry);
+
+    if (dirpath == NULL) {
+        return -1;
+    }
+
+    if (nexus_fs_setattr(nexus_fuse_volume, dirpath, attrs, flags)) {
+        nexus_free(dirpath);
+        return -1;
+    }
+
+    // update the inode number
+    attrs->posix_stat.st_ino = nexus_uuid_hash(&attrs->stat_info.uuid);
+
+    nexus_free(dirpath);
+
+    return 0;
+}
+
+int
+nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_fs_lookup * lookup_info)
 {
     char * dirpath = dentry_get_fullpath(dentry);
 
@@ -71,7 +133,7 @@ nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_stat 
         return -1;
     }
 
-    if (nexus_fs_lookup(nexus_fuse_volume, dirpath, filename, nexus_stat)) {
+    if (nexus_fs_lookup(nexus_fuse_volume, dirpath, filename, lookup_info)) {
         nexus_free(dirpath);
         return -1;
     }

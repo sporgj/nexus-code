@@ -26,11 +26,17 @@ nexus_fuse_readdir(struct my_dentry * dentry, size_t offset, size_t * result_cou
 
 
 int
-nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_stat * nexus_stat);
-
+nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_fs_lookup * lookup_info);
 
 int
 nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat);
+
+int
+nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs);
+
+int
+nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int to_set);
+
 
 int
 nexus_fuse_touch(struct my_dentry  * dentry,

@@ -73,6 +73,7 @@ vfs_add_dentry(struct my_dentry * parent, char * name, struct nexus_uuid * uuid,
     struct my_dentry * result = dentry_lookup(parent, name);
 
     if (result) {
+        result->lookup_count += 1;
         return result;
     }
 
@@ -84,6 +85,8 @@ vfs_add_dentry(struct my_dentry * parent, char * name, struct nexus_uuid * uuid,
 
         return NULL;
     }
+
+    result->lookup_count = 1;
 
     return result;
 }
@@ -112,4 +115,59 @@ vfs_remove_inode(fuse_ino_t ino)
 
 
     dentry_delete_and_free(dentry);
+}
+
+
+
+// TODO add file to list of open files
+struct my_file *
+vfs_create_file(struct my_dentry * dentry)
+{
+    struct my_file * file_ptr = nexus_malloc(sizeof(struct my_file));
+
+    file_ptr->dentry = dentry;
+
+
+    if (dentry) {
+        dentry->openers += 1;
+    }
+
+    return file_ptr;
+}
+
+void
+vfs_delete_file(struct my_file * file_ptr)
+{
+    if (file_ptr->dentry) {
+        file_ptr->dentry->openers -= 1;
+    }
+
+    nexus_free(file_ptr);
+}
+
+
+// TODO add directory to open directories
+struct my_dir *
+vfs_create_dir(struct my_dentry * dentry)
+{
+    struct my_dir * dir_ptr = nexus_malloc(sizeof(struct my_dir));
+
+    dir_ptr->dentry = dentry;
+
+
+    if (dentry) {
+        dentry->openers += 1;
+    }
+
+    return dir_ptr;
+}
+
+void
+vfs_delete_dir(struct my_dir * dir_ptr)
+{
+    if (dir_ptr->dentry) {
+        dir_ptr->dentry->openers -= 1;
+    }
+
+    nexus_free(dir_ptr);
 }

@@ -23,6 +23,8 @@ struct my_dentry {
 
     size_t                lookup_count;
 
+    size_t                openers;
+
     nexus_dirent_type_t   type;
 
     struct my_dentry    * parent;
@@ -62,6 +64,21 @@ vfs_add_dentry(struct my_dentry * parent, char * name, struct nexus_uuid * uuid,
 
 void
 vfs_remove_inode(fuse_ino_t ino);
+
+
+
+struct my_file *
+vfs_create_file(struct my_dentry * dentry);
+
+void
+vfs_delete_file(struct my_file * file_ptr);
+
+
+struct my_dir *
+vfs_create_dir(struct my_dentry * dentry);
+
+void
+vfs_delete_dir(struct my_dir * dir_ptr);
 
 
 
