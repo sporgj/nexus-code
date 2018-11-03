@@ -21,6 +21,9 @@ __fs_ls(struct nexus_volume * vol, char * dirpath);
 int
 __fs_stat(struct nexus_volume * vol, char * path);
 
+int
+__fs_getattr(struct nexus_volume * vol, char * path);
+
 
 
 int

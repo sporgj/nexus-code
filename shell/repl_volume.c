@@ -261,6 +261,28 @@ handle_fs_ls(int argc, char ** argv)
     return ret;
 }
 
+static int
+handle_fs_getattr(int argc, char ** argv)
+{
+    char * path = NULL;
+
+    if (argc < 1) {
+        usage("fs_getattr");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    path = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_getattr(mounted_volume, path);
+
+    nexus_free(path);
+
+    return ret;
+}
+
 /////////
 
 static int
@@ -365,6 +387,7 @@ static struct _cmd cmds[]
         { "fs_touch", handle_fs_touch, "Create a new file", "<filepath>" },
         { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
         { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
+        { "fs_getattr", handle_fs_getattr, "Get attributes (stat) filesystem object", "<path>" },
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };
 

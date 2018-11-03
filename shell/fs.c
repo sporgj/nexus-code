@@ -92,6 +92,37 @@ print_stat_info(const char * path, struct nexus_stat * nexus_stat)
     nexus_free(nexus_name);
 }
 
+static void
+print_lookup_info(const char * path, struct nexus_fs_lookup * lookup_info)
+{
+    char * nexus_name = nexus_uuid_to_alt64(&lookup_info->uuid);
+    char * file_type = NULL;
+
+    switch (lookup_info->type) {
+    case NEXUS_DIR:
+        file_type = "DIR";
+        break;
+    case NEXUS_LNK:
+        file_type = "LNK";
+    default:
+        file_type = "REG";
+    }
+
+    printf(" %s -> [%s] %s\n", path, file_type, nexus_name);
+
+    nexus_free(nexus_name);
+}
+
+static void
+print_attrs_info(const char * path, struct nexus_fs_attr * attrs)
+{
+    struct stat * st = &attrs->posix_stat;
+
+    print_stat_info(path, &attrs->stat_info);
+
+    printf("\t size: %zu, access time: %zu, mod time: %zu\n", st->st_size, st->st_atime, st->st_mtime);
+}
+
 int
 __fs_stat(struct nexus_volume * vol, const char * path)
 {
@@ -113,12 +144,12 @@ __fs_lookup(struct nexus_volume * vol, const char * path)
     char * dirpath  = NULL;
     char * filename = NULL;
 
-    struct nexus_stat nexus_stat;
+    struct nexus_fs_lookup lookup_info;
 
 
     nexus_splitpath(path, &dirpath, &filename);
 
-    if (nexus_fs_lookup(vol, dirpath, filename, &nexus_stat)) {
+    if (nexus_fs_lookup(vol, dirpath, filename, &lookup_info)) {
         log_error("lookup %s FAILED\n", path);
 
         nexus_free(dirpath);
@@ -126,10 +157,25 @@ __fs_lookup(struct nexus_volume * vol, const char * path)
         return -1;
     }
 
-    print_stat_info(path, &nexus_stat);
+    print_lookup_info(path, &lookup_info);
 
     nexus_free(dirpath);
     nexus_free(filename);
+
+    return 0;
+}
+
+int
+__fs_getattr(struct nexus_volume * vol, char * path)
+{
+    struct nexus_fs_attr attrs;
+
+    if (nexus_fs_getattr(vol, path, &attrs)) {
+        log_error("getattr %s FAILED\n", path);
+        return -1;
+    }
+
+    print_attrs_info(path, &attrs);
 
     return 0;
 }
