@@ -7,6 +7,8 @@
  */
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <utime.h>
 #include <limits.h>
 
 #include <stdbool.h>
@@ -603,6 +605,82 @@ err_out:
     return ret;
 }
 
+static int
+twolevel_getattr(struct nexus_uuid * uuid, struct nexus_fs_attr * attrs, void * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    char * filepath = __get_full_path(datastore, uuid);
+
+    int ret = -1;
+
+
+    if (filepath == NULL) {
+        log_error("could not get fullpath\n");
+        return -1;
+    }
+
+    ret = stat(filepath, &attrs->posix_stat);
+
+    nexus_free(filepath);
+
+    return ret;
+}
+
+static int
+twolevel_setattr(struct nexus_uuid     * uuid,
+                 struct nexus_fs_attr  * attrs,
+                 nexus_fs_attr_flags_t   flags,
+                 void                  * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    struct stat * new_stat = &attrs->posix_stat; // this will be updated in-place
+    struct stat   old_stat;
+
+    char * filepath = __get_full_path(datastore, uuid);
+
+    int ret = -1;
+
+
+    if (filepath == NULL) {
+        log_error("could not get fullpath\n");
+        return -1;
+    }
+
+    ret = stat(filepath, &old_stat);
+
+    if (ret != 0) {
+        log_error("could not stat file (%s)\n", filepath);
+        nexus_free(filepath);
+        return -1;
+    }
+
+
+    // update the new stat accordingly
+    if (flags & (NEXUS_FS_ATTR_ATIME | NEXUS_FS_ATTR_MTIME)) {
+        struct utimbuf file_time;
+
+        file_time.actime = (flags & NEXUS_FS_ATTR_ATIME) ? new_stat->st_atime : old_stat.st_atime;
+        file_time.modtime = (flags & NEXUS_FS_ATTR_MTIME) ? new_stat->st_mtime : old_stat.st_mtime;
+
+        ret = utime(filepath, &file_time);
+    }
+
+    if (flags & NEXUS_FS_ATTR_MODE) {
+        ret = chmod(filepath, new_stat->st_mode);
+    }
+
+
+    // get the stat on disk and return
+    if (ret == 0) {
+        ret = stat(filepath, new_stat);
+    }
+
+    nexus_free(filepath);
+
+    return ret;
+}
 
 
 static struct nexus_datastore_impl twolevel_datastore = {
@@ -617,6 +695,9 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .get_uuid      = twolevel_get_uuid,
     .put_uuid      = twolevel_put_uuid, // TODO remove
     .update_uuid   = twolevel_update_uuid, // TODO remove
+
+    .getattr       = twolevel_getattr,
+    .setattr       = twolevel_setattr,
 
     .stat_uuid     = twolevel_stat_uuid,
     .new_uuid      = twolevel_new_uuid,
