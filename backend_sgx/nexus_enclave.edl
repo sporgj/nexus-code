@@ -86,9 +86,9 @@ enclave {
 
         public int ecall_fs_lookup
         (
-            [in, string] char                * directory_IN,
-            [in, string] char                * filename_IN,
-            [user_check] struct nexus_stat   * stat_out
+            [in, string] char                    * directory_IN,
+            [in, string] char                    * filename_IN,
+            [user_check] struct nexus_fs_lookup  * lookup_out
         );
 
         public int ecall_fs_stat

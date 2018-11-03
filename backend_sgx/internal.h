@@ -96,12 +96,24 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
                       void                 * priv_data);
 
 int
-sgx_backend_fs_lookup(struct nexus_volume  * volume,
-                      char                 * dirpath,
-                      char                 * plain_name,
-                      struct nexus_stat    * stat,
-                      void                 * priv_data);
+sgx_backend_fs_lookup(struct nexus_volume    * volume,
+                      char                   * dirpath,
+                      char                   * plain_name,
+                      struct nexus_fs_lookup * lookup_info,
+                      void                   * priv_data);
 
+int
+sgx_backend_fs_getattr(struct nexus_volume  * volume,
+                       char                 * path,
+                       struct nexus_fs_attr * attrs,
+                       void                 * priv_data);
+
+int
+sgx_backend_fs_setattr(struct nexus_volume   * volume,
+                       char                  * path,
+                       struct nexus_fs_attr  * attrs,
+                       nexus_fs_attr_flags_t   flags,
+                       void                  * priv_data);
 int
 sgx_backend_fs_stat(struct nexus_volume * volume,
                     char                * dirpath,

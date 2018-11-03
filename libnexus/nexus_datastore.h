@@ -103,6 +103,17 @@ nexus_datastore_stat_uuid(struct nexus_datastore      * datastore,
                           struct nexus_stat           * stat);
 
 int
+nexus_datastore_getattr(struct nexus_datastore * datastore,
+                        struct nexus_uuid      * uuid,
+                        struct nexus_fs_attr   * attrs);
+
+int
+nexus_datastore_setattr(struct nexus_datastore  * datastore,
+                        struct nexus_uuid       * uuid,
+                        struct nexus_fs_attr    * attrs,
+                        nexus_fs_attr_flags_t     flags);
+
+int
 nexus_datastore_new_uuid(struct nexus_datastore      * datastore,
                          struct nexus_uuid           * uuid,
                          char                        * path);
@@ -155,6 +166,23 @@ struct nexus_datastore_impl {
                      char               * path,
                      struct nexus_stat  * stat,
                      void               * priv_data);
+
+    /**
+     * getattr returns the posix stat values
+     */
+    int (*getattr)(struct nexus_uuid    * uuid,
+                   struct nexus_fs_attr * attrs,
+                   void                 * priv_data);
+
+    /**
+     * setattr using the flags specified, it sets the attributes
+     * and then returns the new file attributes
+     */
+    int (*setattr)(struct nexus_uuid     * uuid,
+                   struct nexus_fs_attr  * attrs,
+                   nexus_fs_attr_flags_t   flags,
+                   void                  * priv_data);
+
     /**
      * Gets uuid content
      * @param uuid

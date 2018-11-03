@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
 
 #include <linux/limits.h>
 
@@ -52,6 +53,36 @@ struct nexus_stat {
     nexus_dirent_type_t type;
 };
 
+
+// this is derived from fuse_lowlevel.h
+// https://github.com/libfuse/libfuse/blob/master/include/fuse_lowlevel.h
+typedef enum {
+    NEXUS_FS_ATTR_MODE      = (1 << 0),
+    NEXUS_FS_ATTR_UID       = (1 << 1),
+    NEXUS_FS_ATTR_GID       = (1 << 2),
+    NEXUS_FS_ATTR_SIZE      = (1 << 3),
+    NEXUS_FS_ATTR_ATIME     = (1 << 4),
+    NEXUS_FS_ATTR_MTIME     = (1 << 5),
+    NEXUS_FS_ATTR_ATIME_NOW = (1 << 7),
+    NEXUS_FS_ATTR_MTIME_NOW = (1 << 8),
+    NEXUS_FS_ATTR_CTIME     = (1 << 10)
+} nexus_fs_attr_flags_t;
+
+
+struct nexus_fs_lookup {
+    struct nexus_uuid   uuid;
+
+    nexus_dirent_type_t type;
+};
+
+// this structure will hold st data
+struct nexus_fs_attr {
+    struct nexus_stat  stat_info;
+
+    struct stat        posix_stat;
+};
+
+
 /**
  * Creates a new file/dir
  * @param parent
@@ -70,14 +101,24 @@ nexus_fs_remove(struct nexus_volume  * volume,
                 struct nexus_uuid    * uuid);
 
 int
-nexus_fs_lookup(struct nexus_volume  * volume,
-                char                 * parent_dir,
-                char                 * plain_name,
-                struct nexus_stat    * stat);
+nexus_fs_lookup(struct nexus_volume    * volume,
+                char                   * parent_dir,
+                char                   * plain_name,
+                struct nexus_fs_lookup * lookup_info);
+
 int
 nexus_fs_stat(struct nexus_volume  * volume,
               char                 * path,
               struct nexus_stat    * nexus_stat);
+
+int
+nexus_fs_getattr(struct nexus_volume * volume, char * path, struct nexus_fs_attr * attrs);
+
+int
+nexus_fs_setattr(struct nexus_volume   * volume,
+                 char                  * path,
+                 struct nexus_fs_attr  * attrs,
+                 nexus_fs_attr_flags_t   flags);
 
 int
 nexus_fs_filldir(struct nexus_volume  * volume,

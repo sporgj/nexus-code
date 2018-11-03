@@ -78,11 +78,11 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
 }
 
 int
-sgx_backend_fs_lookup(struct nexus_volume  * volume,
-                      char                 * dirpath,
-                      char                 * plain_name,
-                      struct nexus_stat    * stat,
-                      void                 * priv_data)
+sgx_backend_fs_lookup(struct nexus_volume    * volume,
+                      char                   * dirpath,
+                      char                   * plain_name,
+                      struct nexus_fs_lookup * lookup_info,
+                      void                   * priv_data)
 {
     struct sgx_backend * sgx_backend = NULL;
 
@@ -94,7 +94,7 @@ sgx_backend_fs_lookup(struct nexus_volume  * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_LOOKUP);
 
-    err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, stat);
+    err = ecall_fs_lookup(sgx_backend->enclave_id, &ret, dirpath, plain_name, lookup_info);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_LOOKUP);
 

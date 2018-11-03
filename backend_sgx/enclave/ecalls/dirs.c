@@ -142,7 +142,9 @@ out:
 }
 
 inline static int
-__nxs_fs_lookup(struct nexus_dirnode * dirnode, char * filename_IN, struct nexus_stat * stat)
+__nxs_fs_lookup(struct nexus_dirnode   * dirnode,
+                char                   * filename_IN,
+                struct nexus_fs_lookup * lookup_info)
 {
     struct nexus_uuid   uuid;
     nexus_dirent_type_t type;
@@ -151,14 +153,14 @@ __nxs_fs_lookup(struct nexus_dirnode * dirnode, char * filename_IN, struct nexus
         return -1;
     }
 
-    stat->type = type;
-    nexus_uuid_copy(&uuid, &stat->uuid);
+    lookup_info->type = type;
+    nexus_uuid_copy(&uuid, &lookup_info->uuid);
 
     return 0;
 }
 
 int
-ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_stat * stat_out)
+ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_fs_lookup * lookup_out)
 {
     struct nexus_metadata * metadata = NULL;
 
@@ -174,7 +176,7 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_stat * stat_
         return -1;
     }
 
-    ret = __nxs_fs_lookup(metadata->dirnode, filename_IN, stat_out);
+    ret = __nxs_fs_lookup(metadata->dirnode, filename_IN, lookup_out);
 
     if (ret != 0) {
         // lookups fail very often, no need to report the error

@@ -271,6 +271,33 @@ nexus_datastore_stat_uuid(struct nexus_datastore      * datastore,
 }
 
 int
+nexus_datastore_getattr(struct nexus_datastore * datastore,
+                        struct nexus_uuid      * uuid,
+                        struct nexus_fs_attr   * attrs)
+{
+    if (datastore->impl->getattr == NULL) {
+        log_error("getattr NOT Implemented for %s datastore\n", datastore->impl->name);
+        return -1;
+    }
+
+    return datastore->impl->getattr(uuid, attrs, datastore->priv_data);
+}
+
+int
+nexus_datastore_setattr(struct nexus_datastore  * datastore,
+                        struct nexus_uuid       * uuid,
+                        struct nexus_fs_attr    * attrs,
+                        nexus_fs_attr_flags_t     flags)
+{
+    if (datastore->impl->setattr == NULL) {
+        log_error("setattr NOT Implemented for %s datastore\n", datastore->impl->name);
+        return -1;
+    }
+
+    return datastore->impl->setattr(uuid, attrs, flags, datastore->priv_data);
+}
+
+int
 nexus_datastore_new_uuid(struct nexus_datastore * datastore, struct nexus_uuid * uuid, char * path)
 {
     return datastore->impl->new_uuid(uuid, path, datastore->priv_data);

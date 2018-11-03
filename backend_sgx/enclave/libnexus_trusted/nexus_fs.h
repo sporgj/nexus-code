@@ -40,3 +40,9 @@ struct nexus_stat {
 
     nexus_dirent_type_t type;
 };
+
+struct nexus_fs_lookup {
+    struct nexus_uuid   uuid;
+
+    nexus_dirent_type_t type;
+};

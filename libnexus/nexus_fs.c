@@ -49,19 +49,19 @@ nexus_fs_remove(struct nexus_volume  * volume,
 }
 
 int
-nexus_fs_lookup(struct nexus_volume  * volume,
-                char                 * dirpath,
-                char                 * plain_name,
-                struct nexus_stat    * stat)
+nexus_fs_lookup(struct nexus_volume    * volume,
+                char                   * parent_dir,
+                char                   * plain_name,
+                struct nexus_fs_lookup * lookup_info)
 {
     struct nexus_backend * backend = volume->backend;
 
     if (backend->impl->fs_lookup == NULL) {
-	log_error("fs_lookup NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+        log_error("fs_lookup NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
     }
 
-    return backend->impl->fs_lookup(volume, dirpath, plain_name, stat, backend->priv_data);
+    return backend->impl->fs_lookup(volume, parent_dir, plain_name, lookup_info, backend->priv_data);
 }
 
 int
@@ -77,6 +77,54 @@ nexus_fs_stat(struct nexus_volume  * volume,
     }
 
     return backend->impl->fs_stat(volume, path, nexus_stat, backend->priv_data);
+}
+
+int
+nexus_fs_getattr(struct nexus_volume * volume, char * path, struct nexus_fs_attr * attrs)
+{
+    struct nexus_stat * stat_info = &attrs->stat_info;
+
+    if (nexus_fs_stat(volume, path, stat_info)) {
+        log_error("could not stat backend (filepath=%s)\n", path);
+        return -1;
+    }
+
+    // XXX: this probably needs to be revised. I'm not too comfortable with libnexus calling
+    // the metadata store. But given that our operations are strictly metadata, let's see
+    if (nexus_datastore_getattr(volume->metadata_store, &stat_info->uuid, attrs)) {
+        return -1;
+    }
+
+    // make sure st.st_size contains the info returned from the backend
+    attrs->posix_stat.st_size = stat_info->size;
+
+    return 0;
+}
+
+int
+nexus_fs_setattr(struct nexus_volume   * volume,
+                 char                  * path,
+                 struct nexus_fs_attr  * attrs,
+                 nexus_fs_attr_flags_t   flags)
+{
+    struct nexus_stat * stat_info = &attrs->stat_info;
+
+    if (nexus_fs_stat(volume, path, stat_info)) {
+        log_error("could not stat backend (filepath=%s)\n", path);
+        return -1;
+    }
+
+    // XXX: @see getattr
+    if (nexus_datastore_setattr(volume->metadata_store, &stat_info->uuid, attrs, flags)) {
+        return -1;
+    }
+
+    // make sure st.st_size contains the info returned from the backend
+    attrs->posix_stat.st_size = stat_info->size;
+
+    // FIXME: what about st_blocks (amount of disk space in units of 512-byte blocks
+
+    return 0;
 }
 
 int
