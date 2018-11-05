@@ -64,7 +64,7 @@ nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 int
 nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
 {
-    char * dirpath = NULL;
+    char * path = NULL;
 
 
     if (dentry->ino == FUSE_ROOT_ID) {
@@ -72,21 +72,21 @@ nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
     }
 
 
-    dirpath = dentry_get_fullpath(dentry);
+    path = dentry_get_fullpath(dentry);
 
-    if (dirpath == NULL) {
+    if (path == NULL) {
         return -1;
     }
 
-    if (nexus_fs_getattr(nexus_fuse_volume, dirpath, attrs)) {
-        nexus_free(dirpath);
+    if (nexus_fs_getattr(nexus_fuse_volume, path, attrs)) {
+        nexus_free(path);
         return -1;
     }
 
     // update the inode number
     attrs->posix_stat.st_ino = nexus_uuid_hash(&attrs->stat_info.uuid);
 
-    nexus_free(dirpath);
+    nexus_free(path);
 
     return 0;
 }
@@ -185,6 +185,46 @@ nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
     }
 
     *ino = nexus_uuid_hash(&uuid);
+
+    nexus_free(parent_dirpath);
+
+    return 0;
+}
+
+int
+nexus_fuse_readlink(struct my_dentry * dentry, char ** target)
+{
+    char * parent_dirpath = dentry_get_parent_fullpath(dentry);
+
+    if (parent_dirpath == NULL) {
+        return -1;
+    }
+
+    int ret = nexus_fs_readlink(nexus_fuse_volume, parent_dirpath, dentry->name, target);
+
+    nexus_free(parent_dirpath);
+
+    return ret;
+}
+
+int
+nexus_fuse_symlink(struct my_dentry  * dentry,
+                   char              * name,
+                   char              * target,
+                   struct nexus_stat * stat_info)
+{
+    char * parent_dirpath = dentry_get_fullpath(dentry);
+
+    if (parent_dirpath == NULL) {
+        return -1;
+    }
+
+    if (nexus_fs_symlink(nexus_fuse_volume, parent_dirpath, name, target, stat_info)) {
+        nexus_free(parent_dirpath);
+        return -1;
+    }
+
+    stat_info->type = NEXUS_LNK;
 
     nexus_free(parent_dirpath);
 

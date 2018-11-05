@@ -104,7 +104,7 @@ dentry_get_fullpath(struct my_dentry * dentry)
 
     current = dentry;
 
-    while (current != NULL) {
+    while (current->parent) {
         total_len += (current->name_len + 1);
 
         current = current->parent;

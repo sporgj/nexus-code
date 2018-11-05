@@ -71,6 +71,13 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     memcpy(&stbuf, &nexus_attrs.posix_stat, sizeof(struct stat));
 
+    printf(":::: path=%s \t name=%s  uuid=%s, ino=%zu, st_ino=%zu, st_size=%zu\n",
+            dentry_get_fullpath(dentry),
+           dentry->name,
+           nexus_uuid_to_base64(&nexus_attrs.stat_info.uuid),
+           ino,
+           stbuf.st_ino, stbuf.st_size);
+
     fuse_reply_attr(req, &stbuf, 1.0);
 }
 
@@ -445,6 +452,57 @@ nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
 }
 
 
+static void
+nxs_fuse_readlink(fuse_req_t req, fuse_ino_t ino)
+{
+    char * target = NULL;
+
+    struct my_dentry * dentry   = vfs_get_dentry(ino);
+
+    if (dentry == NULL) {
+        log_error("could not find inode (%zu)\n", ino);
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+
+    if (nexus_fuse_readlink(dentry, &target)) {
+        log_error("nexus_fuse_readlink (%s) FAILED\n", dentry->name);
+        fuse_reply_err(req, EINVAL);
+        return;
+    }
+
+    fuse_reply_readlink(req, target);
+
+    nexus_free(target);
+}
+
+
+static void
+nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const char * name)
+{
+    struct my_dentry * parent_dentry = vfs_get_dentry(parent);
+
+    struct nexus_stat stat_info;
+
+    struct fuse_entry_param entry_param;
+
+
+    if (parent_dentry == NULL) {
+        log_error("could not get inode (%zu)\n", parent);
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+
+    if (nexus_fuse_symlink(parent_dentry, (char *)name, (char *)link, &stat_info)) {
+        log_error("could not symlink (%s -> %s)\n", name, link);
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+
+    __derive_entry_param_from_stat(&entry_param, &stat_info);
+
+    fuse_reply_entry(req, &entry_param);
+}
 
 static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .lookup                 = nxs_fuse_lookup,
@@ -459,6 +517,8 @@ static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .readdir                = nxs_fuse_readdir,
     .mkdir                  = nxs_fuse_mkdir,
     .rmdir                  = nxs_fuse_remove,
+    .readlink               = nxs_fuse_readlink,
+    .symlink                = nxs_fuse_symlink,
 };
 
 int

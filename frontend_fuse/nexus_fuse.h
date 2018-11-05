@@ -46,3 +46,13 @@ nexus_fuse_touch(struct my_dentry  * dentry,
 
 int
 nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino);
+
+int
+nexus_fuse_readlink(struct my_dentry * dentry, char ** target);
+
+
+int
+nexus_fuse_symlink(struct my_dentry  * dentry,
+                   char              * name,
+                   char              * target,
+                   struct nexus_stat * nexus_stat);
