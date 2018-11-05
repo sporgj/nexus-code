@@ -376,6 +376,63 @@ out:
     return ret;
 }
 
+static char *
+__nxs_fs_readlink(struct nexus_dirnode * dirnode, char * link_name)
+{
+    nexus_dirent_type_t type;
+
+    struct nexus_uuid uuid;
+
+    if (dirnode_find_by_name(dirnode, link_name, &type, &uuid)) {
+        return NULL;
+    }
+
+    return dirnode_get_link(dirnode, &uuid);
+}
+
+int
+ecall_fs_readlink(char * dirpath_IN, char * linkname_IN, char targetpath_out[NEXUS_PATH_MAX])
+{
+    struct nexus_metadata * metadata = NULL;
+
+    const char * result = NULL;
+
+    int ret = -1;
+
+
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata\n");
+        return -1;
+    }
+
+
+    if (metadata->type != NEXUS_DIRNODE) {
+        log_error("path is not a directory\n");
+        nexus_vfs_put(metadata);
+        return -1;
+    }
+
+
+    result = __nxs_fs_readlink(metadata->dirnode, linkname_IN);
+
+    if (result == NULL) {
+        log_error("readlink failed\n");
+        goto out;
+    }
+
+
+    // XXX
+    strncpy(targetpath_out, result, NEXUS_PATH_MAX);
+
+    ret = 0;
+out:
+    nexus_vfs_put(metadata);
+
+    return ret;
+}
+
 int
 __nxs_fs_hardlink(struct nexus_dirnode * src_dirnode,
                   char                 * src_name_IN,

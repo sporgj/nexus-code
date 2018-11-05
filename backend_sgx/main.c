@@ -135,6 +135,7 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .fs_filldir      = sgx_backend_fs_filldir,
     .fs_readdir      = sgx_backend_fs_readdir,
     .fs_symlink      = sgx_backend_fs_symlink,
+    .fs_readlink     = sgx_backend_fs_readlink,
     .fs_hardlink     = sgx_backend_fs_hardlink,
     .fs_rename       = sgx_backend_fs_rename,
     .fs_encrypt      = sgx_backend_fs_encrypt,

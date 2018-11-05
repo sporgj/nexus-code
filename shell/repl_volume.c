@@ -283,6 +283,53 @@ handle_fs_getattr(int argc, char ** argv)
     return ret;
 }
 
+static int
+handle_fs_symlink(int argc, char ** argv)
+{
+    char * path = NULL;
+    char * target = NULL;
+
+    if (argc < 2) {
+        usage("fs_symlink");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    path = strndup(argv[0], NEXUS_PATH_MAX);
+    target = strndup(argv[1], NEXUS_PATH_MAX);
+
+    ret = __fs_symlink(mounted_volume, path, target);
+
+    nexus_free(path);
+    nexus_free(target);
+
+    return ret;
+}
+
+static int
+handle_fs_readlink(int argc, char ** argv)
+{
+    char * path = NULL;
+
+    if (argc < 1) {
+        usage("fs_readlink");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    path = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_readlink(mounted_volume, path);
+
+    nexus_free(path);
+
+    return ret;
+}
+
 /////////
 
 static int
@@ -388,6 +435,8 @@ static struct _cmd cmds[]
         { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
         { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
         { "fs_getattr", handle_fs_getattr, "Get attributes (stat) filesystem object", "<path>" },
+        { "fs_symlink", handle_fs_symlink, "Create symlink", "<path> <target>" },
+        { "fs_readlink", handle_fs_readlink, "Read symlink target", "<path>" },
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };
 

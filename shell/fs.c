@@ -83,6 +83,7 @@ print_stat_info(const char * path, struct nexus_stat * nexus_stat)
         break;
     case NEXUS_LNK:
         file_type = "LNK";
+        break;
     default:
         file_type = "REG";
     }
@@ -104,6 +105,7 @@ print_lookup_info(const char * path, struct nexus_fs_lookup * lookup_info)
         break;
     case NEXUS_LNK:
         file_type = "LNK";
+        break;
     default:
         file_type = "REG";
     }
@@ -266,7 +268,7 @@ print_dirent_entry(struct nexus_dirent * dirent)
 
     if (dirent->type == NEXUS_DIR) {
         type_str = "DIR";
-    } else if (dirent->type == NEXUS_DIR) {
+    } else if (dirent->type == NEXUS_LNK) {
         type_str = "LINK";
     }
 
@@ -321,6 +323,76 @@ __fs_ls(struct nexus_volume * vol, char * dirpath)
 
     return 0;
 }
+
+int
+__fs_symlink(struct nexus_volume * vol, char * path, char * target)
+{
+    char * dirpath = NULL;
+    char * filename = NULL;
+
+    struct nexus_stat stat_info;
+
+    int ret = -1;
+
+
+    nexus_splitpath(path, &dirpath, &filename);
+
+    ret = nexus_fs_symlink(vol, dirpath, filename, target, &stat_info);
+
+    if (ret != 0) {
+        log_error("symlink %s/%s -> %s FAILED\n", dirpath, filename, target);
+
+        nexus_free(dirpath);
+        nexus_free(filename);
+
+        return -1;
+    }
+
+
+    {
+        char * nexus_name = nexus_uuid_to_alt64(&stat_info.uuid);
+        printf(" .symlink %s -> %s\n", path, nexus_name);
+        nexus_free(nexus_name);
+    }
+
+    nexus_free(dirpath);
+    nexus_free(filename);
+
+    return 0;
+}
+
+int
+__fs_readlink(struct nexus_volume * vol, char * path)
+{
+    char * dirpath = NULL;
+    char * filename = NULL;
+
+    char * target = NULL;
+
+    int ret = -1;
+
+
+    nexus_splitpath(path, &dirpath, &filename);
+
+    ret = nexus_fs_readlink(vol, dirpath, filename, &target);
+
+    if (ret != 0) {
+        log_error("readlink %s FAILED\n", path);
+
+        nexus_free(dirpath);
+        nexus_free(filename);
+        return -1;
+    }
+
+    printf(" .readlink %s -> %s\n", path, target);
+
+    nexus_free(dirpath);
+    nexus_free(filename);
+    nexus_free(target);
+
+    return 0;
+}
+
 
 int
 create_file_main(int argc, char ** argv)

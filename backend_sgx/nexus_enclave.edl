@@ -123,6 +123,14 @@ enclave {
                    [out] struct nexus_uuid   * uuid_out
         );
 
+        // #define NEXUS_PATH_MAX 1024
+        public int ecall_fs_readlink
+        (
+            [in, string] char                * directory_IN,
+            [in, string] char                * linkname_IN,
+            [user_check] char                  targetpath_out[1024]
+        );
+
         public int ecall_fs_hardlink
         (
             [in, string] char                * link_dirpath_IN,

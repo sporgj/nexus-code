@@ -131,7 +131,13 @@ nexus_fs_symlink(struct nexus_volume * volume,
                  char                * dirpath,
                  char                * link_name,
                  char                * target_path,
-                 char               ** nexus_name);
+                 struct nexus_stat   * stat_info);
+
+int
+nexus_fs_readlink(struct nexus_volume * volume,
+                  char                * dirpath,
+                  char                * linkname,
+                  char               ** target_path);
 
 int
 nexus_fs_hardlink(struct nexus_volume * volume,

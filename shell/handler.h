@@ -24,6 +24,11 @@ __fs_stat(struct nexus_volume * vol, char * path);
 int
 __fs_getattr(struct nexus_volume * vol, char * path);
 
+int
+__fs_symlink(struct nexus_volume * vol, char * path, char * target);
+
+int
+__fs_readlink(struct nexus_volume * vol, char * path);
 
 
 int

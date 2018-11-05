@@ -141,8 +141,15 @@ sgx_backend_fs_symlink(struct nexus_volume  * volume,
                        char                 * dirpath,
                        char                 * link_name,
                        char                 * target_path,
-                       char                ** nexus_name,
+                       struct nexus_uuid    * uuid,
                        void                 * priv_data);
+
+int
+sgx_backend_fs_readlink(struct nexus_volume  * volume,
+                        char                 * dirpath,
+                        char                 * linkname,
+                        char                ** target,
+                        void                 * priv_data);
 
 int
 sgx_backend_fs_hardlink(struct nexus_volume  * volume,

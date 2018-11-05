@@ -141,8 +141,14 @@ struct nexus_backend_impl {
                       char                 * dirpath,
                       char                 * link_name,
                       char                 * target_path,
-                      char                ** nexus_name,
+                      struct nexus_uuid    * uuid,
                       void                 * priv_data);
+
+    int (*fs_readlink)(struct nexus_volume  * volume,
+                       char                 * dirpath,
+                       char                 * linkname,
+                       char                ** target,
+                       void                 * priv_data);
 
     int (*fs_hardlink)(struct nexus_volume  * volume,
                        char                 * link_dirpath,

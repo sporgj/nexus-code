@@ -1,13 +1,16 @@
 #pragma once
 
+// TODO revise constant values
 typedef enum {
     ECALL_FILLDIR       = 2,
     ECALL_CREATE        = 3,
     ECALL_LOOKUP        = 4,
     ECALL_STAT          = 0x10,
     ECALL_REMOVE        = 5,
+
     ECALL_HARDLINK      = 6,
     ECALL_SYMLINK       = 7,
+    ECALL_READLINK      = 0x11,
     ECALL_RENAME        = 8,
 
     ECALL_STOREACL      = 9,
