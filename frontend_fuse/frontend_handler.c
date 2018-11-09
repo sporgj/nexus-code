@@ -86,6 +86,18 @@ nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
     // update the inode number
     attrs->posix_stat.st_ino = nexus_uuid_hash(&attrs->stat_info.uuid);
 
+    switch(dentry->type) {
+    case NEXUS_DIR:
+        attrs->posix_stat.st_mode = S_IFDIR;
+        break;
+    case NEXUS_REG:
+        attrs->posix_stat.st_mode = S_IFREG;
+        break;
+    case NEXUS_LNK:
+        attrs->posix_stat.st_mode = S_IFLNK;
+        break;
+    }
+
     nexus_free(path);
 
     return 0;
