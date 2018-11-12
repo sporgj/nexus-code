@@ -12,20 +12,34 @@
 #include <list.h> // from nexus
 
 
+struct my_dentry;
+
+struct my_inode {
+    struct nexus_uuid      uuid;
+
+    fuse_ino_t             ino;
+
+    size_t                 lookup_count;
+
+    struct nexus_fs_attr   attrs;
+
+
+    struct my_dentry     * dentry;
+};
+
 struct my_dentry {
     char                  name[NEXUS_NAME_MAX];
 
     size_t                name_len;
 
-    struct nexus_uuid     uuid;
-
-    fuse_ino_t            ino; // pointer to unique inode number
-
-    size_t                lookup_count;
-
-    size_t                openers;
-
     nexus_dirent_type_t   type;
+
+    struct nexus_fs_lookup lookup_info;
+
+    size_t                refcount;
+
+
+    struct my_inode     * inode;
 
     struct my_dentry    * parent;
 
@@ -36,16 +50,26 @@ struct my_dentry {
 
 
 struct my_file {
+    size_t                offset;
+
+    char                * filepath;
+
     struct my_dentry    * dentry;
+
+    struct list_head      open_files;
 };
 
 
 struct my_dir {
     size_t                file_count;
 
+    char                * dirpath;
+
     size_t                readdir_offset; // the current offset of READDIR operation
 
     struct my_dentry    * dentry;
+
+    struct list_head      open_dirs;
 };
 
 
@@ -60,32 +84,48 @@ struct my_dentry *
 vfs_get_dentry(fuse_ino_t ino);
 
 struct my_dentry *
-vfs_add_dentry(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type);
+vfs_cache_dentry(struct my_dentry  * parent,
+                 char              * name,
+                 struct nexus_uuid * uuid,
+                 nexus_dirent_type_t type);
+
+struct my_dentry *
+_vfs_cache_dentry(struct my_dentry * parent, char * name, struct nexus_fs_lookup * lookup_info);
 
 void
-vfs_remove_inode(fuse_ino_t ino);
+vfs_forget_dentry(struct my_dentry * dentry);
+
+
+struct my_inode *
+vfs_get_inode(fuse_ino_t ino);
 
 
 
 struct my_file *
-vfs_create_file(struct my_dentry * dentry);
+vfs_file_alloc(struct my_dentry * dentry);
 
 void
-vfs_delete_file(struct my_file * file_ptr);
+vfs_file_free(struct my_file * file_ptr);
 
 
 struct my_dir *
-vfs_create_dir(struct my_dentry * dentry);
+vfs_dir_alloc(struct my_dentry * dentry);
 
 void
-vfs_delete_dir(struct my_dir * dir_ptr);
+vfs_dir_free(struct my_dir * dir_ptr);
+
+void
+inode_incr_lookup(struct my_inode * inode, uint64_t count);
+
+void
+inode_decr_lookup(struct my_inode * inode, uint64_t count);
 
 
 
 // dentry.c
 
 struct my_dentry *
-dentry_create(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type);
+dentry_create(struct my_dentry * parent, char * name,nexus_dirent_type_t type);
 
 void
 dentry_delete_and_free(struct my_dentry * dentry);
@@ -96,8 +136,23 @@ dentry_alloc();
 struct my_dentry *
 dentry_lookup(struct my_dentry * parent, const char * name);
 
+void
+dentry_instantiate(struct my_dentry * dentry, struct my_inode * inode);
+
 char *
 dentry_get_fullpath(struct my_dentry * dentry);
 
 char *
 dentry_get_parent_fullpath(struct my_dentry * dentry);
+
+
+// copies the inode stat attributes into a destination buffer
+void
+dentry_export_attrs(struct my_dentry * dentry, struct stat * st_dest);
+
+
+struct my_dentry *
+dentry_get(struct my_dentry * dentry);
+
+void
+dentry_put(struct my_dentry * dentry);

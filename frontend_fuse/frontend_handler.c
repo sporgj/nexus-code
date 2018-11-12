@@ -37,15 +37,7 @@ nexus_fuse_readdir(struct my_dentry * dentry,
 int
 nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 {
-    char * dirpath = NULL;
-
-
-    if (dentry->ino == FUSE_ROOT_ID) {
-        return nexus_fs_stat(nexus_fuse_volume, "/", stat);
-    }
-
-
-    dirpath = dentry_get_fullpath(dentry);
+    char * dirpath = dentry_get_fullpath(dentry);
 
     if (dirpath == NULL) {
         return -1;
@@ -64,15 +56,7 @@ nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 int
 nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
 {
-    char * path = NULL;
-
-
-    if (dentry->ino == FUSE_ROOT_ID) {
-        return nexus_fs_getattr(nexus_fuse_volume, "/", attrs);
-    }
-
-
-    path = dentry_get_fullpath(dentry);
+    char * path = dentry_get_fullpath(dentry);
 
     if (path == NULL) {
         return -1;
@@ -85,18 +69,7 @@ nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
 
     // update the inode number
     attrs->posix_stat.st_ino = nexus_uuid_hash(&attrs->stat_info.uuid);
-
-    switch(dentry->type) {
-    case NEXUS_DIR:
-        attrs->posix_stat.st_mode = S_IFDIR;
-        break;
-    case NEXUS_REG:
-        attrs->posix_stat.st_mode = S_IFREG;
-        break;
-    case NEXUS_LNK:
-        attrs->posix_stat.st_mode = S_IFLNK;
-        break;
-    }
+    attrs->posix_stat.st_mode = nexus_fs_sys_mode_from_type(dentry->type);
 
     nexus_free(path);
 
@@ -112,11 +85,6 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
     nexus_fs_attr_flags_t flags = to_set; // the to_set flags and nexus flags are the same
 
 
-    if (dentry->ino == FUSE_ROOT_ID) {
-        return nexus_fs_setattr(nexus_fuse_volume, "/", attrs, flags);
-    }
-
-
     dirpath = dentry_get_fullpath(dentry);
 
     if (dirpath == NULL) {
@@ -130,6 +98,7 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
 
     // update the inode number
     attrs->posix_stat.st_ino = nexus_uuid_hash(&attrs->stat_info.uuid);
+    attrs->posix_stat.st_mode = nexus_fs_sys_mode_from_type(dentry->type);
 
     nexus_free(dirpath);
 

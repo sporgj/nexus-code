@@ -1,5 +1,7 @@
 #include "nexus_fuse.h"
 
+#include <assert.h>
+
 
 struct my_dentry *
 dentry_alloc()
@@ -13,13 +15,30 @@ dentry_alloc()
 }
 
 static void
-d_free(struct my_dentry * dentry)
+dentry_free(struct my_dentry * dentry)
 {
     nexus_free(dentry);
 }
 
+struct my_dentry *
+dentry_get(struct my_dentry * dentry)
+{
+    dentry->refcount += 1;
+
+    return dentry;
+}
+
+void
+dentry_put(struct my_dentry * dentry)
+{
+    assert(dentry->refcount > 0);
+    dentry->refcount -= 1;
+}
+
+
+// TODO redo function to skip dentry's with >1 refcount
 static void
-d_prune(struct my_dentry * dentry)
+dentry_prune(struct my_dentry * dentry)
 {
     while (!list_empty(&dentry->children)) {
         struct my_dentry * first_child = NULL;
@@ -28,9 +47,9 @@ d_prune(struct my_dentry * dentry)
 
         list_del(&first_child->siblings);
 
-        d_prune(first_child);
+        dentry_prune(first_child);
 
-        d_free(first_child);
+        dentry_free(first_child);
     }
 }
 
@@ -59,32 +78,34 @@ void
 dentry_delete_and_free(struct my_dentry * dentry)
 {
     list_del(&dentry->siblings);
-    d_prune(dentry);
-    d_free(dentry);
+    dentry_prune(dentry);
+    dentry_free(dentry);
 }
 
 struct my_dentry *
-dentry_create(struct my_dentry * parent, char * name, struct nexus_uuid * uuid, nexus_dirent_type_t type)
+dentry_create(struct my_dentry * parent, char * name, nexus_dirent_type_t type)
 {
     struct my_dentry * dentry = dentry_alloc();
 
     strncpy(dentry->name, name, NEXUS_NAME_MAX);
+
     dentry->name_len = strnlen(dentry->name, NEXUS_NAME_MAX);
 
     dentry->type = type;
 
-    if (uuid) {
-        nexus_uuid_copy(uuid, &dentry->uuid);
-        dentry->ino = nexus_uuid_hash(uuid);
-    }
-
-    dentry->parent = parent;
-
     if (parent) {
+        dentry->parent = dentry_get(parent);
         list_add(&dentry->siblings, &parent->children);
     }
 
     return dentry;
+}
+
+void
+dentry_instantiate(struct my_dentry * dentry, struct my_inode * inode)
+{
+    dentry->inode = inode;
+    inode->dentry = dentry_get(dentry);
 }
 
 char *
@@ -137,4 +158,23 @@ dentry_get_parent_fullpath(struct my_dentry * dentry)
     }
 
     return dentry_get_fullpath(dentry->parent);
+}
+
+void
+dentry_export_attrs(struct my_dentry * dentry, struct stat * st_dest)
+{
+    st_dest->st_mode = nexus_fs_sys_mode_from_type(dentry->type);
+
+    st_dest->st_ino = nexus_uuid_hash(&dentry->lookup_info.uuid);
+
+    switch(dentry->type) {
+    case NEXUS_DIR:
+        st_dest->st_nlink = 2;
+        break;
+    case NEXUS_REG:
+        // TODO add handling for hardlinks
+    default:
+        st_dest->st_nlink = 1;
+        break;
+    }
 }

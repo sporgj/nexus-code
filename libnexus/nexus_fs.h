@@ -83,6 +83,19 @@ struct nexus_fs_attr {
 };
 
 
+static inline mode_t
+nexus_fs_sys_mode_from_type(nexus_dirent_type_t type)
+{
+    if (type == NEXUS_REG) {
+        return S_IFREG;
+    } else if (type == NEXUS_DIR) {
+        return S_IFDIR;
+    }
+
+    return S_IFLNK;
+}
+
+
 /**
  * Creates a new file/dir
  * @param parent

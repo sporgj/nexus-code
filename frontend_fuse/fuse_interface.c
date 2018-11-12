@@ -1,45 +1,6 @@
 #include "nexus_fuse.h"
 
 static void
-__derive_posix_stat(struct stat * st, nexus_dirent_type_t type, struct nexus_uuid * uuid)
-{
-    memset(st, 0, sizeof(struct stat));
-
-    if (type == NEXUS_DIR) {
-        st->st_mode = S_IFDIR;
-        st->st_nlink = 2;
-    } else if (type == NEXUS_LNK) {
-        st->st_mode = S_IFLNK;
-        st->st_nlink = 1;
-    } else {
-        st->st_mode = S_IFREG;
-        st->st_nlink = 1; // until hardlinks :)
-    }
-
-    st->st_ino = nexus_uuid_hash(uuid);
-}
-
-static inline void
-__derive_entry_param_from_stat(struct fuse_entry_param * entry_param,
-                               struct nexus_stat       * nexus_stat)
-{
-    __derive_posix_stat(&entry_param->attr, nexus_stat->type, &nexus_stat->uuid);
-
-    entry_param->attr.st_size = nexus_stat->size;
-
-    entry_param->ino = entry_param->attr.st_ino;
-}
-
-static inline void
-__derive_entry_param_from_lookup(struct fuse_entry_param * entry_param,
-                                 struct nexus_fs_lookup  * a_lookup)
-{
-    __derive_posix_stat(&entry_param->attr, a_lookup->type, &a_lookup->uuid);
-
-    entry_param->ino = entry_param->attr.st_ino;
-}
-
-static void
 nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 {
     struct my_dentry  * dentry = NULL;
@@ -48,12 +9,6 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     struct nexus_fs_attr nexus_attrs;
 
-    if (ino == FUSE_ROOT_ID) {
-        stbuf.st_mode = S_IFDIR;
-        stbuf.st_nlink = 2;
-        fuse_reply_attr(req, &stbuf, 1.0);
-        return;
-    }
 
     dentry = vfs_get_dentry(ino);
 
@@ -71,12 +26,14 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     memcpy(&stbuf, &nexus_attrs.posix_stat, sizeof(struct stat));
 
+#if 0
     printf(":::: path=%s \t name=%s  uuid=%s, ino=%zu, st_ino=%zu, st_size=%zu\n",
             dentry_get_fullpath(dentry),
            dentry->name,
            nexus_uuid_to_base64(&nexus_attrs.stat_info.uuid),
            ino,
            stbuf.st_ino, stbuf.st_size);
+#endif
 
     fuse_reply_attr(req, &stbuf, 1.0);
 }
@@ -123,7 +80,9 @@ nxs_fuse_setattr(fuse_req_t              req,
 static void
 nxs_fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
 {
-    struct my_dentry    * dentry  = vfs_get_dentry(parent);
+    struct my_dentry    * parent_dentry  = NULL;
+
+    struct my_dentry    * child_dentry   = NULL;
 
     char                * filename = strndup(name, NEXUS_NAME_MAX);
 
@@ -134,18 +93,40 @@ nxs_fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
 
     memset(&entry_param, 0, sizeof(struct fuse_entry_param));
 
-    if (nexus_fuse_lookup(dentry, filename, &a_lookup)) {
+
+    parent_dentry = vfs_get_dentry(parent);
+
+    if (parent_dentry == NULL) {
+        log_error("could not find inode (%zu)\n", parent);
         goto out_err;
     }
 
-    if (vfs_add_dentry(dentry, filename, &a_lookup.uuid, a_lookup.type) == NULL) {
-        log_error("could not add dentry\n");
+
+    child_dentry = dentry_lookup(parent_dentry, name);
+
+    if (nexus_fuse_lookup(parent_dentry, filename, &a_lookup)) {
         goto out_err;
+    }
+
+
+    // cache the entry into the vfs
+    if (child_dentry == NULL) {
+        child_dentry = _vfs_cache_dentry(parent_dentry, filename, &a_lookup);
+
+        if (child_dentry == NULL) {
+            log_error("could not cache dentry (%s)\n", filename);
+            goto out_err;
+        }
     }
 
     nexus_free(filename);
 
-    __derive_entry_param_from_lookup(&entry_param, &a_lookup);
+
+    dentry_export_attrs(child_dentry, &entry_param.attr);
+
+    entry_param.ino = entry_param.attr.st_ino;
+
+    inode_incr_lookup(child_dentry->inode, 1);
 
     fuse_reply_entry(req, &entry_param);
     return;
@@ -153,8 +134,37 @@ nxs_fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
 out_err:
     nexus_free(filename);
     fuse_reply_err(req, ENOENT);
+
+    if (child_dentry) {
+        vfs_forget_dentry(child_dentry);
+    }
 }
 
+static void
+nxs_fuse_forget(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
+{
+    struct my_inode * inode = vfs_get_inode(ino);
+
+    if (inode) {
+        inode_decr_lookup(inode, nlookup);
+    }
+
+    fuse_reply_none(req);
+}
+
+static void
+nxs_fuse_forget_multi(fuse_req_t req, size_t count, struct fuse_forget_data * forgets)
+{
+    for (size_t i = 0; i < count; i++) {
+        struct my_inode * inode = vfs_get_inode(forgets[i].ino);
+
+        if (inode) {
+            inode_decr_lookup(inode, forgets[i].nlookup);
+        }
+    }
+
+    fuse_reply_none(req);
+}
 
 static void
 nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
@@ -180,7 +190,7 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    dir_ptr = vfs_create_dir(dentry);
+    dir_ptr = vfs_dir_alloc(dentry);
 
     if (dir_ptr == NULL) {
         log_error("could not create dir\n");
@@ -203,7 +213,7 @@ nxs_fuse_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     struct my_dir * dir_ptr = (struct my_dir *)fi->fh;
 
     if (dir_ptr) {
-        vfs_delete_dir(dir_ptr);
+        vfs_dir_free(dir_ptr);
         fi->fh = (uintptr_t)NULL;
     }
 
@@ -257,14 +267,7 @@ nxs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
         size_t entry_size;
         struct stat st;
 
-        if (curr_dirent->type == NEXUS_REG) {
-            st.st_mode = S_IFREG;
-        } else if (curr_dirent->type == NEXUS_DIR) {
-            st.st_mode = S_IFDIR;
-        } else {
-            st.st_mode = S_IFLNK;
-        }
-
+        st.st_mode = nexus_fs_sys_mode_from_type(curr_dirent->type);
 
         st.st_ino = nexus_uuid_hash(&curr_dirent->uuid);
 
@@ -324,7 +327,7 @@ __create_file_or_dir(fuse_req_t               req,
     }
 
 
-    return vfs_add_dentry(dentry, filename, &nexus_stat->uuid, nexus_stat->type);
+    return vfs_cache_dentry(dentry, filename, &nexus_stat->uuid, nexus_stat->type);
 
 out_err:
     return NULL;
@@ -351,7 +354,7 @@ nxs_fuse_create(
     }
 
 
-    file_ptr = vfs_create_file(new_dentry);
+    file_ptr = vfs_file_alloc(new_dentry);
 
     if (file_ptr == NULL) {
         log_error("could not create vfs file\n");
@@ -359,7 +362,10 @@ nxs_fuse_create(
         return;
     }
 
-    __derive_entry_param_from_stat(&entry_param, &nexus_stat);
+    dentry_export_attrs(new_dentry, &entry_param.attr);
+    entry_param.ino = entry_param.attr.st_ino;
+
+    inode_incr_lookup(new_dentry->inode, 1);
 
     fi->fh = (uintptr_t)file_ptr;
 
@@ -384,7 +390,10 @@ nxs_fuse_mkdir(fuse_req_t req, fuse_ino_t parent, const char * name, mode_t mode
         return;
     }
 
-    __derive_entry_param_from_stat(&entry_param, &nexus_stat);
+    dentry_export_attrs(new_dentry, &entry_param.attr);
+    entry_param.ino = entry_param.attr.st_ino;
+
+    inode_incr_lookup(new_dentry->inode, 1);
 
     fuse_reply_entry(req, &entry_param);
 }
@@ -401,7 +410,7 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         return;
     }
 
-    file_ptr = vfs_create_file(dentry);
+    file_ptr = vfs_file_alloc(dentry);
 
     if (file_ptr == NULL) {
         log_error("could not create vfs file\n");
@@ -409,6 +418,8 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         return;
     }
 
+
+    inode_incr_lookup(dentry->inode, 1);
 
     fi->fh = (uintptr_t)file_ptr;
 
@@ -421,7 +432,7 @@ nxs_fuse_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
     if (file_ptr) {
-        vfs_delete_file(file_ptr);
+        vfs_file_free(file_ptr);
     }
 
     fuse_reply_err(req, 0);
@@ -445,8 +456,6 @@ nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
         fuse_reply_err(req, EAGAIN);
         return;
     }
-
-    vfs_remove_inode(ino);
 
     fuse_reply_err(req, 0);
 }
@@ -482,6 +491,8 @@ nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const cha
 {
     struct my_dentry * parent_dentry = vfs_get_dentry(parent);
 
+    struct my_dentry * new_dentry = NULL;
+
     struct nexus_stat stat_info;
 
     struct fuse_entry_param entry_param;
@@ -495,11 +506,22 @@ nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const cha
 
     if (nexus_fuse_symlink(parent_dentry, (char *)name, (char *)link, &stat_info)) {
         log_error("could not symlink (%s -> %s)\n", name, link);
-        fuse_reply_err(req, ENOENT);
+        fuse_reply_err(req, EIO);
         return;
     }
 
-    __derive_entry_param_from_stat(&entry_param, &stat_info);
+    new_dentry = vfs_cache_dentry(parent_dentry, (char *)name, &stat_info.uuid, stat_info.type);
+
+    if (new_dentry == NULL) {
+        log_error("could not add dentry to vfs\n");
+        fuse_reply_err(req, EIO);
+        return;
+    }
+
+    dentry_export_attrs(new_dentry, &entry_param.attr);
+    entry_param.ino = entry_param.attr.st_ino;
+
+    inode_incr_lookup(new_dentry->inode, 1);
 
     fuse_reply_entry(req, &entry_param);
 }
@@ -508,6 +530,8 @@ static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .lookup                 = nxs_fuse_lookup,
     .getattr                = nxs_fuse_getattr,
     .setattr                = nxs_fuse_setattr,
+    .forget                 = nxs_fuse_forget,
+    .forget_multi           = nxs_fuse_forget_multi,
     .create                 = nxs_fuse_create,
     .unlink                 = nxs_fuse_remove,
     .open                   = nxs_fuse_open,
