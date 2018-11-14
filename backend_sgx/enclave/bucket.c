@@ -182,6 +182,8 @@ bucket_load_from_uuid(struct dir_bucket    * bucket,
         }
     }
 
+    bucket->on_disk = true;
+
     nexus_crypto_buf_free(crypto_buffer);
 
     return 0;
@@ -227,6 +229,13 @@ bucket_store(struct dir_bucket * bucket)
 
     size_t                    buflen        = 0;
 
+
+    if (!bucket->on_disk && buffer_layer_new(&bucket->uuid)) {
+        log_error("could not create bucket metadata file on disk\n");
+        return -1;
+    }
+
+    bucket->on_disk = true;
 
 
     crypto_buffer = nexus_crypto_buf_new(bucket->size_bytes, 0, &bucket->uuid);

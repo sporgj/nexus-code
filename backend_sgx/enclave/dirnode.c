@@ -459,7 +459,7 @@ __store_other_buckets(struct nexus_dirnode * dirnode, struct __bucket_rec * reco
         if (bucket_store(bucket)) {
             list_iterator_free(iter);
 
-            log_error("bucket_load_from_uuid FAILED (num = %d)\n", i);
+            log_error("bucket_store FAILED (num = %d)\n", i);
             return -1;
         }
 

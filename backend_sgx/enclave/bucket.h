@@ -23,6 +23,8 @@ struct __bucket_rec {
 struct dir_bucket {
     bool                is_dirty;
 
+    bool                on_disk;
+
     size_t              capacity;
 
     size_t              num_items;
