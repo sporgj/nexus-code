@@ -7,8 +7,6 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     struct stat         stbuf;
 
-    struct nexus_fs_attr nexus_attrs;
-
 
     dentry = vfs_get_dentry(ino);
 
@@ -19,21 +17,12 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    if (nexus_fuse_getattr(dentry, &nexus_attrs)) {
+    if (nexus_fuse_getattr(dentry, &dentry->inode->attrs)) {
         fuse_reply_err(req, ENOENT);
         return;
     }
 
-    memcpy(&stbuf, &nexus_attrs.posix_stat, sizeof(struct stat));
-
-#if 0
-    printf(":::: path=%s \t name=%s  uuid=%s, ino=%zu, st_ino=%zu, st_size=%zu\n",
-            dentry_get_fullpath(dentry),
-           dentry->name,
-           nexus_uuid_to_base64(&nexus_attrs.stat_info.uuid),
-           ino,
-           stbuf.st_ino, stbuf.st_size);
-#endif
+    memcpy(&stbuf, &dentry->inode->attrs.posix_stat, sizeof(struct stat));
 
     fuse_reply_attr(req, &stbuf, 1.0);
 }
@@ -410,6 +399,12 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         return;
     }
 
+    // get the file attributes and cache them to the inode
+    if (nexus_fuse_getattr(dentry, &dentry->inode->attrs)) {
+        fuse_reply_err(req, EIO);
+        return;
+    }
+
     file_ptr = vfs_file_alloc(dentry);
 
     if (file_ptr == NULL) {
@@ -431,11 +426,13 @@ nxs_fuse_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
+    int ret = nexus_fuse_store(file_ptr);
+
     if (file_ptr) {
         vfs_file_free(file_ptr);
     }
 
-    fuse_reply_err(req, 0);
+    fuse_reply_err(req, ret);
 }
 
 static void
@@ -526,6 +523,59 @@ nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const cha
     fuse_reply_entry(req, &entry_param);
 }
 
+
+static void
+nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info * fi)
+{
+    struct my_file * file_ptr = (struct my_file *)fi->fh;
+
+    struct fuse_bufvec bufv = FUSE_BUFVEC_INIT(size);
+
+    uint8_t * buffer = nexus_malloc(size);
+    size_t    buflen = 0;
+
+    if (file_read(file_ptr, off, size, buffer, &buflen)) {
+        fuse_reply_err(req, EIO);
+        return;
+    }
+
+    bufv.buf[0].mem  = buffer;
+    bufv.buf[0].size = buflen;
+    bufv.buf[0].pos  = off;
+
+    fuse_reply_data(req, &bufv, FUSE_BUF_NO_SPLICE);  // XXX look into splicing for efficiency
+}
+
+static void
+nxs_fuse_write(fuse_req_t              req,
+               fuse_ino_t              ino,
+               const char *            buffer,
+               size_t                  size,
+               off_t                   off,
+               struct fuse_file_info * fi)
+{
+    struct my_file * file_ptr = (struct my_file *)fi->fh;
+
+    size_t bytes_read = 0;
+
+    if (file_write(file_ptr, off, size, (uint8_t *)buffer, &bytes_read)) {
+        fuse_reply_err(req, EIO);
+        return;
+    }
+
+    fuse_reply_write(req, (int)bytes_read);
+}
+
+static void
+nxs_fuse_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
+{
+    struct my_file * file_ptr = (struct my_file *)fi->fh;
+
+    int ret = nexus_fuse_store(file_ptr);
+
+    fuse_reply_err(req, ret);
+}
+
 static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .lookup                 = nxs_fuse_lookup,
     .getattr                = nxs_fuse_getattr,
@@ -543,6 +593,10 @@ static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .rmdir                  = nxs_fuse_remove,
     .readlink               = nxs_fuse_readlink,
     .symlink                = nxs_fuse_symlink,
+
+    .read                   = nxs_fuse_read,
+    .write                  = nxs_fuse_write,
+    .flush                  = nxs_fuse_flush,
 };
 
 int

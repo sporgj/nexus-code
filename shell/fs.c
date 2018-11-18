@@ -115,6 +115,7 @@ print_lookup_info(const char * path, struct nexus_fs_lookup * lookup_info)
     nexus_free(nexus_name);
 }
 
+#if 0
 static void
 print_attrs_info(const char * path, struct nexus_fs_attr * attrs)
 {
@@ -124,6 +125,7 @@ print_attrs_info(const char * path, struct nexus_fs_attr * attrs)
 
     printf("\t size: %zu, access time: %zu, mod time: %zu\n", st->st_size, st->st_atime, st->st_mtime);
 }
+#endif
 
 int
 __fs_stat(struct nexus_volume * vol, const char * path)
@@ -170,6 +172,11 @@ __fs_lookup(struct nexus_volume * vol, const char * path)
 int
 __fs_getattr(struct nexus_volume * vol, char * path)
 {
+    log_error("function not implemented\n");
+
+    return -1;
+
+#if 0
     struct nexus_fs_attr attrs;
 
     if (nexus_fs_getattr(vol, path, &attrs)) {
@@ -180,6 +187,7 @@ __fs_getattr(struct nexus_volume * vol, char * path)
     print_attrs_info(path, &attrs);
 
     return 0;
+#endif
 }
 
 int

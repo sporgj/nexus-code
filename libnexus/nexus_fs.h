@@ -125,19 +125,19 @@ nexus_fs_stat(struct nexus_volume  * volume,
               struct nexus_stat    * nexus_stat);
 
 int
-nexus_fs_getattr(struct nexus_volume * volume, char * path, struct nexus_fs_attr * attrs);
-
-int
-nexus_fs_setattr(struct nexus_volume   * volume,
-                 char                  * path,
-                 struct nexus_fs_attr  * attrs,
-                 nexus_fs_attr_flags_t   flags);
-
-int
 nexus_fs_filldir(struct nexus_volume  * volume,
                  char                 * dirpath,
                  char                 * nexus_name,
                  char                ** plain_name);
+
+int
+nexus_fs_readdir(struct nexus_volume  * volume,
+                 char                 * dirpath,
+                 struct nexus_dirent  * dirent_buffer_array,
+                 size_t                 dirent_buffer_count,
+                 size_t                 offset,
+                 size_t               * result_count,
+                 size_t               * directory_size);
 
 int
 nexus_fs_symlink(struct nexus_volume * volume,
@@ -189,15 +189,6 @@ nexus_fs_decrypt(struct nexus_volume * volume,
                  size_t                size,
                  size_t                filesize);
 
-
-int
-nexus_fs_readdir(struct nexus_volume  * volume,
-                 char                 * dirpath,
-                 struct nexus_dirent  * dirent_buffer_array,
-                 size_t                 dirent_buffer_count,
-                 size_t                 offset,
-                 size_t               * result_count,
-                 size_t               * directory_size);
 
 
 

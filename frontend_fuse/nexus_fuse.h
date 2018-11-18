@@ -56,3 +56,10 @@ nexus_fuse_symlink(struct my_dentry  * dentry,
                    char              * name,
                    char              * target,
                    struct nexus_stat * nexus_stat);
+
+
+int
+nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * file_chunk);
+
+int
+nexus_fuse_store(struct my_file * file_ptr);

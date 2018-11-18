@@ -12,7 +12,25 @@
 #include <list.h> // from nexus
 
 
+#define NEXUS_CHUNK_LOG2    (20)
+#define NEXUS_CHUNK_SIZE    (1 << NEXUS_CHUNK_LOG2)
+
+
 struct my_dentry;
+
+
+
+struct file_chunk {
+    bool             is_dirty;
+    bool             is_valid;
+
+    uint8_t *        buffer;
+    size_t           size;
+    size_t           base;
+    size_t           index;
+    struct list_head node;
+};
+
 
 struct my_inode {
     struct nexus_uuid      uuid;
@@ -23,6 +41,8 @@ struct my_inode {
 
     struct nexus_fs_attr   attrs;
 
+
+    time_t                 last_accessed;
 
     struct my_dentry     * dentry;
 };
@@ -50,11 +70,24 @@ struct my_dentry {
 
 
 struct my_file {
+    int                   flags;
+
     size_t                offset;
+
+    size_t                filesize;
 
     char                * filepath;
 
     struct my_dentry    * dentry;
+
+    struct my_inode     * inode;
+
+    bool                  is_dirty;
+
+
+    size_t                chunk_count;
+
+    struct list_head      file_chunks;
 
     struct list_head      open_files;
 };
@@ -114,12 +147,34 @@ vfs_dir_alloc(struct my_dentry * dentry);
 void
 vfs_dir_free(struct my_dir * dir_ptr);
 
+
 void
 inode_incr_lookup(struct my_inode * inode, uint64_t count);
 
 void
 inode_decr_lookup(struct my_inode * inode, uint64_t count);
 
+
+void
+file_set_clean(struct my_file * file_ptr);
+
+void
+file_set_dirty(struct my_file * file_ptr);
+
+int
+file_read(struct my_file * file_ptr,
+          size_t           offset,
+          size_t           size,
+          uint8_t        * output_buffer,
+          size_t         * output_buflen);
+
+
+int
+file_write(struct my_file * file_ptr,
+           size_t           offset,
+           size_t           size,
+           uint8_t        * input_buffer,
+           size_t         * bytes_read);
 
 
 // dentry.c

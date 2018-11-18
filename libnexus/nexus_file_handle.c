@@ -31,7 +31,7 @@ __get_sysopen_flags(nexus_io_flags_t mode)
     // by POSIX standards, having O_EXCL and O_CREAT will result in a fail
     // if the file exists.
     if (mode & NEXUS_FCREATE) {
-        res |= O_CREAT;
+        res |= O_CREAT & (~O_EXCL);  // you can't have both O_CREAT and O_EXCL
     }
 
     return res;
@@ -44,11 +44,12 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 {
     struct nexus_file_handle * file_handle = nexus_malloc(sizeof(struct nexus_file_handle));
 
-    file_handle->fd = open(filepath, __get_sysopen_flags(mode));
+    file_handle->fd = open(filepath, __get_sysopen_flags(mode), S_IRWXO);
 
     if (file_handle->fd < 0) {
         nexus_free(file_handle);
         log_error("could not open file (%s)\n", filepath);
+        perror("could not open:");
         return NULL;
     }
 

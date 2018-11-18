@@ -159,27 +159,6 @@ vfs_remove_inode(struct my_inode * inode)
 
 
 
-// TODO add file to list of open files
-struct my_file *
-vfs_file_alloc(struct my_dentry * dentry)
-{
-    struct my_file * file_ptr = nexus_malloc(sizeof(struct my_file));
-
-    file_ptr->dentry   = dentry_get(dentry);
-    file_ptr->filepath = dentry_get_fullpath(dentry);
-
-    return file_ptr;
-}
-
-void
-vfs_file_free(struct my_file * file_ptr)
-{
-    dentry_put(file_ptr->dentry);
-    nexus_free(file_ptr->filepath);
-    nexus_free(file_ptr);
-}
-
-
 // TODO add directory to open directories
 struct my_dir *
 vfs_dir_alloc(struct my_dentry * dentry)
@@ -219,4 +198,266 @@ inode_decr_lookup(struct my_inode * inode, uint64_t count)
     if (inode->lookup_count == 0) {
         vfs_remove_inode(inode);
     }
+}
+
+
+static inline size_t
+get_chunk_number(size_t offset)
+{
+    return ((offset < NEXUS_CHUNK_SIZE)
+                ? 0
+                : 1 + ((offset - NEXUS_CHUNK_SIZE) >> NEXUS_CHUNK_LOG2));
+}
+
+static inline size_t
+get_base_offset(size_t offset)
+{
+    return get_chunk_number(offset) * NEXUS_CHUNK_SIZE; // XXX multiple of 2
+}
+
+
+
+static struct file_chunk *
+__alloc_file_chunk(size_t base)
+{
+    struct file_chunk * chunk = nexus_malloc(sizeof(struct file_chunk));
+
+    chunk->base   = base;
+    chunk->index  = get_chunk_number(base);
+    chunk->buffer = nexus_malloc(NEXUS_CHUNK_SIZE);
+
+    INIT_LIST_HEAD(&chunk->node);
+
+    return chunk;
+}
+
+static void
+__free_file_chunk(struct file_chunk * chunk)
+{
+    nexus_free(chunk->buffer);
+    nexus_free(chunk);
+}
+
+// returns the number of bytes written in the block
+static size_t
+__update_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_t * input_buffer)
+{
+    assert(offset <= chunk->base + NEXUS_CHUNK_SIZE);
+
+    size_t shift = offset - chunk->base;
+
+    size_t nbytes = min(len, (NEXUS_CHUNK_SIZE - shift));
+
+    memcpy(chunk->buffer + shift, input_buffer, nbytes);
+
+    chunk->size = nbytes + shift;
+
+    return nbytes;
+}
+
+// returns the number of bytes read
+static size_t
+__read_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_t * output_buffer)
+{
+    assert(offset <= chunk->base + NEXUS_CHUNK_SIZE);
+
+    size_t shift = offset - chunk->base;
+
+    size_t nbytes = min(len, (NEXUS_CHUNK_SIZE - shift));
+
+    memcpy(output_buffer, chunk->buffer + shift, nbytes);
+
+    return nbytes;
+}
+
+static struct file_chunk *
+__file_find_chunk(struct my_file * file, size_t offset)
+{
+    struct list_head * curr = NULL;
+
+    size_t base = get_base_offset(offset);
+
+    list_for_each(curr, &file->file_chunks) {
+        struct file_chunk * chunk = list_entry(curr, struct file_chunk, node);
+
+        if (base == chunk->base) {
+            return chunk;
+        }
+    }
+
+    return NULL;
+}
+
+static struct file_chunk *
+__file_try_add_chunk(struct my_file * file_ptr, size_t offset)
+{
+    struct file_chunk * chunk = __file_find_chunk(file_ptr, offset);
+
+    if (chunk) {
+        return chunk;
+    }
+
+    chunk = __alloc_file_chunk(get_base_offset(offset));
+
+    list_add_tail(&chunk->node, &file_ptr->file_chunks);
+
+    file_ptr->chunk_count += 1;
+
+    return chunk;
+}
+
+static struct file_chunk *
+__file_load_chunk(struct my_file * file_ptr, size_t offset)
+{
+    struct file_chunk * chunk = NULL;
+
+    if (offset >= file_ptr->filesize) {
+        log_error("trying to read past file size (path=%s, filesize=%zu, offset=%zu)\n",
+                  file_ptr->filepath, file_ptr->filesize, offset);
+        return NULL;
+    }
+
+    chunk = __file_try_add_chunk(file_ptr, offset);
+
+    if (chunk->is_valid) {
+        return chunk;
+    }
+
+    chunk->size = min(NEXUS_CHUNK_SIZE, (file_ptr->filesize - offset));
+
+    if (nexus_fuse_fetch_chunk(file_ptr, chunk)) {
+        log_error("could not fetch chunk\n");
+        return NULL;
+    }
+
+    chunk->is_valid = true;
+    chunk->is_dirty = false;
+
+    return chunk;
+}
+
+int
+file_read(struct my_file * file_ptr,
+          size_t           offset,
+          size_t           size,
+          uint8_t        * output_buffer,
+          size_t         * output_buflen)
+{
+    size_t total_bytes = 0;
+
+    if (file_ptr->filesize == 0) {
+        *output_buflen = 0;
+        return 0;
+    }
+
+
+    do {
+        size_t              nbytes = 0;
+        size_t              len    = min(size, NEXUS_CHUNK_SIZE);
+
+        struct file_chunk * chunk  = __file_load_chunk(file_ptr, offset);
+
+        if (chunk == NULL) {
+            log_error("chunk not found (file=%s, offset=%zu)\n", file_ptr->filepath, offset);
+            return -1;
+        }
+
+        nbytes = __read_file_chunk(chunk, offset, len, output_buffer);
+
+        output_buffer += nbytes;
+        total_bytes   += nbytes;
+        offset        += nbytes;
+        size          -= nbytes;
+    } while(size > 0);
+
+    *output_buflen = total_bytes;
+
+    return 0;
+}
+
+int
+file_write(struct my_file * file_ptr,
+           size_t           offset,
+           size_t           size,
+           uint8_t        * input_buffer,
+           size_t         * bytes_read)
+{
+    size_t total_bytes = 0;
+
+    do {
+        size_t              nbytes = 0;
+        size_t              len    = min(size, NEXUS_CHUNK_SIZE);
+
+        struct file_chunk * chunk  = __file_try_add_chunk(file_ptr, offset);
+
+        if (chunk == NULL) {
+            log_error("chunk not found (file=%s, offset=%zu)\n", file_ptr->filepath, offset);
+            return -1;
+        }
+
+        nbytes = __update_file_chunk(chunk, offset, len, input_buffer);
+
+        input_buffer += nbytes;
+        total_bytes  += nbytes;
+        size         -= nbytes;
+        offset       += nbytes;
+    } while(size > 0);
+
+    *bytes_read = total_bytes;
+
+    if (offset > file_ptr->filesize) {
+        file_ptr->filesize = offset;
+    }
+
+    file_set_dirty(file_ptr);
+
+    return 0;
+}
+
+void
+file_set_clean(struct my_file * file_ptr)
+{
+    file_ptr->is_dirty = false;
+}
+
+void
+file_set_dirty(struct my_file * file_ptr)
+{
+    file_ptr->is_dirty = true;
+}
+
+
+// TODO add file to list of open files
+struct my_file *
+vfs_file_alloc(struct my_dentry * dentry)
+{
+    struct my_file * file_ptr = nexus_malloc(sizeof(struct my_file));
+
+    file_ptr->dentry   = dentry_get(dentry);
+    file_ptr->filepath = dentry_get_fullpath(dentry);
+    file_ptr->inode    = file_ptr->dentry->inode;
+
+    file_ptr->filesize = file_ptr->inode->attrs.posix_stat.st_size;
+
+    INIT_LIST_HEAD(&file_ptr->file_chunks);
+
+    return file_ptr;
+}
+
+void
+vfs_file_free(struct my_file * file_ptr)
+{
+    struct file_chunk * chunk = NULL;
+
+    while (!list_empty(&file_ptr->file_chunks)) {
+        chunk = list_first_entry(&file_ptr->file_chunks, struct file_chunk, node);
+
+        list_del(&chunk->node);
+
+        __free_file_chunk(chunk);
+    }
+
+    dentry_put(file_ptr->dentry);
+    nexus_free(file_ptr->filepath);
+    nexus_free(file_ptr);
 }
