@@ -102,10 +102,34 @@ dentry_create(struct my_dentry * parent, char * name, nexus_dirent_type_t type)
 }
 
 void
+dentry_set_name(struct my_dentry * dentry, const char * name)
+{
+    size_t len = strlen(name);
+
+    assert(len < NEXUS_NAME_MAX);
+
+    strncpy(dentry->name, name, NEXUS_NAME_MAX);
+}
+
+void
+dentry_invalidate(struct my_dentry * dentry)
+{
+    if (dentry->inode) {
+        dentry->inode->dentry_count -= 1;
+        list_del(&dentry->aliases);
+        dentry->inode = NULL;
+
+        // TODO add to invalid list
+    }
+}
+
+void
 dentry_instantiate(struct my_dentry * dentry, struct my_inode * inode)
 {
     dentry->inode = inode;
-    inode->dentry = dentry_get(dentry);
+
+    list_add_tail(&dentry->aliases, &inode->dentry_list);
+    inode->dentry_count += 1;
 }
 
 char *

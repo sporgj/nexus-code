@@ -57,6 +57,14 @@ nexus_fuse_symlink(struct my_dentry  * dentry,
                    char              * target,
                    struct nexus_stat * nexus_stat);
 
+int
+nexus_fuse_hardlink(struct my_dentry * linkdir_dentry, char * linkname, struct my_dentry * target);
+
+int
+nexus_fuse_rename(struct my_dentry * from_dentry,
+                  char             * oldname,
+                  struct my_dentry * to_dentry,
+                  char             * newname);
 
 int
 nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * file_chunk);

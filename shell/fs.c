@@ -264,8 +264,8 @@ __fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_p
     char * to_dirpath    = NULL;
     char * to_filename   = NULL;
 
-    char * nexus_name1   = NULL;
-    char * nexus_name2   = NULL;
+    struct nexus_uuid uuid1;
+    struct nexus_uuid uuid2;
 
     int ret = -1;
 
@@ -273,21 +273,30 @@ __fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_p
     nexus_splitpath(to_path, &to_dirpath, &to_filename);
 
     ret = nexus_fs_rename(
-        vol, from_dirpath, from_filename, to_dirpath, to_filename, &nexus_name1, &nexus_name2);
+        vol, from_dirpath, from_filename, to_dirpath, to_filename, &uuid1, &uuid2);
 
     if (ret != 0) {
         log_error("rename operation\n");
         goto out;
     }
 
-    printf(" .rename %s/%s [%s] -> %s/%s [%s]\n",
-           from_dirpath,
-           from_filename,
-           nexus_name1,
-           to_dirpath,
-           to_filename,
-           nexus_name2);
-    fflush(stdout);
+    {
+        char * nexus_name1   = nexus_uuid_to_alt64(&uuid1);
+        char * nexus_name2   = nexus_uuid_to_alt64(&uuid2);
+
+        printf(" .rename %s/%s [%s] -> %s/%s [%s]\n",
+                from_dirpath,
+                from_filename,
+                nexus_name1,
+                to_dirpath,
+                to_filename,
+                nexus_name2);
+
+        nexus_free(nexus_name1);
+        nexus_free(nexus_name2);
+
+        fflush(stdout);
+    }
 
     ret = 0;
 out:
@@ -295,9 +304,6 @@ out:
     nexus_free(from_filename);
     nexus_free(to_dirpath);
     nexus_free(to_filename);
-
-    nexus_free(nexus_name1);
-    nexus_free(nexus_name2);
 
     return ret;
 }

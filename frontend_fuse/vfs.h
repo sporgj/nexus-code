@@ -44,7 +44,10 @@ struct my_inode {
 
     time_t                 last_accessed;
 
-    struct my_dentry     * dentry;
+
+    size_t                 dentry_count;
+
+    struct list_head       dentry_list;   // all the hardlinks
 };
 
 struct my_dentry {
@@ -66,6 +69,8 @@ struct my_dentry {
     struct list_head      children;
 
     struct list_head      siblings;
+
+    struct list_head      aliases;  // all the aliases (hardlinks)
 };
 
 
@@ -126,7 +131,7 @@ struct my_dentry *
 _vfs_cache_dentry(struct my_dentry * parent, char * name, struct nexus_fs_lookup * lookup_info);
 
 void
-vfs_forget_dentry(struct my_dentry * dentry);
+vfs_forget_dentry(struct my_dentry * dentry, char * name);
 
 
 struct my_inode *
@@ -193,6 +198,12 @@ dentry_lookup(struct my_dentry * parent, const char * name);
 
 void
 dentry_instantiate(struct my_dentry * dentry, struct my_inode * inode);
+
+void
+dentry_invalidate(struct my_dentry * dentry);
+
+void
+dentry_set_name(struct my_dentry * dentry, const char * name);
 
 char *
 dentry_get_fullpath(struct my_dentry * dentry);

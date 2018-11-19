@@ -619,19 +619,26 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
         return -1;
     }
 
+    nexus_uuid_zeroize(overwrite_uuid);
+
     // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
     if (dirnode_remove(to_dirnode, newname, &tmp_type, &tmp_uuid, NULL) == 0) {
-        bool should_remove = false;
         // this means there was an existing entry in the dirnode
+        bool should_remove = true;
+
+        // if the filenode won't be removed (hardlinks), we need to update its metadata
         if (tmp_type == NEXUS_REG) {
-            __remove_filenode(&tmp_uuid, &should_remove);
-        } else if (tmp_type = NEXUS_DIR) {
+            if (__remove_filenode(&tmp_uuid, &should_remove)) {
+                log_error("__remove_filenode FAILED\n");
+                return -1;
+            }
+        } else if (tmp_type == NEXUS_DIR) {
             __remove_dirnode(&tmp_uuid, false);
         }
 
-        nexus_uuid_copy(&tmp_uuid, overwrite_uuid);
-    } else {
-        nexus_uuid_zeroize(overwrite_uuid);
+        if (should_remove) {
+            nexus_uuid_copy(&tmp_uuid, overwrite_uuid);
+        }
     }
 
     if (src_type == NEXUS_LNK) {

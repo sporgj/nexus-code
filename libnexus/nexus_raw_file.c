@@ -133,16 +133,14 @@ nexus_stat_raw_file(char * path, struct nexus_stat * nx_stat)
 int
 nexus_touch_raw_file(char * filepath)
 {
-    FILE * fd = NULL;
+    int fd = open(filepath, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
-    fd = fopen(filepath, "wb");
-
-    if (fd == NULL) {
-	log_error("could not create file (%s)\n", filepath);
-	return -1;
+    if (fd < 0) {
+        log_error("could not create file (%s)\n", filepath);
+        return -1;
     }
 
-    fclose(fd);
+    close(fd);
 
     return 0;
 }

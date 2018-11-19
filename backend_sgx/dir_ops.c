@@ -1,23 +1,5 @@
 #include "internal.h"
 
-#if 0
-static void
-split_path(char * filepath, char ** dirpath, char ** filename)
-{
-    char * fname = NULL;
-
-    fname = strrchr(filepath, '/');
-
-    if (fname == NULL) {
-        *filename = filepath;
-        *dirpath = ".";
-    } else {
-        *filename = fname;
-        *dirpath = filepath;
-    }
-}
-#endif
-
 int
 sgx_backend_fs_create(struct nexus_volume  * volume,
                       char                 * dirpath,
@@ -314,19 +296,15 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                       char                 * oldname,
                       char                 * to_dirpath,
                       char                 * newname,
-                      char                ** old_nexusname,
-                      char                ** new_nexusname,
+                      struct nexus_uuid    * entry_uuid,
+                      struct nexus_uuid    * overriden_uuid,
                       void                 * priv_data)
 {
-    struct sgx_backend * sgx_backend = NULL;
-
-    struct nexus_uuid old_uuid;
-    struct nexus_uuid new_uuid;
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)priv_data;
 
     int err = -1;
     int ret = -1;
 
-    sgx_backend = (struct sgx_backend *)priv_data;
 
     BACKEND_SGX_ECALL_START(ECALL_RENAME);
 
@@ -336,8 +314,8 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                           oldname,
                           to_dirpath,
                           newname,
-                          &old_uuid,
-                          &new_uuid);
+                          entry_uuid,
+                          overriden_uuid);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_RENAME);
 
@@ -345,9 +323,6 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
         log_error("ecall_fs_rename() FAILED. (err=0x%x, ret=%d)\n", err, ret);
         return -1;
     }
-
-    *old_nexusname = nexus_uuid_to_alt64(&old_uuid);
-    *new_nexusname = nexus_uuid_to_alt64(&new_uuid);
 
     return 0;
 }

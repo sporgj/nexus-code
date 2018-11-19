@@ -163,8 +163,8 @@ struct nexus_backend_impl {
                      char                 * oldname,
                      char                 * to_dirpath,
                      char                 * newname,
-                     char                ** old_nexusname,
-                     char                ** new_nexusname,
+                     struct nexus_uuid    * entry_uuid,
+                     struct nexus_uuid    * overriden_uuid,
                      void                 * priv_data);
 
     int (*fs_encrypt)(struct nexus_volume * volume,

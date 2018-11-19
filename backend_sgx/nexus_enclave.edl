@@ -137,7 +137,7 @@ enclave {
             [in, string] char                * linkname_IN,
             [in, string] char                * target_dirpath_IN,
             [in, string] char                * targetname_IN,
-                   [out] struct nexus_uuid   * uuid_out
+            [user_check] struct nexus_uuid   * uuid_out
         );
 
         public int ecall_fs_rename
@@ -146,8 +146,8 @@ enclave {
             [in, string] char                * oldname_IN,
             [in, string] char                * to_dirpath_IN,
             [in, string] char                * newname_IN,
-                   [out] struct nexus_uuid   * old_uuid_out,
-                   [out] struct nexus_uuid   * new_uuid_out
+            [user_check] struct nexus_uuid   * entry_uuid_out,
+            [user_check] struct nexus_uuid   * overriden_uuid_out
         );
 
         // file operations

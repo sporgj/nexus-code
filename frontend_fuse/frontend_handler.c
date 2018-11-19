@@ -269,6 +269,68 @@ nexus_fuse_symlink(struct my_dentry  * dentry,
 }
 
 int
+nexus_fuse_hardlink(struct my_dentry * linkdir_dentry, char * linkname, struct my_dentry * target)
+{
+    char * link_dirpath = dentry_get_fullpath(linkdir_dentry);
+    char * target_dirpath = dentry_get_parent_fullpath(target);
+
+    int ret = -1;
+
+
+    if (link_dirpath && target_dirpath) {
+        struct nexus_uuid hardlink_uuid;
+
+        ret = nexus_fs_hardlink(nexus_fuse_volume,
+                                link_dirpath,
+                                linkname,
+                                target_dirpath,
+                                target->name,
+                                &hardlink_uuid);
+    }
+
+    if (link_dirpath) {
+        nexus_free(link_dirpath);
+    }
+
+    if (target_dirpath) {
+        nexus_free(target_dirpath);
+    }
+
+    return ret;
+}
+
+int
+nexus_fuse_rename(struct my_dentry * from_dentry,
+                  char             * oldname,
+                  struct my_dentry * to_dentry,
+                  char             * newname)
+{
+    char * from_dirpath = dentry_get_fullpath(from_dentry);
+    char * to_dirpath = dentry_get_fullpath(to_dentry);
+
+    int ret = -1;
+
+
+    if (from_dirpath && to_dirpath) {
+        struct nexus_uuid entry_uuid;
+        struct nexus_uuid overwrite_uuid;
+
+        ret = nexus_fs_rename(nexus_fuse_volume,
+                              from_dirpath,
+                              oldname,
+                              to_dirpath,
+                              newname,
+                              &entry_uuid,
+                              &overwrite_uuid);
+    }
+
+    nexus_free(from_dirpath);
+    nexus_free(to_dirpath);
+
+    return ret;
+}
+
+int
 nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 {
     struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;

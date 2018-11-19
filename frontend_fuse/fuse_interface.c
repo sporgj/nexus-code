@@ -125,7 +125,7 @@ out_err:
     fuse_reply_err(req, ENOENT);
 
     if (child_dentry) {
-        vfs_forget_dentry(child_dentry);
+        vfs_forget_dentry(parent_dentry, filename);
     }
 }
 
@@ -523,6 +523,103 @@ nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const cha
     fuse_reply_entry(req, &entry_param);
 }
 
+static void
+nxs_fuse_hardlink(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char * newname)
+{
+    struct my_dentry * linkdir_dentry = NULL;
+    struct my_dentry * target_dentry = NULL;
+
+    struct my_dentry * new_dentry = NULL;
+
+    struct fuse_entry_param entry_param;
+
+    int code = ENOENT;
+
+
+    linkdir_dentry = vfs_get_dentry(newparent);
+
+    if (linkdir_dentry == NULL) {
+        log_error("could not get link directory dentry\n");
+        goto out_err;
+    }
+
+    target_dentry = vfs_get_dentry(ino);
+
+    if (target_dentry == NULL) {
+        log_error("could not get target file dentry\n");
+        goto out_err;
+    }
+
+    if (nexus_fuse_hardlink(linkdir_dentry, (char *)newname, target_dentry)) {
+        code = EIO;
+
+        log_error("could not hardlink\n");
+        goto out_err;
+    }
+
+    new_dentry
+        = vfs_cache_dentry(linkdir_dentry, (char *)newname, &target_dentry->inode->uuid, NEXUS_REG);
+
+    if (new_dentry == NULL) {
+        log_error("could not add dentry to vfs\n");
+        fuse_reply_err(req, EIO);
+        return;
+    }
+
+    dentry_export_attrs(new_dentry, &entry_param.attr);
+    entry_param.ino = entry_param.attr.st_ino;
+
+    inode_incr_lookup(new_dentry->inode, 1);
+
+    fuse_reply_entry(req, &entry_param);
+
+    return;
+out_err:
+    fuse_reply_err(req, code);
+}
+
+static void
+nxs_fuse_rename(fuse_req_t   req,
+                fuse_ino_t   parent,
+                const char * name,
+                fuse_ino_t   newparent,
+                const char * newname,
+                unsigned int flags)
+{
+    struct my_dentry * src_dentry = vfs_get_dentry(parent);
+    struct my_dentry * dst_dentry = vfs_get_dentry(newparent);
+
+    int code = ENOENT;
+
+    (void)flags; // TODO handle rename flags (RENAME_EXCHANGE/RENAME_NOREPLACE)
+
+    if (src_dentry == NULL || dst_dentry == NULL) {
+        log_error("could not fetch source/dest dentries\n");
+        goto out_err;
+    }
+
+
+    if (nexus_fuse_rename(src_dentry, (char *)name, dst_dentry, (char *)newname)) {
+        log_error("nexus_fuse_rename FAILED\n");
+        goto out_err;
+    }
+
+
+    if (parent == newparent) {
+        struct my_dentry * child = dentry_lookup(src_dentry, (char *)name);
+
+        if (child) {
+            dentry_set_name(child, (char *)newname);
+        }
+    } else {
+        vfs_forget_dentry(src_dentry, (char *)name);
+        vfs_forget_dentry(dst_dentry, (char *)newname);
+    }
+
+    code = 0;
+out_err:
+    fuse_reply_err(req, code);
+}
 
 static void
 nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info * fi)
@@ -593,6 +690,8 @@ static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .rmdir                  = nxs_fuse_remove,
     .readlink               = nxs_fuse_readlink,
     .symlink                = nxs_fuse_symlink,
+    .link                   = nxs_fuse_hardlink,
+    .rename                 = nxs_fuse_rename,
 
     .read                   = nxs_fuse_read,
     .write                  = nxs_fuse_write,

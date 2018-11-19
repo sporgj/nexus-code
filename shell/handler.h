@@ -36,6 +36,9 @@ __fs_readlink(struct nexus_volume * vol, char * path);
 int
 __fs_hardlink(struct nexus_volume * vol, char * link_filepath, char * target_filepath);
 
+int
+__fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_path);
+
 
 int
 dispatch_nexus_command(uint8_t    * cmd_buf,

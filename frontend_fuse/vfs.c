@@ -60,6 +60,8 @@ __icache_alloc(fuse_ino_t ino, struct nexus_uuid * uuid)
 
     inode->ino = ino;
 
+    INIT_LIST_HEAD(&inode->dentry_list);
+
     if (uuid) {
         nexus_uuid_copy(uuid, &inode->uuid);
     }
@@ -100,7 +102,11 @@ vfs_get_dentry(fuse_ino_t ino)
 {
     struct my_inode * inode = icache_find(ino);
 
-    return inode ? inode->dentry : NULL;
+    if (inode && inode->dentry_count) {
+        return list_first_entry(&inode->dentry_list, struct my_dentry, aliases);
+    }
+
+    return NULL;
 }
 
 struct my_dentry *
@@ -140,9 +146,13 @@ vfs_cache_dentry(struct my_dentry  * parent,
 }
 
 void
-vfs_forget_dentry(struct my_dentry * dentry)
+vfs_forget_dentry(struct my_dentry * parent_dentry, char * name)
 {
-    // TODO
+    struct my_dentry * child = dentry_lookup(parent_dentry, name);
+
+    if (child) {
+        dentry_invalidate(child);
+    }
 }
 
 void
@@ -152,7 +162,7 @@ vfs_remove_inode(struct my_inode * inode)
         return;
     }
 
-    dentry_put(inode->dentry);
+    // TODO drop all this dentries
 
     icache_del(inode->ino);
 }

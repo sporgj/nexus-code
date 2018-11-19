@@ -166,8 +166,8 @@ nexus_fs_rename(struct nexus_volume * volume,
                 char                * oldname,
                 char                * to_dirpath,
                 char                * newname,
-                char               ** old_nexusname,
-                char               ** new_nexusname);
+                struct nexus_uuid   * entry_uuid,
+                struct nexus_uuid   * overriden_uuid);
 
 
 
