@@ -27,6 +27,10 @@ struct nexus_uuid_path {
 
 int nexus_uuid_gen(struct nexus_uuid * uuid);
 
+// helps emulate a NULL uuid
+void nexus_uuid_zeroize(struct nexus_uuid * uuid);
+bool nexus_uuid_is_zeros(struct nexus_uuid * uuid);
+
 int
 nexus_uuid_compare(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid);
 

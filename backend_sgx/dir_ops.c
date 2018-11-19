@@ -131,7 +131,7 @@ sgx_backend_fs_stat(struct nexus_volume * volume,
         return -1;
     }
 
-    return 0;
+    return ret;
 }
 
 int
@@ -279,18 +279,14 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
                         char                 * link_name,
                         char                 * target_dirpath,
                         char                 * target_name,
-                        char                ** nexus_name,
+                        struct nexus_uuid    * uuid,
                         void                 * priv_data)
 {
-    struct sgx_backend * sgx_backend = NULL;
-
-    struct nexus_uuid uuid;
+    struct sgx_backend * sgx_backend = (struct sgx_backend *)priv_data;
 
     int err = -1;
     int ret = -1;
 
-
-    sgx_backend = (struct sgx_backend *)priv_data;
 
     BACKEND_SGX_ECALL_START(ECALL_HARDLINK);
 
@@ -300,7 +296,7 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
                             link_name,
                             target_dirpath,
                             target_name,
-                            &uuid);
+                            uuid);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_HARDLINK);
 
@@ -308,8 +304,6 @@ sgx_backend_fs_hardlink(struct nexus_volume  * volume,
         log_error("ecall_fs_hardlink() FAILED. (err=0x%x, ret=%d)\n", err, ret);
         return -1;
     }
-
-    *nexus_name = nexus_uuid_to_alt64(&uuid);
 
     return 0;
 }

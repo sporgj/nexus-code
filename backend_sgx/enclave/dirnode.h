@@ -25,8 +25,6 @@ struct __dir_rec {
 
     nexus_dirent_type_t type;
 
-    struct nexus_uuid   real_uuid;
-
     struct nexus_uuid   link_uuid;
 
     uint16_t            name_len;
@@ -162,13 +160,6 @@ dirnode_add(struct nexus_dirnode * dirnode,
             nexus_dirent_type_t    type,
             struct nexus_uuid    * entry_uuid);
 
-int
-dirnode_add2(struct nexus_dirnode * dirnode,
-             char                 * filename,
-             nexus_dirent_type_t    type,
-             struct nexus_uuid    * link_uuid,
-             struct nexus_uuid    * real_uuid);
-
 /**
  * adds a new link
  * @param dirnode
@@ -213,16 +204,6 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
                        size_t               * directory_size);
 
 /**
- * Overloaded find_by_name call that includes the real_uuid
- */
-int
-__dirnode_find_by_name(struct nexus_dirnode * dirnode,
-                       char                 * filename,
-                       nexus_dirent_type_t  * type,
-                       struct nexus_uuid    * link_uuid,
-                       struct nexus_uuid    * real_uuid);
-
-/**
  * Removes an entry from the dirnode
  * @param dirnode
  * @param filanem
@@ -235,5 +216,16 @@ dirnode_remove(struct nexus_dirnode * dirnode,
                char                 * filename,
                nexus_dirent_type_t  * type,
                struct nexus_uuid    * link_uuid,
-               struct nexus_uuid    * real_uuid,
                char                ** symlink_target_path);
+
+
+/**
+ * Searches for the specified entry by name, and only return it after checking the appropriate
+ * checks in the flags.
+ * supported flags: NEXUS_FCREATE/NEXUS_FDELETE
+ */
+struct dir_entry *
+__dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexus_io_flags_t flags);
+
+void
+__dirnode_remove_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);

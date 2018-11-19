@@ -75,22 +75,6 @@ ocall_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume
 }
 
 int
-ocall_buffer_hardlink(struct nexus_uuid   * link_uuid,
-                      struct nexus_uuid   * target_uuid,
-                      struct nexus_volume * volume)
-{
-    return io_buffer_hardlink(link_uuid, target_uuid, volume);
-}
-
-int
-ocall_buffer_rename(struct nexus_uuid   * from_uuid,
-                    struct nexus_uuid   * to_uuid,
-                    struct nexus_volume * volume)
-{
-    return io_buffer_rename(from_uuid, to_uuid, volume);
-}
-
-int
 ocall_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
 {
     return io_buffer_stattime(uuid, timestamp, volume);

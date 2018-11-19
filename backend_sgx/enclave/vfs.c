@@ -81,7 +81,6 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
     INIT_LIST_HEAD(&root_dentry.children);
 
     nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.link_uuid);
-    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.real_uuid);
 
     root_dentry.metadata_type = NEXUS_DIRNODE;
 
@@ -174,20 +173,9 @@ nexus_vfs_release_supernode()
 
 
 struct nexus_metadata *
-nexus_vfs_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t flags)
+nexus_vfs_load(struct nexus_uuid * real_uuid, nexus_metadata_type_t type, nexus_io_flags_t flags)
 {
     struct nexus_metadata * metadata  = NULL;
-
-    struct nexus_uuid     * real_uuid = uuid;
-
-    // check if we are loading a hardlink
-    if (type == NEXUS_FILENODE) {
-        struct nexus_uuid * tmp_uuid = supernode_get_reallink(global_supernode, uuid);
-
-        if (tmp_uuid != NULL) {
-            real_uuid = tmp_uuid;
-        }
-    }
 
     // try loading from cache
     metadata = nexus_lru_get(metadata_objects_list, real_uuid);

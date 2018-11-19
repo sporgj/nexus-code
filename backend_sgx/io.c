@@ -298,42 +298,6 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 }
 
 int
-io_buffer_hardlink(struct nexus_uuid   * link_uuid,
-                   struct nexus_uuid   * target_uuid,
-                   struct nexus_volume * volume)
-{
-    int result = -1;
-
-    BACKEND_SGX_IOBUF_START(IOBUF_HARDLINK);
-
-    result = nexus_datastore_hardlink_uuid(volume->metadata_store,
-                                           link_uuid,
-                                           NULL,
-                                           target_uuid,
-                                           NULL);
-
-    BACKEND_SGX_IOBUF_FINISH(IOBUF_HARDLINK);
-
-    return result;
-}
-
-int
-io_buffer_rename(struct nexus_uuid   * from_uuid,
-                 struct nexus_uuid   * to_uuid,
-                 struct nexus_volume * volume)
-{
-    int result = -1;
-
-    BACKEND_SGX_IOBUF_START(IOBUF_RENAME);
-
-    result = nexus_datastore_rename_uuid(volume->metadata_store, from_uuid, NULL, to_uuid, NULL);
-
-    BACKEND_SGX_IOBUF_FINISH(IOBUF_RENAME);
-
-    return result;
-}
-
-int
 io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
 {
     struct nexus_stat stat_info;

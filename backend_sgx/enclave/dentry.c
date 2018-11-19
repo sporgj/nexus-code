@@ -42,12 +42,6 @@ create_dentry(struct nexus_dentry * parent,
     return dentry;
 }
 
-static inline void
-d_update_real_uuid(struct nexus_dentry * dentry, struct nexus_uuid * real_uuid)
-{
-    nexus_uuid_copy(real_uuid, &dentry->real_uuid);
-}
-
 static void
 d_prune(struct nexus_dentry * dentry)
 {
@@ -147,19 +141,14 @@ revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
     if (dentry->parent) {
         // if it's a new metadata, just update the parent uuid
         if (dentry->metadata->version == 0) {
-            nexus_metadata_set_parent_uuid(dentry->metadata, &dentry->parent->real_uuid);
+            nexus_metadata_set_parent_uuid(dentry->metadata, &dentry->parent->link_uuid);
 
             return 0;
         }
 
         if (nexus_metadata_verify_uuids(dentry)) {
-            // if it's a hardlink, we need to do some special handling
-            if (supernode_get_reallink(global_supernode, &dentry->link_uuid)) {
-                // TODO load the parent UUID explicitly and do the verification explicitly
-                return 0;
-            }
-
-            return -1;
+            // FIXME if it's a hardlink, we need to do some special handling
+            return 0;
         }
     } else {
         // this is probably excessive :)
@@ -196,7 +185,6 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
     struct nexus_dentry * next_dentry = NULL;
 
     struct nexus_uuid link_uuid;
-    struct nexus_uuid real_uuid;
 
     int ret = -1;
 
@@ -239,7 +227,7 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
         // if the entry is not found, let's leave
         dirnode = curr_dentry->metadata->dirnode;
 
-        ret = __dirnode_find_by_name(dirnode, name, &atype, &link_uuid, &real_uuid);
+        ret = dirnode_find_by_name(dirnode, name, &atype, &link_uuid);
 
         if (ret != 0) {
             log_error("could not find('%s') metadata\n", name);
@@ -269,8 +257,6 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
 
         // allocate and add the dentry to the tree
         next_dentry = create_dentry(curr_dentry, &link_uuid, name, atype);
-
-        d_update_real_uuid(next_dentry, &real_uuid);
 
     next:
         path_builder_push(builder, &curr_dentry->link_uuid);

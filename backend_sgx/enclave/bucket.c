@@ -34,7 +34,6 @@ __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char *
 
     // when creating a file, real and link UUIDs are the same
     nexus_uuid_copy(entry_uuid, &dir_rec->link_uuid);
-    nexus_uuid_copy(entry_uuid, &dir_rec->real_uuid);
 
     __init_dir_entry(new_dir_entry);
 

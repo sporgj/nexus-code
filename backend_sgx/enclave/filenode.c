@@ -5,6 +5,8 @@ struct __filenode_hdr {
     struct nexus_uuid         root_uuid;
     struct nexus_uuid         parent_uuid;
 
+    uint16_t                  link_count;
+
     uint32_t                  nchunks;
     uint8_t                   log2chunksize;
     uint64_t                  filesize;
@@ -105,6 +107,8 @@ filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
     struct nexus_filenode * filenode = nexus_malloc(sizeof(struct nexus_filenode));
 
+    filenode->link_count = 1;
+
     nexus_uuid_copy(root_uuid, &filenode->root_uuid);
     nexus_uuid_copy(my_uuid, &filenode->my_uuid);
 
@@ -141,6 +145,8 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
 
     filenode->nchunks  = header->nchunks;
     filenode->filesize = header->filesize;
+
+    filenode->link_count = header->link_count;
 
     nexus_uuid_copy(&header->my_uuid, &filenode->my_uuid);
     nexus_uuid_copy(&header->root_uuid, &filenode->root_uuid);
@@ -263,6 +269,8 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
     header->nchunks       = filenode->nchunks;
     header->log2chunksize = filenode->log2chunksize;
     header->filesize      = filenode->filesize;
+
+    header->link_count    = filenode->link_count;
 
     nexus_uuid_copy(&filenode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&filenode->root_uuid, &header->root_uuid);
@@ -419,3 +427,32 @@ filenode_get_chunk(struct nexus_filenode * filenode, size_t offset)
 
     return chunk_entry ? &chunk_entry->crypto_ctx : NULL;
 }
+
+void
+filenode_incr_linkcount(struct nexus_filenode * filenode)
+{
+#define MAX_LINKS   (UINT16_MAX)
+
+    assert(filenode->link_count != MAX_LINKS);     // TODO handle overflow
+    filenode->link_count += 1;
+    __filenode_set_dirty(filenode);
+}
+
+void
+filenode_decr_linkcount(struct nexus_filenode * filenode)
+{
+    if (filenode->link_count > 0) {
+        filenode->link_count -= 1;
+        __filenode_set_dirty(filenode);
+    }
+}
+
+size_t
+filenode_get_linkcount(struct nexus_filenode * filenode)
+{
+    return filenode->link_count;
+}
+
+
+
+

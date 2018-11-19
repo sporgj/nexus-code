@@ -24,6 +24,9 @@ struct nexus_filenode {
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
 
+
+    size_t                     link_count;
+
     uint32_t                   nchunks;
     uint64_t                   filesize;
 
@@ -37,7 +40,6 @@ struct nexus_filenode {
 
 void
 filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid);
-
 
 /**
  * Creates a new filenode with a given root_uuid
@@ -87,3 +89,16 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize);
 // TODO change API to prevent misuse
 struct nexus_crypto_ctx *
 filenode_get_chunk(struct nexus_filenode * filenode, size_t offset);
+
+
+
+// hardlink stuff
+
+void
+filenode_incr_linkcount(struct nexus_filenode * filenode);
+
+void
+filenode_decr_linkcount(struct nexus_filenode * filenode);
+
+size_t
+filenode_get_linkcount(struct nexus_filenode * filenode);

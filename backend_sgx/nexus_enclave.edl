@@ -265,22 +265,6 @@ enclave {
         );
 
         int
-        ocall_buffer_hardlink
-        (
-            [in]         struct nexus_uuid   * link_uuid,
-            [in]         struct nexus_uuid   * target_uuid,
-            [user_check] struct nexus_volume * volume
-        );
-
-        int
-        ocall_buffer_rename
-        (
-            [in]         struct nexus_uuid   * from_uuid,
-            [in]         struct nexus_uuid   * to_uuid,
-            [user_check] struct nexus_volume * volume
-        );
-
-        int
         ocall_buffer_stattime
         (
             [in]         struct nexus_uuid   * uuid,

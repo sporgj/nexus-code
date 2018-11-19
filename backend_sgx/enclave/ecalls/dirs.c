@@ -75,26 +75,82 @@ out:
 }
 
 inline static int
+__remove_filenode(struct nexus_uuid * uuid, bool * should_remove)
+{
+    // if we are dealing with files, check hardlink count
+    struct nexus_metadata * metadata = nexus_vfs_load(uuid, NEXUS_FILENODE, NEXUS_FRDWR);
+
+    if (metadata == NULL) {
+        log_error("could not find filenode\n");
+        return -1;
+    }
+
+    filenode_decr_linkcount(metadata->filenode);
+
+    // if there are existing links, just update the filenode
+    if (filenode_get_linkcount(metadata->filenode) > 0) {
+        if (nexus_metadata_store(metadata)) {
+            log_error("could not store filenode metadata after increment\n");
+            return -1;
+        }
+
+        nexus_vfs_put(metadata);
+
+        *should_remove = false;
+    } else {
+        // we are going to make the metadata clean to make sure it doesn't get written to disk
+        // and we can just remove the uuid from the vfs
+        __metadata_set_clean(metadata);
+        nexus_vfs_put(metadata);
+        nexus_vfs_delete(uuid);
+
+        *should_remove = true;
+    }
+
+    return 0;
+}
+
+inline static int
+__remove_dirnode(struct nexus_uuid * uuid, bool check_emptiness)
+{
+    // TODO if not empty, add this dirnode to the garbage list
+    nexus_vfs_delete(uuid);
+    return 0;
+}
+
+inline static int
 __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nexus_uuid * uuid_OUT)
 {
     struct nexus_dirnode * dirnode = metadata->dirnode;
 
-    struct nexus_uuid   tmp_uuid;
+    struct nexus_uuid   * tmp_uuid = NULL;
 
-    nexus_dirent_type_t type;
+    nexus_dirent_type_t   tmp_type;
 
 
-    // TODO: check if it's a directory (rmdir)... if non-empty, we refuse
-    // TODO: if it's a file, we should probably drop refcount (hardlink implementation)
+    struct dir_entry * direntry = __dirnode_search_and_check(dirnode, filename_IN, NEXUS_FDELETE);
 
-    if (dirnode_remove(dirnode, filename_IN, &type, uuid_OUT, &tmp_uuid, NULL)) {
-        log_error("dirnode_remove() FAILED\n");
+    if (direntry == NULL) {
         return -1;
     }
 
-    if (type != NEXUS_LNK) {
-        nexus_vfs_delete(uuid_OUT);
+
+    tmp_uuid = &direntry->dir_rec.link_uuid;
+    tmp_type = direntry->dir_rec.type;
+
+    nexus_uuid_copy(tmp_uuid, uuid_OUT);
+
+    if (tmp_type == NEXUS_REG) {
+        bool should_remove = false;
+
+        if (__remove_filenode(tmp_uuid, &should_remove)) {
+            return -1;
+        }
+    } else if (tmp_type == NEXUS_DIRNODE) {
+        __remove_dirnode(tmp_uuid, true);
     }
+
+    __dirnode_remove_dir_entry(dirnode, direntry);
 
     return 0;
 }
@@ -434,47 +490,41 @@ out:
 }
 
 int
-__nxs_fs_hardlink(struct nexus_dirnode * src_dirnode,
-                  char                 * src_name_IN,
-                  struct nexus_dirnode * dst_dirnode,
-                  char                 * dst_name_IN,
-                  struct nexus_uuid    * dst_uuid)
+__nxs_fs_hardlink(struct nexus_dirnode * link_dirnode,
+                  char                 * link_filename,
+                  struct nexus_dirnode * tgt_dirnode,
+                  char                 * tgt_filename,
+                  struct nexus_uuid    * file_uuid)
 {
-    nexus_dirent_type_t src_type;
+    nexus_dirent_type_t type;
 
-    struct nexus_uuid   src_uuid;
-
-    int ret = -1;
-
-
-    ret = dirnode_find_by_name(src_dirnode, src_name_IN, &src_type, &src_uuid);
-
-    if (ret != 0) {
-        log_error("dirnode_find_by_name(%s) FAILED\n", src_name_IN);
+    if (dirnode_find_by_name(tgt_dirnode, tgt_filename, &type, file_uuid)) {
+        log_error("dirnode_find_by_name(%s) FAILED\n", tgt_filename);
         return -1;
     }
 
-    if (src_type != NEXUS_REG) {
+    if (type != NEXUS_REG) {
         log_error("NEXUS only supports hardlinking files\n");
         return -1;
     }
 
-    // generate the uuid and add entry to dirnode
-    nexus_uuid_gen(dst_uuid);
 
-    ret = buffer_layer_hardlink(dst_uuid, &src_uuid);
+    {
+        struct nexus_metadata * metadata = nexus_vfs_load(file_uuid, NEXUS_FILENODE, NEXUS_FRDWR);
 
-    if (ret != 0) {
-        log_error("buffer_layer_hardlink() FAILED\n");
-        return -1;
+        filenode_incr_linkcount(metadata->filenode);
+
+        if (nexus_metadata_store(metadata)) {
+            log_error("could not store filenode metadata after increment\n");
+            return -1;
+        }
+
+        nexus_vfs_put(metadata);
     }
 
-    ret = dirnode_add(dst_dirnode, dst_name_IN, NEXUS_REG, dst_uuid);
-
-    if (ret != 0) {
-        // TODO undo the hardlink
-
-        log_error("dirnode_add(%s) FAILED\n", dst_name_IN);
+    // add entry to src_dirnode
+    if (dirnode_add(link_dirnode, link_filename, NEXUS_REG, file_uuid)) {
+        log_error("dirnode_add(%s) FAILED\n", link_filename);
         return -1;
     }
 
@@ -551,13 +601,12 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
                 char                 * oldname,
                 struct nexus_dirnode * to_dirnode,
                 char                 * newname,
-                struct nexus_uuid    * old_uuid,
-                struct nexus_uuid    * new_uuid)
+                struct nexus_uuid    * src_uuid,
+                struct nexus_uuid    * overwrite_uuid)
 {
-    nexus_dirent_type_t type;
+    nexus_dirent_type_t src_type;
     nexus_dirent_type_t tmp_type;
 
-    struct nexus_uuid   real_uuid;
     struct nexus_uuid   tmp_uuid;
 
     char * symlink_target = NULL;
@@ -565,44 +614,36 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
     int ret = -1;
 
 
-    ret = dirnode_remove(from_dirnode, oldname, &type, old_uuid, &real_uuid, &symlink_target);
-
-    if (ret != 0) {
+    if (dirnode_remove(from_dirnode, oldname, &src_type, src_uuid, &symlink_target)) {
         log_error("could not remove (%s) from directory\n", oldname);
         return -1;
     }
 
-
     // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
-    ret = dirnode_remove(to_dirnode, newname, &tmp_type, new_uuid, &tmp_uuid, NULL);
-
-    if (ret == 0) {
+    if (dirnode_remove(to_dirnode, newname, &tmp_type, &tmp_uuid, NULL) == 0) {
+        bool should_remove = false;
         // this means there was an existing entry in the dirnode
-        nexus_vfs_delete(new_uuid);
+        if (tmp_type == NEXUS_REG) {
+            __remove_filenode(&tmp_uuid, &should_remove);
+        } else if (tmp_type = NEXUS_DIR) {
+            __remove_dirnode(&tmp_uuid, false);
+        }
+
+        nexus_uuid_copy(&tmp_uuid, overwrite_uuid);
     } else {
-        // we are adding a file to the destination dirnode
-        nexus_uuid_gen(new_uuid);
-        ret = 0;
+        nexus_uuid_zeroize(overwrite_uuid);
     }
 
-    if (type == NEXUS_LNK) {
-        ret = dirnode_add_link(to_dirnode, newname, symlink_target, new_uuid);
+    if (src_type == NEXUS_LNK) {
+        ret = dirnode_add_link(to_dirnode, newname, symlink_target, src_uuid);
 
         nexus_free(symlink_target);
     } else {
-        ret = dirnode_add2(to_dirnode, newname, type, new_uuid, &real_uuid);
+        ret = dirnode_add(to_dirnode, newname, src_type, src_uuid);
     }
 
     if (ret != 0) {
         log_error("could not add entry to destination directory\n");
-        return -1;
-    }
-
-
-    ret = buffer_layer_rename(old_uuid, new_uuid);
-
-    if (ret != 0) {
-        log_error("buffer_layer_rename() FAILED\n");
         return -1;
     }
 
@@ -615,8 +656,8 @@ ecall_fs_rename(char              * from_dirpath_IN,
                 char              * oldname_IN,
                 char              * to_dirpath_IN,
                 char              * newname_IN,
-                struct nexus_uuid * old_uuid_out,
-                struct nexus_uuid * new_uuid_out)
+                struct nexus_uuid * entry_uuid_out,
+                struct nexus_uuid * existing_uuid_out)
 {
     struct nexus_metadata * from_metadata = NULL;
     struct nexus_metadata * to_metadata   = NULL;
@@ -625,8 +666,8 @@ ecall_fs_rename(char              * from_dirpath_IN,
     struct nexus_dentry   * from_dentry   = NULL;
     struct nexus_dentry   * to_dentry     = NULL;
 
-    struct nexus_uuid old_uuid;
-    struct nexus_uuid new_uuid;
+    struct nexus_uuid entry_uuid;
+    struct nexus_uuid existing_uuid;
 
     int ret = -1;
 
@@ -682,8 +723,8 @@ do_rename:
                           oldname_IN,
                           tmp_metadata->dirnode,
                           newname_IN,
-                          &old_uuid,
-                          &new_uuid);
+                          &entry_uuid,
+                          &existing_uuid);
 
     if (ret != 0) {
         log_error("rename operation failed\n");
@@ -707,8 +748,8 @@ do_rename:
         }
     }
 
-    nexus_uuid_copy(&old_uuid, old_uuid_out);
-    nexus_uuid_copy(&new_uuid, new_uuid_out);
+    nexus_uuid_copy(&entry_uuid, entry_uuid_out);
+    nexus_uuid_copy(&existing_uuid, existing_uuid_out);
 
     ret = 0;
 

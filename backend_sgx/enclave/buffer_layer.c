@@ -252,87 +252,19 @@ buffer_layer_new(struct nexus_uuid * uuid)
 int
 buffer_layer_delete(struct nexus_uuid * uuid)
 {
-    struct nexus_uuid * tmp_uuid  = NULL;
+    int err = -1;
+    int ret = -1;
 
-    struct nexus_uuid * real_uuid = uuid;
+    buffer_layer_evict(uuid);
 
-    bool modified = supernode_del_hardlink(global_supernode, uuid, &tmp_uuid);
+    err = ocall_buffer_del(&ret, uuid, global_volume);
 
-    // delete link from supernode
-    if (modified) {
-        if (nexus_metadata_store(global_supernode_metadata)) {
-            log_error("could not store supernode\n");
-            return -1;
-        }
+    // XXX: what do to about err?
+    (void) ret;
 
-        // if the delete operation didn't affect an on-disk links
-        if (tmp_uuid == NULL) {
-            return 0;
-        }
-
-        real_uuid = tmp_uuid;
-    }
-
-    buffer_layer_evict(real_uuid);
-
-    {
-        int err = -1;
-        int ret = -1;
-
-        err = ocall_buffer_del(&ret, real_uuid, global_volume);
-
-        // XXX: what do to about err?
-        (void) ret;
-
-        if (err) {
-            log_error("ocall_buffer_del FAILED\n");
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-int
-buffer_layer_hardlink(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid)
-{
-    if (supernode_add_hardlink(global_supernode, src_uuid, dst_uuid)) {
-        log_error("could not add hardlink to supernode\n");
+    if (err) {
+        log_error("ocall_buffer_del FAILED\n");
         return -1;
-    }
-
-    if (nexus_metadata_store(global_supernode_metadata)) {
-        log_error("stores the supernode\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-buffer_layer_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid)
-{
-    bool is_real_file = true; // we assume we are renaming a "real file"
-
-    supernode_rename_link(global_supernode, from_uuid, to_uuid, &is_real_file);
-
-    if (nexus_metadata_store(global_supernode_metadata)) {
-        log_error("supernode_store FAILED\n");
-        return -1;
-    }
-
-    if (is_real_file) {
-        int ret = -1;
-        int err = -1;
-
-        err = ocall_buffer_rename(&ret, from_uuid, to_uuid, global_volume);
-
-        if (err || ret) {
-            log_error("ocall_buffer_hardlink FAILED (err=%d, ret=%d)\n", err, ret);
-            return -1;
-        }
-
-        return nexus_crypto_buf_rename(from_uuid, to_uuid);
     }
 
     return 0;

@@ -13,7 +13,6 @@ struct nexus_dentry {
     size_t                      name_len;
 
     struct nexus_uuid           link_uuid;
-    struct nexus_uuid           real_uuid;
 
     struct nexus_dentry       * parent;
     struct nexus_metadata     * metadata;

@@ -867,25 +867,24 @@ __find_by_name(struct nexus_dirnode * dirnode, char * fname)
     return __dir_entry_from_hashed_filename(rst_hname);
 }
 
-struct dir_entry *
-__dirnode_add(struct nexus_dirnode * dirnode,
-            char                   * filename,
-            nexus_dirent_type_t      type,
-            struct nexus_uuid      * entry_uuid,
-            struct nexus_uuid      * real_uuid)
+int
+dirnode_add(struct nexus_dirnode * dirnode,
+            char                 * filename,
+            nexus_dirent_type_t    type,
+            struct nexus_uuid    * entry_uuid)
 {
     struct dir_entry * new_dir_entry = NULL;
 
     if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_CREATE)) {
         log_error("not authorized to create files\n");
-        return NULL;
+        return -1;
     }
 
     // check for existing entry.
     // XXX: typical filesystems perform a lookup to check if the file exists before
     // adding the file. Consider caching dirnode lookups
     if (__find_by_name(dirnode, filename)) {
-        return NULL;
+        return -1;
     }
 
     __clear_last_failed_lookup(dirnode);
@@ -894,38 +893,7 @@ __dirnode_add(struct nexus_dirnode * dirnode,
 
     __dirnode_add_direntry(dirnode, new_dir_entry);
 
-    if (real_uuid) {
-        nexus_uuid_copy(real_uuid, &new_dir_entry->dir_rec.real_uuid);
-    }
-
-    return new_dir_entry;
-}
-
-int
-dirnode_add(struct nexus_dirnode * dirnode,
-            char                 * filename,
-            nexus_dirent_type_t    type,
-            struct nexus_uuid    * entry_uuid)
-{
-    if (__dirnode_add(dirnode, filename, type, entry_uuid, NULL) != NULL) {
-        return 0;
-    }
-
-    return -1;
-}
-
-int
-dirnode_add2(struct nexus_dirnode * dirnode,
-             char                 * filename,
-             nexus_dirent_type_t    type,
-             struct nexus_uuid    * entry_uuid,
-             struct nexus_uuid    * real_uuid)
-{
-    if (__dirnode_add(dirnode, filename, type, entry_uuid, real_uuid) != NULL) {
-        return 0;
-    }
-
-    return -1;
+    return 0;
 }
 
 int
@@ -1016,11 +984,10 @@ dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
 }
 
 int
-__dirnode_find_by_name(struct nexus_dirnode * dirnode,
-                       char                 * filename,
-                       nexus_dirent_type_t  * type,
-                       struct nexus_uuid    * link_uuid,
-                       struct nexus_uuid    * real_uuid)
+dirnode_find_by_name(struct nexus_dirnode * dirnode,
+                     char                 * filename,
+                     nexus_dirent_type_t  * type,
+                     struct nexus_uuid    * link_uuid)
 {
     struct dir_entry * dir_entry = NULL;
 
@@ -1039,20 +1006,7 @@ __dirnode_find_by_name(struct nexus_dirnode * dirnode,
 
     nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, link_uuid);
 
-    if (real_uuid) {
-        nexus_uuid_copy(&dir_entry->dir_rec.real_uuid, real_uuid);
-    }
-
     return 0;
-}
-
-int
-dirnode_find_by_name(struct nexus_dirnode * dirnode,
-                     char                 * filename,
-                     nexus_dirent_type_t  * type,
-                     struct nexus_uuid    * link_uuid)
-{
-    return __dirnode_find_by_name(dirnode, filename, type, link_uuid, NULL);
 }
 
 static struct nexus_list_iterator *
@@ -1125,36 +1079,54 @@ dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
     return strndup(symlink_entry->target_path, NEXUS_PATH_MAX);
 }
 
+struct dir_entry *
+__dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexus_io_flags_t flags)
+{
+    struct dir_entry * dir_entry = NULL;
+
+    if (flags & NEXUS_FDELETE) {
+        if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_DELETE)) {
+            log_error("not authorized to delete files\n");
+            return NULL;
+        }
+    } else if (flags & NEXUS_FCREATE) {
+        if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_CREATE)) {
+            log_error("not authorized to create files\n");
+            return NULL;
+        }
+    }
+
+    return __find_by_name(dirnode, filename);
+}
+
+
+
+void
+__dirnode_remove_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry)
+{
+    __dirnode_del_direntry(dirnode, dir_entry);
+
+    __free_dir_entry(dir_entry);
+}
+
+
 static inline int
 __dirnode_remove(struct nexus_dirnode * dirnode,
                  char                 * filename,
                  nexus_dirent_type_t  * type,
-                 struct nexus_uuid    * link_uuid,
-                 struct nexus_uuid    * real_uuid)
+                 struct nexus_uuid    * link_uuid)
 {
-    struct dir_entry * dir_entry = NULL;
-
-    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_DELETE)) {
-        log_error("not authorized to create files\n");
-        return -1;
-    }
-
-    dir_entry = __find_by_name(dirnode, filename);
+    struct dir_entry * dir_entry = __dirnode_search_and_check(dirnode, filename, NEXUS_FDELETE);
 
     if (dir_entry == NULL) {
         return -1;
     }
 
-
     *type = dir_entry->dir_rec.type;
 
     nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, link_uuid);
-    nexus_uuid_copy(&dir_entry->dir_rec.real_uuid, real_uuid);
 
-
-    __dirnode_del_direntry(dirnode, dir_entry);
-
-    __free_dir_entry(dir_entry);
+    __dirnode_remove_dir_entry(dirnode, dir_entry);
 
     return 0;
 }
@@ -1164,10 +1136,9 @@ dirnode_remove(struct nexus_dirnode * dirnode,
                char                 * filename,
                nexus_dirent_type_t  * type,
                struct nexus_uuid    * link_uuid,
-               struct nexus_uuid    * real_uuid,
                char                ** symlink_target_path)
 {
-    int ret = __dirnode_remove(dirnode, filename, type, link_uuid, real_uuid);
+    int ret = __dirnode_remove(dirnode, filename, type, link_uuid);
 
     if (*type == NEXUS_LNK) {
         __remove_symlink(dirnode, link_uuid, symlink_target_path);

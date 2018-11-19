@@ -21,6 +21,24 @@ nexus_uuid_gen(struct nexus_uuid * uuid)
     return 0;
 }
 
+void
+nexus_uuid_zeroize(struct nexus_uuid * uuid)
+{
+    memset(uuid, 0, sizeof(struct nexus_uuid));
+}
+
+bool
+nexus_uuid_is_zeros(struct nexus_uuid * uuid)
+{
+    for (size_t i = 0; i < sizeof(struct nexus_uuid); i++) {
+        if (uuid->raw[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int
 nexus_uuid_compare(struct nexus_uuid * src_uuid, struct nexus_uuid * dst_uuid)
 {
