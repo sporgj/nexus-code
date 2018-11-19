@@ -158,7 +158,7 @@ nexus_fs_hardlink(struct nexus_volume * volume,
                   char                * link_name,
                   char                * target_dirpath,
                   char                * target_name,
-                  char               ** nexus_name);
+                  struct nexus_uuid   * uuid);
 
 int
 nexus_fs_rename(struct nexus_volume * volume,

@@ -155,7 +155,7 @@ struct nexus_backend_impl {
                        char                 * link_name,
                        char                 * target_dirpath,
                        char                 * target_name,
-                       char                ** nexus_name,
+                       struct nexus_uuid    * uuid,
                        void                 * priv_data);
 
     int (*fs_rename)(struct nexus_volume  * volume,

@@ -162,13 +162,13 @@ nexus_fs_hardlink(struct nexus_volume * volume,
                   char                * link_name,
                   char                * target_dirpath,
                   char                * target_name,
-                  char               ** nexus_name)
+                  struct nexus_uuid   * uuid)
 {
     struct nexus_backend * backend = volume->backend;
 
-    if (backend->impl->fs_symlink == NULL) {
-	log_error("fs_symlink NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+    if (backend->impl->fs_hardlink == NULL) {
+        log_error("fs_hardlink NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
     }
 
     return backend->impl->fs_hardlink(volume,
@@ -176,7 +176,7 @@ nexus_fs_hardlink(struct nexus_volume * volume,
                                       link_name,
                                       target_dirpath,
                                       target_name,
-                                      nexus_name,
+                                      uuid,
                                       backend->priv_data);
 }
 
