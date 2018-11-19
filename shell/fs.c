@@ -198,8 +198,6 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
 
     struct nexus_uuid uuid;
 
-    char * nexus_name = NULL;
-
     int ret = -1;
 
     nexus_splitpath(path, &dirpath, &filename);
@@ -214,12 +212,48 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
         return -1;
     }
 
-    nexus_name = nexus_uuid_to_alt64(&uuid);
-    printf(" .created %s -> %s\n", path, nexus_name);
-    fflush(stdout);
-    nexus_free(nexus_name);
+
+    {
+        char * nexus_name = nexus_uuid_to_alt64(&uuid);
+        printf(" .created %s -> %s\n", path, nexus_name);
+        fflush(stdout);
+        nexus_free(nexus_name);
+    }
 
     return 0;
+}
+
+int
+__fs_remove(struct nexus_volume * vol, const char * path)
+{
+    char * dirpath  = NULL;
+    char * filename = NULL;
+
+    struct nexus_uuid uuid;
+
+
+    nexus_splitpath(path, &dirpath, &filename);
+
+    int ret = nexus_fs_remove(vol, dirpath, filename, &uuid);
+
+    nexus_free(dirpath);
+    nexus_free(filename);
+
+    if (ret != 0) {
+        log_error("creating %s FAILED\n", path);
+        return -1;
+    }
+
+
+    {
+        char * nexus_name = nexus_uuid_to_alt64(&uuid);
+        printf(" .removed %s -> %s\n", path, nexus_name);
+        fflush(stdout);
+        nexus_free(nexus_name);
+    }
+
+    return 0;
+
 }
 
 int
@@ -401,6 +435,44 @@ __fs_readlink(struct nexus_volume * vol, char * path)
     return 0;
 }
 
+int
+__fs_hardlink(struct nexus_volume * vol, char * link_filepath, char * target_filepath)
+{
+    char * link_dirpath = NULL;
+    char * link_filename = NULL;
+    char * target_dirpath = NULL;
+    char * target_filename = NULL;
+
+    struct nexus_uuid uuid;
+
+    int ret = -1;
+
+
+    nexus_splitpath(link_filepath, &link_dirpath, &link_filename);
+    nexus_splitpath(target_filepath, &target_dirpath, &target_filename);
+
+    ret = nexus_fs_hardlink(vol, link_dirpath, link_filename, target_dirpath, target_filename, &uuid);
+
+    if (ret != 0) {
+        log_error("nexus_fs_hardlink FAILED\n");
+        goto out_err;
+    }
+
+    {
+        char * nexus_name = nexus_uuid_to_alt64(&uuid);
+        printf(" .hardlink %s -> %s [%s]\n", link_filepath, target_filepath, nexus_name);
+        nexus_free(nexus_name);
+    }
+
+    ret = 0;
+out_err:
+    nexus_free(link_dirpath);
+    nexus_free(link_filename);
+    nexus_free(target_dirpath);
+    nexus_free(target_filename);
+
+    return ret;
+}
 
 int
 create_file_main(int argc, char ** argv)

@@ -330,6 +330,31 @@ handle_fs_readlink(int argc, char ** argv)
     return ret;
 }
 
+static int
+handle_fs_hardlink(int argc, char ** argv)
+{
+    char * link_filepath = NULL;
+    char * target_filepath = NULL;
+
+    if (argc < 2) {
+        usage("fs_hardlink");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    link_filepath = strndup(argv[0], NEXUS_PATH_MAX);
+    target_filepath = strndup(argv[1], NEXUS_PATH_MAX);
+
+    ret = __fs_hardlink(mounted_volume, link_filepath, target_filepath);
+
+    nexus_free(link_filepath);
+    nexus_free(target_filepath);
+
+    return ret;
+}
+
 /////////
 
 static int
@@ -437,6 +462,7 @@ static struct _cmd cmds[]
         { "fs_getattr", handle_fs_getattr, "Get attributes (stat) filesystem object", "<path>" },
         { "fs_symlink", handle_fs_symlink, "Create symlink", "<path> <target>" },
         { "fs_readlink", handle_fs_readlink, "Read symlink target", "<path>" },
+        { "fs_hardlink", handle_fs_hardlink, "Hardlink file", "<link_fpath> <target_fpath>" },
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };
 
