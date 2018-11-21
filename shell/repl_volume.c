@@ -196,7 +196,7 @@ handle_user_findkey(int argc, char ** argv)
 /////////
 
 static int
-handle_fs_touch(int argc, char ** argv)
+handle_fs_create(int argc, char ** argv)
 {
     char * filepath = NULL;
 
@@ -481,7 +481,7 @@ static struct _cmd cmds[]
         { "user_findname", handle_user_findname, "Find user by name", "<username>" },
         { "user_findkey", handle_user_findkey, "Find user by pubkey", "<pubkey_file>" },
 
-        { "fs_touch", handle_fs_touch, "Create a new file", "<filepath>" },
+        { "fs_create", handle_fs_create, "Create a new file", "<filepath>" },
         { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
         { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
         { "fs_getattr", handle_fs_getattr, "Get attributes (stat) filesystem object", "<path>" },
