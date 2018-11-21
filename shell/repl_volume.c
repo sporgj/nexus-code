@@ -262,6 +262,28 @@ handle_fs_ls(int argc, char ** argv)
 }
 
 static int
+handle_fs_stat(int argc, char ** argv)
+{
+    char * path = NULL;
+
+    if (argc < 1) {
+        usage("fs_stat");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    path = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_stat(mounted_volume, path);
+
+    nexus_free(path);
+
+    return ret;
+}
+
+static int
 handle_fs_getattr(int argc, char ** argv)
 {
     char * path = NULL;
@@ -484,7 +506,8 @@ static struct _cmd cmds[]
         { "fs_create", handle_fs_create, "Create a new file", "<filepath>" },
         { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
         { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
-        { "fs_getattr", handle_fs_getattr, "Get attributes (stat) filesystem object", "<path>" },
+        { "fs_stat", handle_fs_stat, "Get attributes (stat) filesystem object", "<path>" },
+        { "fs_getattr", handle_fs_getattr, "get more stat attributes (including time)", "<path>" },
         { "fs_symlink", handle_fs_symlink, "Create symlink", "<path> <target>" },
         { "fs_readlink", handle_fs_readlink, "Read symlink target", "<path>" },
         { "fs_hardlink", handle_fs_hardlink, "Hardlink file", "<link_fpath> <target_fpath>" },

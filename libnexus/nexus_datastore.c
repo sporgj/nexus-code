@@ -265,9 +265,9 @@ int
 nexus_datastore_stat_uuid(struct nexus_datastore      * datastore,
                           struct nexus_uuid           * uuid,
                           char                        * path,
-                          struct nexus_stat           * stat)
+                          struct stat                 * stat_buf)
 {
-    return datastore->impl->stat_uuid(uuid, path, stat, datastore->priv_data);
+    return datastore->impl->stat_uuid(uuid, path, stat_buf, datastore->priv_data);
 }
 
 int

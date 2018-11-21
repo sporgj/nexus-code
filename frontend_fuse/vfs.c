@@ -41,6 +41,9 @@ vfs_init()
     root_dentry = dentry_create(NULL, "", NEXUS_DIR);
     root_dentry->inode = __icache_alloc(FUSE_ROOT_ID, NULL);
 
+    root_dentry->inode->lookup_count = 1;
+    dentry_get(root_dentry);
+
     dentry_instantiate(root_dentry, root_dentry->inode);
 
     return 0;
@@ -158,11 +161,18 @@ vfs_forget_dentry(struct my_dentry * parent_dentry, char * name)
 void
 vfs_remove_inode(struct my_inode * inode)
 {
+    struct list_head * curr = NULL;
+
     if (inode == NULL || inode->lookup_count) {
         return;
     }
 
     // TODO drop all this dentries
+    list_for_each(curr, &inode->dentry_list) {
+        struct my_dentry * dentry = list_entry(curr, struct my_dentry, aliases);
+
+        dentry_invalidate(dentry);
+    }
 
     icache_del(inode->ino);
 }
@@ -336,7 +346,7 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
     chunk->size = min(NEXUS_CHUNK_SIZE, (file_ptr->filesize - offset));
 
     if (nexus_fuse_fetch_chunk(file_ptr, chunk)) {
-        log_error("could not fetch chunk\n");
+        log_error("nexus_fuse_fetch_chunk FAILED\n");
         return NULL;
     }
 
@@ -368,7 +378,8 @@ file_read(struct my_file * file_ptr,
         struct file_chunk * chunk  = __file_load_chunk(file_ptr, offset);
 
         if (chunk == NULL) {
-            log_error("chunk not found (file=%s, offset=%zu)\n", file_ptr->filepath, offset);
+            log_error("chunk not found (file=%s, offset=%zu, filesize=%zu)\n",
+                      file_ptr->filepath, offset, file_ptr->filesize);
             return -1;
         }
 

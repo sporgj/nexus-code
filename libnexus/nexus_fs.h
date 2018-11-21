@@ -47,14 +47,14 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
-    size_t              size;
-
     size_t              link_count;  // number of hardlinks
 
     union {
         size_t          filesize;
         size_t          filecount;
     };
+
+    nexus_file_mode_t   mode;
 
     struct nexus_uuid   uuid;
 
@@ -127,6 +127,13 @@ nexus_fs_lookup(struct nexus_volume    * volume,
                 char                   * parent_dir,
                 char                   * plain_name,
                 struct nexus_fs_lookup * lookup_info);
+
+int
+nexus_fs_setattr(struct nexus_volume   * volume,
+                 char                  * path,
+                 struct nexus_fs_attr  * attrs,
+                 nexus_fs_attr_flags_t   flags);
+
 
 int
 nexus_fs_stat(struct nexus_volume  * volume,

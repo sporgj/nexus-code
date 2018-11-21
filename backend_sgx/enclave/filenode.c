@@ -156,6 +156,7 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
     filenode->filesize = header->filesize;
 
     filenode->link_count = header->link_count;
+    filenode->mode       = header->mode;
 
     nexus_uuid_copy(&header->my_uuid, &filenode->my_uuid);
     nexus_uuid_copy(&header->root_uuid, &filenode->root_uuid);
@@ -280,6 +281,7 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
     header->filesize      = filenode->filesize;
 
     header->link_count    = filenode->link_count;
+    header->mode          = filenode->mode;
 
     nexus_uuid_copy(&filenode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&filenode->root_uuid, &header->root_uuid);
@@ -462,6 +464,13 @@ filenode_get_linkcount(struct nexus_filenode * filenode)
     return filenode->link_count;
 }
 
-
-
+void
+filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out)
+{
+    stat_out->mode = filenode->mode;
+    stat_out->type = NEXUS_REG;
+    stat_out->filesize = filenode->filesize;
+    stat_out->link_count = filenode->link_count;
+    nexus_uuid_copy(&filenode->my_uuid, &stat_out->uuid);
+}
 

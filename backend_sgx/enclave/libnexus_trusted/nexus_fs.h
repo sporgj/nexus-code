@@ -36,8 +36,14 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
-    size_t              timestamp;
-    size_t              size;
+    size_t              link_count;  // number of hardlinks
+
+    union {
+        size_t          filesize;
+        size_t          filecount;
+    };
+
+    nexus_file_mode_t   mode;
 
     struct nexus_uuid   uuid;
 

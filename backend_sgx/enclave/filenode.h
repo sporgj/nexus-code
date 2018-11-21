@@ -39,6 +39,9 @@ struct nexus_filenode {
 
 
 void
+filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out);
+
+void
 filenode_set_mode(struct nexus_filenode * filenode, nexus_file_mode_t mode);
 
 void

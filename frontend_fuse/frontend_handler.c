@@ -56,25 +56,25 @@ nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
 }
 
 static void
-__update_posix_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info)
+__derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode_t file_type)
 {
     // make sure st.st_size contains the info returned from the backend
     // posix_stat->st_size = stat_info->size;
 
     switch (stat_info->type) {
     case NEXUS_REG:
-        posix_stat->st_mode = S_IFREG;
-        posix_stat->st_nlink = 1;
+        posix_stat->st_nlink = stat_info->link_count;
+        posix_stat->st_size = stat_info->filesize;
         break;
     case NEXUS_DIR:
-        posix_stat->st_mode = S_IFDIR;
         posix_stat->st_nlink = 2;
         break;
     case NEXUS_LNK:
-        posix_stat->st_mode = S_IFLNK;
         posix_stat->st_nlink = 1;
         break;
     }
+
+    posix_stat->st_mode = (stat_info->mode | file_type);
 
     posix_stat->st_ino = nexus_uuid_hash(&stat_info->uuid);
 
@@ -95,6 +95,8 @@ nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
         return -1;
     }
 
+    memset(stat_info, 0, sizeof(struct nexus_stat));
+
 
     if (nexus_fs_stat(nexus_fuse_volume, path, stat_info)) {
         log_error("could not stat backend (filepath=%s)\n", path);
@@ -108,11 +110,7 @@ nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
         ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs);
     }
 
-    __update_posix_stat_info(&attrs->posix_stat, stat_info);
-
-    // update the inode number
-    attrs->posix_stat.st_mode = nexus_fs_sys_mode_from_type(dentry->type);
-
+    __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
 out:
     nexus_free(path);
 
@@ -127,26 +125,36 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
 
     nexus_fs_attr_flags_t flags = to_set; // the to_set flags and nexus flags are the same
 
-
     char * path = dentry_get_fullpath(dentry);
+
+    int ret = -1;
+
 
     if (path == NULL) {
         return -1;
     }
 
-    if (nexus_fs_stat(nexus_fuse_volume, path, stat_info)) {
+    if (nexus_fs_setattr(nexus_fuse_volume, path, attrs, flags)) {
         log_error("could not stat backend (filepath=%s)\n", path);
-        return -1;
-    }
-
-    if (nexus_datastore_setattr(nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs, flags)) {
         nexus_free(path);
         return -1;
     }
 
-    __update_posix_stat_info(&attrs->posix_stat, stat_info);
+    // XXX: need to revise this at a future time
+    // there's no need to split this away from the backend (nexus_fs_setattr). but I want to try this for now
+    if (dentry->type == NEXUS_REG) {
+        ret = nexus_datastore_setattr(nexus_fuse_volume->data_store, &stat_info->uuid, attrs, flags);
+    } else {
+        ret = nexus_datastore_setattr(nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs, flags);
+    }
 
-    attrs->posix_stat.st_mode = nexus_fs_sys_mode_from_type(dentry->type);
+    if (ret) {
+        log_error("nexus_datastore_setattr FAILED\n");
+        nexus_free(path);
+        return -1;
+    }
+
+    __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
 
     nexus_free(path);
 
@@ -185,6 +193,8 @@ nexus_fuse_create(struct my_dentry  * dentry,
         return -1;
     }
 
+    memset(nexus_stat, 0, sizeof(struct nexus_stat));
+
     // XXX: we probably need an EEXIST
     if (nexus_fs_create(nexus_fuse_volume,
                         parent_dirpath,
@@ -198,6 +208,7 @@ nexus_fuse_create(struct my_dentry  * dentry,
 
     if (type == NEXUS_REG) {
         if (nexus_datastore_new_uuid(nexus_fuse_volume->data_store, &nexus_stat->uuid, NULL)) {
+            nexus_free(parent_dirpath);
             log_error("could not create datastore file\n");
             return -1;
         }
@@ -205,7 +216,6 @@ nexus_fuse_create(struct my_dentry  * dentry,
 
     // setup the stat info
     nexus_stat->type = type;
-    nexus_stat->size = 0;
 
     nexus_free(parent_dirpath);
 
@@ -360,7 +370,8 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
     size_t nbytes = read(file_handle->fd, encrypted_buffer, chunk->size);
 
     if (nbytes != chunk->size) {
-        log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, chunk->size, nbytes);
+        log_error("fetching chunk %zu file='%s' (tried=%zu, got=%zu)\n",
+                  chunk->index, file_handle->filepath, chunk->size, nbytes);
         goto out_err;
     }
 
@@ -371,7 +382,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
                          chunk->base,
                          chunk->size,
                          file_ptr->filesize)) {
-        log_error("nexus_Fs_decrypt() failed (offset=%zu, file=%s)\n", chunk->base, file_ptr->filepath);
+        log_error("nexus_fs_decrypt() failed (offset=%zu, file=%s)\n", chunk->base, file_ptr->filepath);
         goto out_err;
     }
 
@@ -440,6 +451,10 @@ nexus_fuse_store(struct my_file * file_ptr)
             goto out_err;
         }
     }
+
+
+    printf("file written (%s) filepath=%s, filesize=%zu\n",
+            file_handle->filepath, file_ptr->filepath, file_ptr->filesize);
 
     nexus_datastore_fclose(datastore, file_handle);
 

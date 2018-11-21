@@ -118,7 +118,11 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
         return addr;
     }
 
-    flags = info ? info->flags : NEXUS_FWRITE;
+    if (info) {
+        flags = info->flags;
+    }
+
+    flags |= NEXUS_FWRITE;
 
     /* this branch accounts for metadata which have not been written to disk.
      * Examples include: newly created chunks */

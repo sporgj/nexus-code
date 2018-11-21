@@ -444,7 +444,7 @@ twolevel_update_uuid(struct nexus_uuid * uuid,
 static int
 twolevel_stat_uuid(struct nexus_uuid * uuid,
                    char              * path,
-                   struct nexus_stat * stat,
+                   struct stat       * stat_buf,
                    void              * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
@@ -460,7 +460,7 @@ twolevel_stat_uuid(struct nexus_uuid * uuid,
         return -1;
     }
 
-    ret = nexus_stat_raw_file(filename, stat);
+    ret = stat(filename, stat_buf);
 
     nexus_free(filename);
 
@@ -629,17 +629,18 @@ twolevel_getattr(struct nexus_uuid * uuid, struct nexus_fs_attr * attrs, void * 
 
 static int
 twolevel_setattr(struct nexus_uuid     * uuid,
-                 nexus_file_stat_flags_t flags,
-                 struct stat             new_stat,
+                 struct nexus_fs_attr  * attrs,
+                 nexus_fs_attr_flags_t   flags,
                  void                  * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
+    struct stat               * new_stat  = &attrs->posix_stat;
 
     struct stat   old_stat;
 
     char * filepath = __get_full_path(datastore, uuid);
 
-    int ret = -1;
+    int ret = 0;
 
 
     if (filepath == NULL) {
@@ -658,18 +659,31 @@ twolevel_setattr(struct nexus_uuid     * uuid,
     if (flags & (NEXUS_FS_ATTR_ATIME | NEXUS_FS_ATTR_MTIME)) {
         struct utimbuf file_time;
 
-        file_time.actime = (flags & NEXUS_FS_ATTR_ATIME) ? new_stat->st_atime : old_stat.st_atime;
-        file_time.modtime = (flags & NEXUS_FS_ATTR_MTIME) ? new_stat->st_mtime : old_stat.st_mtime;
+        if (flags & NEXUS_FS_ATTR_ATIME) {
+            file_time.actime = old_stat.st_atime = new_stat->st_atime;
+        }
+
+        if (flags & NEXUS_FS_ATTR_MTIME) {
+            file_time.modtime = old_stat.st_mtime = new_stat->st_mtime;
+        }
 
         ret = utime(filepath, &file_time);
     }
 
-    // get the stat on disk and return
-    if (ret == 0) {
-        ret = stat(filepath, new_stat);
+    // we need to truncate
+    if (flags & NEXUS_FS_ATTR_SIZE) {
+        old_stat.st_size = new_stat->st_size;
+
+        ret = truncate(filepath, new_stat->st_size);
     }
 
+
     nexus_free(filepath);
+
+    if (ret == 0) {
+        memcpy(new_stat, &old_stat, sizeof(struct stat));
+        return 0;
+    }
 
     return ret;
 }

@@ -188,7 +188,7 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    dir_ptr->file_count = nexus_stat.size;
+    dir_ptr->file_count = nexus_stat.filecount;
 
     fi->fh = (uintptr_t)dir_ptr;
 
@@ -601,6 +601,7 @@ nxs_fuse_rename(fuse_req_t   req,
         goto out_err;
     }
 
+    vfs_forget_dentry(dst_dentry, (char *)newname);
 
     if (parent == newparent) {
         struct my_dentry * child = dentry_lookup(src_dentry, (char *)name);
@@ -610,7 +611,6 @@ nxs_fuse_rename(fuse_req_t   req,
         }
     } else {
         vfs_forget_dentry(src_dentry, (char *)name);
-        vfs_forget_dentry(dst_dentry, (char *)newname);
     }
 
     code = 0;

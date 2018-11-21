@@ -48,7 +48,7 @@ __io_buffer_get(struct nexus_uuid   * uuid,
 
     bool                       is_new       = false;
 
-    struct nexus_stat          stat;
+    struct stat stat_buf;
 
 
     // first check the cached metadata buffer
@@ -62,13 +62,13 @@ __io_buffer_get(struct nexus_uuid   * uuid,
         goto read_datastore;
     }
 
-    if (nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat)) {
+    if (nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_buf)) {
         log_error("could not stat metadata file\n");
         return NULL;
     }
 
     // if nothing changed and we are just reading, just return the buffer
-    if (stat.timestamp <= metadata_buf->timestamp && !(flags & NEXUS_FWRITE)) {
+    if (stat_buf.st_mtime <= (int)metadata_buf->timestamp && !(flags & NEXUS_FWRITE)) {
         *p_timestamp = metadata_buf->timestamp;
         *p_size      = metadata_buf->size;
 
@@ -300,13 +300,13 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 int
 io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
 {
-    struct nexus_stat stat_info;
+    struct stat stat_buf;
 
     int result = -1;
 
     BACKEND_SGX_IOBUF_START(IOBUF_STAT);
 
-    result = nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_info);
+    result = nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_buf);
 
     BACKEND_SGX_IOBUF_FINISH(IOBUF_STAT);
 
@@ -316,7 +316,7 @@ io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_vo
     }
 
 
-    *timestamp = stat_info.timestamp;
+    *timestamp = stat_buf.st_mtime;
 
     return 0;
 }

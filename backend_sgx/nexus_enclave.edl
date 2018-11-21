@@ -92,6 +92,13 @@ enclave {
             [user_check] struct nexus_fs_lookup  * lookup_out
         );
 
+        public int ecall_fs_set_mode
+        (
+            [in, string] char                * filepath_IN,
+                         nexus_file_mode_t     mode,
+            [user_check] struct nexus_stat   * stat_out
+        );
+
         public int ecall_fs_stat
         (
             [in, string] char                * path_IN,
@@ -177,13 +184,8 @@ enclave {
         public int ecall_fs_truncate
         (
             [in, string] char                * filepath_IN,
-                         size_t                size
-        );
-
-        public int ecall_fs_truncate
-        (
-            [in, string] char                * filepath_IN,
-                         nexus_file_mode_t     mode
+                         size_t                size,
+            [user_check] struct nexus_stat   * stat_out
         );
 
 

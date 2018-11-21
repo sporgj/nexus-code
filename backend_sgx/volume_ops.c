@@ -11,9 +11,9 @@
 static int
 load_or_create_instance(struct sgx_backend * backend)
 {
-    struct nexus_stat stat;
+    struct stat st;
 
-    if (nexus_stat_raw_file(nexus_config.instance_path, &stat)) {
+    if (stat(nexus_config.instance_path, &st)) {
         nexus_printf("Instance file (%s) not found... Creating\n", nexus_config.instance_path);
 
         if (nxs_create_instance(backend->enclave_path, nexus_config.instance_path)) {

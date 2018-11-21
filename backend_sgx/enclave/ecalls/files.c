@@ -115,7 +115,7 @@ __nxs_fs_crypto(char              * filepath_IN,
     ret = nexus_metadata_store(metadata);
 
     if (ret != 0) {
-        log_error("nexus_vfs_put FAILED\n");
+        log_error("nexus_metadata_store FAILED\n");
         goto out;
     }
 
@@ -159,4 +159,35 @@ ecall_fs_decrypt(char    * filepath_IN,
                            size,
                            filesize,
                            NEXUS_DECRYPT);
+}
+
+int
+ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
+{
+    struct nexus_metadata * metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+    struct nexus_filenode * filenode = NULL;
+
+
+    if (metadata == NULL) {
+        log_error("could not get metadata (%s)\n", filepath_IN);
+        return -1;
+    }
+
+
+    filenode = metadata->filenode;
+
+    // TODO check access control
+    filenode_set_filesize(filenode, size);
+
+    if (nexus_metadata_store(metadata)) {
+        nexus_vfs_put(metadata);
+        log_error("nexus_metadata_store FAILED\n");
+        return -1;
+    }
+
+    filenode_export_stat(metadata->filenode, stat_out);
+
+    nexus_vfs_put(metadata);
+
+    return 0;
 }

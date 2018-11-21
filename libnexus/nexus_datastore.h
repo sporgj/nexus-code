@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+#include <sys/stat.h>
+
 #include <nexus_fs.h>
 #include <nexus_uuid.h>
 #include <nexus_json.h>
@@ -100,7 +102,7 @@ int
 nexus_datastore_stat_uuid(struct nexus_datastore      * datastore,
                           struct nexus_uuid           * uuid,
                           char                        * path,
-                          struct nexus_stat           * stat);
+                          struct stat                 * stat_buf);
 
 int
 nexus_datastore_getattr(struct nexus_datastore * datastore,
@@ -164,7 +166,7 @@ struct nexus_datastore_impl {
      */
     int (*stat_uuid)(struct nexus_uuid  * uuid,
                      char               * path,
-                     struct nexus_stat  * stat,
+                     struct stat        * stat_buf,
                      void               * priv_data);
 
     /**

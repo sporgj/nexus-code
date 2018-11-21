@@ -34,9 +34,6 @@ int
 nexus_touch_raw_file(char * path);
 
 
-int
-nexus_stat_raw_file(char * path, struct nexus_stat * stat);
-
 /*
  * This will delete a single file
  *  path must point to a file (not a directory)

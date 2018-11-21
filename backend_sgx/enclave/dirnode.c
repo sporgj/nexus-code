@@ -1216,3 +1216,12 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
 
     return 0;
 }
+
+void
+dirnode_export_stat(struct nexus_dirnode * dirnode, struct nexus_stat * stat_out)
+{
+    stat_out->mode = dirnode->mode;
+    stat_out->type = NEXUS_DIR;
+    stat_out->filecount = dirnode->dir_entry_count;
+    nexus_uuid_copy(&dirnode->my_uuid, &stat_out->uuid);
+}

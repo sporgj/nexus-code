@@ -33,6 +33,10 @@ dentry_put(struct my_dentry * dentry)
 {
     assert(dentry->refcount > 0);
     dentry->refcount -= 1;
+
+    if (dentry->refcount == 0) {
+        dentry_invalidate(dentry);
+    }
 }
 
 
@@ -109,6 +113,7 @@ dentry_set_name(struct my_dentry * dentry, const char * name)
     assert(len < NEXUS_NAME_MAX);
 
     strncpy(dentry->name, name, NEXUS_NAME_MAX);
+    printf("new_name: %s, name=%s\n", dentry->name, name);
 }
 
 void
@@ -120,6 +125,11 @@ dentry_invalidate(struct my_dentry * dentry)
         dentry->inode = NULL;
 
         // TODO add to invalid list
+    }
+
+    if (dentry->parent) {
+        dentry_put(dentry->parent);
+        list_del(&dentry->siblings);
     }
 }
 

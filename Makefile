@@ -48,12 +48,12 @@ all: mbedtls backends datastores libnexus_probes libnexus frontends
 
 frontends: $(nexus_frontends)
 
-$(nexus_frontends):
+$(nexus_frontends): libnexus
 	$(call build,BUILDING, make -C $@)
 
 backends: $(nexus_backends)
 
-$(nexus_backends):
+$(nexus_backends): libnexus_probes
 	$(call build,BUILDING, make -C $@)
 
 
@@ -64,7 +64,7 @@ $(nexus_datastores):
 	$(call build,BUILDING, make -C $@)
 
 
-libnexus:
+libnexus: mbedtls
 	$(call build,BUILDING, make -C $@)
 	$(call build,AR,$(AR) -M < libnexus.mri)
 

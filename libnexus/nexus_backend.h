@@ -112,11 +112,6 @@ struct nexus_backend_impl {
                      struct nexus_stat    * nexus_stat,
                      void                 * priv_data);
 
-    int (*fs_getattr)(struct nexus_volume   * volume,
-                      char                  * path,
-                      struct nexus_fs_attr  * attrs,
-                      void                  * priv_data);
-
     int (*fs_setattr)(struct nexus_volume   * volume,
                       char                  * path,
                       struct nexus_fs_attr  * attrs,

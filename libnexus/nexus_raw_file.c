@@ -110,27 +110,6 @@ nexus_write_raw_file(char * path, void * buf, size_t size)
 }
 
 int
-nexus_stat_raw_file(char * path, struct nexus_stat * nx_stat)
-{
-    struct stat   file_stats;
-
-    int ret = 0;
-
-
-    ret = stat(path, &file_stats);
-
-    if (ret == -1) {
-	log_error("Could not stat file (%s)\n", path);
-	return -1;
-    }
-
-    nx_stat->timestamp = file_stats.st_mtime;
-    nx_stat->size	    = file_stats.st_size;
-
-    return 0;
-}
-
-int
 nexus_touch_raw_file(char * filepath)
 {
     int fd = open(filepath, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);

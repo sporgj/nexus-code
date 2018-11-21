@@ -271,24 +271,6 @@ __nxs_fs_filldir(struct nexus_metadata * metadata,
     return 0;
 }
 
-static inline void
-__nxs_fs_stat(struct nexus_metadata * metadata, struct nexus_stat * stat_info)
-{
-    if (metadata->type == NEXUS_DIRNODE) {
-        struct nexus_dirnode * dirnode = metadata->dirnode;
-
-        stat_info->size = dirnode->dir_entry_count;
-        stat_info->type = NEXUS_DIR;
-    } else {
-        struct nexus_filenode * filenode = metadata->filenode;
-
-        stat_info->size = filenode->filesize;
-        stat_info->type = NEXUS_REG;
-    }
-
-    nexus_uuid_copy(&metadata->uuid, &stat_info->uuid);
-}
-
 int
 ecall_fs_stat(char * path_IN, struct nexus_stat * nexus_stat_out)
 {
@@ -299,7 +281,11 @@ ecall_fs_stat(char * path_IN, struct nexus_stat * nexus_stat_out)
         return -1;
     }
 
-    __nxs_fs_stat(metadata, nexus_stat_out);
+    if (metadata->type == NEXUS_DIRNODE) {
+        dirnode_export_stat(metadata->dirnode, nexus_stat_out);
+    } else {
+        filenode_export_stat(metadata->filenode, nexus_stat_out);
+    }
 
     nexus_vfs_put(metadata);
 
@@ -778,4 +764,38 @@ out:
     }
 
     return ret;
+}
+
+int
+ecall_fs_set_mode(char * filepath_IN, nexus_file_mode_t mode, struct nexus_stat * stat_out)
+{
+    struct nexus_metadata * metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata (%s)\n", filepath_IN);
+        return -1;
+    }
+
+    // TODO check access control
+    if (metadata->type == NEXUS_FILENODE) {
+        filenode_set_mode(metadata->filenode, mode);
+    } else if (metadata->type == NEXUS_DIRNODE) {
+        dirnode_set_mode(metadata->dirnode, mode);
+    }
+
+    if (nexus_metadata_store(metadata)) {
+        nexus_vfs_put(metadata);
+        log_error("nexus_metadata_store FAILED\n");
+        return -1;
+    }
+
+    if (metadata->type == NEXUS_FILENODE) {
+        filenode_export_stat(metadata->filenode, stat_out);
+    } else if (metadata->type == NEXUS_DIRNODE) {
+        dirnode_export_stat(metadata->dirnode, stat_out);
+    }
+
+    nexus_vfs_put(metadata);
+
+    return 0;
 }

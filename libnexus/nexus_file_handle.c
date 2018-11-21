@@ -13,6 +13,11 @@
 #include "nexus_file_handle.h"
 
 
+#define MAX_RETRIES     10
+
+#define POSIX_OPEN_MODE     (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+
+
 static int
 __get_sysopen_flags(nexus_io_flags_t mode)
 {
@@ -37,14 +42,12 @@ __get_sysopen_flags(nexus_io_flags_t mode)
     return res;
 }
 
-#define MAX_RETRIES 10
-
 struct nexus_file_handle *
 nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
 {
     struct nexus_file_handle * file_handle = nexus_malloc(sizeof(struct nexus_file_handle));
 
-    file_handle->fd = open(filepath, __get_sysopen_flags(mode), S_IRWXO);
+    file_handle->fd = open(filepath, __get_sysopen_flags(mode), POSIX_OPEN_MODE);
 
     if (file_handle->fd < 0) {
         nexus_free(file_handle);
