@@ -65,6 +65,8 @@ struct nexus_dirnode {
     struct nexus_uuid       root_uuid;
     struct nexus_uuid       parent_uuid;
 
+    nexus_file_mode_t       mode;
+
     size_t                  symlink_count;
     size_t                  symlink_buflen;
 
@@ -88,6 +90,11 @@ struct nexus_dirnode {
 
     struct nexus_metadata * metadata;
 };
+
+
+
+void
+dirnode_set_mode(struct nexus_dirnode * dirnode, nexus_file_mode_t mode);
 
 /**
  * Creates a new dirnode

@@ -74,6 +74,7 @@ enclave {
             [in, string] char                * directory_IN,
             [in, string] char                * filename_IN,
                          nexus_dirent_type_t   type_IN,
+                         nexus_file_mode_t     mode,
                    [out] struct nexus_uuid   * uuid_out
         );
 
@@ -173,6 +174,18 @@ enclave {
                          size_t                filesize
         );
 
+        public int ecall_fs_truncate
+        (
+            [in, string] char                * filepath_IN,
+                         size_t                size
+        );
+
+        public int ecall_fs_truncate
+        (
+            [in, string] char                * filepath_IN,
+                         nexus_file_mode_t     mode
+        );
+
 
         // ---------------------- user -----------------------
         public int ecall_user_add
@@ -220,6 +233,7 @@ enclave {
         ocall_buffer_lock
         (
             [in]         struct nexus_uuid   * metadata_uuid,
+                         nexus_io_flags_t      flags,
             [user_check] struct nexus_volume * volume
         );
 

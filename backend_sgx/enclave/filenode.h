@@ -19,7 +19,7 @@ struct nexus_filenode {
     struct nexus_uuid          root_uuid;
     struct nexus_uuid          parent_uuid;
 
-    struct nexus_uuid          link_uuid; // link UUID, changes on renames
+    nexus_file_mode_t          mode;
 
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
@@ -30,13 +30,16 @@ struct nexus_filenode {
     uint32_t                   nchunks;
     uint64_t                   filesize;
 
-    nexus_io_flags_t            mode;
+    nexus_io_flags_t           flags;
 
     struct nexus_list          chunk_list;
 
     struct nexus_metadata    * metadata;
 };
 
+
+void
+filenode_set_mode(struct nexus_filenode * filenode, nexus_file_mode_t mode);
 
 void
 filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid);

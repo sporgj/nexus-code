@@ -26,6 +26,9 @@ typedef enum {
 } nexus_io_flags_t;
 
 
+typedef uint32_t nexus_file_mode_t;
+
+
 struct nexus_dirent {
     char                name[NEXUS_NAME_MAX];
     struct nexus_uuid   uuid;

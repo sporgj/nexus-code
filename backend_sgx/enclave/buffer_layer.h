@@ -11,7 +11,7 @@ uint8_t *
 buffer_layer_alloc(struct nexus_uuid * uuid, size_t size);
 
 int
-buffer_layer_lock(struct nexus_uuid * uuid);
+buffer_layer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags);
 
 int
 buffer_layer_unlock(struct nexus_uuid * uuid);

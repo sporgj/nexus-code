@@ -3,8 +3,9 @@
 int
 sgx_backend_fs_create(struct nexus_volume  * volume,
                       char                 * dirpath,
-                      char                 * plain_name,
+                      char                 * name,
                       nexus_dirent_type_t    type,
+                      nexus_file_mode_t      mode,
                       struct nexus_uuid    * uuid,
                       void                 * priv_data)
 {
@@ -18,7 +19,7 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_CREATE);
 
-    err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, plain_name, type, uuid);
+    err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, name, type, mode, uuid);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_CREATE);
 

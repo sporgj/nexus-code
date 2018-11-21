@@ -63,12 +63,12 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
         return -1;
     }
 
-
-    global_supernode_metadata = nexus_metadata_new(&global_supernode->my_uuid,
-                                                   global_supernode,
-                                                   NEXUS_SUPERNODE,
-                                                   NEXUS_FREAD,
-                                                   nexus_crypto_buf_version(supernode_crypto_buf));
+    global_supernode_metadata
+        = nexus_metadata_from_object(&global_supernode->my_uuid,
+                                     global_supernode,
+                                     NEXUS_SUPERNODE,
+                                     NEXUS_FREAD,
+                                     nexus_crypto_buf_version(supernode_crypto_buf));
 
     if (global_supernode_metadata == NULL) {
         log_error("could not create metadata\n");
@@ -145,7 +145,7 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     }
 
     if (flags & NEXUS_FWRITE) {
-        return buffer_layer_lock(&metadata->uuid);
+        return buffer_layer_lock(&metadata->uuid, flags);
     }
 
     return 0;

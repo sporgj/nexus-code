@@ -98,6 +98,8 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 {
     struct metadata_info * info = NULL;
 
+    nexus_io_flags_t       flags;
+
     uint8_t              * addr = nexus_heap_malloc(global_heap, size);
 
     if (addr == NULL) {
@@ -109,12 +111,14 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
     info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
 
     // this means that the file has been requested in a previous get with FWRITE
-    if (info && info->flags & NEXUS_FWRITE) {
+    if (info && (info->flags & (NEXUS_FWRITE | NEXUS_FCREATE))) {
         info->tmp_buffer = addr;
         info->tmp_buflen = size;
 
         return addr;
     }
+
+    flags = info ? info->flags : NEXUS_FWRITE;
 
     /* this branch accounts for metadata which have not been written to disk.
      * Examples include: newly created chunks */
@@ -122,7 +126,7 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
     // lock the file and insert into metadata table
     {
         int ret = -1;
-        int err = ocall_buffer_lock(&ret, uuid, global_volume);
+        int err = ocall_buffer_lock(&ret, uuid, flags, global_volume);
 
         if (err || ret) {
             nexus_heap_free(global_heap, addr);
@@ -132,7 +136,7 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
         }
     }
 
-    info = __update_timestamp(uuid, 0, NEXUS_FWRITE);
+    info = __update_timestamp(uuid, 0, flags);
 
     info->tmp_buffer = addr;
     info->tmp_buflen = size;
@@ -141,19 +145,19 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 }
 
 int
-buffer_layer_lock(struct nexus_uuid * uuid)
+buffer_layer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 {
     int err = -1;
     int ret = -1;
 
-    err = ocall_buffer_lock(&ret, uuid, global_volume);
+    err = ocall_buffer_lock(&ret, uuid, flags, global_volume);
 
     if (err || ret) {
         log_error("ocall_buffer_lock FAILED (err=%d, ret=%d)\n", err, ret);
         return -1;
     }
 
-    __update_timestamp(uuid, 0, NEXUS_FWRITE);
+    __update_timestamp(uuid, 0, flags);
 
     return 0;
 }

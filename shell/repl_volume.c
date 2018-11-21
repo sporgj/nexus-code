@@ -210,7 +210,7 @@ handle_fs_touch(int argc, char ** argv)
 
     filepath = strndup(argv[0], NEXUS_PATH_MAX);
 
-    ret = __fs_touch(mounted_volume, filepath, NEXUS_REG);
+    ret = __fs_create(mounted_volume, filepath, NEXUS_REG);
 
     nexus_free(filepath);
 
@@ -232,7 +232,7 @@ handle_fs_mkdir(int argc, char ** argv)
 
     dirpath = strndup(argv[0], NEXUS_PATH_MAX);
 
-    ret = __fs_touch(mounted_volume, dirpath, NEXUS_DIR);
+    ret = __fs_create(mounted_volume, dirpath, NEXUS_DIR);
 
     nexus_free(dirpath);
 

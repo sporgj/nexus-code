@@ -63,11 +63,14 @@ __metadata_set_dirty(struct nexus_metadata * metadata);
  * @return metadata
  */
 struct nexus_metadata *
-nexus_metadata_new(struct nexus_uuid     * uuid,
-                   void                  * obj,
-                   nexus_metadata_type_t   type,
-                   nexus_io_flags_t        flags,
-                   uint32_t                version);
+nexus_metadata_from_object(struct nexus_uuid     * uuid,
+                           void                  * obj,
+                           nexus_metadata_type_t   type,
+                           nexus_io_flags_t        flags,
+                           uint32_t                version);
+
+struct nexus_metadata *
+nexus_metadata_create(struct nexus_uuid * uuid, nexus_dirent_type_t dirent_type);
 
 /**
  * Increments the refcount of the metadata object

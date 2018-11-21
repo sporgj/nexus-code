@@ -173,10 +173,11 @@ nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_fs_lo
 }
 
 int
-nexus_fuse_touch(struct my_dentry  * dentry,
-                 char              * filename,
-                 nexus_dirent_type_t type,
-                 struct nexus_stat * nexus_stat)
+nexus_fuse_create(struct my_dentry  * dentry,
+                  char              * filename,
+                  nexus_dirent_type_t type,
+                  mode_t              mode,
+                  struct nexus_stat * nexus_stat)
 {
     char * parent_dirpath = dentry_get_fullpath(dentry);
 
@@ -185,7 +186,12 @@ nexus_fuse_touch(struct my_dentry  * dentry,
     }
 
     // XXX: we probably need an EEXIST
-    if (nexus_fs_touch(nexus_fuse_volume, parent_dirpath, filename, type, &nexus_stat->uuid)) {
+    if (nexus_fs_create(nexus_fuse_volume,
+                        parent_dirpath,
+                        filename,
+                        type,
+                        (nexus_file_mode_t)mode,
+                        &nexus_stat->uuid)) {
         nexus_free(parent_dirpath);
         return -1;
     }

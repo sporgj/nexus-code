@@ -39,10 +39,11 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
 
 
 int
-nexus_fuse_touch(struct my_dentry  * dentry,
-                 char              * filename,
-                 nexus_dirent_type_t type,
-                 struct nexus_stat * nexus_stat);
+nexus_fuse_create(struct my_dentry  * dentry,
+                  char              * filename,
+                  nexus_dirent_type_t type,
+                  mode_t              mode,
+                  struct nexus_stat * nexus_stat);
 
 int
 nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino);

@@ -31,7 +31,7 @@ __get_sysopen_flags(nexus_io_flags_t mode)
     // by POSIX standards, having O_EXCL and O_CREAT will result in a fail
     // if the file exists.
     if (mode & NEXUS_FCREATE) {
-        res |= O_CREAT & (~O_EXCL);  // you can't have both O_CREAT and O_EXCL
+        res |= (O_CREAT | O_WRONLY) & (~O_EXCL);  // you can't have both O_CREAT and O_EXCL
     }
 
     return res;

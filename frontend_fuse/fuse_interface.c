@@ -300,16 +300,13 @@ __create_file_or_dir(fuse_req_t               req,
     struct my_dentry * dentry   = vfs_get_dentry(parent);
 
 
-    (void)mode; // XXX: we probably have to handle this for POSIX compat.
-
-
     if (dentry == NULL) {
         log_error("could not find inode (%zu)\n", parent);
         fuse_reply_err(req, ENOENT);
         goto out_err;
     }
 
-    if (nexus_fuse_touch(dentry, filename, type, nexus_stat)) {
+    if (nexus_fuse_create(dentry, filename, type, mode, nexus_stat)) {
         log_error("nexus_fuse_touch (%s/) -> (%s) FAILED\n", dentry->name, name);
         fuse_reply_err(req, EAGAIN);
         goto out_err;

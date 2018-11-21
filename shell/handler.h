@@ -13,7 +13,7 @@
 
 
 int
-__fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type);
+__fs_create(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type);
 
 int
 __fs_remove(struct nexus_volume * vol, const char * path);

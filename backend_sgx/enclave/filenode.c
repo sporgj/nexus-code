@@ -5,6 +5,8 @@ struct __filenode_hdr {
     struct nexus_uuid         root_uuid;
     struct nexus_uuid         parent_uuid;
 
+    nexus_file_mode_t         mode;
+
     uint16_t                  link_count;
 
     uint32_t                  nchunks;
@@ -83,6 +85,13 @@ filenode_set_chunksize(struct nexus_filenode * filenode, size_t log2chunksize)
 {
     filenode->log2chunksize = log2chunksize;
     filenode->chunksize     = 1 << log2chunksize;
+}
+
+void
+filenode_set_mode(struct nexus_filenode * filenode, nexus_file_mode_t mode)
+{
+    filenode->mode = mode;
+    __filenode_set_dirty(filenode);
 }
 
 void
@@ -223,7 +232,7 @@ filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags
         return NULL;
     }
 
-    filenode->mode = flags;
+    filenode->flags = flags;
 
     return filenode;
 }

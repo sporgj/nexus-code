@@ -629,13 +629,12 @@ twolevel_getattr(struct nexus_uuid * uuid, struct nexus_fs_attr * attrs, void * 
 
 static int
 twolevel_setattr(struct nexus_uuid     * uuid,
-                 struct nexus_fs_attr  * attrs,
-                 nexus_fs_attr_flags_t   flags,
+                 nexus_file_stat_flags_t flags,
+                 struct stat             new_stat,
                  void                  * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
 
-    struct stat * new_stat = &attrs->posix_stat; // this will be updated in-place
     struct stat   old_stat;
 
     char * filepath = __get_full_path(datastore, uuid);
@@ -648,9 +647,7 @@ twolevel_setattr(struct nexus_uuid     * uuid,
         return -1;
     }
 
-    ret = stat(filepath, &old_stat);
-
-    if (ret != 0) {
+    if (stat(filepath, &old_stat)) {
         log_error("could not stat file (%s)\n", filepath);
         nexus_free(filepath);
         return -1;
@@ -666,11 +663,6 @@ twolevel_setattr(struct nexus_uuid     * uuid,
 
         ret = utime(filepath, &file_time);
     }
-
-    if (flags & NEXUS_FS_ATTR_MODE) {
-        ret = chmod(filepath, new_stat->st_mode);
-    }
-
 
     // get the stat on disk and return
     if (ret == 0) {

@@ -99,3 +99,14 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
 
     return 0;
 }
+
+int
+sgx_backend_fs_setattr(struct nexus_volume   * volume,
+                       char                  * path,
+                       struct nexus_fs_attr  * attrs,
+                       nexus_fs_attr_flags_t   flags,
+                       void                  * priv_data)
+{
+    // TODO
+    return -1;
+}

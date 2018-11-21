@@ -192,7 +192,7 @@ io_buffer_put(struct nexus_uuid   * uuid,
 }
 
 static inline struct metadata_buf *
-__io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
+__io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
 {
     struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
 
@@ -208,7 +208,7 @@ __io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
         metadata_buf->locked_file = nexus_datastore_fopen(volume->metadata_store,
                                                           uuid,
                                                           NULL,
-                                                          NEXUS_FRDWR);
+                                                          flags);
 
         if (metadata_buf->locked_file == NULL) {
             log_error("nexus_datastore_fopen FAILED\n");
@@ -220,13 +220,13 @@ __io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
 }
 
 struct metadata_buf *
-io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume)
+io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
 {
     struct metadata_buf * result = NULL;
 
     BACKEND_SGX_IOBUF_START(IOBUF_LOCK);
 
-    result = __io_buffer_lock(uuid, volume);
+    result = __io_buffer_lock(uuid, flags, volume);
 
     BACKEND_SGX_IOBUF_FINISH(IOBUF_LOCK);
 

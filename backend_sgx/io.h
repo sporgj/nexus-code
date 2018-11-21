@@ -20,7 +20,7 @@ io_buffer_put(struct nexus_uuid   * uuid,
               struct nexus_volume * volume);
 
 struct metadata_buf *
-io_buffer_lock(struct nexus_uuid * uuid, struct nexus_volume * volume);
+io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume);
 
 struct metadata_buf *
 io_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume);

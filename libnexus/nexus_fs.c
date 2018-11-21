@@ -16,20 +16,21 @@
 
 
 int
-nexus_fs_touch(struct nexus_volume  * volume,
-               char                 * dirpath,
-               char                 * plain_name,
-               nexus_dirent_type_t    type,
-               struct nexus_uuid    * uuid)
+nexus_fs_create(struct nexus_volume  * volume,
+                char                 * dirpath,
+                char                 * name,
+                nexus_dirent_type_t    type,
+                nexus_file_mode_t      mode,
+                struct nexus_uuid    * uuid)
 {
     struct nexus_backend * backend = volume->backend;
 
-    if (backend->impl->fs_touch == NULL) {
+    if (backend->impl->fs_create == NULL) {
         log_error("fs_touch NOT Implemented for %s backend\n", backend->impl->name);
         return -1;
     }
 
-    return backend->impl->fs_touch(volume, dirpath, plain_name, type, uuid, backend->priv_data);
+    return backend->impl->fs_create(volume, dirpath, name, type, mode, uuid, backend->priv_data);
 }
 
 int

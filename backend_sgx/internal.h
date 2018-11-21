@@ -85,6 +85,7 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
                       nexus_dirent_type_t    type,
+                      nexus_file_mode_t      mode,
                       struct nexus_uuid    * uuid,
                       void                 * priv_data);
 
@@ -101,13 +102,6 @@ sgx_backend_fs_lookup(struct nexus_volume    * volume,
                       char                   * plain_name,
                       struct nexus_fs_lookup * lookup_info,
                       void                   * priv_data);
-
-int
-sgx_backend_fs_getattr(struct nexus_volume  * volume,
-                       char                 * path,
-                       struct nexus_fs_attr * attrs,
-                       void                 * priv_data);
-
 int
 sgx_backend_fs_setattr(struct nexus_volume   * volume,
                        char                  * path,

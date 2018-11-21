@@ -191,7 +191,7 @@ __fs_getattr(struct nexus_volume * vol, char * path)
 }
 
 int
-__fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type)
+__fs_create(struct nexus_volume * vol, const char * path, nexus_dirent_type_t type)
 {
     char * dirpath  = NULL;
     char * filename = NULL;
@@ -202,7 +202,7 @@ __fs_touch(struct nexus_volume * vol, const char * path, nexus_dirent_type_t typ
 
     nexus_splitpath(path, &dirpath, &filename);
 
-    ret = nexus_fs_touch(vol, dirpath, filename, type, &uuid);
+    ret = nexus_fs_create(vol, dirpath, filename, type, 0, &uuid);
 
     nexus_free(dirpath);
     nexus_free(filename);
@@ -517,7 +517,7 @@ create_file_main(int argc, char ** argv)
 
     (void)ret;
 
-    if (__fs_touch(vol, file_path, NEXUS_REG)) {
+    if (__fs_create(vol, file_path, NEXUS_REG)) {
         return -1;
     }
 

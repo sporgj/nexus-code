@@ -28,6 +28,8 @@ typedef enum {
 } nexus_dirent_type_t;
 
 
+typedef uint32_t   nexus_file_mode_t; // POSIX mode is 4 bytes
+
 typedef enum {
     NEXUS_FREAD          = 0x00000001,
     NEXUS_FWRITE         = 0x00000002,
@@ -45,8 +47,14 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
-    size_t              timestamp;
     size_t              size;
+
+    size_t              link_count;  // number of hardlinks
+
+    union {
+        size_t          filesize;
+        size_t          filecount;
+    };
 
     struct nexus_uuid   uuid;
 
@@ -75,7 +83,7 @@ struct nexus_fs_lookup {
     nexus_dirent_type_t type;
 };
 
-// this structure will hold st data
+// this structure will hold stat data
 struct nexus_fs_attr {
     struct nexus_stat  stat_info;
 
@@ -101,11 +109,12 @@ nexus_fs_sys_mode_from_type(nexus_dirent_type_t type)
  * @param parent
  */
 int
-nexus_fs_touch(struct nexus_volume  * volume,
-               char                 * parent_dir,
-               char                 * plain_name,
-               nexus_dirent_type_t    type,
-               struct nexus_uuid    * uuid);
+nexus_fs_create(struct nexus_volume  * volume,
+                char                 * parent_dir,
+                char                 * plain_name,
+                nexus_dirent_type_t    type,
+                nexus_file_mode_t      mode,
+                struct nexus_uuid    * uuid);
 
 int
 nexus_fs_remove(struct nexus_volume  * volume,
@@ -188,21 +197,3 @@ nexus_fs_decrypt(struct nexus_volume * volume,
                  off_t                 offset,
                  size_t                size,
                  size_t                filesize);
-
-
-
-
-
-int
-nexus_fs_delete(struct nexus_volume * volume,
-		char                * path);
-
-
-int
-nexus_fs_create(struct nexus_volume * volume,
-		char                * path,
-		nexus_dirent_type_t   type,
-		struct nexus_stat   * stat);
-
-
-

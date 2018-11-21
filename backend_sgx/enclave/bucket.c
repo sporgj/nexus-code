@@ -229,7 +229,7 @@ bucket_store(struct dir_bucket * bucket)
     size_t                    buflen        = 0;
 
 
-    if (!bucket->on_disk && buffer_layer_new(&bucket->uuid)) {
+    if (!bucket->on_disk && buffer_layer_lock(&bucket->uuid, NEXUS_FCREATE)) {
         log_error("could not create bucket metadata file on disk\n");
         return -1;
     }
