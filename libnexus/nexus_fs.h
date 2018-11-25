@@ -53,6 +53,7 @@ struct nexus_dirent {
 };
 
 struct nexus_stat {
+    /* data stored inside the actual metadata */
     size_t              link_count;  // number of hardlinks
 
     union {
@@ -61,14 +62,13 @@ struct nexus_stat {
     };
 
     nexus_file_mode_t   mode;
-
+    nexus_dirent_type_t type;
     struct nexus_uuid   uuid;
 
-    size_t              symlink_size;
-    struct nexus_uuid   symlink_uuid;
-
-    nexus_dirent_type_t type;
+    /* data stored inside the dirnode directory entry */
     nexus_dirent_type_t link_type;
+    size_t              link_size;
+    struct nexus_uuid   link_uuid;
 };
 
 

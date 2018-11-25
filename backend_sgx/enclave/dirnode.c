@@ -1088,6 +1088,8 @@ __dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uui
     symlink_entry = list_iterator_get(iter);
 
     list_iterator_free(iter);
+
+    return symlink_entry->target_path;
 }
 
 char *
@@ -1237,22 +1239,21 @@ dirnode_export_link_stat(struct nexus_dirnode * dirnode, char * name, struct nex
 {
     struct dir_entry * direntry = __find_by_name(dirnode, name);
 
-    struct nexus_uuid * entry_uuid = NULL;
-
     if (direntry == NULL) {
         return -1;
     }
 
     stat_out->link_type = direntry->dir_rec.type;
-
-    entry_uuid = &direntry->dir_rec.link_uuid;
+    nexus_uuid_copy(&direntry->dir_rec.link_uuid, &stat_out->link_uuid);
 
     if (stat_out->link_type == NEXUS_LNK) {
-        const char * target = __dirnode_get_link(dirnode, entry_uuid);
-        stat_out->symlink_size = strnlen(target, NEXUS_PATH_MAX);
-        nexus_uuid_copy(entry_uuid, &stat_out->symlink_uuid);
+        const char * target = __dirnode_get_link(dirnode, &direntry->dir_rec.link_uuid);
+        stat_out->link_size = strnlen(target, NEXUS_PATH_MAX);
     } else {
-        nexus_uuid_copy(entry_uuid, &stat_out->uuid);
+        /* technically, the link size for files/dirs is the UUID they point to. */
+        stat_out->link_size = sizeof(struct nexus_uuid);
+        stat_out->type = NEXUS_DIR;
+        nexus_uuid_copy(&direntry->dir_rec.link_uuid, &stat_out->uuid);
     }
 
     return 0;

@@ -277,7 +277,7 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
 
     struct nexus_dentry   * parent_dentry = nexus_vfs_lookup_parent(path_IN, &walker);
 
-    int ret = -1;
+    int ret = 0;
 
 
     if (parent_dentry == NULL) {

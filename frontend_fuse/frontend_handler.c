@@ -91,6 +91,8 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
 {
     struct nexus_stat * stat_info = &attrs->stat_info;
 
+    struct nexus_uuid * uuid = NULL;
+
     char * path = dentry_get_fullpath(dentry);
 
     int ret = -1;
@@ -108,24 +110,33 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
         goto out;
     }
 
+
+    if (dentry->parent == NULL || stat_flags & NEXUS_STAT_FILE) {
+        uuid = &stat_info->uuid;
+    } else {
+        uuid =  &stat_info->link_uuid;
+    }
+
     // stat the datastores
     switch (dentry->type) {
     case NEXUS_DIR:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs);
+        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
         break;
     case NEXUS_REG:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, &stat_info->uuid, attrs);
+        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, uuid, attrs);
         break;
     case NEXUS_LNK:
         // we will just return stat information about its parent
-        ret = nexus_datastore_getattr(
-            nexus_fuse_volume->metadata_store, &dentry->parent->inode->uuid, attrs);
+        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store,
+                                      &dentry->parent->inode->attrs.stat_info.uuid,
+                                      attrs);
     }
 
-
-    if (ret == 0) {
-        __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
+    if (ret) {
+        goto out;
     }
+
+    __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
 out:
     nexus_free(path);
 
@@ -158,9 +169,11 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
     // XXX: need to revise this at a future time
     // there's no need to split this away from the backend (nexus_fs_setattr). but I want to try this for now
     if (dentry->type == NEXUS_REG) {
-        ret = nexus_datastore_setattr(nexus_fuse_volume->data_store, &stat_info->uuid, attrs, flags);
-    } else {
-        ret = nexus_datastore_setattr(nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs, flags);
+        ret = nexus_datastore_setattr(
+            nexus_fuse_volume->data_store, &stat_info->uuid, attrs, flags);
+    } else if (dentry->type == NEXUS_DIR) {
+        ret = nexus_datastore_setattr(
+            nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs, flags);
     }
 
     if (ret) {
@@ -468,8 +481,8 @@ nexus_fuse_store(struct my_file * file_ptr)
     }
 
 
-    printf("file written (%s) filepath=%s, filesize=%zu\n",
-            file_handle->filepath, file_ptr->filepath, file_ptr->filesize);
+    // printf("file written (%s) filepath=%s, filesize=%zu\n",
+    //         file_handle->filepath, file_ptr->filepath, file_ptr->filesize);
 
     nexus_datastore_fclose(datastore, file_handle);
 

@@ -396,6 +396,10 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         return;
     }
 
+    if (fi->flags & O_CREAT) {
+        printf("nxs_fuse_open called with O_CREATE\n");
+    }
+
     // get the file attributes and cache them to the inode
     if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &dentry->inode->attrs)) {
         fuse_reply_err(req, EIO);

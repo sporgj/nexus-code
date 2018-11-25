@@ -74,7 +74,7 @@ create_file_usage()
 static void
 print_stat_info(const char * path, struct nexus_stat * nexus_stat)
 {
-    char * nexus_name = nexus_uuid_to_alt64(&nexus_stat->uuid);
+    char * nexus_name = NULL;
     char * file_type = NULL;
 
     switch (nexus_stat->type) {
@@ -86,6 +86,13 @@ print_stat_info(const char * path, struct nexus_stat * nexus_stat)
         break;
     default:
         file_type = "REG";
+    }
+
+    if (nexus_stat->link_type == NEXUS_LNK) {
+        file_type  = "LNK";
+        nexus_name = nexus_uuid_to_alt64(&nexus_stat->link_uuid);
+    } else {
+        nexus_name = nexus_uuid_to_alt64(&nexus_stat->uuid);
     }
 
     printf(" %s -> [%s] %s\n", path, file_type, nexus_name);

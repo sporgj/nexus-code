@@ -113,7 +113,6 @@ dentry_set_name(struct my_dentry * dentry, const char * name)
     assert(len < NEXUS_NAME_MAX);
 
     strncpy(dentry->name, name, NEXUS_NAME_MAX);
-    printf("new_name: %s, name=%s\n", dentry->name, name);
 }
 
 void
@@ -140,6 +139,7 @@ dentry_instantiate(struct my_dentry * dentry, struct my_inode * inode)
 
     list_add_tail(&dentry->aliases, &inode->dentry_list);
     inode->dentry_count += 1;
+    dentry_get(dentry);
 }
 
 char *

@@ -174,7 +174,7 @@ dentry_follow_link(struct nexus_dentry * dentry, char * symlink_target)
 
     // TODO handle absolute paths in symlink targets
 
-    return walk_path(&dentry);
+    return walk_path(&walker);
 }
 
 static struct nexus_dentry *
@@ -246,7 +246,7 @@ walk_path(struct path_walker * walker)
 
 
         if (atype == NEXUS_LNK) {
-            char * target = dirnode_get_link(dirnode, &next_dentry->link_uuid);
+            char * target = dirnode_get_link(dirnode, &link_uuid);
 
             next_dentry = dentry_follow_link(curr_dentry, target);
 

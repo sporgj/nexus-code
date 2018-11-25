@@ -11,6 +11,8 @@ static struct nexus_hashtable * inode_cache      = NULL;
 
 static struct my_dentry       * root_dentry      = NULL;
 
+static struct my_inode        * root_inode       = NULL;
+
 
 static struct my_inode *
 __icache_alloc(fuse_ino_t ino, struct nexus_uuid * uuid);
@@ -39,12 +41,11 @@ vfs_init()
     }
 
     root_dentry = dentry_create(NULL, "", NEXUS_DIR);
-    root_dentry->inode = __icache_alloc(FUSE_ROOT_ID, NULL);
+    root_inode  = __icache_alloc(FUSE_ROOT_ID, NULL);
 
-    root_dentry->inode->lookup_count = 1;
-    dentry_get(root_dentry);
+    root_inode->lookup_count = 1;
 
-    dentry_instantiate(root_dentry, root_dentry->inode);
+    dentry_instantiate(root_dentry, root_inode);
 
     return 0;
 }
