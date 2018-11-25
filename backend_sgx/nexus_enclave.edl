@@ -102,6 +102,7 @@ enclave {
         public int ecall_fs_stat
         (
             [in, string] char                * path_IN,
+                         nexus_stat_flags_t    stat_flags,
             [user_check] struct nexus_stat   * stat_out
         );
 

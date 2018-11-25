@@ -29,10 +29,12 @@ int
 nexus_fuse_lookup(struct my_dentry * dentry, char * filename, struct nexus_fs_lookup * lookup_info);
 
 int
-nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat);
+nexus_fuse_stat(struct my_dentry * dentry, nexus_stat_flags_t stat_flags, struct nexus_stat * stat_info);
 
 int
-nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs);
+nexus_fuse_getattr(struct my_dentry     * dentry,
+                   nexus_stat_flags_t     stat_flags,
+                   struct nexus_fs_attr * attrs);
 
 int
 nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int to_set);

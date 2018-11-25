@@ -85,6 +85,7 @@ nexus_fs_setattr(struct nexus_volume   * volume,
 int
 nexus_fs_stat(struct nexus_volume  * volume,
               char                 * path,
+              nexus_stat_flags_t     stat_flags,
               struct nexus_stat    * nexus_stat)
 {
     struct nexus_backend * backend = volume->backend;
@@ -94,7 +95,7 @@ nexus_fs_stat(struct nexus_volume  * volume,
         return -1;
     }
 
-    return backend->impl->fs_stat(volume, path, nexus_stat, backend->priv_data);
+    return backend->impl->fs_stat(volume, path, stat_flags, nexus_stat, backend->priv_data);
 }
 
 int

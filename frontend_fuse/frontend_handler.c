@@ -37,7 +37,7 @@ nexus_fuse_readdir(struct my_dentry * dentry,
 }
 
 int
-nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
+nexus_fuse_stat(struct my_dentry * dentry, nexus_stat_flags_t stat_flags, struct nexus_stat * stat_info)
 {
     char * dirpath = dentry_get_fullpath(dentry);
 
@@ -45,7 +45,10 @@ nexus_fuse_stat(struct my_dentry * dentry, struct nexus_stat * stat)
         return -1;
     }
 
-    if (nexus_fs_stat(nexus_fuse_volume, dirpath, stat)) {
+
+    memset(stat_info, 0, sizeof(struct nexus_stat));
+
+    if (nexus_fs_stat(nexus_fuse_volume, dirpath, stat_flags, stat_info)) {
         nexus_free(dirpath);
         return -1;
     }
@@ -82,7 +85,9 @@ __derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode
 }
 
 int
-nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
+nexus_fuse_getattr(struct my_dentry     * dentry,
+                   nexus_stat_flags_t     stat_flags,
+                   struct nexus_fs_attr * attrs)
 {
     struct nexus_stat * stat_info = &attrs->stat_info;
 
@@ -98,19 +103,29 @@ nexus_fuse_getattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs)
     memset(stat_info, 0, sizeof(struct nexus_stat));
 
 
-    if (nexus_fs_stat(nexus_fuse_volume, path, stat_info)) {
+    if (nexus_fs_stat(nexus_fuse_volume, path, stat_flags, stat_info)) {
         log_error("could not stat backend (filepath=%s)\n", path);
         goto out;
     }
 
     // stat the datastores
-    if (dentry->type == NEXUS_REG) {
-        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, &stat_info->uuid, attrs);
-    } else {
+    switch (dentry->type) {
+    case NEXUS_DIR:
         ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs);
+        break;
+    case NEXUS_REG:
+        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, &stat_info->uuid, attrs);
+        break;
+    case NEXUS_LNK:
+        // we will just return stat information about its parent
+        ret = nexus_datastore_getattr(
+            nexus_fuse_volume->metadata_store, &dentry->parent->inode->uuid, attrs);
     }
 
-    __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
+
+    if (ret == 0) {
+        __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
+    }
 out:
     nexus_free(path);
 

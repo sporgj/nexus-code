@@ -5,12 +5,13 @@
 
 struct nexus_metadata;
 
-
 struct nexus_dentry {
-    nexus_metadata_type_t       metadata_type;
+    nexus_dirent_type_t         dirent_type;
 
     char                      * name;
     size_t                      name_len;
+
+    char                      * symlink_target;
 
     struct nexus_uuid           link_uuid;
 
@@ -21,6 +22,23 @@ struct nexus_dentry {
     struct list_head            siblings;
 };
 
+
+typedef enum {
+    PATH_WALK_NORMAL        = 1,
+    PATH_WALK_PARENT        = 2    // stop at the parent and return that dentry
+} path_walk_type_t;
+
+
+// structure populated during lookups
+struct path_walker {
+    struct nexus_dentry * parent_dentry;
+
+    char                * remaining_path; // the path left to be looked up
+
+    path_walk_type_t      type;
+};
+
+
 int
 revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags);
 
@@ -30,10 +48,7 @@ revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags);
  * @param path
  */
 struct nexus_dentry *
-dentry_lookup(struct nexus_dentry * root_dentry, char * path);
-
-struct nexus_metadata *
-dentry_get_metadata(struct nexus_dentry * metadata, nexus_io_flags_t flags, bool revalidate);
+dentry_lookup(struct path_walker * walker);
 
 void
 dentry_delete(struct nexus_dentry * dentry);

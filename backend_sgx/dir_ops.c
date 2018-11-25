@@ -92,6 +92,7 @@ sgx_backend_fs_lookup(struct nexus_volume    * volume,
 int
 sgx_backend_fs_stat(struct nexus_volume * volume,
                     char                * path,
+                    nexus_stat_flags_t    stat_flags,
                     struct nexus_stat   * nexus_stat,
                     void                * priv_data)
 {
@@ -105,7 +106,7 @@ sgx_backend_fs_stat(struct nexus_volume * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_STAT);
 
-    err = ecall_fs_stat(sgx_backend->enclave_id, &ret, path, nexus_stat);
+    err = ecall_fs_stat(sgx_backend->enclave_id, &ret, path, stat_flags, nexus_stat);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_STAT);
 
@@ -385,7 +386,7 @@ sgx_backend_fs_setattr(struct nexus_volume   * volume,
     } else if (flags & NEXUS_FS_ATTR_MODE) {
         return __backend_set_mode(sgx_backend, path, stat_buf->st_mode, &attrs->stat_info);
     } else {
-        return sgx_backend_fs_stat(volume, path, &attrs->stat_info, priv_data);
+        return sgx_backend_fs_stat(volume, path, NEXUS_STAT_FILE, &attrs->stat_info, priv_data);
     }
 
     return 0;

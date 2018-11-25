@@ -111,6 +111,7 @@ sgx_backend_fs_setattr(struct nexus_volume   * volume,
 int
 sgx_backend_fs_stat(struct nexus_volume * volume,
                     char                * dirpath,
+                    nexus_stat_flags_t    stat_flags,
                     struct nexus_stat   * nexus_stat,
                     void                * priv_data);
 

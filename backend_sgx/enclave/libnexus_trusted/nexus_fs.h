@@ -26,6 +26,12 @@ typedef enum {
 } nexus_io_flags_t;
 
 
+typedef enum {
+    NEXUS_STAT_LINK      = 0x0001, // lstat
+    NEXUS_STAT_FILE      = 0x0002 // fstat
+} nexus_stat_flags_t;
+
+
 typedef uint32_t nexus_file_mode_t;
 
 
@@ -47,7 +53,11 @@ struct nexus_stat {
 
     struct nexus_uuid   uuid;
 
+    size_t              symlink_size;
+    struct nexus_uuid   symlink_uuid;
+
     nexus_dirent_type_t type;
+    nexus_dirent_type_t link_type;
 };
 
 struct nexus_fs_lookup {

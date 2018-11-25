@@ -5,7 +5,7 @@
 #include <nexus_hash.h>
 
 #include "metadata.h"
-
+#include "dentry.h"
 
 
 int
@@ -35,6 +35,12 @@ nexus_vfs_get(char * path, nexus_io_flags_t flags);
 // lookup the dentry
 struct nexus_dentry *
 nexus_vfs_lookup(char * filepath);
+
+struct nexus_dentry *
+nexus_vfs_lookup_parent(char * filepath, struct path_walker * walker);
+
+struct nexus_metadata *
+nexus_vfs_complete_lookup(struct path_walker * walker, nexus_io_flags_t flags);
 
 /**
  * puts back a metadata onto the VFS
@@ -78,3 +84,6 @@ nexus_vfs_load(struct nexus_uuid     * metadata_uuid,
 void
 nexus_vfs_delete(struct nexus_uuid * metadata_uuid);
 
+
+struct nexus_metadata *
+dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool revalidate);

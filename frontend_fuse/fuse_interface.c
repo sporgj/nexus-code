@@ -17,7 +17,7 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    if (nexus_fuse_getattr(dentry, &dentry->inode->attrs)) {
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_LINK, &dentry->inode->attrs)) {
         fuse_reply_err(req, ENOENT);
         return;
     }
@@ -173,7 +173,7 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         return;
     }
 
-    if (nexus_fuse_stat(dentry, &nexus_stat)) {
+    if (nexus_fuse_stat(dentry, NEXUS_STAT_FILE, &nexus_stat)) {
         fuse_reply_err(req, ENOENT);
         return;
     }
@@ -397,7 +397,7 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
     // get the file attributes and cache them to the inode
-    if (nexus_fuse_getattr(dentry, &dentry->inode->attrs)) {
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &dentry->inode->attrs)) {
         fuse_reply_err(req, EIO);
         return;
     }

@@ -21,7 +21,7 @@ typedef enum {
 struct nexus_metadata {
     struct nexus_uuid            uuid;
 
-    nexus_metadata_type_t        type;
+    nexus_dirent_type_t          type;
 
     nexus_io_flags_t             flags;
 

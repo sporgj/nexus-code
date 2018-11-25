@@ -128,11 +128,11 @@ print_attrs_info(const char * path, struct nexus_fs_attr * attrs)
 #endif
 
 int
-__fs_stat(struct nexus_volume * vol, const char * path)
+__fs_stat(struct nexus_volume * vol, const char * path, nexus_stat_flags_t stat_flags)
 {
     struct nexus_stat nexus_stat;
 
-    if (nexus_fs_stat(vol, (char *)path, &nexus_stat)) {
+    if (nexus_fs_stat(vol, (char *)path, stat_flags, &nexus_stat)) {
         log_error("stat %s FAILED\n", path);
         return -1;
     }

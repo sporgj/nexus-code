@@ -109,6 +109,7 @@ struct nexus_backend_impl {
 
     int   (*fs_stat)(struct nexus_volume  * volume,
                      char                 * path,
+                     nexus_stat_flags_t     stat_flags,
                      struct nexus_stat    * nexus_stat,
                      void                 * priv_data);
 

@@ -99,6 +99,9 @@ dirnode_set_mode(struct nexus_dirnode * dirnode, nexus_file_mode_t mode);
 void
 dirnode_export_stat(struct nexus_dirnode * dirnode, struct nexus_stat * stat_out);
 
+int
+dirnode_export_link_stat(struct nexus_dirnode * dirnode, char * name, struct nexus_stat * stat_out);
+
 /**
  * Creates a new dirnode
  *

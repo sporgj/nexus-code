@@ -144,7 +144,6 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
         return -1;
     }
 
-
     tmp_uuid = &direntry->dir_rec.link_uuid;
     tmp_type = direntry->dir_rec.type;
 
@@ -272,24 +271,52 @@ __nxs_fs_filldir(struct nexus_metadata * metadata,
 }
 
 int
-ecall_fs_stat(char * path_IN, struct nexus_stat * nexus_stat_out)
+ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat * nexus_stat_out)
 {
-    struct nexus_metadata * metadata = nexus_vfs_get(path_IN, NEXUS_FREAD);
+    struct path_walker      walker        = { 0 };
 
-    if (metadata == NULL) {
-        log_error("could not get metadata\n");
+    struct nexus_dentry   * parent_dentry = nexus_vfs_lookup_parent(path_IN, &walker);
+
+    int ret = -1;
+
+
+    if (parent_dentry == NULL) {
+        log_error("could not get parent dentry\n");
         return -1;
     }
 
-    if (metadata->type == NEXUS_DIRNODE) {
-        dirnode_export_stat(metadata->dirnode, nexus_stat_out);
-    } else {
-        filenode_export_stat(metadata->filenode, nexus_stat_out);
+    if (stat_flags & NEXUS_STAT_LINK) {
+        struct nexus_dirnode * dirnode = parent_dentry->metadata->dirnode;
+
+        ret = 0;
+
+        if (walker.remaining_path) {
+            ret = dirnode_export_link_stat(dirnode, walker.remaining_path, nexus_stat_out);
+        } else {
+            // it is the root directory
+            dirnode_export_stat(dirnode, nexus_stat_out);
+        }
     }
 
-    nexus_vfs_put(metadata);
+    if (stat_flags & NEXUS_STAT_FILE) {
+        struct nexus_metadata * metadata = nexus_vfs_complete_lookup(&walker, NEXUS_FREAD);
 
-    return 0;
+        if (metadata == NULL) {
+            log_error("could not get metadata\n");
+
+            return -1;
+        }
+
+        if (metadata->type == NEXUS_DIRNODE) {
+            dirnode_export_stat(metadata->dirnode, nexus_stat_out);
+        } else {
+            filenode_export_stat(metadata->filenode, nexus_stat_out);
+        }
+
+        nexus_vfs_put(metadata);
+    }
+
+    return ret;
 }
 
 int
@@ -372,6 +399,11 @@ __nxs_fs_symlink(struct nexus_metadata * metadata,
                  struct nexus_uuid     * entry_uuid)
 {
     nexus_uuid_gen(entry_uuid);
+
+    if (buffer_layer_new(entry_uuid)) {
+        log_error("could not create empty metadata \n");
+        return -1;
+    }
 
     if (dirnode_add_link(metadata->dirnode, link_name, symlink_target, entry_uuid)) {
         log_error("could not add link to dirnode\n");
@@ -470,13 +502,15 @@ ecall_fs_readlink(char * dirpath_IN, char * linkname_IN, char targetpath_out[NEX
     result = __nxs_fs_readlink(metadata->dirnode, linkname_IN);
 
     if (result == NULL) {
-        log_error("readlink failed\n");
+        log_error("readlink FAILED\n");
         goto out;
     }
 
 
     // XXX
     strncpy(targetpath_out, result, NEXUS_PATH_MAX);
+
+    nexus_free(result);
 
     ret = 0;
 out:

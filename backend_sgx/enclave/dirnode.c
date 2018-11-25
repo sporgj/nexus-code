@@ -1074,8 +1074,8 @@ __remove_symlink(struct nexus_dirnode * dirnode,
     return 0;
 }
 
-char *
-dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
+static inline const char *
+__dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
 {
     struct symlink_entry       * symlink_entry = NULL;
 
@@ -1088,8 +1088,14 @@ dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
     symlink_entry = list_iterator_get(iter);
 
     list_iterator_free(iter);
+}
 
-    return strndup(symlink_entry->target_path, NEXUS_PATH_MAX);
+char *
+dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
+{
+    const char * target = __dirnode_get_link(dirnode, entry_uuid);
+
+    return target ? strndup(target, NEXUS_PATH_MAX) : NULL;
 }
 
 struct dir_entry *
@@ -1224,4 +1230,30 @@ dirnode_export_stat(struct nexus_dirnode * dirnode, struct nexus_stat * stat_out
     stat_out->type = NEXUS_DIR;
     stat_out->filecount = dirnode->dir_entry_count;
     nexus_uuid_copy(&dirnode->my_uuid, &stat_out->uuid);
+}
+
+int
+dirnode_export_link_stat(struct nexus_dirnode * dirnode, char * name, struct nexus_stat * stat_out)
+{
+    struct dir_entry * direntry = __find_by_name(dirnode, name);
+
+    struct nexus_uuid * entry_uuid = NULL;
+
+    if (direntry == NULL) {
+        return -1;
+    }
+
+    stat_out->link_type = direntry->dir_rec.type;
+
+    entry_uuid = &direntry->dir_rec.link_uuid;
+
+    if (stat_out->link_type == NEXUS_LNK) {
+        const char * target = __dirnode_get_link(dirnode, entry_uuid);
+        stat_out->symlink_size = strnlen(target, NEXUS_PATH_MAX);
+        nexus_uuid_copy(entry_uuid, &stat_out->symlink_uuid);
+    } else {
+        nexus_uuid_copy(entry_uuid, &stat_out->uuid);
+    }
+
+    return 0;
 }

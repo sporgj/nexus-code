@@ -40,6 +40,12 @@ typedef enum {
 } nexus_io_flags_t;
 
 
+typedef enum {
+    NEXUS_STAT_LINK      = 0x0001, // lstat
+    NEXUS_STAT_FILE      = 0x0002 // fstat
+} nexus_stat_flags_t;
+
+
 struct nexus_dirent {
     char                name[NEXUS_NAME_MAX];
     struct nexus_uuid   uuid;
@@ -58,7 +64,11 @@ struct nexus_stat {
 
     struct nexus_uuid   uuid;
 
+    size_t              symlink_size;
+    struct nexus_uuid   symlink_uuid;
+
     nexus_dirent_type_t type;
+    nexus_dirent_type_t link_type;
 };
 
 
@@ -138,6 +148,7 @@ nexus_fs_setattr(struct nexus_volume   * volume,
 int
 nexus_fs_stat(struct nexus_volume  * volume,
               char                 * path,
+              nexus_stat_flags_t     stat_flags,
               struct nexus_stat    * nexus_stat);
 
 int

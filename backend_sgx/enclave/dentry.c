@@ -1,6 +1,7 @@
 #include "enclave_internal.h"
 
-#include "path_builder.c"
+static struct nexus_dentry *
+walk_path(struct path_walker * walker);
 
 static struct nexus_dentry *
 d_alloc(struct nexus_dentry * parent,
@@ -12,7 +13,7 @@ d_alloc(struct nexus_dentry * parent,
 
     INIT_LIST_HEAD(&dentry->children);
 
-    dentry->metadata_type = (type == NEXUS_DIR ? NEXUS_DIRNODE : NEXUS_FILENODE);
+    dentry->dirent_type   = type;
     dentry->parent        = parent;
     dentry->name_len      = strnlen(name, NEXUS_NAME_MAX);
     dentry->name          = strndup(name, NEXUS_NAME_MAX);
@@ -25,6 +26,10 @@ d_alloc(struct nexus_dentry * parent,
 static void
 d_free(struct nexus_dentry * dentry)
 {
+    if (dentry->symlink_target) {
+        nexus_free(dentry->symlink_target);
+    }
+
     nexus_free(dentry->name);
     nexus_free(dentry);
 }
@@ -105,8 +110,9 @@ dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child_file
 }
 
 static int
-__revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
+__revalidate_inode(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 {
+    nexus_metadata_type_t metadata_type;
 
     if (dentry->metadata) {
         if (nexus_vfs_revalidate(dentry->metadata, flags)) {
@@ -117,8 +123,15 @@ __revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
         return 0; //
     }
 
+
+    if (dentry->dirent_type == NEXUS_DIR) {
+        metadata_type = NEXUS_DIRNODE;
+    } else if (dentry->dirent_type == NEXUS_REG) {
+        metadata_type = NEXUS_FILENODE;
+    }
+
     // dentry->metadata = NULL
-    dentry->metadata = nexus_vfs_load(&dentry->link_uuid, dentry->metadata_type, flags);
+    dentry->metadata = nexus_vfs_load(&dentry->link_uuid, metadata_type, flags);
 
     if (dentry->metadata == NULL) {
         log_error("could not load metadata\n");
@@ -134,45 +147,38 @@ __revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 int
 revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 {
-    if (__revalidate_dentry(dentry, flags)) {
+    if (dentry->dirent_type == NEXUS_LNK) {
+        // TODO not implemented
+        log_error("could not revalidate symlink\n");
         return -1;
     }
 
-    if (dentry->parent) {
-        // if it's a new metadata, just update the parent uuid
-        if (dentry->metadata->version == 0) {
-            nexus_metadata_set_parent_uuid(dentry->metadata, &dentry->parent->link_uuid);
+    if (__revalidate_inode(dentry, flags)) {
+        return -1;
+    }
 
-            return 0;
-        }
-
-        if (nexus_metadata_verify_uuids(dentry)) {
-            // FIXME if it's a hardlink, we need to do some special handling
-            return 0;
-        }
-    } else {
-        // this is probably excessive :)
+    if (dentry->parent == NULL) {   // revalidate top dentry
         struct nexus_dirnode * root_dirnode = (struct nexus_dirnode *)dentry->metadata->object;
 
         return nexus_uuid_compare(&global_supernode->root_uuid, &root_dirnode->my_uuid);
     }
 
-    return 0;
-}
-
-struct nexus_metadata *
-dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool revalidate)
-{
-    if (revalidate && revalidate_dentry(dentry, flags)) {
-        log_error("could revalidate dentry\n");
-        return NULL;
-    }
-
-    return nexus_metadata_get(dentry->metadata);
+    return nexus_metadata_verify_uuids(dentry);
 }
 
 static struct nexus_dentry *
-walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder * builder)
+dentry_follow_link(struct nexus_dentry * dentry, char * symlink_target)
+{
+    struct path_walker walker
+        = { .parent_dentry = dentry, .remaining_path = symlink_target, .type = PATH_WALK_NORMAL };
+
+    // TODO handle absolute paths in symlink targets
+
+    return walk_path(&dentry);
+}
+
+static struct nexus_dentry *
+walk_path(struct path_walker * walker)
 {
     nexus_dirent_type_t atype;
 
@@ -181,115 +187,97 @@ walk_path(struct nexus_dentry * root_dentry, char * relpath, struct path_builder
 
     struct nexus_dirnode * dirnode    = NULL;
 
-    struct nexus_dentry * curr_dentry = root_dentry;
+    struct nexus_dentry * curr_dentry = walker->parent_dentry;
     struct nexus_dentry * next_dentry = NULL;
 
     struct nexus_uuid link_uuid;
 
-    int ret = -1;
+    name = strtok_r(NULL, "/", &walker->remaining_path);
 
-    name = strtok_r(relpath, "/", &next_token);
     while (name != NULL) {
         // check for . and ..
         if (name[0] == '.') {
             if (name[1] == '\0') {
-                // skip this term
                 goto skip;
             } else if (name[1] == '.') {
-                // move back to the parent
                 curr_dentry = curr_dentry->parent;
+
                 if (curr_dentry == NULL) {
                     log_error("error with path");
                     return NULL;
                 }
 
-                path_builder_pop(builder);
+                goto skip;
             }
         }
 
-        if (curr_dentry->metadata_type != NEXUS_DIRNODE) {
+        if (curr_dentry->dirent_type != NEXUS_DIR) {
             log_error("path traversal encountered an incorrect dentry type\n");
             return NULL;
         }
 
-        ret = revalidate_dentry(curr_dentry, NEXUS_FREAD);
-        if (ret != 0) {
+        if (walker->type == PATH_WALK_PARENT && walker->remaining_path == NULL) {
+            walker->remaining_path = name;
+            return curr_dentry;
+        }
+
+
+        if (revalidate_dentry(curr_dentry, NEXUS_FREAD)) {
             log_error("dentry revalidation FAILED\n");
             return NULL;
         }
 
-        // check the dentry cache if it entry exists
+
+        // check the dentry cache if it exists
         next_dentry = d_lookup(curr_dentry, name);
+
         if (next_dentry != NULL) {
             goto next;
         }
 
-        // if the entry is not found, let's leave
+
+        // otherwise, let's look inside the dirnode
         dirnode = curr_dentry->metadata->dirnode;
 
-        ret = dirnode_find_by_name(dirnode, name, &atype, &link_uuid);
-
-        if (ret != 0) {
+        if (dirnode_find_by_name(dirnode, name, &atype, &link_uuid)) {
             log_error("could not find('%s') metadata\n", name);
             return NULL;
         }
 
+
         if (atype == NEXUS_LNK) {
-            char * symlink_target = dirnode_get_link(dirnode, &link_uuid);
+            char * target = dirnode_get_link(dirnode, &next_dentry->link_uuid);
 
-            if (symlink_target == NULL) {
-                log_error("getting symlink (%s) target FAILED\n", name);
-            }
+            next_dentry = dentry_follow_link(curr_dentry, target);
 
-            // TODO handle absolute paths in symlink targets
-
-            next_dentry = walk_path(curr_dentry, symlink_target, builder);
-
-            nexus_free(symlink_target);
-
-            if (next_dentry == NULL) {
-                log_error("traversing symlink (%s) target FAILED\n", name);
-                return NULL;
-            }
-
-            goto next;
+            nexus_free(target);
+        } else {
+            // allocate and add the dentry to the tree
+            next_dentry = create_dentry(curr_dentry, &link_uuid, name, atype);
         }
 
-        // allocate and add the dentry to the tree
-        next_dentry = create_dentry(curr_dentry, &link_uuid, name, atype);
+
+        if (next_dentry == NULL) {
+            log_error("could not find dentry\n");
+            return NULL;
+        }
 
     next:
-        path_builder_push(builder, &curr_dentry->link_uuid);
-        curr_dentry = next_dentry;
+        walker->parent_dentry = curr_dentry = next_dentry;
+
     skip:
-        name = strtok_r(NULL, "/", &next_token);
+        name = strtok_r(NULL, "/", &walker->remaining_path);
     }
 
     return curr_dentry;
 }
 
 struct nexus_dentry *
-dentry_lookup(struct nexus_dentry * root_dentry, char * path)
+dentry_lookup(struct path_walker * walker)
 {
-    struct nexus_dentry * dentry  = NULL;
-
-    struct path_builder builder;
-
-
-    path_builder_init(&builder);
-
-    if (path == NULL) {
-        log_error("path cannot be null\n");
-        return NULL;
+    if (walker->remaining_path == NULL) {
+        return walker->parent_dentry;
     }
 
-    if (path[0] == '\0') {
-        dentry = root_dentry;
-    } else {
-        dentry = walk_path(root_dentry, path, &builder);
-    }
-
-    path_builder_free(&builder);
-
-    return dentry;
+    return walk_path(walker);
 }

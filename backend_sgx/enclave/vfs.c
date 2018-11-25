@@ -82,7 +82,7 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
 
     nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.link_uuid);
 
-    root_dentry.metadata_type = NEXUS_DIRNODE;
+    root_dentry.dirent_type = NEXUS_DIR;
 
     return 0;
 
@@ -92,16 +92,67 @@ out_err:
     return -1;
 }
 
+struct nexus_metadata *
+dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool revalidate)
+{
+    if (revalidate && revalidate_dentry(dentry, flags)) {
+        log_error("could revalidate dentry\n");
+        return NULL;
+    }
+
+    return nexus_metadata_get(dentry->metadata);
+}
+
 struct nexus_dentry *
 nexus_vfs_lookup(char * filepath)
 {
-    return dentry_lookup(&root_dentry, filepath);
+    struct path_walker walker
+        = { .remaining_path = filepath, .type = PATH_WALK_NORMAL, .parent_dentry = &root_dentry };
+
+    return dentry_lookup(&walker);
+}
+
+struct nexus_dentry *
+nexus_vfs_lookup_parent(char * filepath, struct path_walker * walker)
+{
+    walker->remaining_path = filepath;
+    walker->parent_dentry  = &root_dentry;
+    walker->type           = PATH_WALK_PARENT;
+
+    struct nexus_dentry * dentry = dentry_lookup(walker);
+
+    if (dentry == NULL) {
+        return NULL;
+    }
+
+    return revalidate_dentry(dentry, NEXUS_FREAD) ? NULL : dentry;
+}
+
+struct nexus_metadata *
+nexus_vfs_complete_lookup(struct path_walker * walker, nexus_io_flags_t flags)
+{
+    walker->type = PATH_WALK_NORMAL;
+
+    struct nexus_dentry * start_dentry = walker->parent_dentry;
+
+    struct nexus_dentry * dentry = dentry_lookup(walker);
+
+    if (dentry == NULL) {
+        log_error("dentry_lookup FAILED\n");
+        return NULL;
+    }
+
+    if (dentry == start_dentry) {
+        return nexus_metadata_get(dentry->metadata);
+    }
+
+    return dentry_get_metadata(dentry, flags, true);
 }
 
 struct nexus_metadata *
 nexus_vfs_get(char * filepath, nexus_io_flags_t flags)
 {
-    struct nexus_dentry * dentry = dentry_lookup(&root_dentry, filepath);
+    struct nexus_dentry * dentry = nexus_vfs_lookup(filepath);
 
     if (dentry == NULL) {
         log_error("dentry_lookup FAILED\n");
@@ -110,7 +161,6 @@ nexus_vfs_get(char * filepath, nexus_io_flags_t flags)
 
     return dentry_get_metadata(dentry, flags, true);
 }
-
 
 void
 nexus_vfs_put(struct nexus_metadata * metadata)
