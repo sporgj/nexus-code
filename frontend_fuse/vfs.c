@@ -54,7 +54,9 @@ void
 vfs_deinit()
 {
     // TODO iterate through all the inodes and dentries
-    nexus_free_htable(inode_cache, 1, 0);
+    if (inode_cache) {
+        nexus_free_htable(inode_cache, 1, 0);
+    }
 }
 
 static struct my_inode *
@@ -168,7 +170,6 @@ vfs_remove_inode(struct my_inode * inode)
         return;
     }
 
-    // TODO drop all this dentries
     list_for_each(curr, &inode->dentry_list) {
         struct my_dentry * dentry = list_entry(curr, struct my_dentry, aliases);
 
