@@ -1,7 +1,6 @@
 create libnexus.a
 addlib ./build/libnexus.a
 addlib ./build/libmbedcrypto.a
-addlib ./build/backend_clear.a
 addlib ./build/backend_sgx.a
 addlib ./build/datastore_flat.a
 addlib ./build/datastore_twolevel.a
