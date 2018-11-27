@@ -98,7 +98,7 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 {
     struct metadata_info * info = NULL;
 
-    nexus_io_flags_t       flags;
+    nexus_io_flags_t       flags = 0;
 
     uint8_t              * addr = nexus_heap_malloc(global_heap, size);
 
