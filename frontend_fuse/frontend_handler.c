@@ -80,8 +80,6 @@ __derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode
     posix_stat->st_mode = (stat_info->mode | file_type);
 
     posix_stat->st_ino = nexus_uuid_hash(&stat_info->uuid);
-
-    // FIXME: what about st_blocks (amount of disk space in units of 512-byte blocks
 }
 
 int
@@ -410,7 +408,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
                          chunk->base,
                          chunk->size,
                          file_ptr->filesize)) {
-        log_error("nexus_fs_decrypt() failed (offset=%zu, file=%s)\n", chunk->base, file_ptr->filepath);
+        log_error("nexus_fs_decrypt() failed (offset=%zu, size=%zu)\n", chunk->base, chunk->size);
         goto out_err;
     }
 
@@ -481,8 +479,8 @@ nexus_fuse_store(struct my_file * file_ptr)
     }
 
 
-    // printf("file written (%s) filepath=%s, filesize=%zu\n",
-    //         file_handle->filepath, file_ptr->filepath, file_ptr->filesize);
+    // printf("file stored (%s) filepath=%s [fid=%d], filesize=%zu\n",
+    //         file_handle->filepath, file_ptr->filepath, file_ptr->fid, file_ptr->filesize);
 
     nexus_datastore_fclose(datastore, file_handle);
 

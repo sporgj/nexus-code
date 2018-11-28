@@ -118,10 +118,14 @@ dentry_set_name(struct my_dentry * dentry, const char * name)
 void
 dentry_invalidate(struct my_dentry * dentry)
 {
-    if (dentry->inode) {
+    struct my_inode * inode = dentry->inode;
+
+    if (inode) {
+        pthread_mutex_lock(&inode->dentry_lock);
         dentry->inode->dentry_count -= 1;
         list_del(&dentry->aliases);
         dentry->inode = NULL;
+        pthread_mutex_unlock(&inode->dentry_lock);
 
         // TODO add to invalid list
     }
@@ -137,8 +141,11 @@ dentry_instantiate(struct my_dentry * dentry, struct my_inode * inode)
 {
     dentry->inode = inode;
 
+    pthread_mutex_lock(&inode->dentry_lock);
     list_add_tail(&dentry->aliases, &inode->dentry_list);
     inode->dentry_count += 1;
+    pthread_mutex_unlock(&inode->dentry_lock);
+
     dentry_get(dentry);
 }
 
