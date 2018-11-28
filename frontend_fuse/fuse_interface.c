@@ -722,6 +722,8 @@ nxs_fuse_rename(fuse_req_t   req,
         vfs_forget_dentry(src_dentry, (char *)name);
     }
 
+    fuse_reply_err(req, 0);
+
     code = 0;
 out_err:
     if (src_inode) {
