@@ -89,7 +89,8 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_dirent_type_t dirent_type)
         log_error("could not lock metadata file\n");
         return NULL;
     }
-
+    
+    ocall_print2(NULL);
 
     metadata_type = (dirent_type == NEXUS_DIR) ? NEXUS_DIRNODE : NEXUS_FILENODE;
 
