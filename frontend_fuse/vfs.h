@@ -153,7 +153,7 @@ vfs_get_inode(fuse_ino_t ino);
 
 
 struct my_file *
-vfs_file_alloc(struct my_dentry * dentry);
+vfs_file_alloc(struct my_dentry * dentry, int flags);
 
 void
 vfs_file_free(struct my_file * file_ptr);
@@ -210,13 +210,13 @@ file_write(struct my_file * file_ptr,
            size_t         * bytes_written);
 
 struct my_file *
-file_open(struct my_dentry * dentry, int fid);
+file_open(struct my_dentry * dentry, int fid, int flags);
 
 void
 file_close(struct my_file * file_ptr);
 
 
-// 
+//
 // dentry.c
 //
 

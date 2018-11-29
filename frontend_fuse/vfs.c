@@ -17,7 +17,7 @@ static struct my_dentry       * root_dentry      = NULL;
 static struct my_inode        * root_inode       = NULL;
 
 
-static int file_counter = 0;
+static int                      vfs_file_counter = 0;
 
 
 static struct my_inode *
@@ -314,9 +314,16 @@ file_set_dirty(struct my_file * file_ptr)
 
 // TODO add file to list of open files
 struct my_file *
-vfs_file_alloc(struct my_dentry * dentry)
+vfs_file_alloc(struct my_dentry * dentry, int flags)
 {
-    return file_open(dentry, ++file_counter);
+    struct my_file * file_ptr = NULL;
+
+    pthread_mutex_lock(&icache_mutex);
+    vfs_file_counter += 1;
+    file_ptr = file_open(dentry, vfs_file_counter, flags);
+    pthread_mutex_unlock(&icache_mutex);
+
+    return file_ptr;
 }
 
 void

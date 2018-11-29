@@ -390,7 +390,7 @@ nxs_fuse_create(
     }
 
 
-    file_ptr = vfs_file_alloc(new_dentry);
+    file_ptr = vfs_file_alloc(new_dentry, fi->flags);
 
     if (file_ptr == NULL) {
         log_error("could not create vfs file\n");
@@ -467,7 +467,7 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto out_err;
     }
 
-    file_ptr = vfs_file_alloc(dentry);
+    file_ptr = vfs_file_alloc(dentry, fi->flags);
 
     if (file_ptr == NULL) {
         code = ENOENT;

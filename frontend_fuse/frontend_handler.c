@@ -381,6 +381,9 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
 
+    size_t nbytes = 0;
+    size_t size   = 0;
+
 
     file_handle = nexus_datastore_fopen(datastore, &file_ptr->inode->uuid, NULL, NEXUS_FREAD);
 
@@ -393,13 +396,17 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
         lseek(file_handle->fd, chunk->base, SEEK_SET);
     }
 
-    size_t nbytes = read(file_handle->fd, encrypted_buffer, chunk->size);
+    size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - chunk->base);
 
-    if (nbytes != chunk->size) {
+    nbytes = read(file_handle->fd, encrypted_buffer, size);
+
+    if (nbytes != size) {
         log_error("fetching chunk %zu file='%s' (tried=%zu, got=%zu)\n",
-                  chunk->index, file_handle->filepath, chunk->size, nbytes);
+                  chunk->index, file_handle->filepath, size, nbytes);
         goto out_err;
     }
+
+    chunk->size = size;
 
     if (nexus_fs_decrypt(nexus_fuse_volume,
                          file_ptr->filepath,
@@ -457,12 +464,14 @@ nexus_fuse_store(struct my_file * file_ptr)
     list_for_each(chunk_iter, &file_ptr->file_chunks) {
         struct file_chunk * chunk = list_entry(chunk_iter, struct file_chunk, node);
 
+        size_t size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - chunk->base);
+
         if (nexus_fs_encrypt(nexus_fuse_volume,
                              file_ptr->filepath,
                              chunk->buffer,
                              encrypted_buffer,
                              chunk->base,
-                             chunk->size,
+                             size,
                              file_ptr->filesize)) {
             log_error("could not encrypt the buffer\n");
             goto out_err;
@@ -472,8 +481,8 @@ nexus_fuse_store(struct my_file * file_ptr)
 
         size_t nbytes = write(file_handle->fd, encrypted_buffer, chunk->size);
 
-        if (nbytes != chunk->size) {
-            log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, chunk->size, nbytes);
+        if (nbytes != size) {
+            log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, size, nbytes);
             goto out_err;
         }
     }

@@ -101,6 +101,17 @@ __file_try_add_chunk(struct my_file * file_ptr, size_t offset)
 
     chunk = __alloc_file_chunk(get_base_offset(offset));
 
+    // if we are not at the end of the file and we have read mode on
+    if (offset < file_ptr->filesize && file_ptr->flags & O_RDONLY) {
+        chunk->size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - offset);
+
+        if (nexus_fuse_fetch_chunk(file_ptr, chunk)) {
+            __free_file_chunk(chunk);
+            log_error("nexus_fuse_fetch_chunk FAILED\n");
+            return NULL;
+        }
+    }
+
     list_add_tail(&chunk->node, &file_ptr->file_chunks);
 
     file_ptr->chunk_count += 1;
@@ -228,8 +239,8 @@ file_write(struct my_file * file_ptr,
     file_set_dirty(file_ptr);
 
 
-    printf("file write filepath=%s [%d], offset=%zu, bytes_written=%zu, filesize=%zu\n",
-            file_ptr->filepath, file_ptr->fid, offset, *bytes_written, file_ptr->filesize);
+    // printf("file write filepath=%s [%d], offset=%zu, bytes_written=%zu, filesize=%zu\n",
+    //         file_ptr->filepath, file_ptr->fid, offset, *bytes_written, file_ptr->filesize);
 
     pthread_rwlock_unlock(&file_ptr->io_lock);
 
@@ -237,11 +248,12 @@ file_write(struct my_file * file_ptr,
 }
 
 struct my_file *
-file_open(struct my_dentry * dentry, int fid)
+file_open(struct my_dentry * dentry, int fid, int flags)
 {
     struct my_file * file_ptr = nexus_malloc(sizeof(struct my_file));
 
     file_ptr->fid      = fid;
+    file_ptr->flags    = flags;
 
     file_ptr->dentry   = dentry_get(dentry);
     file_ptr->filepath = dentry_get_fullpath(dentry);
