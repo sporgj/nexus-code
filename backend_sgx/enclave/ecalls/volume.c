@@ -122,6 +122,9 @@ ecall_create_volume(char                    * user_pubkey_IN,
 
         key_buffer_free(key_buffer);
     }
+    
+    //Stash Verifier INIT
+    stashv_init(supernode_uuid_out);
 
     ret = 0;
 out:

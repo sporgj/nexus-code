@@ -2,7 +2,7 @@
 /* Responsible for verifying the returned file versions */
 
 #include <nexus_hashtable.h>
-#include "internal.h"
+#include "enclave_internal.h"
 
 #define HASHTABLE_SIZE 127
 
@@ -22,27 +22,52 @@ struct stash_verifier {
 //};
 
 /* 
- * Initialized the stash verifier, loads the stash file
+ * Initialize the stash verifier, loads the stash file
  * of the volume from untrusted memory
  */
 int
-stashv_init(void *u_ptr) {
+stashv_init(nexus_uuid *vol_ptr) {
 
-    if (u_ptr == NULL) {
+    if (u_ptr != NULL) {
+        
+        //int err = -1;
+        //int ret = -1;
+        int size = 0;
+        
+        void *d_ptr;
+        
+        //Make ocall to load the stash file for the volume
+        //ret = ocall_stash_get(vol_ptr, d_ptr, &size);
+        
+        if (ocall_stash_get(vol_ptr, d_ptr, &size)) {
+            log_error("ocall_stash_get FAILED\n");
+            return -1;
+        }
+        
+        if(d_ptr == NULL) {
+            log_error("ocall_stash_get FAILED d_ptr issue");
+            return -1;
+        }
+        
         //create stash file for the volume if it does not exist
         stashv = nexus_malloc(sizeof (struct stash_verifier));
+        
+        memcpy(stashv->stash_table, d_ptr, size);
+        
+        
 
-        stash_verifier->stash_table = nexus_create_htable(HASHTABLE_SIZE,
-                __uuid_hasher,
-                __uuid_equals);
+//        stashv->stash_table = nexus_create_htable(HASHTABLE_SIZE,
+//                __uuid_hasher,
+//                __uuid_equals);
 
-        if (stash_verifier->stash_table == NULL) {
+        if (stashv->stash_table == NULL) {
             nexus_free(stashv);
             log_error("nexus_create_htable FAILED\n");
             return -1;
         }
     } else {
-        //load stash table TODO
+        //need volume info
+        return -1;
     }
     return 0;
 }
@@ -55,11 +80,12 @@ int
 stashv_add(struct nexus_uuid *uuid) {
 
     nexus_htable_insert(stashv->stash_table, uuid->raw, (uintptr_t) 0);
+    stashv_flush();
     return 0;
 }
 
 /* 
- * Verifies the returned version of the
+ * Verifies the returned version of the 
  * file with the last seen version and if
  * the returned version if less than the seen
  * version update the stash file
@@ -97,9 +123,20 @@ stashv_delete(struct nexus_uuid *uuid) {
  * to stash file
  */
 int
-stashv_flush() {
+stashv_flush(int op, nexus_uuid *uuid, uint32_t version) {
+    
+    //int err = -1;
+    //int ret = -1;
 
     //serialize_table(table);
+    
+    //ret = ocall_stash_update(op, uuid, version);
+    
+    if (ocall_stash_update(op, uuid, version)) {
+        log_error("ocall_stash_update FAILED\n");
+        return -1;
+    }
+    
     return 0;
 }
 

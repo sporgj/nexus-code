@@ -313,6 +313,10 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * crypto_buf,
             goto err;
         }
     }
+    
+    if(stashv_check_update(crypto_buf->uuid, crypto_buf->version) == -1) {
+        log_error("stash_verification FAILED\n");
+    }
 
 
     nexus_free(buf_hdr);
@@ -465,6 +469,10 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
 
     /* Finally copy the header out to the external buffer */
     memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
+    
+    if(stashv_check_update(crypto_buf->uuid, crypto_buf->version) == -1) {
+        log_error("stash_verification FAILED\n");
+    }
 
 
     ret = buffer_layer_put(&crypto_buf->uuid);

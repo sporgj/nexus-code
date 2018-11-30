@@ -185,6 +185,11 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
     dentry_delete_child(metadata->dentry, filename_IN);
 
     ret = __nxs_fs_remove(metadata, filename_IN, &entry_uuid);
+    
+    if(stashv_delete(uuid_out) == -1) {
+        log_error("Stash remove FAILED\n");
+        return -1;
+    }
 
     if (ret != 0) {
         log_error("__nxs_fs_remove() FAILED\n");
