@@ -1,6 +1,11 @@
 #pragma once
 #include <nexus_uuid.h>
 
+/**
+ * The buffer layer handles all the metadata operations with untrusted
+ * code.
+ */
+
 int
 buffer_layer_init();
 
