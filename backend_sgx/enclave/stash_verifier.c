@@ -6,6 +6,12 @@
 
 #define HASHTABLE_SIZE 127
 
+typedef enum {
+    NEXUS_STASH_UPDATE = 0,
+    NEXUS_STASH_REMOVE = 1,
+    NEXUS_STASH_ADD    = 2
+} nexus_dentry_type_t;
+
 struct stash_verifier * stashv;
 
 struct stash_verifier {
@@ -52,6 +58,8 @@ stashv_init(nexus_uuid *vol_ptr) {
         //create stash file for the volume if it does not exist
         stashv = nexus_malloc(sizeof (struct stash_verifier));
         
+        stashv->stash_table = nexus_malloc(size);
+        
         memcpy(stashv->stash_table, d_ptr, size);
         
         
@@ -80,7 +88,10 @@ int
 stashv_add(struct nexus_uuid *uuid) {
 
     nexus_htable_insert(stashv->stash_table, uuid->raw, (uintptr_t) 0);
-    stashv_flush();
+    if(stashv_flush(2, uuid, NULL) == -1) {
+        log_error("stash_flush FAILED\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -97,7 +108,10 @@ stashv_check_update(struct nexus_uuid *uuid, uint32_t version) {
     if (seen_version < version) {
         nexus_htable_insert(stashv->stash_table, uuid->raw, version);
         //table.update(uuid, version);
-        stashv_flush();
+        if(stashv_flush(0, uuid, version) == -1) {
+            log_error("stash_flush FAILED\n");
+            return -1;
+        }
         return 0;
     } else if (seen_version == version) {
         return 0;
@@ -114,6 +128,10 @@ stashv_delete(struct nexus_uuid *uuid) {
 
     //What is free key?
     nexus_htable_remove(stashv->stash_table, uuid->raw, 1);
+    if(stashv_flush(1, uuid, NULL) == -1) {
+        log_error("stash_flush FAILED\n");
+        return -1;
+    }
     //table.remove(uuid);
     return 0;
 }
