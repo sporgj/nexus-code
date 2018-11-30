@@ -19,6 +19,7 @@ exec_objs := \
 	dentry.o \
 	fuse_interface.o \
 	frontend_handler.o \
+	io.o \
 	main.o
 
 execs := nexus-fuse

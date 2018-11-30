@@ -52,7 +52,6 @@ nexus_file_handle_open(char * filepath, nexus_io_flags_t mode)
     if (file_handle->fd < 0) {
         nexus_free(file_handle);
         log_error("could not open file (%s)\n", filepath);
-        perror("could not open:");
         return NULL;
     }
 
