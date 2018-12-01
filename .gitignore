@@ -18,3 +18,5 @@ afs_frontend/nexus-afs
 nexus-afs
 nexus
 nx-create-volume
+nbproject/
+.gitignore
