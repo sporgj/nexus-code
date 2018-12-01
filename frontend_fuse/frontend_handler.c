@@ -80,8 +80,6 @@ __derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode
     posix_stat->st_mode = (stat_info->mode | file_type);
 
     posix_stat->st_ino = nexus_uuid_hash(&stat_info->uuid);
-
-    // FIXME: what about st_blocks (amount of disk space in units of 512-byte blocks
 }
 
 int
@@ -383,6 +381,9 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
 
+    size_t nbytes = 0;
+    size_t size   = 0;
+
 
     file_handle = nexus_datastore_fopen(datastore, &file_ptr->inode->uuid, NULL, NEXUS_FREAD);
 
@@ -395,13 +396,17 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
         lseek(file_handle->fd, chunk->base, SEEK_SET);
     }
 
-    size_t nbytes = read(file_handle->fd, encrypted_buffer, chunk->size);
+    size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - chunk->base);
 
-    if (nbytes != chunk->size) {
+    nbytes = read(file_handle->fd, encrypted_buffer, size);
+
+    if (nbytes != size) {
         log_error("fetching chunk %zu file='%s' (tried=%zu, got=%zu)\n",
-                  chunk->index, file_handle->filepath, chunk->size, nbytes);
+                  chunk->index, file_handle->filepath, size, nbytes);
         goto out_err;
     }
+
+    chunk->size = size;
 
     if (nexus_fs_decrypt(nexus_fuse_volume,
                          file_ptr->filepath,
@@ -410,7 +415,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
                          chunk->base,
                          chunk->size,
                          file_ptr->filesize)) {
-        log_error("nexus_fs_decrypt() failed (offset=%zu, file=%s)\n", chunk->base, file_ptr->filepath);
+        log_error("nexus_fs_decrypt() failed (offset=%zu, size=%zu)\n", chunk->base, chunk->size);
         goto out_err;
     }
 
@@ -459,12 +464,14 @@ nexus_fuse_store(struct my_file * file_ptr)
     list_for_each(chunk_iter, &file_ptr->file_chunks) {
         struct file_chunk * chunk = list_entry(chunk_iter, struct file_chunk, node);
 
+        size_t size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - chunk->base);
+
         if (nexus_fs_encrypt(nexus_fuse_volume,
                              file_ptr->filepath,
                              chunk->buffer,
                              encrypted_buffer,
                              chunk->base,
-                             chunk->size,
+                             size,
                              file_ptr->filesize)) {
             log_error("could not encrypt the buffer\n");
             goto out_err;
@@ -474,15 +481,15 @@ nexus_fuse_store(struct my_file * file_ptr)
 
         size_t nbytes = write(file_handle->fd, encrypted_buffer, chunk->size);
 
-        if (nbytes != chunk->size) {
-            log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, chunk->size, nbytes);
+        if (nbytes != size) {
+            log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, size, nbytes);
             goto out_err;
         }
     }
 
 
-    // printf("file written (%s) filepath=%s, filesize=%zu\n",
-    //         file_handle->filepath, file_ptr->filepath, file_ptr->filesize);
+    // printf("file stored (%s) filepath=%s [fid=%d], filesize=%zu\n",
+    //         file_handle->filepath, file_ptr->filepath, file_ptr->fid, file_ptr->filesize);
 
     nexus_datastore_fclose(datastore, file_handle);
 
