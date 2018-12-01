@@ -34,7 +34,7 @@ struct stash_verifier {
 int
 stashv_init(nexus_uuid *vol_ptr) {
 
-    if (u_ptr != NULL) {
+    if (vol_ptr != NULL) {
         
         //int err = -1;
         //int ret = -1;
@@ -60,19 +60,17 @@ stashv_init(nexus_uuid *vol_ptr) {
         
         stashv->stash_table = nexus_malloc(size);
         
-        memcpy(stashv->stash_table, d_ptr, size);
-        
-        
-
-//        stashv->stash_table = nexus_create_htable(HASHTABLE_SIZE,
-//                __uuid_hasher,
-//                __uuid_equals);
-
         if (stashv->stash_table == NULL) {
             nexus_free(stashv);
             log_error("nexus_create_htable FAILED\n");
             return -1;
         }
+        
+        memcpy(stashv->stash_table, d_ptr, size);        
+
+//        stashv->stash_table = nexus_create_htable(HASHTABLE_SIZE,
+//                __uuid_hasher,
+//                __uuid_equals);
     } else {
         //need volume info
         return -1;
