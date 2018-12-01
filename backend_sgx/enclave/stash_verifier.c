@@ -87,7 +87,7 @@ stashv_init(nexus_uuid *vol_ptr) {
 int
 stashv_add(struct nexus_uuid *uuid) {
 
-    nexus_htable_insert(stashv->stash_table, uuid->raw, (uintptr_t) 0);
+    nexus_htable_insert(stashv->stash_table, uuid, (uintptr_t) 0);
     if(stashv_flush(2, uuid, NULL) == -1) {
         log_error("stash_flush FAILED\n");
         return -1;
@@ -104,9 +104,9 @@ stashv_add(struct nexus_uuid *uuid) {
 int
 stashv_check_update(struct nexus_uuid *uuid, uint32_t version) {
 
-    uint32_t seen_version = nexus_htable_search(stashv->stash_table, uuid->raw);
+    uint32_t seen_version = nexus_htable_search(stashv->stash_table, uuid);
     if (seen_version < version) {
-        nexus_htable_insert(stashv->stash_table, uuid->raw, version);
+        nexus_htable_insert(stashv->stash_table, uuid, version);
         //table.update(uuid, version);
         if(stashv_flush(0, uuid, version) == -1) {
             log_error("stash_flush FAILED\n");
@@ -127,7 +127,7 @@ int
 stashv_delete(struct nexus_uuid *uuid) {
 
     //What is free key?
-    nexus_htable_remove(stashv->stash_table, uuid->raw, 1);
+    nexus_htable_remove(stashv->stash_table, uuid, 1);
     if(stashv_flush(1, uuid, NULL) == -1) {
         log_error("stash_flush FAILED\n");
         return -1;
