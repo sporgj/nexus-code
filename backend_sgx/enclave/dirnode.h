@@ -28,6 +28,8 @@ struct __dir_rec {
     struct nexus_uuid   link_uuid;
 
     uint16_t            name_len;
+    
+    struct nexus_mac    link_mac;
 
     struct nexus_mac    link_mac;
 
