@@ -28,6 +28,8 @@ struct __dir_rec {
     struct nexus_uuid   link_uuid;
 
     uint16_t            name_len;
+    
+    struct nexus_mac    link_mac;
 
     char                name[NEXUS_NAME_MAX]; // XXX: waste of space...
 } __attribute__((packed));

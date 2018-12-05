@@ -7,10 +7,10 @@ struct nexus_mac * root_mac;
 
 /* 
  * Initializes the merkle hash tree, by loading
- * from hash file
+ * the hash file
  */
 int
-stashv_init(nexus_uuid *vol_ptr) {
+merkle_init(nexus_uuid *vol_ptr) {
 
     if (vol_ptr != NULL) {
         int size = 0;
@@ -40,4 +40,19 @@ stashv_init(nexus_uuid *vol_ptr) {
         return -1;
     }
     return 0;
+}
+
+/* 
+ * Updates mac value of the modified node in the
+ * parent.
+ */
+int
+merkle_update(struct nexus_uuid node_uuid) {
+    while(!isNodeRoot(node_uuid)) {
+        struct nexus_uuid parent_uuid = getParent(node_uuid);
+        
+        //TODO: How to get the mac? Depends on the hooks
+        update_dir_rec(parent_uuid, node_uuid);
+        node_uuid = parent_uuid;
+    }
 }
