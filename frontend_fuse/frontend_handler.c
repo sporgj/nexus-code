@@ -61,9 +61,6 @@ nexus_fuse_stat(struct my_dentry * dentry, nexus_stat_flags_t stat_flags, struct
 static void
 __derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode_t file_type)
 {
-    // make sure st.st_size contains the info returned from the backend
-    // posix_stat->st_size = stat_info->size;
-
     switch (stat_info->type) {
     case NEXUS_REG:
         posix_stat->st_nlink = stat_info->link_count;

@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <sgx_spinlock.h>
+
 #include <assert.h>
 
 #include <sgx_trts.h>
@@ -88,6 +90,9 @@ extern nexus_uid_t                   global_user_id;
 
 extern size_t                        global_chunk_size;
 extern size_t                        global_log2chunk_size;
+
+
+extern sgx_spinlock_t                vfs_ops_lock;
 
 
 /**

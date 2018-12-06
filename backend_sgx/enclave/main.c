@@ -12,6 +12,7 @@ struct nexus_heap   * global_heap               = NULL;
 
 nexus_uid_t           global_user_id            = NEXUS_INVALID_USER_ID;
 
+sgx_spinlock_t        vfs_ops_lock              = SGX_SPINLOCK_INITIALIZER;
 
 
 void

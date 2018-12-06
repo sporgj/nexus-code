@@ -218,6 +218,28 @@ handle_fs_create(int argc, char ** argv)
 }
 
 static int
+handle_fs_remove(int argc, char ** argv)
+{
+    char * filepath = NULL;
+
+    if (argc < 1) {
+        usage("fs_remove");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    filepath = strndup(argv[0], NEXUS_PATH_MAX);
+
+    ret = __fs_remove(mounted_volume, filepath);
+
+    nexus_free(filepath);
+
+    return ret;
+}
+
+static int
 handle_fs_mkdir(int argc, char ** argv)
 {
     char * dirpath = NULL;
@@ -525,7 +547,8 @@ static struct _cmd cmds[]
         { "user_findname", handle_user_findname, "Find user by name", "<username>" },
         { "user_findkey", handle_user_findkey, "Find user by pubkey", "<pubkey_file>" },
 
-        { "fs_create", handle_fs_create, "Create a new file", "<filepath>" },
+        { "fs_create", handle_fs_create, "Creates a new file", "<filepath>" },
+        { "fs_remove", handle_fs_remove, "Deletes a new file", "<filepath>" },  // FIXME: change to "fs_delete"
         { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
         { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
         { "fs_fstat", handle_fs_fstat, "Get file attributes", "<path>" },

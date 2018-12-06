@@ -1,17 +1,27 @@
 #pragma once
 
+#include <sgx_spinlock.h>
+
 #include <nexus_uuid.h>
 
 
 struct nexus_metadata;
 
+
+typedef enum {
+    DENTRY_PARENT_CHANGED  = 0x0001,
+    DENTRY_DELETED         = 0x0002
+} dcache_flags_t;
+
 struct nexus_dentry {
     nexus_dirent_type_t         dirent_type;
 
-    char                      * name;
-    size_t                      name_len;
+    dcache_flags_t              flags;
 
-    char                      * symlink_target;
+    size_t                      d_count;
+
+    char                        name[NEXUS_NAME_MAX];
+    size_t                      name_len;
 
     struct nexus_uuid           link_uuid;
 
@@ -19,8 +29,15 @@ struct nexus_dentry {
     struct nexus_metadata     * metadata;
 
     struct list_head            children;
+
     struct list_head            siblings;
+
+    struct list_head            aliases; // other hardlinks
 };
+
+
+
+extern struct nexus_dentry      * root_dentry;
 
 
 typedef enum {
@@ -38,9 +55,20 @@ struct path_walker {
     path_walk_type_t      type;
 };
 
+// initializes the root dentry
+void
+dcache_init_root();
+
+
+struct nexus_dentry *
+dentry_get(struct nexus_dentry * dentry);
+
+void
+dentry_put(struct nexus_dentry * dentry);
+
 
 int
-revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags);
+dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags);
 
 /**
  * Performs a dentry lookups

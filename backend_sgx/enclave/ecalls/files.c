@@ -135,13 +135,21 @@ ecall_fs_encrypt(char    * filepath_IN,
                  size_t    size,
                  size_t    filesize)
 {
-    return __nxs_fs_crypto(filepath_IN,
+    int ret = -1;
+
+    sgx_spin_lock(&vfs_ops_lock);
+
+    ret  = __nxs_fs_crypto(filepath_IN,
                            input_buffer_in,
                            output_buffer_in,
                            offset,
                            size,
                            filesize,
                            NEXUS_ENCRYPT);
+
+    sgx_spin_unlock(&vfs_ops_lock);
+
+    return ret;
 }
 
 int
@@ -152,13 +160,21 @@ ecall_fs_decrypt(char    * filepath_IN,
                  size_t    size,
                  size_t    filesize)
 {
-    return __nxs_fs_crypto(filepath_IN,
+    int ret = -1;
+
+    sgx_spin_lock(&vfs_ops_lock);
+
+    ret  = __nxs_fs_crypto(filepath_IN,
                            input_buffer_in,
                            output_buffer_in,
                            offset,
                            size,
                            filesize,
                            NEXUS_DECRYPT);
+
+    sgx_spin_unlock(&vfs_ops_lock);
+
+    return ret;
 }
 
 int
@@ -168,8 +184,13 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
     struct nexus_filenode * filenode = NULL;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
+    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+
     if (metadata == NULL) {
         log_error("could not get metadata (%s)\n", filepath_IN);
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -182,12 +203,14 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
     if (nexus_metadata_store(metadata)) {
         nexus_vfs_put(metadata);
         log_error("nexus_metadata_store FAILED\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
     filenode_export_stat(metadata->filenode, stat_out);
 
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return 0;
 }

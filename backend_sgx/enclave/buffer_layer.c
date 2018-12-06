@@ -17,6 +17,8 @@ struct metadata_buffer {
 /* the buffer cache is a hashatable of <uuid, metadata_buffer> pairs */
 static struct nexus_hashtable * buffer_cache = NULL;
 
+static sgx_spinlock_t           bcache_lock  = SGX_SPINLOCK_INITIALIZER;
+
 static size_t                   buffer_count = 0;
 
 
@@ -25,6 +27,8 @@ static struct metadata_buffer *
 __bcache_update(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t flags)
 {
     struct metadata_buffer * metadata_buf = NULL;
+
+    sgx_spin_lock(&bcache_lock);
 
     metadata_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
 
@@ -38,6 +42,8 @@ __bcache_update(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t fla
         buffer_count += 1;
     }
 
+    sgx_spin_unlock(&bcache_lock);
+
     metadata_buf->timestamp = timestamp;
     metadata_buf->flags     = flags;
 
@@ -49,13 +55,15 @@ __bcache_evict(struct nexus_uuid * uuid)
 {
     struct metadata_buffer * meta_buf = NULL;
 
+    sgx_spin_lock(&bcache_lock);
     meta_buf = (struct metadata_buffer *)nexus_htable_remove(buffer_cache, (uintptr_t)uuid, 0);
 
     if (meta_buf) {
         nexus_free(meta_buf);
+        buffer_count -= 1;
     }
 
-    buffer_count -= 1;
+    sgx_spin_unlock(&bcache_lock);
 }
 
 int
@@ -178,7 +186,7 @@ buffer_layer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags)
     err = ocall_buffer_lock(&ret, uuid, flags, global_volume);
 
     if (err || ret) {
-        log_error("ocall_buffer_lock FAILED (err=%d, ret=%d)\n", err, ret);
+        log_error("ocall_bcache_lock FAILED (err=%d, ret=%d)\n", err, ret);
         return -1;
     }
 
