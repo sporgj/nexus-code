@@ -18,7 +18,7 @@ merkle_init(nexus_uuid *vol_ptr) {
 
     if (vol_ptr != NULL) {
         
-        root_mac = nexus_malloc(sizeof (struct nexus_mac));
+        //root_mac = nexus_malloc(sizeof (struct nexus_mac));
         
         //making an ocall to load vol merkle file
         int err = -1;
