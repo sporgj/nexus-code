@@ -326,7 +326,19 @@ nexus_metadata_unlock(struct nexus_metadata * metadata)
 
 int
 nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
-{
+{ 
+    return __nexus_metadata_verify_uuids(dentry);
+    
+    if(dentry->parent == NULL) {
+        //root
+        //merkle_verify(dentry, )
+    }
+    //return 0;
+}
+
+int
+__nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
+{ 
     // make sure the dentry's real uuid matches the metadata's uuid
     if (nexus_uuid_compare(&dentry->metadata->uuid, &dentry->link_uuid)) {
         return -1;
