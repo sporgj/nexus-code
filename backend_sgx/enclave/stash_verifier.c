@@ -79,7 +79,7 @@ int
 stashv_add(struct nexus_uuid *uuid) {
 
     nexus_htable_insert(stashv->stash_table, uuid, (uintptr_t) 0);
-    if(stashv_flush(2, uuid, NULL) == -1) {
+    if(stashv_flush(NEXUS_STASH_ADD, uuid, NULL) == -1) {
         log_error("stash_flush FAILED\n");
         return -1;
     }
@@ -116,7 +116,7 @@ stashv_check_update(struct nexus_uuid *uuid, uint32_t version) {
     if (seen_version < version) {
         nexus_htable_insert(stashv->stash_table, uuid, version);
         //table.update(uuid, version);
-        if(stashv_flush(0, uuid, version) == -1) {
+        if(stashv_flush(NEXUS_STASH_UPDATE, uuid, version) == -1) {
             log_error("stash_flush FAILED\n");
             return -1;
         }
@@ -136,7 +136,7 @@ stashv_delete(struct nexus_uuid *uuid) {
 
     //What is free key?
     nexus_htable_remove(stashv->stash_table, uuid, 1);
-    if(stashv_flush(1, uuid, NULL) == -1) {
+    if(stashv_flush(NEXUS_STASH_REMOVE, uuid, NULL) == -1) {
         log_error("stash_flush FAILED\n");
         return -1;
     }
@@ -151,17 +151,27 @@ stashv_delete(struct nexus_uuid *uuid) {
 int
 stashv_flush(int op, struct nexus_uuid *uuid, uint32_t version) {
     
-    //int err = -1;
-    //int ret = -1;
+    int err = -1;
+    int ret = -1;
+        
+    if(op == NEXUS_STASH_ADD) {
+        err = ocall_stash_add(&ret, uuid, version);
+    } else if(op == NEXUS_STASH_REMOVE) {
+        err = ocall_stash_remove(&ret, uuid);
+    } else if(op == NEXUS_STASH_UPDATE) {
+        err = ocall_stash_update(&ret, uuid, version);
+    }
+    //err = ocall_stash_update(&ret, op, uuid, version);
 
-    //serialize_table(table);
-    
-    //ret = ocall_stash_update(op, uuid, version);
-    
-    if (ocall_stash_update(op, uuid, version)) {
-        log_error("ocall_stash_update FAILED\n");
+    if (err || ret) {
+        log_error("ocall_stash_update FAILED (err=%d, ret=%d)\n", err, ret);
         return -1;
     }
+    
+//    if (ocall_stash_update(op, uuid, version)) {
+//        log_error("ocall_stash_update FAILED\n");
+//        return -1;
+//    }
     
     return 0;
 }
