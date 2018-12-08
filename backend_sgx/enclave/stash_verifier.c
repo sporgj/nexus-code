@@ -20,13 +20,6 @@ struct stash_verifier {
     size_t table_size;
 };
 
-//struct object_stash {
-//    struct nexus_uuid uuid;
-//
-//    uint32_t version;
-//
-//};
-
 /* 
  * Initialize the stash verifier, loads the stash file
  * of the volume from untrusted memory
@@ -36,15 +29,15 @@ stashv_init(struct nexus_uuid *vol_ptr) {
 
     if (vol_ptr != NULL) {
         
-//        int err = -1;
-//        int ret = -1;
-//
-//        err = ocall_stash_load(&ret, vol_ptr);
-//
-//        if (err || ret) {
-//            log_error("stashv_init FAILED (err=%d, ret=%d)\n", err, ret);
-//            return -1;
-//        }
+        int err = -1;
+        int ret = -1;
+
+        err = ocall_stash_load(&ret, vol_ptr);
+
+        if (err || ret) {
+            log_error("stashv_init FAILED (err=%d, ret=%d)\n", err, ret);
+            return -1;
+        }
         
         stashv = nexus_malloc(sizeof (struct stash_verifier));
         
@@ -58,11 +51,9 @@ stashv_init(struct nexus_uuid *vol_ptr) {
             return -1;
         }
         
-        //memcpy(stashv->stash_table, d_ptr, size);        
-
-//        stashv->stash_table = nexus_create_htable(HASHTABLE_SIZE,
-//                __uuid_hasher,
-//                __uuid_equals);
+        stashv->stash_table = nexus_create_htable(HASHTABLE_SIZE,
+                __uuid_hasher,
+                __uuid_equals);
     } else {
         //need volume info
         log_error("stashv_init FAILED\n");
@@ -97,17 +88,17 @@ stashv_check_update(struct nexus_uuid *uuid, uint32_t version) {
 
     uint32_t seen_version = nexus_htable_search(stashv->stash_table, uuid);
     if(seen_version == NULL) {
-//        int err = -1;
-//        int ret = -1;
-//        
+        int err = -1;
+        int ret = -1;
+        
         uint32_t saved_version = 0;
-//
-//        err = ocall_stash_get(&ret, uuid, &saved_version);
-//
-//        if (err || ret) {
-//            log_error("stashv_check_update FAILED (err=%d, ret=%d)\n", err, ret);
-//            return -1;
-//        }
+
+        err = ocall_stash_get(&ret, uuid, &saved_version);
+
+        if (err || ret) {
+            log_error("stashv_check_update FAILED (err=%d, ret=%d)\n", err, ret);
+            return -1;
+        }
         
         seen_version = saved_version;
         
@@ -140,7 +131,6 @@ stashv_delete(struct nexus_uuid *uuid) {
         log_error("stash_flush FAILED\n");
         return -1;
     }
-    //table.remove(uuid);
     return 0;
 }
 
@@ -151,27 +141,21 @@ stashv_delete(struct nexus_uuid *uuid) {
 int
 stashv_flush(int op, struct nexus_uuid *uuid, uint32_t version) {
     
-//    int err = -1;
-//    int ret = -1;
-//        
-//    if(op == NEXUS_STASH_ADD) {
-//        err = ocall_stash_add(&ret, uuid, version);
-//    } else if(op == NEXUS_STASH_REMOVE) {
-//        err = ocall_stash_remove(&ret, uuid);
-//    } else if(op == NEXUS_STASH_UPDATE) {
-//        err = ocall_stash_update(&ret, uuid, version);
-//    }
-//    //err = ocall_stash_update(&ret, op, uuid, version);
-//
-//    if (err || ret) {
-//        log_error("ocall_stash_update FAILED (err=%d, ret=%d)\n", err, ret);
-//        return -1;
-//    }
-    
-//    if (ocall_stash_update(op, uuid, version)) {
-//        log_error("ocall_stash_update FAILED\n");
-//        return -1;
-//    }
+    int err = -1;
+    int ret = -1;
+        
+    if(op == NEXUS_STASH_ADD) {
+        err = ocall_stash_add(&ret, uuid, version);
+    } else if(op == NEXUS_STASH_REMOVE) {
+        err = ocall_stash_remove(&ret, uuid);
+    } else if(op == NEXUS_STASH_UPDATE) {
+        err = ocall_stash_update(&ret, uuid, version);
+    }
+
+    if (err || ret) {
+        log_error("ocall_stash_update FAILED (err=%d, ret=%d)\n", err, ret);
+        return -1;
+    }
     
     return 0;
 }
@@ -186,58 +170,3 @@ stashv_exit() {
     nexus_free(stashv);
     return 0;
 }
-//uint32_t
-//get_version(uint32_t *uuid) {
-//
-//    char *token, *version;
-//
-//    char *search = ";";
-//
-//    static const char filename[] = "/tmp/file.txt";
-//    FILE *file = fopen(filename, "r");
-//    if (file != NULL) {
-//        char line [ 128 ];
-//        while (fgets(line, sizeof line, file) != NULL) {
-//            token = strtok(line, search);
-//            if (token == uuid) {
-//                version = strtok(NULL, search);
-//                break;
-//            }
-//        }
-//        fclose(file);
-//    }
-//    return *(uint32_t *) & version;
-//}
-
-
-
-
-
-
-//void
-//update_version(char *uuid, int version) {
-//    
-//}
-//
-//struct object_stash {
-//};
-//
-//uint8_t *
-//get_supernode_mac(struct nexus_metadata * key_encryption_key, struct nexus_key * secret_key) {
-//
-//}
-//
-//store_updated_version(UUID updated_object, int version) {
-//    //Load the stash file based on volume
-//    File stash_file = loadfile(vol_info);
-//
-//    // Find the UUID that needs to be changed
-//    UUID modified_uuid = search_file(updated_object);
-//
-//    //Update the version
-//
-//    //Write the file back
-//    saveFile();
-//}
-
-
