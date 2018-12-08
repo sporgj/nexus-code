@@ -153,6 +153,7 @@ int              nexus_json_get_array_len(nexus_json_obj_t arr);
 
 
 nexus_json_obj_t nexus_json_array_get_object(nexus_json_obj_t arr, int idx);
+nexus_json_obj_t nexus_json_array_get_child_by_index(nexus_json_obj_t obj, int idx);
 nexus_json_obj_t nexus_json_array_add_object(nexus_json_obj_t arr);
 
 
