@@ -63,7 +63,8 @@ objs := nexus_enclave_u.o \
 	quote.o \
 	rk_protocol.o \
 	rk_messages.o \
-	ocalls.o
+	ocalls.o \
+	ocalls_stash_verifier.o
 
 
 edl_src := nexus_enclave.edl

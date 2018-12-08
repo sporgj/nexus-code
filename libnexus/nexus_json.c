@@ -268,6 +268,20 @@ nexus_json_get_int(nexus_json_obj_t   obj,
     return 0;
 }
 
+nexus_json_obj_t
+nexus_json_array_get_child_by_index(nexus_json_obj_t arr, int idx)
+{
+    struct nx_json * tgt_obj = NULL;
+
+    tgt_obj = nx_json_get_item(arr, idx);
+
+    if (tgt_obj == NULL) {
+	return NEXUS_JSON_INVALID_OBJ;
+    }
+
+    return tgt_obj;
+}
+
 int
 nexus_json_get_double(nexus_json_obj_t   obj,
 		      char             * key,
