@@ -11,7 +11,7 @@
 
     "backend" : {
         "name" : "SGX",
-        "enclave_path": "/home/briand/nexus/build/nexus_enclave.signed.so"
+        "enclave_path": "/home/pranut/Projects/nexus-code/build/nexus_enclave.signed.so"
     }
 
 }

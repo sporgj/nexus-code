@@ -14,7 +14,7 @@ struct nexus_mac * root_mac;
  * the hash file
  */
 int
-merkle_init(nexus_uuid *vol_ptr) {
+merkle_init(struct nexus_uuid *vol_ptr) {
 
     if (vol_ptr != NULL) {
         
@@ -30,11 +30,6 @@ merkle_init(nexus_uuid *vol_ptr) {
             log_error("merkle_init FAILED (err=%d, ret=%d)\n", err, ret);
             return -1;
         }   
-        
-        if(d_ptr == NULL) {
-            log_error("ocall_merkle_get FAILED d_ptr issue");
-            return -1;
-        }
         
         if (root_mac == NULL) {
             log_error("root_mac malloc FAILED\n");
@@ -64,8 +59,8 @@ merkle_update(struct nexus_dentry *parent_dentry, struct nexus_uuid *child_uuid,
 
         list_for_each(curr, &parent->dirents_list) {
             struct dir_entry * dir_entry = __dir_entry_from_dirents_list(curr);
-            if(dir_entry->dir_rec->link_uuid == child_uuid) {
-                dir_entry->dir_rec->link_mac = child_mac;
+            if(nexus_uuid_compare(&(dir_entry->dir_rec.link_uuid), child_uuid)) {
+                dir_entry->dir_rec.link_mac = *child_mac;
                 break;
             }
         }

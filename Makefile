@@ -1,6 +1,6 @@
 include build.mk
 
-nexus_home := $(PWD)
+nexus_home := /home/pranut/Projects/nexus-code
 build_path := $(nexus_home)/build/
 
 nexus_frontends :=	shell \
@@ -48,12 +48,12 @@ all: mbedtls backends datastores libnexus_probes libnexus frontends
 
 frontends: $(nexus_frontends)
 
-$(nexus_frontends): libnexus
+$(nexus_frontends):
 	$(call build,BUILDING, make -C $@)
 
 backends: $(nexus_backends)
 
-$(nexus_backends): libnexus_probes
+$(nexus_backends):
 	$(call build,BUILDING, make -C $@)
 
 
@@ -64,7 +64,7 @@ $(nexus_datastores):
 	$(call build,BUILDING, make -C $@)
 
 
-libnexus: mbedtls
+libnexus:
 	$(call build,BUILDING, make -C $@)
 	$(call build,AR,$(AR) -M < libnexus.mri)
 
