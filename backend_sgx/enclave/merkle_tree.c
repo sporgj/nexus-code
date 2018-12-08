@@ -4,9 +4,16 @@
 
 #include "metadata.h"
 #include "dentry.h"
+#include "enclave_internal.h"
 
 
 struct nexus_mac * root_mac;
+
+static struct dir_entry *
+dir_entry_from_dirents_list(struct list_head * dent_ptr)
+{
+    return container_of(dent_ptr, struct dir_entry, dent_list);
+}
 
 
 /* 
@@ -24,16 +31,17 @@ merkle_init(struct nexus_uuid *vol_ptr) {
         int err = -1;
         int ret = -1;
 
-        err = ocall_merkle_init(&ret, vol_ptr, root_mac);
+        //BRIAND: The ocall is not ready yet, so commented it out for now
+        //err = ocall_merkle_init(&ret, vol_ptr, root_mac);
 
         if (err || ret) {
             log_error("merkle_init FAILED (err=%d, ret=%d)\n", err, ret);
-            return -1;
+            //return -1;
         }   
         
         if (root_mac == NULL) {
             log_error("root_mac malloc FAILED\n");
-            return -1;
+            //return -1;
         }
                 
     } else {
@@ -57,8 +65,9 @@ merkle_update(struct nexus_dentry *parent_dentry, struct nexus_uuid *child_uuid,
     
         struct list_head * curr = NULL;
 
+        //BRIAND: I am getting seg fault here, not sure what I did wrong
         list_for_each(curr, &parent->dirents_list) {
-            struct dir_entry * dir_entry = __dir_entry_from_dirents_list(curr);
+            struct dir_entry * dir_entry = dir_entry_from_dirents_list(curr);
             if(nexus_uuid_compare(&(dir_entry->dir_rec.link_uuid), child_uuid)) {
                 dir_entry->dir_rec.link_mac = *child_mac;
                 break;
@@ -72,12 +81,23 @@ merkle_update(struct nexus_dentry *parent_dentry, struct nexus_uuid *child_uuid,
         int err = -1;
         int ret = -1;
 
-        err = ocall_merkle_get(&ret, child_mac);
+        //err = ocall_merkle_get(&ret, child_mac);
 
         if (err || ret) {
             log_error("merkle_update FAILED (err=%d, ret=%d)\n", err, ret);
-            return -1;
+            //return -1;
         }   
     }
+    return 0;
+}
+
+//BRIAND: The code for verification goes here
+int
+merkle_verify(struct nexus_dentry *dentry, struct nexus_mac *mac) {
+    
+    //Need to first check if the dentry is root if it is then compare with
+    //global variable root mac else iteratively keep checking to verify
+    //structure of the file system
+    
     return 0;
 }
