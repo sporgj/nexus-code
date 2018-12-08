@@ -321,7 +321,7 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
         }
     }
 
-    if (stat_flags & NEXUS_STAT_FILE) {
+    if (stat_flags & NEXUS_STAT_FILE || nexus_stat_out->link_type != NEXUS_LNK) {
         struct nexus_metadata * metadata = nexus_vfs_complete_lookup(&walker, NEXUS_FREAD);
 
         if (metadata == NULL) {

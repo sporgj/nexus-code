@@ -1252,7 +1252,7 @@ dirnode_export_link_stat(struct nexus_dirnode * dirnode, char * name, struct nex
     } else {
         /* technically, the link size for files/dirs is the UUID they point to. */
         stat_out->link_size = sizeof(struct nexus_uuid);
-        stat_out->type = NEXUS_DIR;
+        stat_out->type = stat_out->link_type;
         nexus_uuid_copy(&direntry->dir_rec.link_uuid, &stat_out->uuid);
     }
 
