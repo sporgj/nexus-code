@@ -36,15 +36,15 @@ stashv_init(struct nexus_uuid *vol_ptr) {
 
     if (vol_ptr != NULL) {
         
-        int err = -1;
-        int ret = -1;
-
-        err = ocall_stash_load(&ret, vol_ptr);
-
-        if (err || ret) {
-            log_error("stashv_init FAILED (err=%d, ret=%d)\n", err, ret);
-            return -1;
-        }
+//        int err = -1;
+//        int ret = -1;
+//
+//        err = ocall_stash_load(&ret, vol_ptr);
+//
+//        if (err || ret) {
+//            log_error("stashv_init FAILED (err=%d, ret=%d)\n", err, ret);
+//            return -1;
+//        }
         
         stashv = nexus_malloc(sizeof (struct stash_verifier));
         
@@ -97,17 +97,17 @@ stashv_check_update(struct nexus_uuid *uuid, uint32_t version) {
 
     uint32_t seen_version = nexus_htable_search(stashv->stash_table, uuid);
     if(seen_version == NULL) {
-        int err = -1;
-        int ret = -1;
-        
-        uint32_t saved_version;
-
-        err = ocall_stash_get(&ret, uuid, &saved_version);
-
-        if (err || ret) {
-            log_error("stashv_check_update FAILED (err=%d, ret=%d)\n", err, ret);
-            return -1;
-        }
+//        int err = -1;
+//        int ret = -1;
+//        
+        uint32_t saved_version = 0;
+//
+//        err = ocall_stash_get(&ret, uuid, &saved_version);
+//
+//        if (err || ret) {
+//            log_error("stashv_check_update FAILED (err=%d, ret=%d)\n", err, ret);
+//            return -1;
+//        }
         
         seen_version = saved_version;
         
@@ -151,22 +151,22 @@ stashv_delete(struct nexus_uuid *uuid) {
 int
 stashv_flush(int op, struct nexus_uuid *uuid, uint32_t version) {
     
-    int err = -1;
-    int ret = -1;
-        
-    if(op == NEXUS_STASH_ADD) {
-        err = ocall_stash_add(&ret, uuid, version);
-    } else if(op == NEXUS_STASH_REMOVE) {
-        err = ocall_stash_remove(&ret, uuid);
-    } else if(op == NEXUS_STASH_UPDATE) {
-        err = ocall_stash_update(&ret, uuid, version);
-    }
-    //err = ocall_stash_update(&ret, op, uuid, version);
-
-    if (err || ret) {
-        log_error("ocall_stash_update FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
+//    int err = -1;
+//    int ret = -1;
+//        
+//    if(op == NEXUS_STASH_ADD) {
+//        err = ocall_stash_add(&ret, uuid, version);
+//    } else if(op == NEXUS_STASH_REMOVE) {
+//        err = ocall_stash_remove(&ret, uuid);
+//    } else if(op == NEXUS_STASH_UPDATE) {
+//        err = ocall_stash_update(&ret, uuid, version);
+//    }
+//    //err = ocall_stash_update(&ret, op, uuid, version);
+//
+//    if (err || ret) {
+//        log_error("ocall_stash_update FAILED (err=%d, ret=%d)\n", err, ret);
+//        return -1;
+//    }
     
 //    if (ocall_stash_update(op, uuid, version)) {
 //        log_error("ocall_stash_update FAILED\n");

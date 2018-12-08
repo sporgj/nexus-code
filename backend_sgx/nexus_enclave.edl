@@ -289,16 +289,6 @@ enclave {
             [user_check] struct nexus_volume * volume
         );
 
-        
-        /* int
-        ocall_set_stash_verifier
-        (
-            [in]         struct nexus_uuid   * metadata_uuid,
-            [user_check] uint8_t             * buffer,
-                         size_t                size,
-            [out]        size_t              * timestamp,
-            [user_check] struct nexus_volume * volume
-        ); */
 
 
         // ---------------------- utilities ---------------------
@@ -310,8 +300,6 @@ enclave {
         void ocall_free([user_check] void * untrusted_ptr);
 
         void ocall_print([in, string] char * str);
-
-        void ocall_print2([in, string] char * str);
     };
 
 };
