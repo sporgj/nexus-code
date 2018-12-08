@@ -112,6 +112,7 @@ objs := nexus_enclave_t.o \
 	bucket.o \
 	filenode.o \
 	supernode.o \
+	merkle_tree.o\
 	main.o
 
 
