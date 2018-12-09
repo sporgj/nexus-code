@@ -148,6 +148,11 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
         return -1;
     }
 
+    // create the hashtree
+    if (hashtree_manager_init(sgx_backend)) {
+        log_error("hashtree_mananger_init FAILED\n");
+        return -1;
+    }
 
     key_buffer_init(&volkey_keybuf);
 

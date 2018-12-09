@@ -35,6 +35,8 @@ __check_hashtree_folder()
     // make the directory
     snprintf(buffer, PATH_MAX, "%s/%s", nexus_config.user_data_dir, HASHTREE_FOLDER_NAME);
 
+    log_debug("Creating hastree folder... %s\n", buffer);
+
     ret = mkdir(buffer, 0770);
 
     if ((ret == -1) && (errno != EEXIST)) {
