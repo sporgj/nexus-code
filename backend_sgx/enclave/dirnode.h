@@ -28,7 +28,7 @@ struct __dir_rec {
     struct nexus_uuid   link_uuid;
 
     uint16_t            name_len;
-    
+
     struct nexus_mac    link_mac;
 
     char                name[NEXUS_NAME_MAX]; // XXX: waste of space...
@@ -78,6 +78,10 @@ struct nexus_dirnode {
     size_t                  bucket_count;
 
     char                  * last_failed_lookup; // TODO could be made into a list
+
+
+    struct nexus_mac        mac; // this will hold the mac extracted from the crypto buffer
+
 
     struct nexus_acl        dir_acl;
 
@@ -257,3 +261,15 @@ __dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexu
 
 void
 __dirnode_clobber_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
+
+
+
+int
+dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
+                            struct nexus_uuid    * uuid,
+                            struct nexus_mac     * mac);
+
+int
+dirnode_check_direntry_mac(struct nexus_dirnode * dirnode,
+                           struct nexus_uuid    * uuid,
+                           struct nexus_mac     * mac);

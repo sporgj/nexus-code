@@ -25,6 +25,9 @@ struct nexus_filenode {
     uint32_t                   log2chunksize;
 
 
+    struct nexus_mac           mac;
+
+
     size_t                     link_count;
 
     uint32_t                   nchunks;

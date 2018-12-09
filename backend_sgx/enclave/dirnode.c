@@ -311,11 +311,13 @@ dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_
 {
     struct nexus_dirnode * dirnode = NULL;
 
+    struct nexus_mac mac;
+
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &mac);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
@@ -329,6 +331,8 @@ dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_
         log_error("__parse_dirnode FAILED\n");
         return NULL;
     }
+
+    nexus_mac_copy(&mac, &dirnode->mac);
 
     return dirnode;
 }
@@ -625,12 +629,17 @@ dirnode_store(struct nexus_uuid    * uuid,
         }
 
 
-        ret = nexus_crypto_buf_put(crypto_buffer, mac);
+        ret = nexus_crypto_buf_put(crypto_buffer, &dirnode->mac);
 
         if (ret != 0) {
             log_error("nexus_crypto_buf_put FAILED\n");
             goto out;
         }
+    }
+
+
+    if (mac) {
+        nexus_mac_copy(&dirnode->mac, mac);
     }
 
     __dirnode_set_clean(dirnode);
@@ -1329,4 +1338,39 @@ dirnode_rename(struct nexus_dirnode * src_dirnode,
     *src_type = src_direntry->dir_rec.type;
 
     return 0;
+}
+
+
+int
+dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
+                            struct nexus_uuid    * uuid,
+                            struct nexus_mac     * mac)
+{
+    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
+
+    if (direntry == NULL) {
+        log_error("direntry_update could not find uuid\n");
+        return -1;
+    }
+
+    nexus_mac_copy(mac, &direntry->dir_rec.link_mac);
+
+    __dirnode_set_dirty(dirnode);
+
+    return 0;
+}
+
+int
+dirnode_check_direntry_mac(struct nexus_dirnode * dirnode,
+                           struct nexus_uuid    * uuid,
+                           struct nexus_mac     * mac)
+{
+    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
+
+    if (direntry == NULL) {
+        log_error("direntry_check could not find uuid\n");
+        return -1;
+    }
+
+    return nexus_mac_compare(mac, &direntry->dir_rec.link_mac);
 }
