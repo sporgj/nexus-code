@@ -457,7 +457,7 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
     // get the file attributes and cache them to the inode
-    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &dentry->inode->attrs)) {
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
         goto out_err;
     }
 
@@ -467,6 +467,7 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto out_err;
     }
 
+
     file_ptr = vfs_file_alloc(dentry, fi->flags);
 
     if (file_ptr == NULL) {
@@ -475,6 +476,11 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto out_err;
     }
 
+
+    if (!inode->is_dirty) {
+        printf("fuse_open ino=%d (%s)\n", (int)inode->ino, file_ptr->filepath);
+        inode->filesize = inode->attrs.posix_stat.st_size;
+    }
 
     inode_incr_lookup(dentry->inode, 1);
 
@@ -749,6 +755,10 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
     uint8_t * buffer = nexus_malloc(size);
     size_t    buflen = 0;
 
+    if (file_ptr->fid > 40) {
+        printf("reading: %s\n", file_ptr->filepath);
+    }
+
     if (file_read(file_ptr, off, size, buffer, &buflen)) {
         fuse_reply_err(req, EIO);
         return;
@@ -759,6 +769,8 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
     bufv.buf[0].pos  = off;
 
     fuse_reply_data(req, &bufv, FUSE_BUF_NO_SPLICE);  // XXX look into splicing for efficiency
+
+    file_ptr->total_sent += buflen;
 
     free(buffer);
 }
@@ -779,6 +791,8 @@ nxs_fuse_write(fuse_req_t              req,
         fuse_reply_err(req, EIO);
         return;
     }
+
+    file_ptr->total_recv += size;
 
     fuse_reply_write(req, (int)bytes_read);
 }

@@ -31,6 +31,8 @@ struct file_chunk {
     size_t           base;
     size_t           index;
     struct list_head node;
+
+    struct my_inode * inode;
 };
 
 
@@ -48,12 +50,21 @@ struct my_inode {
 
     time_t                 last_accessed;
 
+    bool                   is_dirty;
+
 
     size_t                 dentry_count;
 
     struct list_head       dentry_list;   // all the hardlinks
 
     pthread_mutex_t        dentry_lock;
+
+
+    size_t                 filesize;
+
+    size_t                 chunk_count;
+
+    struct list_head       file_chunks;
 
 
     pthread_mutex_t        lock;
@@ -90,7 +101,8 @@ struct my_file {
 
     size_t                offset;
 
-    size_t                filesize;
+    size_t                total_recv;
+    size_t                total_sent;
 
     char                * filepath;
 
@@ -100,10 +112,6 @@ struct my_file {
 
     bool                  is_dirty;
 
-
-    size_t                chunk_count;
-
-    struct list_head      file_chunks;
 
     struct list_head      open_files;
 
@@ -184,6 +192,12 @@ inode_get(struct my_inode * inode);
 void
 inode_put(struct my_inode * inode);
 
+void
+inode_set_dirty(struct my_inode * inode);
+
+void
+inode_set_clean(struct my_inode * inode);
+
 
 //
 // io.c
@@ -258,3 +272,7 @@ dentry_get(struct my_dentry * dentry);
 
 void
 dentry_put(struct my_dentry * dentry);
+
+
+void
+__free_file_chunk(struct file_chunk * chunk);

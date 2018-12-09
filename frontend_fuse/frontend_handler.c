@@ -374,6 +374,8 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 {
     struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;
 
+    struct my_inode          * inode       = file_ptr->dentry->inode;
+
     struct nexus_file_handle * file_handle = NULL;
 
     uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
@@ -382,7 +384,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
     size_t size   = 0;
 
 
-    file_handle = nexus_datastore_fopen(datastore, &file_ptr->inode->uuid, NULL, NEXUS_FREAD);
+    file_handle = nexus_datastore_fopen(datastore, &inode->uuid, NULL, NEXUS_FREAD);
 
     if (file_handle == NULL) {
         log_error("could not get the file handle from datastore\n");
@@ -393,7 +395,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
         lseek(file_handle->fd, chunk->base, SEEK_SET);
     }
 
-    size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - chunk->base);
+    size = min(NEXUS_CHUNK_SIZE, inode->filesize - chunk->base);
 
     nbytes = read(file_handle->fd, encrypted_buffer, size);
 
@@ -411,7 +413,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
                          chunk->buffer,
                          chunk->base,
                          chunk->size,
-                         file_ptr->filesize)) {
+                         file_ptr->inode->filesize)) {
         log_error("nexus_fs_decrypt() failed (offset=%zu, size=%zu)\n", chunk->base, chunk->size);
         goto out_err;
     }
@@ -431,6 +433,8 @@ nexus_fuse_store(struct my_file * file_ptr)
 {
     struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;
 
+    struct my_inode          * inode       = file_ptr->dentry->inode;
+
     struct nexus_file_handle * file_handle = NULL;
 
     struct list_head         * chunk_iter  = NULL;
@@ -442,8 +446,7 @@ nexus_fuse_store(struct my_file * file_ptr)
         return 0;
     }
 
-    file_handle = nexus_datastore_fopen(
-        datastore, &file_ptr->inode->uuid, NULL, NEXUS_FRDWR);
+    file_handle = nexus_datastore_fopen(datastore, &inode->uuid, NULL, NEXUS_FRDWR);
 
     if (file_handle == NULL) {
         log_error("could not get file handle from datastore\n");
@@ -451,17 +454,17 @@ nexus_fuse_store(struct my_file * file_ptr)
     }
 
 
-    if (ftruncate(file_handle->fd, file_ptr->filesize)) {
+    if (ftruncate(file_handle->fd, inode->filesize)) {
         log_error("ftruncate FAILED (datafile=%s, size=%zu)\n",
                   file_handle->filepath,
-                  file_ptr->filesize);
+                  inode->filesize);
         goto out_err;
     }
 
-    list_for_each(chunk_iter, &file_ptr->file_chunks) {
+    list_for_each(chunk_iter, &inode->file_chunks) {
         struct file_chunk * chunk = list_entry(chunk_iter, struct file_chunk, node);
 
-        size_t size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - chunk->base);
+        size_t size = min(NEXUS_CHUNK_SIZE, inode->filesize - chunk->base);
 
         if (nexus_fs_encrypt(nexus_fuse_volume,
                              file_ptr->filepath,
@@ -469,14 +472,14 @@ nexus_fuse_store(struct my_file * file_ptr)
                              encrypted_buffer,
                              chunk->base,
                              size,
-                             file_ptr->filesize)) {
+                             inode->filesize)) {
             log_error("could not encrypt the buffer\n");
             goto out_err;
         }
 
         lseek(file_handle->fd, chunk->base, SEEK_SET);
 
-        size_t nbytes = write(file_handle->fd, encrypted_buffer, chunk->size);
+        size_t nbytes = write(file_handle->fd, encrypted_buffer, size);
 
         if (nbytes != size) {
             log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, size, nbytes);
@@ -484,9 +487,15 @@ nexus_fuse_store(struct my_file * file_ptr)
         }
     }
 
+    // printf("file stored (%s):: fpath=%s [fid=%d], fsize=%zu, tsent=%zu, trecv=%zu\n",
+    //        file_handle->filepath,
+    //        file_ptr->filepath,
+    //        file_ptr->fid,
+    //        inode->filesize,
+    //        file_ptr->total_sent,
+    //        file_ptr->total_recv);
 
-    // printf("file stored (%s) filepath=%s [fid=%d], filesize=%zu\n",
-    //         file_handle->filepath, file_ptr->filepath, file_ptr->fid, file_ptr->filesize);
+    inode_set_clean(inode);
 
     nexus_datastore_fclose(datastore, file_handle);
 

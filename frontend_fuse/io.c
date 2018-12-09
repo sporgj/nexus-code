@@ -33,7 +33,7 @@ __alloc_file_chunk(size_t base)
     return chunk;
 }
 
-static void
+void
 __free_file_chunk(struct file_chunk * chunk)
 {
     nexus_free(chunk->buffer);
@@ -54,6 +54,10 @@ __update_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_
 
     chunk->size = nbytes + shift;
 
+    chunk->is_dirty = true;
+
+    inode_set_dirty(chunk->inode);
+
     return nbytes;
 }
 
@@ -73,13 +77,15 @@ __read_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_t 
 }
 
 static struct file_chunk *
-__file_find_chunk(struct my_file * file, size_t offset)
+__file_find_chunk(struct my_file * file_ptr, size_t offset)
 {
+    struct my_inode * inode = file_ptr->dentry->inode;
+
     struct list_head * curr = NULL;
 
     size_t base = get_base_offset(offset);
 
-    list_for_each(curr, &file->file_chunks) {
+    list_for_each(curr, &inode->file_chunks) {
         struct file_chunk * chunk = list_entry(curr, struct file_chunk, node);
 
         if (base == chunk->base) {
@@ -93,17 +99,19 @@ __file_find_chunk(struct my_file * file, size_t offset)
 static struct file_chunk *
 __file_try_add_chunk(struct my_file * file_ptr, size_t offset)
 {
+    struct my_inode   * inode = file_ptr->inode;
+
     struct file_chunk * chunk = __file_find_chunk(file_ptr, offset);
 
     if (chunk) {
         return chunk;
     }
 
+    // allocate the chunk and add to the inode list
     chunk = __alloc_file_chunk(get_base_offset(offset));
 
-    // if we are not at the end of the file and we have read mode on
-    if (offset < file_ptr->filesize && file_ptr->flags & O_RDONLY) {
-        chunk->size = min(NEXUS_CHUNK_SIZE, file_ptr->filesize - offset);
+    if (chunk->base < inode->filesize) {
+        chunk->size = min(NEXUS_CHUNK_SIZE, inode->filesize - offset);
 
         if (nexus_fuse_fetch_chunk(file_ptr, chunk)) {
             __free_file_chunk(chunk);
@@ -112,9 +120,15 @@ __file_try_add_chunk(struct my_file * file_ptr, size_t offset)
         }
     }
 
-    list_add_tail(&chunk->node, &file_ptr->file_chunks);
+    pthread_mutex_lock(&inode->lock);
+    list_add_tail(&chunk->node, &inode->file_chunks);
 
-    file_ptr->chunk_count += 1;
+    inode->chunk_count += 1;
+    pthread_mutex_unlock(&inode->lock);
+
+    chunk->inode = inode;
+
+    chunk->is_valid = true;
 
     return chunk;
 }
@@ -124,9 +138,11 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
 {
     struct file_chunk * chunk = NULL;
 
-    if (offset >= file_ptr->filesize) {
+    if (offset >= file_ptr->inode->filesize && !(file_ptr->flags & O_WRONLY)) {
         log_error("trying to read past file size (path=%s, filesize=%zu, offset=%zu)\n",
-                  file_ptr->filepath, file_ptr->filesize, offset);
+                  file_ptr->filepath,
+                  file_ptr->inode->filesize,
+                  offset);
         return NULL;
     }
 
@@ -135,16 +151,6 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
     if (chunk->is_valid) {
         return chunk;
     }
-
-    chunk->size = min(NEXUS_CHUNK_SIZE, (file_ptr->filesize - offset));
-
-    if (nexus_fuse_fetch_chunk(file_ptr, chunk)) {
-        log_error("nexus_fuse_fetch_chunk FAILED\n");
-        return NULL;
-    }
-
-    chunk->is_valid = true;
-    chunk->is_dirty = false;
 
     return chunk;
 }
@@ -161,7 +167,10 @@ file_read(struct my_file * file_ptr,
 
     pthread_rwlock_rdlock(&file_ptr->io_lock);
 
-    if (file_ptr->filesize == 0) {
+    if (file_ptr->inode->filesize == 0) {
+        printf("inode (%d) size=%zu\n",
+               (int)file_ptr->inode->ino,
+               file_ptr->inode->attrs.posix_stat.st_size);
         *output_buflen = 0;
         pthread_rwlock_unlock(&file_ptr->io_lock);
         return 0;
@@ -176,7 +185,10 @@ file_read(struct my_file * file_ptr,
 
         if (chunk == NULL) {
             log_error("chunk not found (file=%s [%d], offset=%zu, filesize=%zu)\n",
-                      file_ptr->filepath, file_ptr->fid, offset, file_ptr->filesize);
+                      file_ptr->filepath,
+                      file_ptr->fid,
+                      offset,
+                      file_ptr->inode->filesize);
             pthread_rwlock_unlock(&file_ptr->io_lock);
             return -1;
         }
@@ -191,6 +203,14 @@ file_read(struct my_file * file_ptr,
 
     *output_buflen = total_bytes;
 
+    // printf("{read} filepath=%s [%d] (ino=%d), offset=%zu, bytes_written=%zu, filesize=%zu\n",
+    //        file_ptr->filepath,
+    //        file_ptr->fid,
+    //        (int)file_ptr->inode->ino,
+    //        offset,
+    //        *output_buflen,
+    //        file_ptr->inode->filesize);
+
     pthread_rwlock_unlock(&file_ptr->io_lock);
 
     return 0;
@@ -203,8 +223,15 @@ file_write(struct my_file * file_ptr,
            uint8_t        * input_buffer,
            size_t         * bytes_written)
 {
+    struct my_inode * inode = file_ptr->inode;
+
     size_t total_bytes = 0;
     size_t curpos      = offset;
+
+
+    if (file_ptr->flags & O_APPEND) {
+        curpos = file_ptr->offset;
+    }
 
     pthread_rwlock_wrlock(&file_ptr->io_lock);
 
@@ -232,15 +259,23 @@ file_write(struct my_file * file_ptr,
 
     *bytes_written = total_bytes;
 
-    if (curpos > file_ptr->filesize) {
-        file_ptr->filesize = curpos;
+    if (file_ptr->flags & O_APPEND) {
+        file_ptr->offset += total_bytes;
+    }
+
+    if (curpos > inode->filesize) {
+        inode->filesize = curpos;
     }
 
     file_set_dirty(file_ptr);
 
-
-    // printf("file write filepath=%s [%d], offset=%zu, bytes_written=%zu, filesize=%zu\n",
-    //         file_ptr->filepath, file_ptr->fid, offset, *bytes_written, file_ptr->filesize);
+    // printf("{write} filepath=%s [%d] (%d), offset=%zu, bytes_written=%zu, filesize=%zu\n",
+    //        file_ptr->filepath,
+    //        file_ptr->fid,
+    //        (int)file_ptr->inode->ino,
+    //        offset,
+    //        *bytes_written,
+    //        file_ptr->inode->filesize);
 
     pthread_rwlock_unlock(&file_ptr->io_lock);
 
@@ -259,9 +294,9 @@ file_open(struct my_dentry * dentry, int fid, int flags)
     file_ptr->filepath = dentry_get_fullpath(dentry);
     file_ptr->inode    = file_ptr->dentry->inode;
 
-    file_ptr->filesize = file_ptr->inode->attrs.posix_stat.st_size;
-
-    INIT_LIST_HEAD(&file_ptr->file_chunks);
+    if (flags & O_APPEND) {
+        file_ptr->offset = file_ptr->inode->filesize;
+    }
 
     pthread_rwlock_init(&file_ptr->io_lock, NULL);
 
@@ -271,16 +306,6 @@ file_open(struct my_dentry * dentry, int fid, int flags)
 void
 file_close(struct my_file * file_ptr)
 {
-    struct file_chunk * chunk = NULL;
-
-    while (!list_empty(&file_ptr->file_chunks)) {
-        chunk = list_first_entry(&file_ptr->file_chunks, struct file_chunk, node);
-
-        list_del(&chunk->node);
-
-        __free_file_chunk(chunk);
-    }
-
     dentry_put(file_ptr->dentry);
     nexus_free(file_ptr->filepath);
     nexus_free(file_ptr);

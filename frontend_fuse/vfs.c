@@ -76,6 +76,7 @@ __icache_alloc(fuse_ino_t ino, struct nexus_uuid * uuid)
     inode->ino = ino;
 
     INIT_LIST_HEAD(&inode->dentry_list);
+    INIT_LIST_HEAD(&inode->file_chunks);
 
     if (uuid) {
         nexus_uuid_copy(uuid, &inode->uuid);
@@ -108,15 +109,28 @@ __icache_find(fuse_ino_t ino)
 static inline void
 __icache_del(fuse_ino_t ino)
 {
-    struct my_inode * inode = NULL;
+    struct my_inode   * inode = NULL;
 
     pthread_mutex_lock(&icache_mutex);
     inode = (struct my_inode *) nexus_htable_remove(icache_table, (uintptr_t)ino, 0);
     pthread_mutex_unlock(&icache_mutex);
 
-    if (inode) {
-        nexus_free(inode);
+    if (inode == NULL) {
+        return;
     }
+
+    // free the chunks
+    while (!list_empty(&inode->file_chunks)) {
+        struct file_chunk * chunk = NULL;
+
+        chunk = list_first_entry(&inode->file_chunks, struct file_chunk, node);
+
+        list_del(&chunk->node);
+
+        __free_file_chunk(chunk);
+    }
+
+    nexus_free(inode);
 }
 
 struct my_inode *
@@ -285,6 +299,18 @@ inode_decr_lookup(struct my_inode * inode, uint64_t count)
         vfs_remove_inode(inode);
     }
     pthread_mutex_unlock(&inode->lock);
+}
+
+void
+inode_set_dirty(struct my_inode * inode)
+{
+    inode->is_dirty = true;
+}
+
+void
+inode_set_clean(struct my_inode * inode)
+{
+    inode->is_dirty = false;
 }
 
 bool
