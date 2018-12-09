@@ -97,14 +97,15 @@ dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool r
 }
 
 struct nexus_dentry *
-nexus_vfs_lookup(char * filepath)
+nexus_vfs_lookup(char * filepath, nexus_io_flags_t flags)
 {
     struct nexus_dentry * dentry = NULL;
 
     struct path_walker walker = {
         .remaining_path       = filepath,
         .type                 = PATH_WALK_NORMAL,
-        .parent_dentry        = root_dentry
+        .parent_dentry        = root_dentry,
+        .io_flags             = flags
     };
 
     sgx_spin_lock(&traversal_lock);
@@ -120,6 +121,7 @@ nexus_vfs_lookup_parent(char * filepath, struct path_walker * walker)
     walker->remaining_path = filepath;
     walker->parent_dentry  = root_dentry;
     walker->type           = PATH_WALK_PARENT;
+    walker->io_flags       = NEXUS_FREAD;
 
     sgx_spin_lock(&traversal_lock);
     struct nexus_dentry * dentry = dentry_lookup(walker);
@@ -160,7 +162,7 @@ nexus_vfs_complete_lookup(struct path_walker * walker, nexus_io_flags_t flags)
 struct nexus_metadata *
 nexus_vfs_get(char * filepath, nexus_io_flags_t flags)
 {
-    struct nexus_dentry * dentry = nexus_vfs_lookup(filepath);
+    struct nexus_dentry * dentry = nexus_vfs_lookup(filepath, flags);
 
     if (dentry == NULL) {
         log_error("dentry_lookup FAILED\n");

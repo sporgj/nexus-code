@@ -277,7 +277,7 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
 // @param metadata
 // @param mac
 // @return 0 on success
-static int
+int
 __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac)
 {
     int ret = -1;
@@ -313,21 +313,13 @@ __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac)
 int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
-    struct nexus_mac mac;
-
-    struct nexus_dentry * dentry = NULL; // FIXME: change function signature to take dentry
-
     // first save it as a normal metadata
-    if (__nexus_metadata_store(metadata, &mac)) {
+    if (__nexus_metadata_store(metadata, NULL)) {
         return -1;
     }
 
-    // as of now, we assume hardlink files will be in the same directory as the parent.
-    // this will SURELY change in the next update
-    dentry = metadata_get_dentry(metadata);
-
     // now, let's try and process it up the tree
-    if (hashtree_update(dentry, &metadata->uuid, &mac)) {
+    if (hashtree_update(metadata)) {
         return -1;
     }
 

@@ -53,6 +53,8 @@ struct path_walker {
     char                * remaining_path; // the path left to be looked up
 
     path_walk_type_t      type;
+
+    nexus_io_flags_t      io_flags;
 };
 
 // initializes the root dentry

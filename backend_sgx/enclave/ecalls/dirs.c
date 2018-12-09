@@ -10,6 +10,8 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
 {
     nexus_uuid_gen(entry_uuid);
 
+    struct nexus_mac entry_mac;
+
 
     // create the new metadata
     {
@@ -28,6 +30,8 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
             return -1;
         }
 
+        nexus_metadata_get_mac(metadata, &entry_mac);
+
         nexus_metadata_free(metadata);
     }
 
@@ -35,6 +39,11 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
     // update the parent dirnode
     if (dirnode_add(parent_dirnode, filename_IN, type_IN, entry_uuid)) {
         log_error("dirnode_add() FAILED\n");
+        return -1;
+    }
+
+    if (dirnode_update_direntry_mac(parent_dirnode, entry_uuid, &entry_mac)) {
+        log_error("dirnode_update_direntry_mac FAILED\n");
         return -1;
     }
 
@@ -754,8 +763,8 @@ ecall_fs_rename(char              * from_dirpath_IN,
     }
 
     // get the necessary metadata
-    from_dentry = nexus_vfs_lookup(from_dirpath_IN);
-    to_dentry   = nexus_vfs_lookup(to_dirpath_IN);
+    from_dentry = nexus_vfs_lookup(from_dirpath_IN, NEXUS_FRDWR);
+    to_dentry   = nexus_vfs_lookup(to_dirpath_IN, NEXUS_FRDWR);
 
     if (from_dentry == NULL || to_dentry == NULL) {
         log_error("could not find dentry\n");

@@ -271,12 +271,13 @@ dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 }
 
 static struct nexus_dentry *
-dentry_follow_link(struct nexus_dentry * dentry, char * symlink_target)
+dentry_follow_link(struct nexus_dentry * dentry, char * symlink_target, struct path_walker * prev_walker)
 {
     struct path_walker walker = {
         .parent_dentry        = dentry,
         .remaining_path       = symlink_target,
-        .type                 = PATH_WALK_NORMAL
+        .type                 = PATH_WALK_NORMAL,
+        .io_flags             = prev_walker->io_flags
     };
 
     // TODO handle absolute paths in symlink targets
@@ -329,7 +330,7 @@ walk_path(struct path_walker * walker)
         }
 
 
-        if (dentry_revalidate(curr_dentry, NEXUS_FREAD)) {
+        if (dentry_revalidate(curr_dentry, walker->io_flags)) {
             log_error("dentry revalidation FAILED\n");
             return NULL;
         }
@@ -360,7 +361,7 @@ lookup_dirnode:
         if (atype == NEXUS_LNK) {
             char * target = dirnode_get_link(dirnode, &link_uuid);
 
-            next_dentry = dentry_follow_link(curr_dentry, target);
+            next_dentry = dentry_follow_link(curr_dentry, target, walker);
 
             nexus_free(target);
         } else {

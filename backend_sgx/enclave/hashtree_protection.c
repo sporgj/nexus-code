@@ -78,39 +78,68 @@ hashtree_destroy()
 }
 
 int
-hashtree_update(struct nexus_dentry * parent_dentry,
-                struct nexus_uuid   * child_uuid,
-                struct nexus_mac    * child_mac)
+hashtree_update(struct nexus_metadata * metadata)
 {
-    struct nexus_dirnode * dirnode = NULL;
+    struct nexus_dentry * parent_dentry = NULL;
+    struct nexus_dentry * child_dentry  = NULL;
 
-    int ret = -1;
+    struct nexus_mac    child_mac;
+    struct nexus_uuid * child_uuid = NULL;
 
 
-    if (parent_dentry == NULL) {
+
+    // as of now, we assume hardlink files will be in the same directory as the parent.
+    // this will SURELY change in the next update
+
+    child_dentry = metadata_get_dentry(metadata);
+
+    if (child_dentry == NULL) {
         return 0;
     }
 
-    if (parent_dentry->metadata == NULL) {
-        log_error("dentry does not have a metadata object to update");
-        return -1;
+
+    if (child_dentry == root_dentry) {
+        goto update_root;
     }
+
+
+
+    parent_dentry = child_dentry->parent;
+
+    nexus_metadata_get_mac(metadata, &child_mac);
+
+    child_uuid = &child_dentry->metadata->uuid;
+
+    do {
+        if (parent_dentry->metadata == NULL) {
+            log_error("dentry does not have a metadata object to update");
+            return -1;
+        }
+
+
+        struct nexus_dirnode * parent_dirnode = parent_dentry->metadata->dirnode;
+
+        if (dirnode_update_direntry_mac(parent_dirnode, child_uuid, &child_mac)) {
+            log_error("could not update direntry\n");
+            return -1;
+        }
+
+        if (__nexus_metadata_store(parent_dentry->metadata, &child_mac)) {
+            log_error("__nexus_metadata_store() FAILED\n");
+            return -1;
+        }
+
+
+        child_dentry = parent_dentry;
+        child_uuid = &child_dentry->metadata->uuid;
+        parent_dentry = parent_dentry->parent;
+    } while(child_dentry != root_dentry);
+
 
     // update the child mac in the dirnode
-    dirnode = parent_dentry->metadata->dirnode;
 
-    if (dirnode_update_direntry_mac(dirnode, child_uuid, child_mac)) {
-        log_error("could not update direntry\n");
-        return -1;
-    }
-
-    ret = nexus_metadata_store(parent_dentry->metadata);
-
-    if (ret == 0 && parent_dentry == root_dentry) {
-        ret = __update_hashtree_root(&parent_dentry->metadata);
-    }
-
-    return ret;
+update_root:
+    return __update_hashtree_root(&child_dentry->metadata);
 }
 
 int

@@ -34,7 +34,7 @@ nexus_vfs_get(char * path, nexus_io_flags_t flags);
 
 // lookup the dentry
 struct nexus_dentry *
-nexus_vfs_lookup(char * filepath);
+nexus_vfs_lookup(char * filepath, nexus_io_flags_t flags);
 
 struct nexus_dentry *
 nexus_vfs_lookup_parent(char * filepath, struct path_walker * walker);
