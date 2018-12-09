@@ -39,6 +39,9 @@
 #include "bucket.h"
 #include "filenode.h"
 
+#include "hashtree_protection.h"
+
+
 #include <nexus_volume.h>
 #include <nexus_fs.h>
 #include <nexus_log.h>

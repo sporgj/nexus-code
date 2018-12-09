@@ -10,6 +10,7 @@
 #include <nexus_fs.h>
 #include <nexus_heap.h>
 #include <nexus_ringbuf.h>
+#include <nexus_mac.h>
 
 #include "tweetnacl.h"
 

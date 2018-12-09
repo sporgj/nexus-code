@@ -43,7 +43,6 @@ struct nexus_metadata {
         void                     * object;
     };
 
-
     sgx_spinlock_t                 dentry_lock;
     struct list_head               dentry_list;
     size_t                         dentry_count;
@@ -58,6 +57,10 @@ __metadata_set_dirty(struct nexus_metadata * metadata);
 
 struct nexus_dentry *
 metadata_get_dentry(struct nexus_metadata * metadata);
+
+
+void
+nexus_metadata_get_mac(struct nexus_metadata * metadata, struct nexus_mac * mac_out);
 
 /**
  * Creates a new metadata

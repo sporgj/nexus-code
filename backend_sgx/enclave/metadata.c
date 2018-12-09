@@ -51,6 +51,29 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     metadata->object = object;
 }
 
+void
+nexus_metadata_get_mac(struct nexus_metadata * metadata, struct nexus_mac * mac_out)
+{
+    struct nexus_supernode * supernode = NULL;
+    struct nexus_dirnode   * dirnode   = NULL;
+    struct nexus_filenode  * filenode  = NULL;
+
+    switch (metadata->type) {
+    case NEXUS_FILENODE:
+        filenode = metadata->filenode;
+        nexus_mac_copy(&filenode->mac, mac_out);
+        break;
+    case NEXUS_DIRNODE:
+        dirnode = metadata->dirnode;
+        nexus_mac_copy(&dirnode->mac, mac_out);
+        break;
+    case NEXUS_SUPERNODE:
+        supernode = metadata->supernode;
+        nexus_mac_copy(&supernode->mac, mac_out);
+        break;
+    }
+}
+
 struct nexus_dentry *
 metadata_get_dentry(struct nexus_metadata * metadata)
 {
@@ -249,8 +272,13 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
     return nexus_metadata_from_object(uuid, object, type, flags, version);
 }
 
-int
-__nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac *mac)
+
+// this does the actual storage.
+// @param metadata
+// @param mac
+// @return 0 on success
+static int
+__nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac)
 {
     int ret = -1;
 
@@ -285,13 +313,24 @@ __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac *mac)
 int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
-    struct nexus_mac *mac;
-    if(__nexus_metadata_store(metadata, mac)) {
+    struct nexus_mac mac;
+
+    struct nexus_dentry * dentry = NULL; // FIXME: change function signature to take dentry
+
+    // first save it as a normal metadata
+    if (__nexus_metadata_store(metadata, &mac)) {
         return -1;
     }
-    if(merkle_update(metadata->dentry, metadata->uuid, mac)) {
+
+    // as of now, we assume hardlink files will be in the same directory as the parent.
+    // this will SURELY change in the next update
+    dentry = metadata_get_dentry(metadata);
+
+    // now, let's try and process it up the tree
+    if (hashtree_update(dentry, &metadata->uuid, &mac)) {
         return -1;
     }
+
     return 0;
 }
 
@@ -325,26 +364,24 @@ nexus_metadata_unlock(struct nexus_metadata * metadata)
 }
 
 int
-nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
-{ 
-    return __nexus_metadata_verify_uuids(dentry);
-    
-    if(dentry->parent == NULL) {
-        //root
-        //merkle_verify(dentry, )
-    }
-    //return 0;
-}
-
-int
 __nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
-{ 
+{
     // make sure the dentry's real uuid matches the metadata's uuid
     if (nexus_uuid_compare(&dentry->metadata->uuid, &dentry->link_uuid)) {
         return -1;
     }
 
     return 0;
+}
+
+int
+nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
+{
+     if (__nexus_metadata_verify_uuids(dentry)) {
+         return -1;
+     }
+
+     return hashtree_verify(dentry);
 }
 
 void

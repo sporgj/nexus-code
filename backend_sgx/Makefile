@@ -63,6 +63,7 @@ objs := nexus_enclave_u.o \
 	quote.o \
 	rk_protocol.o \
 	rk_messages.o \
+	hashtree_manager.o \
 	ocalls.o
 
 

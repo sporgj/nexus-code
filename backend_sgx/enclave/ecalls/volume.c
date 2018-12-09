@@ -124,8 +124,8 @@ ecall_create_volume(char                    * user_pubkey_IN,
     }
 
     //Merkle Tree INIT
-    merkle_init(supernode_uuid_out);
-    
+    hashtree_init();
+
     ret = 0;
 out:
     nexus_enclave_volumekey_clear();

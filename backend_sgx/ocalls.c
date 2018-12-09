@@ -81,3 +81,19 @@ ocall_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus
 {
     return io_buffer_stattime(uuid, timestamp, volume);
 }
+
+
+
+// fetch root stuf
+
+int
+ocall_hashtree_fetch_root(uint32_t * version, struct nexus_mac * mac, struct nexus_volume * volume)
+{
+    return hashtree_manager_fetch(version, mac, volume);
+}
+
+int
+ocall_hashtree_store_root(uint32_t version, struct nexus_mac * mac, struct nexus_volume * volume)
+{
+    return hashtree_manager_update(version, mac, volume);
+}

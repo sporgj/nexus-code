@@ -27,6 +27,8 @@
 // #include "fs.h"
 #include "io.h"
 
+#include "hashtree_manager.h"
+
 
 // For every run of NeXUS, there will be a unique instance
 extern struct nxs_instance * global_nxs_instance;
