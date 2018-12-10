@@ -1338,7 +1338,7 @@ dirnode_rename(struct nexus_dirnode * src_dirnode,
     *src_type = src_direntry->dir_rec.type;
 
     return 0;
-
+}
 
 int
 dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
