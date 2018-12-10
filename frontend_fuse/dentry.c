@@ -113,6 +113,8 @@ dentry_set_name(struct my_dentry * dentry, const char * name)
     assert(len < NEXUS_NAME_MAX);
 
     strncpy(dentry->name, name, NEXUS_NAME_MAX);
+
+    dentry->name_len = len;
 }
 
 void
