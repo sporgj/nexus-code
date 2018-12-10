@@ -109,6 +109,10 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
         metadata->is_locked = true;
     }
 
+    if (nexus_uuid_compare(uuid, &global_supernode->root_uuid) == 0) {
+        metadata->is_root_dirnode = true;
+    }
+
     return metadata;
 }
 
@@ -250,6 +254,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     }
 
     metadata->is_invalid = false;
+
+    metadata->version = version;
 
     return 0;
 }

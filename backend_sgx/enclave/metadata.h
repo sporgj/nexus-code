@@ -36,6 +36,9 @@ struct nexus_metadata {
 
     bool                         is_locked;
 
+    bool                         is_root_dirnode;
+
+
     union {
         struct nexus_supernode   * supernode;
         struct nexus_dirnode     * dirnode;

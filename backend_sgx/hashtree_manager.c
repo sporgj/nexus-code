@@ -161,6 +161,8 @@ hashtree_manager_init(struct sgx_backend * backend)
         return -1;
     }
 
+    nexus_printf("Hashtree Initialized: root_version=%zu\n", (size_t)_roothash_buffer.root_version);
+
     return 0;
 }
 

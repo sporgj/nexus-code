@@ -261,12 +261,6 @@ dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
         return -1;
     }
 
-    if (dentry == root_dentry) {
-        struct nexus_dirnode * root_dirnode = (struct nexus_dirnode *)dentry->metadata->object;
-
-        return nexus_uuid_compare(&global_supernode->root_uuid, &root_dirnode->my_uuid);
-    }
-
     return nexus_metadata_verify_uuids(dentry);
 }
 

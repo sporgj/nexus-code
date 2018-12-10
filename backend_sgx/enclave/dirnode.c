@@ -1341,9 +1341,10 @@ dirnode_rename(struct nexus_dirnode * src_dirnode,
 }
 
 int
-dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
-                            struct nexus_uuid    * uuid,
-                            struct nexus_mac     * mac)
+dirnode_hashtree_update(struct nexus_dirnode * dirnode,
+                        struct nexus_uuid    * uuid,
+                        struct nexus_mac     * mac,
+                        uint32_t               version)
 {
     struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
 
@@ -1354,40 +1355,7 @@ dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
 
     nexus_mac_copy(mac, &direntry->dir_rec.link_mac);
 
-    __dirnode_set_dirty(dirnode);
-
-    return 0;
-}
-
-int
-dirnode_check_direntry_mac(struct nexus_dirnode * dirnode,
-                           struct nexus_uuid    * uuid,
-                           struct nexus_mac     * mac)
-{
-    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
-
-    if (direntry == NULL) {
-        log_error("direntry_check could not find uuid\n");
-        return -1;
-    }
-
-    return nexus_mac_compare(mac, &direntry->dir_rec.link_mac);
-}
-
-
-int
-dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
-                            struct nexus_uuid    * uuid,
-                            struct nexus_mac     * mac)
-{
-    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
-
-    if (direntry == NULL) {
-        log_error("direntry_update could not find uuid\n");
-        return -1;
-    }
-
-    nexus_mac_copy(mac, &direntry->dir_rec.link_mac);
+    direntry->dir_rec.link_version = version;
 
     __dirnode_set_dirty(dirnode);
 
@@ -1395,16 +1363,20 @@ dirnode_update_direntry_mac(struct nexus_dirnode * dirnode,
 }
 
 int
-dirnode_check_direntry_mac(struct nexus_dirnode * dirnode,
-                           struct nexus_uuid    * uuid,
-                           struct nexus_mac     * mac)
+dirnode_hashtree_fetch(struct nexus_dirnode * dirnode,
+                       struct nexus_uuid    * uuid,
+                       struct nexus_mac     * mac,
+                       uint32_t             * version)
 {
     struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
 
     if (direntry == NULL) {
-        log_error("direntry_check could not find uuid\n");
         return -1;
     }
 
-    return nexus_mac_compare(mac, &direntry->dir_rec.link_mac);
+    *version = direntry->dir_rec.link_version;
+
+    nexus_mac_copy(&direntry->dir_rec.link_mac, mac);
+
+    return 0;
 }

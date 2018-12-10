@@ -35,7 +35,7 @@ __store_hashtree_root()
     int err = -1;
     int ret = -1;
 
-    err = ocall_hashtree_store_root(&ret, &hashtree_root_version, &hashtree_root_mac, global_volume);
+    err = ocall_hashtree_store_root(&ret, hashtree_root_version, &hashtree_root_mac, global_volume);
 
     if (err || ret) {
         log_error("ocall_hashtree_store_root FAILED (err=%d, ret=%d)\n", err, ret);
@@ -88,6 +88,10 @@ hashtree_update(struct nexus_metadata * metadata)
 
 
 
+    if (metadata->is_root_dirnode) {
+        return __update_hashtree_root(metadata);
+    }
+
     // as of now, we assume hardlink files will be in the same directory as the parent.
     // this will SURELY change in the next update
 
@@ -96,12 +100,6 @@ hashtree_update(struct nexus_metadata * metadata)
     if (child_dentry == NULL) {
         return 0;
     }
-
-
-    if (child_dentry == root_dentry) {
-        goto update_root;
-    }
-
 
 
     parent_dentry = child_dentry->parent;
@@ -119,7 +117,7 @@ hashtree_update(struct nexus_metadata * metadata)
 
         struct nexus_dirnode * parent_dirnode = parent_dentry->metadata->dirnode;
 
-        if (dirnode_update_direntry_mac(parent_dirnode, child_uuid, &child_mac)) {
+        if (dirnode_hashtree_update(parent_dirnode, child_uuid, &child_mac, metadata->version)) {
             log_error("could not update direntry\n");
             return -1;
         }
@@ -136,10 +134,7 @@ hashtree_update(struct nexus_metadata * metadata)
     } while(child_dentry != root_dentry);
 
 
-    // update the child mac in the dirnode
-
-update_root:
-    return __update_hashtree_root(&child_dentry->metadata);
+    return __update_hashtree_root(root_dentry->metadata);
 }
 
 int
@@ -150,6 +145,9 @@ hashtree_verify(struct nexus_dentry * dentry)
     struct nexus_dirnode * parent_dirnode = NULL;
 
     struct nexus_mac metadata_mac;
+    struct nexus_mac link_mac;
+
+    uint32_t link_version = 0;
 
 
     if (metadata == NULL) {
@@ -160,7 +158,7 @@ hashtree_verify(struct nexus_dentry * dentry)
     // if it's the root, let's make sure we have the latest version
     if (dentry == root_dentry) {
         if (hashtree_root_version > metadata->version) {
-            log_error("metadata version out of date. local=%zu, remote=%zu\n",
+            log_error("root metadata outdated. local=%zu, remote=%zu\n",
                       (size_t) hashtree_root_version,
                       (size_t) metadata->version);
             return -1;
@@ -179,5 +177,26 @@ hashtree_verify(struct nexus_dentry * dentry)
     nexus_metadata_get_mac(metadata, &metadata_mac);
 
     // otherwise, just check with the parent dirnode
-    return dirnode_check_direntry_mac(parent_dirnode, &metadata->uuid, &metadata_mac);
+    if (dirnode_hashtree_fetch(parent_dirnode, &metadata->uuid, &link_mac, &link_version)) {
+        log_error("dirnode_hashtree_fetch FAILED\n");
+        return -1;
+    }
+
+    if (nexus_mac_compare(&metadata_mac, &link_mac) == 0) {
+        return 0;
+    }
+
+    // if it's a file, there's a chance it was updated through another link (they can have multiple parents)
+    if (metadata->type == NEXUS_FILENODE && metadata->version > link_version) {
+        // XXX: to be strictly secure, we should probably have the parent dirnode updated with this filenode
+        // but i presume this will be updated soon on this tree.
+        return 0;
+    }
+
+    log_error("'%s' metadata is stale (link_version=%zu, metadata_version=%zu)\n",
+              dentry->name,
+              (size_t)link_version,
+              (size_t)metadata->version);
+
+    return -1;
 }

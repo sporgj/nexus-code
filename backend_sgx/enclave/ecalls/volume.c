@@ -123,9 +123,6 @@ ecall_create_volume(char                    * user_pubkey_IN,
         key_buffer_free(key_buffer);
     }
 
-    //Merkle Tree INIT
-    hashtree_init();
-
     ret = 0;
 out:
     nexus_enclave_volumekey_clear();
@@ -290,6 +287,9 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
             goto out;
         }
     }
+
+
+    hashtree_init();
 
     ret = 0;
 out:
