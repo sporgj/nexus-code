@@ -89,7 +89,7 @@ out:
     return ret;
 }
 
-inline static int
+static int
 __remove_filenode(struct nexus_uuid * uuid, bool * should_remove)
 {
     // if we are dealing with files, check hardlink count
@@ -167,7 +167,7 @@ __nxs_fs_remove(struct nexus_metadata * metadata,
         __remove_dirnode(tmp_uuid, true);
     }
 
-    __dirnode_remove_dir_entry(dirnode, direntry);
+    __dirnode_clobber_dir_entry(dirnode, direntry);
 
     return 0;
 }
@@ -186,7 +186,7 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 
     sgx_spin_lock(&vfs_ops_lock);
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR | NEXUS_FDELETE);
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
@@ -681,53 +681,41 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
                 struct nexus_uuid    * overwrite_uuid)
 {
     nexus_dirent_type_t src_type;
-    nexus_dirent_type_t tmp_type;
+    nexus_dirent_type_t tmp_type = 0;
 
-    struct nexus_uuid   tmp_uuid;
-
-    char * symlink_target = NULL;
-
-    int ret = -1;
-
-
-    if (dirnode_remove(from_dirnode, oldname, &src_type, src_uuid, &symlink_target)) {
-        log_error("could not remove (%s) from directory\n", oldname);
-        return -1;
-    }
 
     nexus_uuid_zeroize(overwrite_uuid);
 
+    if (dirnode_rename(from_dirnode,
+                       oldname,
+                       to_dirnode,
+                       newname,
+                       src_uuid,
+                       &src_type,
+                       overwrite_uuid,
+                       &tmp_type)) {
+        log_error("dirnode_rename FAILED\n");
+        return -1;
+    }
+
     // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
-    if (dirnode_remove(to_dirnode, newname, &tmp_type, &tmp_uuid, NULL) == 0) {
+    if (tmp_type != 0) {
         // this means there was an existing entry in the dirnode
         bool should_remove = true;
 
         // if the filenode won't be removed (hardlinks), we need to update its metadata
         if (tmp_type == NEXUS_REG) {
-            if (__remove_filenode(&tmp_uuid, &should_remove)) {
+            if (__remove_filenode(overwrite_uuid, &should_remove)) {
                 log_error("__remove_filenode FAILED\n");
                 return -1;
             }
         } else if (tmp_type == NEXUS_DIR) {
-            __remove_dirnode(&tmp_uuid, false);
+            __remove_dirnode(overwrite_uuid, false);
         }
 
-        if (should_remove) {
-            nexus_uuid_copy(&tmp_uuid, overwrite_uuid);
+        if (should_remove == false) {
+            nexus_uuid_zeroize(overwrite_uuid);
         }
-    }
-
-    if (src_type == NEXUS_LNK) {
-        ret = dirnode_add_link(to_dirnode, newname, symlink_target, src_uuid);
-
-        nexus_free(symlink_target);
-    } else {
-        ret = dirnode_add(to_dirnode, newname, src_type, src_uuid);
-    }
-
-    if (ret != 0) {
-        log_error("could not add entry to destination directory\n");
-        return -1;
     }
 
     return 0;

@@ -231,6 +231,19 @@ dirnode_remove(struct nexus_dirnode * dirnode,
                struct nexus_uuid    * link_uuid,
                char                ** symlink_target_path);
 
+/**
+ * Renames a directory entry across dirnodes. Overwrite type/uuid will contain the
+ * pre-existing directory entries
+ */
+int
+dirnode_rename(struct nexus_dirnode * src_dirnode,
+               char                 * oldname,
+               struct nexus_dirnode * dst_dirnode,
+               char                 * newname,
+               struct nexus_uuid    * src_uuid,
+               nexus_dirent_type_t  * src_type,
+               struct nexus_uuid    * overwrite_uuid,
+               nexus_dirent_type_t  * overwrite_type);
 
 /**
  * Searches for the specified entry by name, and only return it after checking the appropriate
@@ -241,4 +254,4 @@ struct dir_entry *
 __dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexus_io_flags_t flags);
 
 void
-__dirnode_remove_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
+__dirnode_clobber_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
