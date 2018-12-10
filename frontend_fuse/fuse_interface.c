@@ -1,5 +1,10 @@
 #include "nexus_fuse.h"
 
+#define FUSE_ENTRY_TIMEOUT   60
+
+#define FUSE_ATTR_TIMEOUT   30
+
+
 static void
 nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 {
@@ -20,13 +25,17 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    if (nexus_fuse_getattr(dentry, NEXUS_STAT_LINK, &dentry->inode->attrs)) {
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_LINK, &inode->attrs)) {
         goto out_err;
     }
 
-    memcpy(&stbuf, &dentry->inode->attrs.posix_stat, sizeof(struct stat));
+    memcpy(&stbuf, &inode->attrs.posix_stat, sizeof(struct stat));
 
-    fuse_reply_attr(req, &stbuf, 1.0);
+    if (dentry->inode->is_dirty) {
+        stbuf.st_size = inode->filesize;
+    }
+
+    fuse_reply_attr(req, &stbuf, FUSE_ATTR_TIMEOUT);
 
     code = 0;
 
@@ -76,7 +85,7 @@ nxs_fuse_setattr(fuse_req_t              req,
 
     memcpy(&stbuf, &nexus_attrs.posix_stat, sizeof(struct stat));
 
-    fuse_reply_attr(req, &stbuf, 1.0);
+    fuse_reply_attr(req, &stbuf, FUSE_ATTR_TIMEOUT);
 
     code = 0;
 
@@ -142,6 +151,8 @@ nxs_fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
     dentry_export_attrs(child_dentry, &entry_param.attr);
 
     entry_param.ino = entry_param.attr.st_ino;
+    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
+    entry_param.attr_timeout = 0;
 
     inode_incr_lookup(child_dentry->inode, 1);
 
@@ -400,6 +411,8 @@ nxs_fuse_create(
 
     dentry_export_attrs(new_dentry, &entry_param.attr);
     entry_param.ino = entry_param.attr.st_ino;
+    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
+    entry_param.attr_timeout = 0;
 
     inode_get(new_inode);
     inode_incr_lookup(new_dentry->inode, 1);
@@ -431,6 +444,8 @@ nxs_fuse_mkdir(fuse_req_t req, fuse_ino_t parent, const char * name, mode_t mode
 
     dentry_export_attrs(new_dentry, &entry_param.attr);
     entry_param.ino = entry_param.attr.st_ino;
+    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
+    entry_param.attr_timeout = 0;
 
     new_inode = new_dentry->inode;
 
@@ -478,7 +493,6 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
 
     if (!inode->is_dirty) {
-        printf("fuse_open ino=%d (%s)\n", (int)inode->ino, file_ptr->filepath);
         inode->filesize = inode->attrs.posix_stat.st_size;
     }
 
@@ -606,6 +620,8 @@ nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const cha
 
     dentry_export_attrs(new_dentry, &entry_param.attr);
     entry_param.ino = entry_param.attr.st_ino;
+    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
+    entry_param.attr_timeout = 0;
 
     inode_incr_lookup(new_dentry->inode, 1);
 
@@ -666,6 +682,8 @@ nxs_fuse_hardlink(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const ch
 
     dentry_export_attrs(new_dentry, &entry_param.attr);
     entry_param.ino = entry_param.attr.st_ino;
+    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
+    entry_param.attr_timeout = 0;
 
     inode_get(new_dentry->inode);
     inode_incr_lookup(new_dentry->inode, 1);
@@ -750,25 +768,15 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
-    struct fuse_bufvec bufv = FUSE_BUFVEC_INIT(size);
-
     uint8_t * buffer = nexus_malloc(size);
     size_t    buflen = 0;
-
-    if (file_ptr->fid > 40) {
-        printf("reading: %s\n", file_ptr->filepath);
-    }
 
     if (file_read(file_ptr, off, size, buffer, &buflen)) {
         fuse_reply_err(req, EIO);
         return;
     }
 
-    bufv.buf[0].mem  = buffer;
-    bufv.buf[0].size = buflen;
-    bufv.buf[0].pos  = off;
-
-    fuse_reply_data(req, &bufv, FUSE_BUF_NO_SPLICE);  // XXX look into splicing for efficiency
+    fuse_reply_buf(req, (const char *)buffer, buflen);
 
     file_ptr->total_sent += buflen;
 

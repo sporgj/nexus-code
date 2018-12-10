@@ -168,9 +168,6 @@ file_read(struct my_file * file_ptr,
     pthread_rwlock_rdlock(&file_ptr->io_lock);
 
     if (file_ptr->inode->filesize == 0) {
-        printf("inode (%d) size=%zu\n",
-               (int)file_ptr->inode->ino,
-               file_ptr->inode->attrs.posix_stat.st_size);
         *output_buflen = 0;
         pthread_rwlock_unlock(&file_ptr->io_lock);
         return 0;
