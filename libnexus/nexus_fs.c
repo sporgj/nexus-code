@@ -34,11 +34,11 @@ nexus_fs_create(struct nexus_volume  * volume,
 }
 
 int
-nexus_fs_remove(struct nexus_volume  * volume,
-                char                 * dirpath,
-                char                 * plain_name,
-                struct nexus_uuid    * uuid,
-                bool                 * should_remove)
+nexus_fs_remove(struct nexus_volume     * volume,
+                char                    * dirpath,
+                char                    * plain_name,
+                struct nexus_fs_lookup  * lookup_info,
+                bool                    * should_remove)
 {
     struct nexus_backend * backend = volume->backend;
 
@@ -47,7 +47,7 @@ nexus_fs_remove(struct nexus_volume  * volume,
         return -1;
     }
 
-    return backend->impl->fs_remove(volume, dirpath, plain_name, uuid, should_remove, backend->priv_data);
+    return backend->impl->fs_remove(volume, dirpath, plain_name, lookup_info, should_remove, backend->priv_data);
 }
 
 int
@@ -201,14 +201,14 @@ nexus_fs_hardlink(struct nexus_volume * volume,
 }
 
 int
-nexus_fs_rename(struct nexus_volume * volume,
-                char                * from_dirpath,
-                char                * oldname,
-                char                * to_dirpath,
-                char                * newname,
-                struct nexus_uuid   * entry_uuid,
-                struct nexus_uuid   * overriden_uuid,
-                bool                * should_remove)
+nexus_fs_rename(struct nexus_volume     * volume,
+                char                    * from_dirpath,
+                char                    * oldname,
+                char                    * to_dirpath,
+                char                    * newname,
+                struct nexus_uuid       * entry_uuid,
+                struct nexus_fs_lookup  * overriden_entry,
+                bool                    * should_remove)
 {
     struct nexus_backend * backend = volume->backend;
 
@@ -223,7 +223,7 @@ nexus_fs_rename(struct nexus_volume * volume,
                                     to_dirpath,
                                     newname,
                                     entry_uuid,
-                                    overriden_uuid,
+                                    overriden_entry,
                                     should_remove,
                                     backend->priv_data);
 }

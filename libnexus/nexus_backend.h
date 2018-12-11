@@ -95,12 +95,12 @@ struct nexus_backend_impl {
                      struct nexus_uuid    * uuid,
                      void                 * priv_data);
 
-    int (*fs_remove)(struct nexus_volume  * volume,
-                     char                 * dirpath,
-                     char                 * plain_name,
-                     struct nexus_uuid    * uuid,
-                     bool                 * should_remove,
-                     void                 * priv_data);
+    int (*fs_remove)(struct nexus_volume    * volume,
+                     char                   * dirpath,
+                     char                   * plain_name,
+                     struct nexus_fs_lookup * lookup_info,
+                     bool                   * should_remove,
+                     void                   * priv_data);
 
     int (*fs_lookup)(struct nexus_volume    * volume,
                      char                   * dirpath,
@@ -156,15 +156,15 @@ struct nexus_backend_impl {
                        struct nexus_uuid    * uuid,
                        void                 * priv_data);
 
-    int (*fs_rename)(struct nexus_volume  * volume,
-                     char                 * from_dirpath,
-                     char                 * oldname,
-                     char                 * to_dirpath,
-                     char                 * newname,
-                     struct nexus_uuid    * entry_uuid,
-                     struct nexus_uuid    * overriden_uuid,
-                     bool                 * should_remove,
-                     void                 * priv_data);
+    int (*fs_rename)(struct nexus_volume     * volume,
+                     char                    * from_dirpath,
+                     char                    * oldname,
+                     char                    * to_dirpath,
+                     char                    * newname,
+                     struct nexus_uuid       * entry_uuid,
+                     struct nexus_fs_lookup  * overriden_entry,
+                     bool                    * should_remove,
+                     void                    * priv_data);
 
     int (*fs_encrypt)(struct nexus_volume * volume,
                       char                * path,

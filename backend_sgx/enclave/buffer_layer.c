@@ -208,6 +208,8 @@ buffer_layer_unlock(struct nexus_uuid * uuid)
         return -1;
     }
 
+    __bcache_update(uuid, 0, NEXUS_FREAD);
+
     return ret;
 }
 
