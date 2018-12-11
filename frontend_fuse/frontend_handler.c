@@ -248,7 +248,7 @@ nexus_fuse_create(struct my_dentry  * dentry,
 int
 nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
 {
-    struct nexus_uuid uuid;
+    struct nexus_fs_lookup lookup_info;
     char * parent_dirpath = dentry_get_fullpath(dentry);
 
     bool should_remove = true;
@@ -257,15 +257,16 @@ nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
         return -1;
     }
 
-    if (nexus_fs_remove(nexus_fuse_volume, parent_dirpath, filename, &uuid, &should_remove)) {
+    if (nexus_fs_remove(
+            nexus_fuse_volume, parent_dirpath, filename, &lookup_info, &should_remove)) {
         nexus_free(parent_dirpath);
         return -1;
     }
 
-    *ino = nexus_uuid_hash(&uuid);
+    *ino = nexus_uuid_hash(&lookup_info.uuid);
 
-    if (should_remove) {
-        nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &uuid, NULL);
+    if (should_remove && lookup_info.type == NEXUS_REG) {
+        nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &lookup_info.uuid, NULL);
     }
 
     nexus_free(parent_dirpath);
@@ -358,7 +359,7 @@ nexus_fuse_rename(struct my_dentry * from_dentry,
 
     if (from_dirpath && to_dirpath) {
         struct nexus_uuid entry_uuid;
-        struct nexus_uuid overwrite_uuid;
+        struct nexus_fs_lookup overwrite_entry;
 
         bool should_remove = false;
 
@@ -368,11 +369,11 @@ nexus_fuse_rename(struct my_dentry * from_dentry,
                               to_dirpath,
                               newname,
                               &entry_uuid,
-                              &overwrite_uuid,
+                              &overwrite_entry,
                               &should_remove);
 
-        if (ret == 0 && should_remove) {
-            nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &overwrite_uuid, NULL);
+        if (ret == 0 && should_remove && overwrite_entry.type == NEXUS_REG) {
+            nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &overwrite_entry.uuid, NULL);
         }
     }
 
