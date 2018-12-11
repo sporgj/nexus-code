@@ -112,6 +112,7 @@ objs := nexus_enclave_t.o \
 	bucket.o \
 	filenode.o \
 	supernode.o \
+	stash_verifier.o \
 	main.o
 
 

@@ -291,16 +291,34 @@ enclave {
             [user_check] struct nexus_volume * volume
         );
 
-        
-        /* int
-        ocall_set_stash_verifier
+
+
+        // -------------- version stash ocalls ---------------
+
+        int
+        ocall_versionstash_store
         (
             [in]         struct nexus_uuid   * metadata_uuid,
-            [user_check] uint8_t             * buffer,
-                         size_t                size,
-            [out]        size_t              * timestamp,
+            [in]         struct nexus_mac    * mac,
+                         uint32_t              version,
             [user_check] struct nexus_volume * volume
-        ); */
+        );
+
+        int
+        ocall_versionstash_fetch
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [out]        struct nexus_mac    * mac,
+            [out]        uint32_t            * version,
+            [user_check] struct nexus_volume * volume
+        );
+
+        int
+        ocall_versionstash_delete
+        (
+            [in]         struct nexus_uuid   * metadata_uuid,
+            [user_check] struct nexus_volume * volume
+        );
 
 
         // ---------------------- utilities ---------------------

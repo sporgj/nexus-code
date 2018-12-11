@@ -51,6 +51,29 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     metadata->object = object;
 }
 
+void
+nexus_metadata_get_mac(struct nexus_metadata * metadata, struct nexus_mac * mac_out)
+{
+    struct nexus_supernode * supernode = NULL;
+    struct nexus_dirnode   * dirnode   = NULL;
+    struct nexus_filenode  * filenode  = NULL;
+
+    switch (metadata->type) {
+    case NEXUS_FILENODE:
+        filenode = metadata->filenode;
+        nexus_mac_copy(&filenode->mac, mac_out);
+        break;
+    case NEXUS_DIRNODE:
+        dirnode = metadata->dirnode;
+        nexus_mac_copy(&dirnode->mac, mac_out);
+        break;
+    case NEXUS_SUPERNODE:
+        supernode = metadata->supernode;
+        nexus_mac_copy(&supernode->mac, mac_out);
+        break;
+    }
+}
+
 struct nexus_dentry *
 metadata_get_dentry(struct nexus_metadata * metadata)
 {
@@ -84,6 +107,12 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
 
     if (flags & NEXUS_FWRITE) {
         metadata->is_locked = true;
+    }
+
+
+    if (stashv_verify(metadata)) {
+        nexus_metadata_free(metadata);
+        return NULL;
     }
 
     return metadata;
@@ -286,7 +315,12 @@ __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac *mac)
 int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
-    if(__nexus_metadata_store(metadata, NULL)) {
+    if (__nexus_metadata_store(metadata, NULL)) {
+        return -1;
+    }
+
+    if (stashv_update(metadata)) {
+        log_error("stashv_update() FAILED\n");
         return -1;
     }
 
