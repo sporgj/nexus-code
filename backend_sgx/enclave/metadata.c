@@ -155,6 +155,7 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
         supernode_free(metadata->supernode);
+        break;
     case NEXUS_DIRNODE:
         dirnode_free(metadata->dirnode);
         break;
