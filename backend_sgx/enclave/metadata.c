@@ -111,7 +111,8 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
 
 
     if (stashv_verify(metadata)) {
-        nexus_metadata_free(metadata);
+        log_error("stash_verify FAILED\n");
+        nexus_free(metadata);
         return NULL;
     }
 

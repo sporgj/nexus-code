@@ -109,11 +109,20 @@ stashv_destroy()
 }
 
 
+// removes entry from enclave only
+int
+stashv_drop(struct nexus_uuid * uuid)
+{
+    nexus_lru_del(__stashv_cache, uuid);
+}
+
+/**
+ * removes the uuid from both enclave and untrusted memory
+ */
 int
 stashv_delete(struct nexus_uuid * uuid)
 {
     nexus_lru_del(__stashv_cache, uuid);
-
     return __delete_stash_item(uuid);
 }
 

@@ -50,6 +50,12 @@ ecall_init_enclave(struct nexus_volume  * volume,
         global_log2chunk_size = pow2 - 1;
     }
 
+
+    if (stashv_init()) {
+        log_error("initializing stash verifier failed\n");
+        return -1;
+    }
+
     return 0;
 }
 

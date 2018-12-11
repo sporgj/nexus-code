@@ -17,3 +17,9 @@ stashv_update(struct nexus_metadata * metadata);
 
 int
 stashv_verify(struct nexus_metadata * metadata);
+
+int
+stashv_drop(struct nexus_uuid * uuid);
+
+int
+stashv_delete(struct nexus_uuid * uuid);

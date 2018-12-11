@@ -312,6 +312,14 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         return -1;
     }
 
+
+    // create the stash manager
+    if (stash_manager_init(sgx_backend)) {
+        log_error("could not start stash manager\n");
+        return -1;
+    }
+
+
     if (init_enclave(sgx_backend)) {
         nexus_free(public_key_str);
 

@@ -73,6 +73,8 @@ ocall_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume
 int
 ocall_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 {
+    stash_manager_delete(metadata_uuid, volume);
+
     return io_buffer_del(metadata_uuid, volume);
 }
 

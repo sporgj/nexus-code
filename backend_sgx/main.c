@@ -54,6 +54,8 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
         munmap(sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
 
+    stash_manager_destroy();
+
     nexus_free(sgx_backend);
 
     return 0;

@@ -34,6 +34,7 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
 
     // update the parent dirnode
     if (dirnode_add(parent_dirnode, filename_IN, type_IN, entry_uuid)) {
+        buffer_layer_delete(entry_uuid);
         log_error("dirnode_add() FAILED\n");
         return -1;
     }

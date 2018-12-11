@@ -167,7 +167,7 @@ __parse_version_file() {
 
     // read the header
     len    = sizeof(struct __stash_verifier_hdr);
-    nbytes = write(stash_filehandle->fd, &tmp_header, len);
+    nbytes = read(stash_filehandle->fd, &tmp_header, len);
 
     if (nbytes != len) {
         log_error("read stash header FAILED. tried=%d, got=%d\n", len, nbytes);
@@ -186,7 +186,7 @@ __parse_version_file() {
 
         if (nbytes != len) {
             nexus_free(uuid_version);
-            log_error("write stash file FAILED. tried=%d, got=%d\n", len, nbytes);
+            log_error("read stash entry FAILED. tried=%d, got=%d\n", len, nbytes);
             return -1;
         }
 
@@ -306,12 +306,14 @@ stash_manager_init(struct sgx_backend * backend)
         return -1;
     }
 
+    stash_htable = nexus_create_htable(256, uuid_hash_func, uuid_equal_func);
+
     if (__parse_version_file()) {
         log_error("__parse_version_file FAILED\n");
         return -1;
     }
 
-    stash_htable = nexus_create_htable(256, uuid_hash_func, uuid_equal_func);
+    nexus_printf("Started stash manager. count=%d\n", (int)stash_header.entry_count);
 
     return 0;
 }
@@ -344,11 +346,9 @@ stash_manager_store(struct nexus_uuid   * uuid,
         nexus_uuid_copy(uuid, &uuidversion->uuid);
 
         __put_version_buffer(uuidversion);
-
-        return -1;
     }
 
-    if (uuidversion->version > version) {
+    if (uuidversion->version < version) {
         uuidversion->version = version;
 
         nexus_mac_copy(mac, &uuidversion->mac);
@@ -396,5 +396,5 @@ stash_manager_delete(struct nexus_uuid * uuid, struct nexus_volume * volume)
 
     nexus_free(uuidversion);
 
-    return 0;
+    return __update_version_file();
 }
