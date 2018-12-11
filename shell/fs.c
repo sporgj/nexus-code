@@ -238,10 +238,12 @@ __fs_remove(struct nexus_volume * vol, const char * path)
 
     struct nexus_uuid uuid;
 
+    bool should_remove = false;
+
 
     nexus_splitpath(path, &dirpath, &filename);
 
-    int ret = nexus_fs_remove(vol, dirpath, filename, &uuid);
+    int ret = nexus_fs_remove(vol, dirpath, filename, &uuid, &should_remove);
 
     nexus_free(dirpath);
     nexus_free(filename);
@@ -274,13 +276,15 @@ __fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_p
     struct nexus_uuid uuid1;
     struct nexus_uuid uuid2;
 
+    bool should_remove = false;
+
     int ret = -1;
 
     nexus_splitpath(from_path, &from_dirpath, &from_filename);
     nexus_splitpath(to_path, &to_dirpath, &to_filename);
 
     ret = nexus_fs_rename(
-        vol, from_dirpath, from_filename, to_dirpath, to_filename, &uuid1, &uuid2);
+        vol, from_dirpath, from_filename, to_dirpath, to_filename, &uuid1, &uuid2, &should_remove);
 
     if (ret != 0) {
         log_error("rename operation\n");

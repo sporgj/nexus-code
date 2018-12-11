@@ -251,16 +251,22 @@ nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
     struct nexus_uuid uuid;
     char * parent_dirpath = dentry_get_fullpath(dentry);
 
+    bool should_remove = true;
+
     if (parent_dirpath == NULL) {
         return -1;
     }
 
-    if (nexus_fs_remove(nexus_fuse_volume, parent_dirpath, filename, &uuid)) {
+    if (nexus_fs_remove(nexus_fuse_volume, parent_dirpath, filename, &uuid, &should_remove)) {
         nexus_free(parent_dirpath);
         return -1;
     }
 
     *ino = nexus_uuid_hash(&uuid);
+
+    if (should_remove) {
+        nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &uuid, NULL);
+    }
 
     nexus_free(parent_dirpath);
 
@@ -345,7 +351,7 @@ nexus_fuse_rename(struct my_dentry * from_dentry,
                   char             * newname)
 {
     char * from_dirpath = dentry_get_fullpath(from_dentry);
-    char * to_dirpath = dentry_get_fullpath(to_dentry);
+    char * to_dirpath   = dentry_get_fullpath(to_dentry);
 
     int ret = -1;
 
@@ -354,13 +360,20 @@ nexus_fuse_rename(struct my_dentry * from_dentry,
         struct nexus_uuid entry_uuid;
         struct nexus_uuid overwrite_uuid;
 
+        bool should_remove = false;
+
         ret = nexus_fs_rename(nexus_fuse_volume,
                               from_dirpath,
                               oldname,
                               to_dirpath,
                               newname,
                               &entry_uuid,
-                              &overwrite_uuid);
+                              &overwrite_uuid,
+                              &should_remove);
+
+        if (ret == 0 && should_remove) {
+            nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &overwrite_uuid, NULL);
+        }
     }
 
     nexus_free(from_dirpath);

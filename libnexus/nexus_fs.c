@@ -37,16 +37,17 @@ int
 nexus_fs_remove(struct nexus_volume  * volume,
                 char                 * dirpath,
                 char                 * plain_name,
-                struct nexus_uuid    * uuid)
+                struct nexus_uuid    * uuid,
+                bool                 * should_remove)
 {
     struct nexus_backend * backend = volume->backend;
 
     if (backend->impl->fs_remove == NULL) {
-	log_error("fs_remove NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+        log_error("fs_remove NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
     }
 
-    return backend->impl->fs_remove(volume, dirpath, plain_name, uuid, backend->priv_data);
+    return backend->impl->fs_remove(volume, dirpath, plain_name, uuid, should_remove, backend->priv_data);
 }
 
 int
@@ -206,13 +207,14 @@ nexus_fs_rename(struct nexus_volume * volume,
                 char                * to_dirpath,
                 char                * newname,
                 struct nexus_uuid   * entry_uuid,
-                struct nexus_uuid   * overriden_uuid)
+                struct nexus_uuid   * overriden_uuid,
+                bool                * should_remove)
 {
     struct nexus_backend * backend = volume->backend;
 
     if (backend->impl->fs_rename == NULL) {
-	log_error("fs_rename NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+        log_error("fs_rename NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
     }
 
     return backend->impl->fs_rename(volume,
@@ -222,6 +224,7 @@ nexus_fs_rename(struct nexus_volume * volume,
                                     newname,
                                     entry_uuid,
                                     overriden_uuid,
+                                    should_remove,
                                     backend->priv_data);
 }
 

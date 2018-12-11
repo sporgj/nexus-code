@@ -36,6 +36,7 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
                       struct nexus_uuid    * uuid,
+                      bool                 * should_remove,
                       void                 * priv_data)
 {
     struct sgx_backend * sgx_backend = NULL;
@@ -48,7 +49,7 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_REMOVE);
 
-    err = ecall_fs_remove(sgx_backend->enclave_id, &ret, dirpath, plain_name, uuid);
+    err = ecall_fs_remove(sgx_backend->enclave_id, &ret, dirpath, plain_name, uuid, should_remove);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_REMOVE);
 
@@ -300,6 +301,7 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                       char                 * newname,
                       struct nexus_uuid    * entry_uuid,
                       struct nexus_uuid    * overriden_uuid,
+                      bool                 * should_remove,
                       void                 * priv_data)
 {
     struct sgx_backend * sgx_backend = (struct sgx_backend *)priv_data;
@@ -317,7 +319,8 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                           to_dirpath,
                           newname,
                           entry_uuid,
-                          overriden_uuid);
+                          overriden_uuid,
+                          should_remove);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_RENAME);
 
