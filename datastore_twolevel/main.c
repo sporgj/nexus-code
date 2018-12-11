@@ -508,7 +508,7 @@ twolevel_del_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
     ret = nexus_delete_raw_file(filename);
 
     if (ret != 0) {
-        log_error("Could not delete file (%s)", filename);
+        log_error("Could not delete file (%s)\n", filename);
         goto err;
     }
 
