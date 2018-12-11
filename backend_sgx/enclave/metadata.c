@@ -251,7 +251,7 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
 }
 
 int
-nexus_metadata_store(struct nexus_metadata * metadata)
+__nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac *mac)
 {
     int ret = -1;
 
@@ -262,13 +262,13 @@ nexus_metadata_store(struct nexus_metadata * metadata)
 
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
-        ret = supernode_store(metadata->supernode, metadata->version, NULL);
+        ret = supernode_store(metadata->supernode, metadata->version, mac);
         break;
     case NEXUS_DIRNODE:
-        ret = dirnode_store(&metadata->uuid, metadata->dirnode, metadata->version, NULL);
+        ret = dirnode_store(&metadata->uuid, metadata->dirnode, metadata->version, mac);
         break;
     case NEXUS_FILENODE:
-        ret = filenode_store(&metadata->uuid, metadata->filenode, metadata->version, NULL);
+        ret = filenode_store(&metadata->uuid, metadata->filenode, metadata->version, mac);
         break;
     }
 
@@ -281,6 +281,16 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     }
 
     return ret;
+}
+
+int
+nexus_metadata_store(struct nexus_metadata * metadata)
+{
+    if(__nexus_metadata_store(metadata, NULL)) {
+        return -1;
+    }
+
+    return 0;
 }
 
 struct nexus_metadata *

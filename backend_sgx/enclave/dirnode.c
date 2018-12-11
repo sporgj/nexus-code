@@ -311,11 +311,13 @@ dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_
 {
     struct nexus_dirnode * dirnode = NULL;
 
+    struct nexus_mac mac;
+
     uint8_t * buffer = NULL;
     size_t    buflen = 0;
 
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &mac);
 
     if (buffer == NULL) {
         nexus_crypto_buf_free(crypto_buffer);
@@ -329,6 +331,8 @@ dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flags_
         log_error("__parse_dirnode FAILED\n");
         return NULL;
     }
+
+    nexus_mac_copy(&mac, &dirnode->mac);
 
     return dirnode;
 }
@@ -625,12 +629,17 @@ dirnode_store(struct nexus_uuid    * uuid,
         }
 
 
-        ret = nexus_crypto_buf_put(crypto_buffer, mac);
+        ret = nexus_crypto_buf_put(crypto_buffer, &dirnode->mac);
 
         if (ret != 0) {
             log_error("nexus_crypto_buf_put FAILED\n");
             goto out;
         }
+    }
+
+
+    if (mac) {
+        nexus_mac_copy(&dirnode->mac, mac);
     }
 
     __dirnode_set_clean(dirnode);

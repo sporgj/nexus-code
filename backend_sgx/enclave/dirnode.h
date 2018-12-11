@@ -77,6 +77,10 @@ struct nexus_dirnode {
 
     char                  * last_failed_lookup; // TODO could be made into a list
 
+
+    struct nexus_mac        mac; // this will hold the mac extracted from the crypto buffer
+
+
     struct nexus_acl        dir_acl;
 
     struct nexus_list       symlink_list;

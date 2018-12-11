@@ -66,7 +66,7 @@ supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flag
     size_t    buflen = 0;
 
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &supernode->mac);
 
     if (buffer == NULL) {
         log_error("nexus_crypto_buf_get() FAILED\n");
@@ -226,11 +226,16 @@ supernode_store(struct nexus_supernode * supernode, int version, struct nexus_ma
             goto out;
         }
 
-        ret = nexus_crypto_buf_put(crypto_buffer, mac);
+        ret = nexus_crypto_buf_put(crypto_buffer, &supernode->mac);
         if (ret != 0) {
             log_error("nexus_crypto_buf_put FAILED\n");
             goto out;
         }
+    }
+
+
+    if (mac) {
+        nexus_mac_copy(&supernode->mac, mac);
     }
 
     __supernode_set_clean(supernode);
