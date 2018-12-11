@@ -143,10 +143,10 @@ __remove_dirnode(struct nexus_uuid * uuid, bool check_emptiness)
 }
 
 inline static int
-__nxs_fs_remove(struct nexus_metadata * metadata,
-                char *                  filename_IN,
-                struct nexus_uuid *     uuid_OUT,
-                bool *                  should_remove)
+__nxs_fs_remove(struct nexus_metadata  * metadata,
+                char                   * filename_IN,
+                struct nexus_fs_lookup * fs_lookup_OUT,
+                bool                   * should_remove)
 {
     struct nexus_dirnode * dirnode = metadata->dirnode;
 
@@ -164,8 +164,6 @@ __nxs_fs_remove(struct nexus_metadata * metadata,
     tmp_uuid = &direntry->dir_rec.link_uuid;
     tmp_type = direntry->dir_rec.type;
 
-    nexus_uuid_copy(tmp_uuid, uuid_OUT);
-
     *should_remove = true;
 
     if (tmp_type == NEXUS_REG) {
@@ -176,17 +174,21 @@ __nxs_fs_remove(struct nexus_metadata * metadata,
         __remove_dirnode(tmp_uuid, true);
     }
 
+    nexus_uuid_copy(tmp_uuid, &fs_lookup_OUT->uuid);
+    fs_lookup_OUT->type = tmp_type;
+
     __dirnode_clobber_dir_entry(dirnode, direntry);
 
     return 0;
 }
 
 int
-ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_out)
+ecall_fs_remove(char                   * dirpath_IN,
+                char                   * filename_IN,
+                struct nexus_fs_lookup * fs_lookup_OUT,
+                bool                   * should_remove_out)
 {
     struct nexus_metadata * metadata = NULL;
-
-    struct nexus_uuid entry_uuid;
 
     bool should_remove = true; // TODO make this ecall argument
 
@@ -206,7 +208,7 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 
     dentry_delete_child(metadata_get_dentry(metadata), filename_IN);
 
-    ret = __nxs_fs_remove(metadata, filename_IN, &entry_uuid, &should_remove);
+    ret = __nxs_fs_remove(metadata, filename_IN, fs_lookup_OUT, &should_remove);
 
     if (ret != 0) {
         log_error("__nxs_fs_remove() FAILED\n");
@@ -219,7 +221,7 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
         goto out;
     }
 
-    nexus_uuid_copy(&entry_uuid, uuid_out);
+    *should_remove_out = should_remove;
 
     ret = 0;
 out:
@@ -682,18 +684,17 @@ out:
 }
 
 int
-__nxs_fs_rename(struct nexus_dirnode * from_dirnode,
-                char                 * oldname,
-                struct nexus_dirnode * to_dirnode,
-                char                 * newname,
-                struct nexus_uuid    * src_uuid,
-                struct nexus_uuid    * overwrite_uuid)
+__nxs_fs_rename(struct nexus_dirnode    * from_dirnode,
+                char                    * oldname,
+                struct nexus_dirnode    * to_dirnode,
+                char                    * newname,
+                struct nexus_uuid       * src_uuid,
+                struct nexus_fs_lookup  * overwrite_entry,
+                bool                    * should_remove)
 {
     nexus_dirent_type_t src_type;
     nexus_dirent_type_t tmp_type = 0;
 
-
-    nexus_uuid_zeroize(overwrite_uuid);
 
     if (dirnode_rename(from_dirnode,
                        oldname,
@@ -701,8 +702,8 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
                        newname,
                        src_uuid,
                        &src_type,
-                       overwrite_uuid,
-                       &tmp_type)) {
+                       &overwrite_entry->uuid,
+                       &overwrite_entry->type)) {
         log_error("dirnode_rename FAILED\n");
         return -1;
     }
@@ -710,20 +711,15 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
     // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
     if (tmp_type != 0) {
         // this means there was an existing entry in the dirnode
-        bool should_remove = true;
 
         // if the filenode won't be removed (hardlinks), we need to update its metadata
         if (tmp_type == NEXUS_REG) {
-            if (__remove_filenode(overwrite_uuid, &should_remove)) {
+            if (__remove_filenode(&overwrite_entry->uuid, should_remove)) {
                 log_error("__remove_filenode FAILED\n");
                 return -1;
             }
         } else if (tmp_type == NEXUS_DIR) {
-            __remove_dirnode(overwrite_uuid, false);
-        }
-
-        if (should_remove == false) {
-            nexus_uuid_zeroize(overwrite_uuid);
+            __remove_dirnode(&overwrite_entry->uuid, false);
         }
     }
 
@@ -732,12 +728,13 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
 
 
 int
-ecall_fs_rename(char              * from_dirpath_IN,
-                char              * oldname_IN,
-                char              * to_dirpath_IN,
-                char              * newname_IN,
-                struct nexus_uuid * entry_uuid_out,
-                struct nexus_uuid * existing_uuid_out)
+ecall_fs_rename(char                    * from_dirpath_IN,
+                char                    * oldname_IN,
+                char                    * to_dirpath_IN,
+                char                    * newname_IN,
+                struct nexus_uuid       * entry_uuid_out,
+                struct nexus_fs_lookup  * overwrite_entry_out,
+                bool                    * should_remove_out)
 {
     struct nexus_metadata * from_metadata = NULL;
     struct nexus_metadata * to_metadata   = NULL;
@@ -747,7 +744,9 @@ ecall_fs_rename(char              * from_dirpath_IN,
     struct nexus_dentry   * to_dentry     = NULL;
 
     struct nexus_uuid entry_uuid;
-    struct nexus_uuid existing_uuid;
+    struct nexus_fs_lookup existing_entry;
+
+    bool should_remove = false;
 
     int ret = -1;
 
@@ -811,7 +810,8 @@ do_rename:
                           tmp_metadata->dirnode,
                           newname_IN,
                           &entry_uuid,
-                          &existing_uuid);
+                          &existing_entry,
+                          &should_remove);
 
     if (ret != 0) {
         log_error("rename operation failed\n");
@@ -836,7 +836,9 @@ do_rename:
     }
 
     nexus_uuid_copy(&entry_uuid, entry_uuid_out);
-    nexus_uuid_copy(&existing_uuid, existing_uuid_out);
+    memcpy(&overwrite_entry_out, &existing_entry, sizeof(struct nexus_fs_lookup));
+
+    *should_remove_out = should_remove;
 
     ret = 0;
 

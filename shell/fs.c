@@ -236,12 +236,15 @@ __fs_remove(struct nexus_volume * vol, const char * path)
     char * dirpath  = NULL;
     char * filename = NULL;
 
-    struct nexus_uuid uuid;
+    struct nexus_fs_lookup lookup_info = { 0 };
+
+
+    bool should_remove = false;
 
 
     nexus_splitpath(path, &dirpath, &filename);
 
-    int ret = nexus_fs_remove(vol, dirpath, filename, &uuid);
+    int ret = nexus_fs_remove(vol, dirpath, filename, &lookup_info, &should_remove);
 
     nexus_free(dirpath);
     nexus_free(filename);
@@ -251,13 +254,10 @@ __fs_remove(struct nexus_volume * vol, const char * path)
         return -1;
     }
 
+    printf(" .remove (rm=%d):: ", (int)should_remove);
 
-    {
-        char * nexus_name = nexus_uuid_to_alt64(&uuid);
-        printf(" .removed %s -> %s\n", path, nexus_name);
-        fflush(stdout);
-        nexus_free(nexus_name);
-    }
+    print_lookup_info(path, &lookup_info);
+
 
     return 0;
 
@@ -272,15 +272,23 @@ __fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_p
     char * to_filename   = NULL;
 
     struct nexus_uuid uuid1;
-    struct nexus_uuid uuid2;
+    struct nexus_fs_lookup lookup_info;
+
+    bool should_remove = false;
 
     int ret = -1;
 
     nexus_splitpath(from_path, &from_dirpath, &from_filename);
     nexus_splitpath(to_path, &to_dirpath, &to_filename);
 
-    ret = nexus_fs_rename(
-        vol, from_dirpath, from_filename, to_dirpath, to_filename, &uuid1, &uuid2);
+    ret = nexus_fs_rename(vol,
+                          from_dirpath,
+                          from_filename,
+                          to_dirpath,
+                          to_filename,
+                          &uuid1,
+                          &lookup_info,
+                          &should_remove);
 
     if (ret != 0) {
         log_error("rename operation\n");
@@ -289,15 +297,16 @@ __fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_p
 
     {
         char * nexus_name1   = nexus_uuid_to_alt64(&uuid1);
-        char * nexus_name2   = nexus_uuid_to_alt64(&uuid2);
+        char * nexus_name2   = nexus_uuid_to_alt64(&lookup_info.uuid);
 
-        printf(" .rename %s/%s [%s] -> %s/%s [%s]\n",
+        printf(" .rename %s/%s [%s] -> %s/%s [%s] {rm=%d}\n",
                 from_dirpath,
                 from_filename,
                 nexus_name1,
                 to_dirpath,
                 to_filename,
-                nexus_name2);
+                nexus_name2,
+                (int)should_remove);
 
         nexus_free(nexus_name1);
         nexus_free(nexus_name2);

@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include <sys/stat.h>
 
@@ -127,10 +128,11 @@ nexus_fs_create(struct nexus_volume  * volume,
                 struct nexus_uuid    * uuid);
 
 int
-nexus_fs_remove(struct nexus_volume  * volume,
-                char                 * parent_dir,
-                char                 * plain_name,
-                struct nexus_uuid    * uuid);
+nexus_fs_remove(struct nexus_volume     * volume,
+                char                    * dirpath,
+                char                    * plain_name,
+                struct nexus_fs_lookup  * lookup_info,
+                bool                    * should_remove);
 
 int
 nexus_fs_lookup(struct nexus_volume    * volume,
@@ -188,13 +190,14 @@ nexus_fs_hardlink(struct nexus_volume * volume,
                   struct nexus_uuid   * uuid);
 
 int
-nexus_fs_rename(struct nexus_volume * volume,
-                char                * from_dirpath,
-                char                * oldname,
-                char                * to_dirpath,
-                char                * newname,
-                struct nexus_uuid   * entry_uuid,
-                struct nexus_uuid   * overriden_uuid);
+nexus_fs_rename(struct nexus_volume     * volume,
+                char                    * from_dirpath,
+                char                    * oldname,
+                char                    * to_dirpath,
+                char                    * newname,
+                struct nexus_uuid       * entry_uuid,
+                struct nexus_fs_lookup  * overriden_entry,
+                bool                    * should_remove);
 
 
 
