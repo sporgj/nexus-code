@@ -3,13 +3,16 @@
 #define LRU_CAPACITY    (256)
 
 
-struct nexus_supernode      * global_supernode                = NULL;
+struct nexus_supernode      * global_supernode           = NULL;
 
-struct nexus_metadata       * global_supernode_metadata       = NULL;
+struct nexus_metadata       * global_supernode_metadata  = NULL;
 
-static struct nexus_lru     * metadata_objects_list           = NULL;
+static struct nexus_lru     * metadata_cache             = NULL;
 
-static struct nexus_dentry    root_dentry;
+static sgx_spinlock_t         mcache_lock                = SGX_SPINLOCK_INITIALIZER;
+
+static sgx_spinlock_t         traversal_lock             = SGX_SPINLOCK_INITIALIZER;
+
 
 void
 __lru_shrinker(uintptr_t element, uintptr_t key)
@@ -28,10 +31,7 @@ nexus_vfs_init()
 {
     global_supernode = NULL;
 
-    metadata_objects_list = nexus_lru_create(LRU_CAPACITY,
-                                             __uuid_hasher,
-                                             __uuid_equals,
-                                             __lru_shrinker);
+    metadata_cache = nexus_lru_create(LRU_CAPACITY, __uuid_hasher, __uuid_equals, __lru_shrinker);
 
     return 0;
 }
@@ -39,7 +39,7 @@ nexus_vfs_init()
 void
 nexus_vfs_deinit()
 {
-    nexus_lru_destroy(metadata_objects_list);
+    nexus_lru_destroy(metadata_cache);
 
     if (global_supernode) {
         supernode_free(global_supernode);
@@ -75,14 +75,7 @@ nexus_vfs_mount(struct nexus_crypto_buf * supernode_crypto_buf)
         goto out_err;
     }
 
-    // initialize the root nexus dentry
-    // TODO add code to cleanup root dentry
-    memset(&root_dentry, 0, sizeof(struct nexus_dentry));
-    INIT_LIST_HEAD(&root_dentry.children);
-
-    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry.link_uuid);
-
-    root_dentry.dirent_type = NEXUS_DIR;
+    dcache_init_root();
 
     return 0;
 
@@ -95,7 +88,7 @@ out_err:
 struct nexus_metadata *
 dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool revalidate)
 {
-    if (revalidate && revalidate_dentry(dentry, flags)) {
+    if (revalidate && dentry_revalidate(dentry, flags)) {
         log_error("could revalidate dentry\n");
         return NULL;
     }
@@ -106,26 +99,41 @@ dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool r
 struct nexus_dentry *
 nexus_vfs_lookup(char * filepath)
 {
-    struct path_walker walker
-        = { .remaining_path = filepath, .type = PATH_WALK_NORMAL, .parent_dentry = &root_dentry };
+    struct nexus_dentry * dentry = NULL;
 
-    return dentry_lookup(&walker);
+    struct path_walker walker = {
+        .remaining_path       = filepath,
+        .type                 = PATH_WALK_NORMAL,
+        .parent_dentry        = root_dentry
+    };
+
+    sgx_spin_lock(&traversal_lock);
+    dentry = dentry_lookup(&walker);
+    sgx_spin_unlock(&traversal_lock);
+
+    return dentry;
 }
 
 struct nexus_dentry *
 nexus_vfs_lookup_parent(char * filepath, struct path_walker * walker)
 {
     walker->remaining_path = filepath;
-    walker->parent_dentry  = &root_dentry;
+    walker->parent_dentry  = root_dentry;
     walker->type           = PATH_WALK_PARENT;
 
+    sgx_spin_lock(&traversal_lock);
     struct nexus_dentry * dentry = dentry_lookup(walker);
+    sgx_spin_unlock(&traversal_lock);
 
     if (dentry == NULL) {
         return NULL;
     }
 
-    return revalidate_dentry(dentry, NEXUS_FREAD) ? NULL : dentry;
+    if (dentry_revalidate(dentry, NEXUS_FREAD)) {
+        return NULL;
+    }
+
+    return dentry;
 }
 
 struct nexus_metadata *
@@ -172,25 +180,16 @@ nexus_vfs_put(struct nexus_metadata * metadata)
     }
 }
 
-void
-nexus_vfs_drop(struct nexus_metadata * metadata)
-{
-    // this eventually calls nexus_metadata_free
-    nexus_lru_del(metadata_objects_list, &metadata->uuid);
-}
-
 int
-nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
+nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
 {
-    bool should_reload = true;
-
     if (metadata->is_invalid) {
         return nexus_metadata_reload(metadata, flags);
     }
 
-    buffer_layer_revalidate(&metadata->uuid, &should_reload);
+    buffer_layer_revalidate(&metadata->uuid, has_changed);
 
-    if (should_reload) {
+    if (*has_changed) {
         return nexus_metadata_reload(metadata, flags);
     }
 
@@ -204,7 +203,9 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 struct nexus_supernode *
 nexus_vfs_acquire_supernode(nexus_io_flags_t flags)
 {
-    if (nexus_vfs_revalidate(global_supernode_metadata, flags)) {
+    bool has_changed = false;
+
+    if (nexus_vfs_revalidate(global_supernode_metadata, flags, &has_changed)) {
         log_error("could not revalidate supernode\n");
         return NULL;
     }
@@ -228,10 +229,12 @@ nexus_vfs_load(struct nexus_uuid * real_uuid, nexus_metadata_type_t type, nexus_
     struct nexus_metadata * metadata  = NULL;
 
     // try loading from cache
-    metadata = nexus_lru_get(metadata_objects_list, real_uuid);
+    metadata = nexus_lru_get(metadata_cache, real_uuid);
 
     if (metadata) {
-        if (nexus_vfs_revalidate(metadata, flags) == 0) {
+        bool has_changed = false;
+
+        if (nexus_vfs_revalidate(metadata, flags, &has_changed) == 0) {
             return metadata;
         }
 
@@ -246,7 +249,9 @@ nexus_vfs_load(struct nexus_uuid * real_uuid, nexus_metadata_type_t type, nexus_
         return NULL;
     }
 
-    nexus_lru_put(metadata_objects_list, real_uuid, metadata);
+    sgx_spin_lock(&mcache_lock);
+    nexus_lru_put(metadata_cache, real_uuid, metadata);
+    sgx_spin_unlock(&mcache_lock);
 
     return metadata;
 }
@@ -254,7 +259,9 @@ nexus_vfs_load(struct nexus_uuid * real_uuid, nexus_metadata_type_t type, nexus_
 void
 nexus_vfs_delete(struct nexus_uuid * uuid)
 {
-    nexus_lru_del(metadata_objects_list, uuid);
+    sgx_spin_lock(&mcache_lock);
+    nexus_lru_del(metadata_cache, uuid);
+    sgx_spin_unlock(&mcache_lock);
 
     buffer_layer_delete(uuid);
 }

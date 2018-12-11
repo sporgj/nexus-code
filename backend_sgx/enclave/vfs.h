@@ -50,18 +50,12 @@ void
 nexus_vfs_put(struct nexus_metadata * metadata);
 
 /**
- * Drops the metadata out of the VFS.
- */
-void
-nexus_vfs_drop(struct nexus_metadata * metadata);
-
-/**
  * Checks whether the specified metadata object is uptodate
  * @param metadata
  * @return 0 on success
  */
 int
-nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags);
+nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed);
 
 
 struct nexus_supernode *

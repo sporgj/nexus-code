@@ -51,6 +51,16 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     metadata->object = object;
 }
 
+struct nexus_dentry *
+metadata_get_dentry(struct nexus_metadata * metadata)
+{
+    if (metadata->dentry_count == 0) {
+        return NULL;
+    }
+
+    return list_first_entry(&metadata->dentry_list, struct nexus_dentry, aliases);
+}
+
 struct nexus_metadata *
 nexus_metadata_from_object(struct nexus_uuid     * uuid,
                            void                  * obj,
@@ -64,10 +74,13 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
     metadata->flags   = flags;
     metadata->version = version;
 
+    metadata->dentry_lock = SGX_SPINLOCK_INITIALIZER;
+
     nexus_uuid_copy(uuid, &metadata->uuid);
 
     __set_metadata_object(metadata, obj);
 
+    INIT_LIST_HEAD(&metadata->dentry_list);
 
     if (flags & NEXUS_FWRITE) {
         metadata->is_locked = true;
@@ -123,8 +136,19 @@ nexus_metadata_free(struct nexus_metadata * metadata)
         break;
     }
 
-    if (metadata->dentry) {
-        metadata->dentry->metadata = NULL;
+    if (metadata->dentry_count) {
+        struct list_head * curr = NULL;
+        struct list_head * pos = NULL;
+
+        list_for_each_safe(curr, pos, &metadata->dentry_list) {
+            struct nexus_dentry * dentry = NULL;
+
+            dentry = list_entry(curr, struct nexus_dentry, aliases);
+
+            dentry_invalidate(dentry);
+        }
+
+        metadata->dentry_count = 0;
     }
 
     nexus_free(metadata);

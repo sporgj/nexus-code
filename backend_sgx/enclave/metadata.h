@@ -1,4 +1,5 @@
 #pragma once
+#include <sgx_spinlock.h>
 
 #include <stdbool.h>
 
@@ -21,13 +22,11 @@ typedef enum {
 struct nexus_metadata {
     struct nexus_uuid            uuid;
 
-    nexus_dirent_type_t          type;
+    nexus_metadata_type_t        type;
 
     nexus_io_flags_t             flags;
 
     uint32_t                     version;
-
-    size_t                       timestamp; // the last time it was read/written to disk
 
     size_t                       ref_count;
 
@@ -44,7 +43,10 @@ struct nexus_metadata {
         void                     * object;
     };
 
-    struct nexus_dentry          * dentry;  // dentry pointing to metadata
+
+    sgx_spinlock_t                 dentry_lock;
+    struct list_head               dentry_list;
+    size_t                         dentry_count;
 };
 
 
@@ -54,6 +56,8 @@ __metadata_set_clean(struct nexus_metadata * metadata);
 void
 __metadata_set_dirty(struct nexus_metadata * metadata);
 
+struct nexus_dentry *
+metadata_get_dentry(struct nexus_metadata * metadata);
 
 /**
  * Creates a new metadata

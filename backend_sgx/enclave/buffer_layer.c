@@ -1,26 +1,75 @@
 #include "enclave_internal.h"
 
 
-struct metadata_info {
+struct metadata_buffer {
     struct nexus_uuid      uuid;
 
     nexus_io_flags_t       flags;
 
     size_t                 timestamp;
 
-    uint8_t              * tmp_buffer; // used for "flush" operations
+    uint8_t              * tmp_buffer;
 
     size_t                 tmp_buflen;
 };
 
 
-static struct nexus_hashtable * metadata_info_htable = NULL;
+/* the buffer cache is a hashatable of <uuid, metadata_buffer> pairs */
+static struct nexus_hashtable * buffer_cache = NULL;
 
+static sgx_spinlock_t           bcache_lock  = SGX_SPINLOCK_INITIALIZER;
+
+static size_t                   buffer_count = 0;
+
+
+
+static struct metadata_buffer *
+__bcache_update(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t flags)
+{
+    struct metadata_buffer * metadata_buf = NULL;
+
+    sgx_spin_lock(&bcache_lock);
+
+    metadata_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+
+    if (metadata_buf == NULL) {
+        metadata_buf =  nexus_malloc(sizeof(struct metadata_buffer));
+
+        nexus_uuid_copy(uuid, &metadata_buf->uuid);
+
+        nexus_htable_insert(buffer_cache, (uintptr_t)&metadata_buf->uuid, (uintptr_t)metadata_buf);
+
+        buffer_count += 1;
+    }
+
+    sgx_spin_unlock(&bcache_lock);
+
+    metadata_buf->timestamp = timestamp;
+    metadata_buf->flags     = flags;
+
+    return metadata_buf;
+}
+
+static inline void
+__bcache_evict(struct nexus_uuid * uuid)
+{
+    struct metadata_buffer * meta_buf = NULL;
+
+    sgx_spin_lock(&bcache_lock);
+    meta_buf = (struct metadata_buffer *)nexus_htable_remove(buffer_cache, (uintptr_t)uuid, 0);
+
+    if (meta_buf) {
+        nexus_free(meta_buf);
+        buffer_count -= 1;
+    }
+
+    sgx_spin_unlock(&bcache_lock);
+}
 
 int
 buffer_layer_init()
 {
-    metadata_info_htable = nexus_create_htable(17, __uuid_hasher, __uuid_equals);
+    buffer_cache = nexus_create_htable(17, __uuid_hasher, __uuid_equals);
 
     return 0;
 }
@@ -28,67 +77,47 @@ buffer_layer_init()
 int
 buffer_layer_exit()
 {
-    nexus_free_htable(metadata_info_htable, 1, 0);
+    // TODO clear the buffer cache
+    nexus_free_htable(buffer_cache, 1, 0);
     return 0;
-}
-
-static struct metadata_info *
-__update_timestamp(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t flags)
-{
-    struct metadata_info * info = NULL;
-
-    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
-
-    if (info == NULL) {
-        info =  nexus_malloc(sizeof(struct metadata_info));
-
-        nexus_uuid_copy(uuid, &info->uuid);
-
-        nexus_htable_insert(metadata_info_htable, (uintptr_t)&info->uuid, (uintptr_t)info);
-    }
-
-    info->timestamp = timestamp;
-    info->flags     = flags;
-
-    return info;
 }
 
 void
 buffer_layer_evict(struct nexus_uuid * uuid)
 {
-    struct metadata_info * info = NULL;
-
-    info = (struct metadata_info *)nexus_htable_remove(metadata_info_htable, (uintptr_t)uuid, 0);
-
-    nexus_free(info);
+    __bcache_evict(uuid);
 }
 
 int
 buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 {
-    struct metadata_info * info    = NULL;
+    struct metadata_buffer * meta_buf = NULL;
 
     size_t stat_timestamp;
 
-    int err = -1;
-    int ret = -1;
 
     // check if we have a timestamp
-    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
+    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
 
-    if (info == NULL) {
+    if (meta_buf == NULL) {
         *should_reload = true;
         return 0;
     }
 
-    err = ocall_buffer_stattime(&ret, uuid, &stat_timestamp, global_volume);
+    // stat the datastore
+    {
+        int err = -1;
+        int ret = -1;
 
-    if (err || ret) {
-        log_error("ocall_buffer_stat FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
+        err = ocall_buffer_stattime(&ret, uuid, &stat_timestamp, global_volume);
+
+        if (err || ret) {
+            log_error("ocall_buffer_stattime FAILED (err=%d, ret=%d)\n", err, ret);
+            return -1;
+        }
     }
 
-    *should_reload = stat_timestamp > info->timestamp;
+    *should_reload = stat_timestamp > meta_buf->timestamp;
 
     return 0;
 }
@@ -96,7 +125,7 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 uint8_t *
 buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 {
-    struct metadata_info * info = NULL;
+    struct metadata_buffer * meta_buf = NULL;
 
     nexus_io_flags_t       flags = 0;
 
@@ -108,18 +137,18 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
     }
 
 
-    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable, (uintptr_t)uuid);
+    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
 
     // this means that the file has been requested in a previous get with FWRITE
-    if (info && (info->flags & (NEXUS_FWRITE | NEXUS_FCREATE))) {
-        info->tmp_buffer = addr;
-        info->tmp_buflen = size;
+    if (meta_buf && (meta_buf->flags & (NEXUS_FWRITE | NEXUS_FCREATE))) {
+        meta_buf->tmp_buffer = addr;
+        meta_buf->tmp_buflen = size;
 
         return addr;
     }
 
-    if (info) {
-        flags = info->flags;
+    if (meta_buf) {
+        flags = meta_buf->flags;
     }
 
     flags |= NEXUS_FWRITE;
@@ -140,10 +169,10 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
         }
     }
 
-    info = __update_timestamp(uuid, 0, flags);
+    meta_buf = __bcache_update(uuid, 0, flags);
 
-    info->tmp_buffer = addr;
-    info->tmp_buflen = size;
+    meta_buf->tmp_buffer = addr;
+    meta_buf->tmp_buflen = size;
 
     return addr;
 }
@@ -157,11 +186,11 @@ buffer_layer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags)
     err = ocall_buffer_lock(&ret, uuid, flags, global_volume);
 
     if (err || ret) {
-        log_error("ocall_buffer_lock FAILED (err=%d, ret=%d)\n", err, ret);
+        log_error("ocall_bcache_lock FAILED (err=%d, ret=%d)\n", err, ret);
         return -1;
     }
 
-    __update_timestamp(uuid, 0, flags);
+    __bcache_update(uuid, 0, flags);
 
     return 0;
 }
@@ -199,41 +228,42 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
         return NULL;
     }
 
-    __update_timestamp(uuid, timestamp, flags);
+    __bcache_update(uuid, timestamp, flags);
 
     return external_addr;
 }
 
 int
-buffer_layer_put(struct nexus_uuid * buffer_uuid)
+buffer_layer_put(struct nexus_uuid * uuid)
 {
-    struct metadata_info * info = NULL;
-
-    info = (struct metadata_info *)nexus_htable_search(metadata_info_htable,
-                                                       (uintptr_t)buffer_uuid);
+    struct metadata_buffer * meta_buf = NULL;
 
     size_t timestamp = 0;
 
-    if (info && info->tmp_buffer) {
+
+    // get the metadata buffer from the cache and write it to disk
+    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+
+    if (meta_buf && meta_buf->tmp_buffer) {
         int ret = -1;
         int err = ocall_buffer_put(&ret,
-                                   buffer_uuid,
-                                   info->tmp_buffer,
-                                   info->tmp_buflen,
+                                   uuid,
+                                   meta_buf->tmp_buffer,
+                                   meta_buf->tmp_buflen,
                                    &timestamp,
                                    global_volume);
 
-        nexus_heap_free(global_heap, info->tmp_buffer);
+        nexus_heap_free(global_heap, meta_buf->tmp_buffer);
 
-        info->tmp_buffer = NULL;
-        info->tmp_buflen = 0;
+        meta_buf->tmp_buffer = NULL;
+        meta_buf->tmp_buflen = 0;
 
         if (err || ret) {
             log_error("ocall_buffer_put FAILED (err=%d, ret=%d)\n", err, ret);
             return -1;
         }
 
-        __update_timestamp(buffer_uuid, timestamp, NEXUS_FREAD);
+        __bcache_update(uuid, timestamp, NEXUS_FREAD);
 
         return 0;
     }

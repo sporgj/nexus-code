@@ -1,7 +1,31 @@
 #include "enclave_internal.h"
 
+
+struct nexus_dentry * root_dentry = NULL;
+
+
 static struct nexus_dentry *
 walk_path(struct path_walker * walker);
+
+
+
+void
+dcache_init_root()
+{
+    if (root_dentry) {
+        nexus_free(root_dentry);
+    }
+
+    root_dentry = nexus_malloc(sizeof(struct nexus_dentry));
+
+    INIT_LIST_HEAD(&root_dentry->children);
+    INIT_LIST_HEAD(&root_dentry->aliases);
+
+    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry->link_uuid);
+
+    root_dentry->dirent_type = NEXUS_DIR;
+    root_dentry->d_count     = 1;
+}
 
 static struct nexus_dentry *
 d_alloc(struct nexus_dentry * parent,
@@ -12,11 +36,20 @@ d_alloc(struct nexus_dentry * parent,
     struct nexus_dentry * dentry = nexus_malloc(sizeof(struct nexus_dentry));
 
     INIT_LIST_HEAD(&dentry->children);
+    INIT_LIST_HEAD(&dentry->aliases);
 
     dentry->dirent_type   = type;
-    dentry->parent        = parent;
     dentry->name_len      = strnlen(name, NEXUS_NAME_MAX);
-    dentry->name          = strndup(name, NEXUS_NAME_MAX);
+
+    strncpy(dentry->name, name, NEXUS_NAME_MAX);
+
+    dentry->d_count       = 1;
+
+    if (parent) {
+        dentry->parent    = dentry_get(parent);
+
+        list_add_tail(&dentry->siblings, &parent->children);
+    }
 
     nexus_uuid_copy(uuid, &dentry->link_uuid);
 
@@ -26,45 +59,44 @@ d_alloc(struct nexus_dentry * parent,
 static void
 d_free(struct nexus_dentry * dentry)
 {
-    if (dentry->symlink_target) {
-        nexus_free(dentry->symlink_target);
-    }
-
-    nexus_free(dentry->name);
     nexus_free(dentry);
 }
 
-static struct nexus_dentry *
-create_dentry(struct nexus_dentry * parent,
-              struct nexus_uuid   * uuid,
-              const char          * name,
-              nexus_dirent_type_t   type)
+static void
+d_iput(struct nexus_dentry * dentry)
 {
-    struct nexus_dentry * dentry = d_alloc(parent, uuid, name, type);
-
-    list_add_tail(&dentry->siblings, &parent->children);
-
-    return dentry;
+    if (dentry && dentry->metadata) {
+        list_del(&dentry->aliases);
+        dentry->metadata->dentry_count -= 1;
+        dentry->metadata = NULL;
+    }
 }
 
 static void
-d_prune(struct nexus_dentry * dentry)
+__dcache_prune(struct nexus_dentry * dentry)
 {
-    while (!list_empty(&dentry->children)) {
-        struct nexus_dentry * first_child = NULL;
+    struct list_head * curr_child = NULL;
+    struct list_head * next_pos = NULL;
 
-        first_child = list_first_entry(&dentry->children, struct nexus_dentry, siblings);
+    // try deleting its children
+    list_for_each_safe(curr_child, next_pos, &dentry->children) {
+        struct nexus_dentry * child_dentry = NULL;
 
-        list_del(&first_child->siblings);
+        child_dentry = list_entry(curr_child, struct nexus_dentry, siblings);
 
-        d_prune(first_child);
-
-        d_free(first_child);
+        __dcache_prune(child_dentry);
     }
 
-    if (dentry->metadata) {
-        // TODO refactor into VFS call
-        dentry->metadata->dentry = NULL;
+    // if there're no other links, remove it from parents
+    if (dentry->d_count <= 1) {
+        d_iput(dentry);
+
+        if (dentry->parent) {
+            dentry_put(dentry->parent);
+            list_del(&dentry->siblings);
+        }
+
+        d_free(dentry);
     }
 }
 
@@ -89,35 +121,106 @@ d_lookup(struct nexus_dentry * parent, const char * name)
     return NULL;
 }
 
+
+struct nexus_dentry *
+dentry_get(struct nexus_dentry * dentry)
+{
+    if (dentry == NULL) {
+        return NULL;
+    }
+
+    dentry->d_count += 1;
+    return dentry;
+}
+
+void
+dentry_put(struct nexus_dentry * dentry)
+{
+    if (dentry == NULL) {
+        return;
+    }
+
+    dentry->d_count -= 1;
+
+    if (dentry->d_count == 0) {
+        __dcache_prune(dentry);
+    }
+}
+
+
+void
+dentry_instantiate(struct nexus_dentry * dentry, struct nexus_metadata * metadata)
+{
+    if (!list_empty(&dentry->aliases)) {
+        abort();
+    }
+
+    dentry->metadata = metadata;
+
+    if (metadata) {
+        list_add(&dentry->aliases, &metadata->dentry_list);
+        metadata->dentry_count += 1;
+    }
+}
+
+void
+dentry_invalidate(struct nexus_dentry * dentry)
+{
+    if (dentry->metadata) {
+        list_del(&dentry->aliases);
+        dentry->metadata->dentry_count -= 1;
+        dentry->metadata = NULL;
+    }
+}
+
 void
 dentry_delete(struct nexus_dentry * dentry)
 {
-    list_del(&dentry->siblings);
-    d_prune(dentry);
-    d_free(dentry);
+    if (dentry->parent) {
+        dentry_put(dentry->parent);
+        list_del(&dentry->siblings);
+        dentry->parent = NULL;
+    }
+
+    // mark it as deleted and add it to the list of dropped dentries
+    dentry->flags |= DENTRY_DELETED;
+    d_iput(dentry);
+
+    __dcache_prune(dentry);
 }
 
 void
 dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child_filename)
 {
-    struct nexus_dentry * dentry = NULL;
+    struct nexus_dentry * dentry = d_lookup(parent_dentry, child_filename);
 
-    dentry = d_lookup(parent_dentry, child_filename);
-
-    if (dentry != NULL) {
+    if (dentry) {
         dentry_delete(dentry);
     }
 }
 
 static int
-__revalidate_inode(struct nexus_dentry * dentry, nexus_io_flags_t flags)
+__dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 {
     nexus_metadata_type_t metadata_type;
 
     if (dentry->metadata) {
-        if (nexus_vfs_revalidate(dentry->metadata, flags)) {
+        bool has_reloaded = false;
+
+        if (nexus_vfs_revalidate(dentry->metadata, flags, &has_reloaded)) {
             log_error("could not revalidate dentry\n");
             return -1;
+        }
+
+        // update all the child dentries
+        if (has_reloaded) {
+            struct list_head * curr = NULL;
+
+            list_for_each(curr, &dentry->children) {
+                struct nexus_dentry * child_dentry = list_entry(curr, struct nexus_dentry, siblings);
+
+                child_dentry->flags |= DENTRY_PARENT_CHANGED;
+            }
         }
 
         return 0; //
@@ -130,22 +233,23 @@ __revalidate_inode(struct nexus_dentry * dentry, nexus_io_flags_t flags)
         metadata_type = NEXUS_FILENODE;
     }
 
-    // dentry->metadata = NULL
-    dentry->metadata = nexus_vfs_load(&dentry->link_uuid, metadata_type, flags);
+    // instantiate the dentry
+    {
+        struct nexus_metadata * metadata = nexus_vfs_load(&dentry->link_uuid, metadata_type, flags);
 
-    if (dentry->metadata == NULL) {
-        log_error("could not load metadata\n");
-        return -1;
+        if (metadata == NULL) {
+            log_error("could not load metadata\n");
+            return -1;
+        }
+
+        dentry_instantiate(dentry, metadata);
     }
-
-    // otherwise, add dirnode to metadata list
-    dentry->metadata->dentry = dentry;
 
     return 0;
 }
 
 int
-revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
+dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 {
     if (dentry->dirent_type == NEXUS_LNK) {
         // TODO not implemented
@@ -153,11 +257,11 @@ revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
         return -1;
     }
 
-    if (__revalidate_inode(dentry, flags)) {
+    if (__dentry_revalidate(dentry, flags)) {
         return -1;
     }
 
-    if (dentry->parent == NULL) {   // revalidate top dentry
+    if (dentry == root_dentry) {
         struct nexus_dirnode * root_dirnode = (struct nexus_dirnode *)dentry->metadata->object;
 
         return nexus_uuid_compare(&global_supernode->root_uuid, &root_dirnode->my_uuid);
@@ -169,8 +273,11 @@ revalidate_dentry(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 static struct nexus_dentry *
 dentry_follow_link(struct nexus_dentry * dentry, char * symlink_target)
 {
-    struct path_walker walker
-        = { .parent_dentry = dentry, .remaining_path = symlink_target, .type = PATH_WALK_NORMAL };
+    struct path_walker walker = {
+        .parent_dentry        = dentry,
+        .remaining_path       = symlink_target,
+        .type                 = PATH_WALK_NORMAL
+    };
 
     // TODO handle absolute paths in symlink targets
 
@@ -222,7 +329,7 @@ walk_path(struct path_walker * walker)
         }
 
 
-        if (revalidate_dentry(curr_dentry, NEXUS_FREAD)) {
+        if (dentry_revalidate(curr_dentry, NEXUS_FREAD)) {
             log_error("dentry revalidation FAILED\n");
             return NULL;
         }
@@ -231,11 +338,16 @@ walk_path(struct path_walker * walker)
         // check the dentry cache if it exists
         next_dentry = d_lookup(curr_dentry, name);
 
-        if (next_dentry != NULL) {
+        if (next_dentry) {
+            if (next_dentry->flags & DENTRY_PARENT_CHANGED) {
+                goto lookup_dirnode;
+            }
+
             goto next;
         }
 
 
+lookup_dirnode:
         // otherwise, let's look inside the dirnode
         dirnode = curr_dentry->metadata->dirnode;
 
@@ -252,8 +364,18 @@ walk_path(struct path_walker * walker)
 
             nexus_free(target);
         } else {
-            // allocate and add the dentry to the tree
-            next_dentry = create_dentry(curr_dentry, &link_uuid, name, atype);
+            if (next_dentry == NULL) {
+                next_dentry = d_alloc(curr_dentry, &link_uuid, name, atype);
+            } else {
+                // if it's the same, uuid, we can just change the flag
+                if (nexus_uuid_compare(&link_uuid, &next_dentry->link_uuid) == 0) {
+                    next_dentry->flags &= ~DENTRY_PARENT_CHANGED;
+                } else {
+                    // we have to delete this dentry
+                    dentry_delete(next_dentry);
+                    next_dentry = d_alloc(curr_dentry, &link_uuid, name, atype);
+                }
+            }
         }
 
 
@@ -264,6 +386,7 @@ walk_path(struct path_walker * walker)
 
     next:
         walker->parent_dentry = curr_dentry = next_dentry;
+        next_dentry = NULL;
 
     skip:
         name = strtok_r(NULL, "/", &walker->remaining_path);

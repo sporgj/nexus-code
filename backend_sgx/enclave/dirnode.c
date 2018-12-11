@@ -34,6 +34,9 @@ struct symlink_entry {
 static void
 dirnode_init(struct nexus_dirnode * dirnode);
 
+static inline void
+__clear_last_failed_lookup(struct nexus_dirnode * dirnode);
+
 
 /**
  * Returns the size of the main bucket
@@ -61,6 +64,8 @@ __dirnode_set_dirty(struct nexus_dirnode * dirnode)
     if (dirnode->metadata) {
         __metadata_set_dirty(dirnode->metadata);
     }
+
+    __clear_last_failed_lookup(dirnode);
 }
 
 static inline void
@@ -909,26 +914,15 @@ dirnode_add(struct nexus_dirnode * dirnode,
     return 0;
 }
 
-int
-dirnode_add_link(struct nexus_dirnode * dirnode,
-                 char                 * link_name,
-                 char                 * target_path,
-                 struct nexus_uuid    * entry_uuid)
+static void
+__dirnode_add_symlink(struct nexus_dirnode * dirnode,
+                      struct nexus_uuid    * entry_uuid,
+                      char                 * target_path)
 {
     struct symlink_entry * symlink_entry = NULL;
 
-    size_t target_len = 0;
-    size_t total_len  = 0;
-
-
-    // sets the dirnode dirty
-    if (dirnode_add(dirnode, link_name, NEXUS_LNK, entry_uuid) != 0) {
-        log_error("dirnode_add() FAILED\n");
-        return -1;
-    }
-
-    target_len = strnlen(target_path, NEXUS_PATH_MAX);
-    total_len  = target_len + sizeof(struct symlink_entry) + 1;
+    size_t target_len = strnlen(target_path, NEXUS_PATH_MAX);
+    size_t total_len  = target_len + sizeof(struct symlink_entry) + 1;
 
     symlink_entry = nexus_malloc(total_len);
 
@@ -942,6 +936,23 @@ dirnode_add_link(struct nexus_dirnode * dirnode,
 
     dirnode->symlink_count  += 1;
     dirnode->symlink_buflen += total_len;
+
+    __dirnode_set_dirty(dirnode);
+}
+
+int
+dirnode_add_link(struct nexus_dirnode * dirnode,
+                 char                 * link_name,
+                 char                 * target_path,
+                 struct nexus_uuid    * entry_uuid)
+{
+    // sets the dirnode dirty
+    if (dirnode_add(dirnode, link_name, NEXUS_LNK, entry_uuid) != 0) {
+        log_error("dirnode_add() FAILED\n");
+        return -1;
+    }
+
+    __dirnode_add_symlink(dirnode, entry_uuid, target_path);
 
     return 0;
 }
@@ -1123,7 +1134,7 @@ __dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexu
 
 
 void
-__dirnode_remove_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry)
+__dirnode_clobber_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry)
 {
     __dirnode_del_direntry(dirnode, dir_entry);
 
@@ -1147,7 +1158,7 @@ __dirnode_remove(struct nexus_dirnode * dirnode,
 
     nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, link_uuid);
 
-    __dirnode_remove_dir_entry(dirnode, dir_entry);
+    __dirnode_clobber_dir_entry(dirnode, dir_entry);
 
     return 0;
 }
@@ -1252,9 +1263,70 @@ dirnode_export_link_stat(struct nexus_dirnode * dirnode, char * name, struct nex
     } else {
         /* technically, the link size for files/dirs is the UUID they point to. */
         stat_out->link_size = sizeof(struct nexus_uuid);
-        stat_out->type = NEXUS_DIR;
+        stat_out->type = stat_out->link_type;
         nexus_uuid_copy(&direntry->dir_rec.link_uuid, &stat_out->uuid);
     }
+
+    return 0;
+}
+
+int
+dirnode_rename(struct nexus_dirnode * src_dirnode,
+               char                 * oldname,
+               struct nexus_dirnode * dst_dirnode,
+               char                 * newname,
+               struct nexus_uuid    * src_uuid,
+               nexus_dirent_type_t  * src_type,
+               struct nexus_uuid    * overwrite_uuid,
+               nexus_dirent_type_t  * overwrite_type)
+{
+    struct dir_entry * src_direntry = NULL;
+    struct dir_entry * dst_direntry = NULL;
+
+    struct nexus_uuid    * uuid_ptr = NULL;
+
+
+
+    src_direntry = __find_by_name(src_dirnode, oldname);
+
+    if (src_direntry == NULL) {
+        log_error("could not find (%s) in dirnode\n", oldname);
+        return -1;
+    }
+
+
+    uuid_ptr = &src_direntry->dir_rec.link_uuid;
+
+
+    dst_direntry = __find_by_name(dst_dirnode, newname);
+
+    // then we are overwriting
+    if (dst_direntry) {
+        *overwrite_type = dst_direntry->dir_rec.type;
+        nexus_uuid_copy(&dst_direntry->dir_rec.link_uuid, overwrite_uuid);
+        __dirnode_clobber_dir_entry(dst_dirnode, dst_direntry);
+    }
+
+
+    __dirnode_del_direntry(src_dirnode, src_direntry);
+    __rename_dir_entry(src_direntry, newname);
+    __dirnode_add_direntry(dst_dirnode, src_direntry);
+
+
+    if (src_dirnode != dst_dirnode) {
+        char * symlink_path = NULL;
+
+        // then we have to move the symlink across
+        if (__remove_symlink(src_dirnode, uuid_ptr, &symlink_path) == 0) {
+            __dirnode_add_symlink(dst_dirnode, uuid_ptr, symlink_path);
+            nexus_free(symlink_path);
+        }
+    }
+
+
+    nexus_uuid_copy(uuid_ptr, src_uuid);
+
+    *src_type = src_direntry->dir_rec.type;
 
     return 0;
 }

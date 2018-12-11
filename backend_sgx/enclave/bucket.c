@@ -1,8 +1,10 @@
 #include "enclave_internal.h"
 
 
-static inline void
-__init_dir_entry(struct dir_entry * dir_entry)
+// use this function with care. it will remove the dir_entry from whichever hash
+// map it is connected to. Readd dir_entry to hashmap after calling this function
+static void
+__rehash_dir_entry(struct dir_entry * dir_entry)
 {
     struct __hashed_name * filename_hash = &dir_entry->filename_hash;
     struct __hashed_uuid * fileuuid_hash = &dir_entry->fileuuid_hash;
@@ -13,6 +15,12 @@ __init_dir_entry(struct dir_entry * dir_entry)
     hashmap_entry_init(&filename_hash->hash_entry, strhash(filename_hash->name));
     hashmap_entry_init(&fileuuid_hash->hash_entry,
                        memhash(fileuuid_hash->uuid, sizeof(struct nexus_uuid)));
+}
+
+static inline void
+__init_dir_entry(struct dir_entry * dir_entry)
+{
+    __rehash_dir_entry(dir_entry);
 
     INIT_LIST_HEAD(&dir_entry->dent_list);
     INIT_LIST_HEAD(&dir_entry->bckt_list);
@@ -38,6 +46,20 @@ __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char *
     __init_dir_entry(new_dir_entry);
 
     return new_dir_entry;
+}
+
+void
+__rename_dir_entry(struct dir_entry * dir_entry, char * newname)
+{
+    struct __dir_rec * dir_rec = &dir_entry->dir_rec;
+
+    dir_rec->name_len = strlen(newname);
+    dir_rec->rec_len  = sizeof(struct __dir_rec) - (NEXUS_NAME_MAX - dir_rec->name_len) + 1;
+
+    memset(dir_rec->name, 0, NEXUS_NAME_MAX);
+    memcpy(dir_rec->name, newname, dir_rec->name_len);
+
+    __rehash_dir_entry(dir_entry);
 }
 
 void

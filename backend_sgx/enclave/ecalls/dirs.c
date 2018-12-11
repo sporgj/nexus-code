@@ -1,5 +1,6 @@
 #include "../enclave_internal.h"
 
+
 inline static int
 __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
                 char                  * filename_IN,
@@ -54,10 +55,13 @@ ecall_fs_create(char                * dirpath_IN,
     int ret = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
     metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -80,11 +84,12 @@ ecall_fs_create(char                * dirpath_IN,
     ret = 0;
 out:
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
 
-inline static int
+static int
 __remove_filenode(struct nexus_uuid * uuid, bool * should_remove)
 {
     // if we are dealing with files, check hardlink count
@@ -129,7 +134,10 @@ __remove_dirnode(struct nexus_uuid * uuid, bool check_emptiness)
 }
 
 inline static int
-__nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nexus_uuid * uuid_OUT)
+__nxs_fs_remove(struct nexus_metadata * metadata,
+                char *                  filename_IN,
+                struct nexus_uuid *     uuid_OUT,
+                bool *                  should_remove)
 {
     struct nexus_dirnode * dirnode = metadata->dirnode;
 
@@ -149,42 +157,50 @@ __nxs_fs_remove(struct nexus_metadata * metadata, char * filename_IN, struct nex
 
     nexus_uuid_copy(tmp_uuid, uuid_OUT);
 
-    if (tmp_type == NEXUS_REG) {
-        bool should_remove = false;
+    *should_remove = true;
 
-        if (__remove_filenode(tmp_uuid, &should_remove)) {
+    if (tmp_type == NEXUS_REG) {
+        if (__remove_filenode(tmp_uuid, should_remove)) {
             return -1;
         }
-    } else if (tmp_type == NEXUS_DIRNODE) {
+    } else if (tmp_type == NEXUS_DIR) {
         __remove_dirnode(tmp_uuid, true);
     }
 
-    __dirnode_remove_dir_entry(dirnode, direntry);
+    __dirnode_clobber_dir_entry(dirnode, direntry);
 
     return 0;
 }
 
 int
-ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_out)
+ecall_fs_remove(char              * dirpath_IN,
+                char              * filename_IN,
+                struct nexus_uuid * uuid_out,
+                bool              * should_remove_out)
 {
     struct nexus_metadata * metadata = NULL;
 
     struct nexus_uuid entry_uuid;
 
+    bool should_remove = true; // TODO make this ecall argument
+
     int ret = -1;
 
 
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR | NEXUS_FDELETE);
+    sgx_spin_lock(&vfs_ops_lock);
+
+    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
 
-    dentry_delete_child(metadata->dentry, filename_IN);
+    dentry_delete_child(metadata_get_dentry(metadata), filename_IN);
 
-    ret = __nxs_fs_remove(metadata, filename_IN, &entry_uuid);
+    ret = __nxs_fs_remove(metadata, filename_IN, &entry_uuid, &should_remove);
 
     if (ret != 0) {
         log_error("__nxs_fs_remove() FAILED\n");
@@ -199,9 +215,12 @@ ecall_fs_remove(char * dirpath_IN, char * filename_IN, struct nexus_uuid * uuid_
 
     nexus_uuid_copy(&entry_uuid, uuid_out);
 
+    *should_remove_out = should_remove;
+
     ret = 0;
 out:
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
@@ -234,10 +253,13 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_fs_lookup * 
     int ret = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
     metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -252,6 +274,7 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_fs_lookup * 
 out:
     nexus_vfs_put(metadata);
 
+    sgx_spin_unlock(&vfs_ops_lock);
     return ret;
 }
 
@@ -275,12 +298,17 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
 {
     struct path_walker      walker        = { 0 };
 
-    struct nexus_dentry   * parent_dentry = nexus_vfs_lookup_parent(path_IN, &walker);
+    struct nexus_dentry   * parent_dentry = NULL;
 
     int ret = 0;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
+    parent_dentry = nexus_vfs_lookup_parent(path_IN, &walker);
+
     if (parent_dentry == NULL) {
+        sgx_spin_unlock(&vfs_ops_lock);
         log_error("could not get parent dentry\n");
         return -1;
     }
@@ -298,11 +326,12 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
         }
     }
 
-    if (stat_flags & NEXUS_STAT_FILE) {
+    if (stat_flags & NEXUS_STAT_FILE || nexus_stat_out->link_type != NEXUS_LNK) {
         struct nexus_metadata * metadata = nexus_vfs_complete_lookup(&walker, NEXUS_FREAD);
 
         if (metadata == NULL) {
             log_error("could not get metadata\n");
+            sgx_spin_unlock(&vfs_ops_lock);
 
             return -1;
         }
@@ -315,6 +344,8 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
 
         nexus_vfs_put(metadata);
     }
+
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
@@ -330,10 +361,13 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char filename_out[
     int ret = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
     metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -348,6 +382,7 @@ ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char filename_out[
     ret = 0;
 out:
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
@@ -365,10 +400,13 @@ ecall_fs_readdir(char                * dirpath_IN,
     int ret = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
     metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -387,6 +425,7 @@ ecall_fs_readdir(char                * dirpath_IN,
     ret = 0;
 out:
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
@@ -426,10 +465,13 @@ ecall_fs_symlink(char              * dirpath_IN,
     int ret = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
+
     metadata = nexus_vfs_get(dirpath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -456,6 +498,7 @@ ecall_fs_symlink(char              * dirpath_IN,
 
 out:
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
@@ -484,10 +527,12 @@ ecall_fs_readlink(char * dirpath_IN, char * linkname_IN, char targetpath_out[NEX
     int ret = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
     metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
 
     if (metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -495,6 +540,7 @@ ecall_fs_readlink(char * dirpath_IN, char * linkname_IN, char targetpath_out[NEX
     if (metadata->type != NEXUS_DIRNODE) {
         log_error("path is not a directory\n");
         nexus_vfs_put(metadata);
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -515,6 +561,7 @@ ecall_fs_readlink(char * dirpath_IN, char * linkname_IN, char targetpath_out[NEX
     ret = 0;
 out:
     nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
 }
@@ -576,10 +623,12 @@ ecall_fs_hardlink(char              * src_dirpath_IN,
     int                     ret          = -1;
 
 
+    sgx_spin_lock(&vfs_ops_lock);
     dst_metadata = nexus_vfs_get(dst_dirpath_IN, NEXUS_FRDWR);
 
     if (dst_metadata == NULL) {
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -593,6 +642,7 @@ ecall_fs_hardlink(char              * src_dirpath_IN,
     if (src_metadata == NULL) {
         nexus_vfs_put(dst_metadata);
         log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -623,6 +673,7 @@ out:
     nexus_vfs_put(src_metadata);
     nexus_vfs_put(dst_metadata);
 
+    sgx_spin_unlock(&vfs_ops_lock);
     return ret;
 }
 
@@ -632,56 +683,40 @@ __nxs_fs_rename(struct nexus_dirnode * from_dirnode,
                 struct nexus_dirnode * to_dirnode,
                 char                 * newname,
                 struct nexus_uuid    * src_uuid,
-                struct nexus_uuid    * overwrite_uuid)
+                struct nexus_uuid    * overwrite_uuid,
+                bool                 * should_remove)
 {
     nexus_dirent_type_t src_type;
-    nexus_dirent_type_t tmp_type;
+    nexus_dirent_type_t tmp_type = 0;
 
-    struct nexus_uuid   tmp_uuid;
-
-    char * symlink_target = NULL;
-
-    int ret = -1;
-
-
-    if (dirnode_remove(from_dirnode, oldname, &src_type, src_uuid, &symlink_target)) {
-        log_error("could not remove (%s) from directory\n", oldname);
-        return -1;
-    }
 
     nexus_uuid_zeroize(overwrite_uuid);
 
+    if (dirnode_rename(from_dirnode,
+                       oldname,
+                       to_dirnode,
+                       newname,
+                       src_uuid,
+                       &src_type,
+                       overwrite_uuid,
+                       &tmp_type)) {
+        log_error("dirnode_rename FAILED\n");
+        return -1;
+    }
+
     // for example if moving foo/bar.txt to cat/, if bar.txt already exists in cat/, we need to remove it
-    if (dirnode_remove(to_dirnode, newname, &tmp_type, &tmp_uuid, NULL) == 0) {
+    if (tmp_type != 0) {
         // this means there was an existing entry in the dirnode
-        bool should_remove = true;
 
         // if the filenode won't be removed (hardlinks), we need to update its metadata
         if (tmp_type == NEXUS_REG) {
-            if (__remove_filenode(&tmp_uuid, &should_remove)) {
+            if (__remove_filenode(overwrite_uuid, should_remove)) {
                 log_error("__remove_filenode FAILED\n");
                 return -1;
             }
         } else if (tmp_type == NEXUS_DIR) {
-            __remove_dirnode(&tmp_uuid, false);
+            __remove_dirnode(overwrite_uuid, false);
         }
-
-        if (should_remove) {
-            nexus_uuid_copy(&tmp_uuid, overwrite_uuid);
-        }
-    }
-
-    if (src_type == NEXUS_LNK) {
-        ret = dirnode_add_link(to_dirnode, newname, symlink_target, src_uuid);
-
-        nexus_free(symlink_target);
-    } else {
-        ret = dirnode_add(to_dirnode, newname, src_type, src_uuid);
-    }
-
-    if (ret != 0) {
-        log_error("could not add entry to destination directory\n");
-        return -1;
     }
 
     return 0;
@@ -694,7 +729,8 @@ ecall_fs_rename(char              * from_dirpath_IN,
                 char              * to_dirpath_IN,
                 char              * newname_IN,
                 struct nexus_uuid * entry_uuid_out,
-                struct nexus_uuid * existing_uuid_out)
+                struct nexus_uuid * existing_uuid_out,
+                bool              * should_remove_out)
 {
     struct nexus_metadata * from_metadata = NULL;
     struct nexus_metadata * to_metadata   = NULL;
@@ -706,8 +742,12 @@ ecall_fs_rename(char              * from_dirpath_IN,
     struct nexus_uuid entry_uuid;
     struct nexus_uuid existing_uuid;
 
+    bool should_remove = false;
+
     int ret = -1;
 
+
+    sgx_spin_lock(&vfs_ops_lock);
 
     // if it's the same directory, just skip to editing the same dirnode
     if (strncmp(from_dirpath_IN, to_dirpath_IN, NEXUS_PATH_MAX) == 0) {
@@ -723,6 +763,8 @@ ecall_fs_rename(char              * from_dirpath_IN,
 
     if (from_dentry == NULL || to_dentry == NULL) {
         log_error("could not find dentry\n");
+        sgx_spin_unlock(&vfs_ops_lock);
+
         return -1;
     }
 
@@ -742,26 +784,30 @@ ecall_fs_rename(char              * from_dirpath_IN,
 do_rename:
     if (from_metadata == NULL) {
         log_error("could not get source metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
+
         return -1;
     }
 
     if (tmp_metadata == NULL) {
         nexus_vfs_put(from_metadata);
+        sgx_spin_unlock(&vfs_ops_lock);
 
         log_error("could not get destination metadata\n");
         return -1;
     }
 
 
-    dentry_delete_child(from_metadata->dentry, oldname_IN);
-    dentry_delete_child(tmp_metadata->dentry, newname_IN);
+    dentry_delete_child(metadata_get_dentry(from_metadata), oldname_IN);
+    dentry_delete_child(metadata_get_dentry(tmp_metadata), newname_IN);
 
     ret = __nxs_fs_rename(from_metadata->dirnode,
                           oldname_IN,
                           tmp_metadata->dirnode,
                           newname_IN,
                           &entry_uuid,
-                          &existing_uuid);
+                          &existing_uuid,
+                          &should_remove);
 
     if (ret != 0) {
         log_error("rename operation failed\n");
@@ -788,6 +834,8 @@ do_rename:
     nexus_uuid_copy(&entry_uuid, entry_uuid_out);
     nexus_uuid_copy(&existing_uuid, existing_uuid_out);
 
+    *should_remove_out = should_remove;
+
     ret = 0;
 
 out:
@@ -797,16 +845,23 @@ out:
         nexus_vfs_put(to_metadata);
     }
 
+    sgx_spin_unlock(&vfs_ops_lock);
+
     return ret;
 }
 
 int
 ecall_fs_set_mode(char * filepath_IN, nexus_file_mode_t mode, struct nexus_stat * stat_out)
 {
-    struct nexus_metadata * metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+    struct nexus_metadata * metadata = NULL;
+
+
+    sgx_spin_lock(&vfs_ops_lock);
+    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
 
     if (metadata == NULL) {
         log_error("could not get metadata (%s)\n", filepath_IN);
+        sgx_spin_unlock(&vfs_ops_lock);
         return -1;
     }
 
@@ -819,6 +874,7 @@ ecall_fs_set_mode(char * filepath_IN, nexus_file_mode_t mode, struct nexus_stat 
 
     if (nexus_metadata_store(metadata)) {
         nexus_vfs_put(metadata);
+        sgx_spin_unlock(&vfs_ops_lock);
         log_error("nexus_metadata_store FAILED\n");
         return -1;
     }
@@ -830,6 +886,8 @@ ecall_fs_set_mode(char * filepath_IN, nexus_file_mode_t mode, struct nexus_stat 
     }
 
     nexus_vfs_put(metadata);
+
+    sgx_spin_unlock(&vfs_ops_lock);
 
     return 0;
 }

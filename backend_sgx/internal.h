@@ -94,6 +94,7 @@ sgx_backend_fs_remove(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * plain_name,
                       struct nexus_uuid    * uuid,
+                      bool                 * should_remove,
                       void                 * priv_data);
 
 int
@@ -163,6 +164,7 @@ sgx_backend_fs_rename(struct nexus_volume  * volume,
                       char                 * newname,
                       struct nexus_uuid    * entry_uuid,
                       struct nexus_uuid    * overriden_uuid,
+                      bool                 * should_remove,
                       void                 * priv_data);
 
 int

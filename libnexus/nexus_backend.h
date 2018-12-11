@@ -99,6 +99,7 @@ struct nexus_backend_impl {
                      char                 * dirpath,
                      char                 * plain_name,
                      struct nexus_uuid    * uuid,
+                     bool                 * should_remove,
                      void                 * priv_data);
 
     int (*fs_lookup)(struct nexus_volume    * volume,
@@ -162,6 +163,7 @@ struct nexus_backend_impl {
                      char                 * newname,
                      struct nexus_uuid    * entry_uuid,
                      struct nexus_uuid    * overriden_uuid,
+                     bool                 * should_remove,
                      void                 * priv_data);
 
     int (*fs_encrypt)(struct nexus_volume * volume,
