@@ -17,11 +17,19 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     int code = ENOENT;
 
 
-    dentry = vfs_get_dentry(ino, &inode);
+    if (fi && fi->fh) {
+        struct my_file * file_ptr = (struct my_file *)fi->fh;
 
-    if (dentry == NULL) {
-        log_error("could not find inode (%zu)\n", ino);
-        goto exit;
+        dentry = file_ptr->dentry;
+
+        inode = inode_get(file_ptr->inode);
+    } else {
+        dentry = vfs_get_dentry(ino, &inode);
+
+        if (dentry == NULL) {
+            log_error("could not find inode (%zu)\n", ino);
+            goto exit;
+        }
     }
 
 
@@ -31,7 +39,7 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     memcpy(&stbuf, &inode->attrs.posix_stat, sizeof(struct stat));
 
-    if (dentry->inode->is_dirty) {
+    if (inode->is_dirty) {
         stbuf.st_size = inode->filesize;
     }
 
@@ -491,10 +499,6 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto out_err;
     }
 
-
-    if (!inode->is_dirty) {
-        inode->filesize = inode->attrs.posix_stat.st_size;
-    }
 
     inode_incr_lookup(dentry->inode, 1);
 
