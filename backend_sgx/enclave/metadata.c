@@ -151,6 +151,8 @@ nexus_metadata_free(struct nexus_metadata * metadata)
         metadata->dentry_count = 0;
     }
 
+    memset(metadata, 0, sizeof(struct nexus_metadata));
+
     nexus_free(metadata);
 }
 
@@ -228,6 +230,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     }
 
     metadata->is_invalid = false;
+
+    metadata->is_dirty = false;
 
     return 0;
 }

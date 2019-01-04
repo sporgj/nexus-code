@@ -145,6 +145,8 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
     struct __filenode_hdr * header = NULL;
 
     if (buflen < sizeof(struct __filenode_hdr)) {
+        filenode_init(filenode, 0);     // this is to avoid filenode_free()
+
         log_error("buffer is too small to fit a filenode\n");
         return NULL;
     }
@@ -384,6 +386,7 @@ void
 filenode_free(struct nexus_filenode * filenode)
 {
     nexus_list_destroy(&filenode->chunk_list);
+    memset(filenode, 0, sizeof(struct nexus_filenode));
     nexus_free(filenode);
 }
 

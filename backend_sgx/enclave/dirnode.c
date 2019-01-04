@@ -821,26 +821,17 @@ dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 void
 dirnode_free(struct nexus_dirnode * dirnode)
 {
+    struct list_head * curr = NULL;
+    struct list_head * next = NULL;
+
+
     // delete the dir_entries
-    {
-        struct dir_entry    * dir_entry = NULL;
+    list_for_each_safe(curr, next, &dirnode->dirents_list) {
+        struct dir_entry * dir_entry = __dir_entry_from_dirents_list(curr);
 
-        struct hashmap_iter   iter;
-
-        hashmap_iter_init(&dirnode->filename_hashmap, &iter);
-
-        do {
-            struct __hashed_name * tmp = hashmap_iter_next(&iter);
-
-            if (tmp == NULL) {
-                break;
-            }
-
-            dir_entry = __dir_entry_from_hashed_filename(tmp);
-
-            __dirnode_del_direntry(dirnode, dir_entry);
-        } while(true);
+        __free_dir_entry(dir_entry);
     }
+
 
     hashmap_free(&dirnode->filename_hashmap, 0);
     hashmap_free(&dirnode->fileuuid_hashmap, 0);
@@ -853,6 +844,8 @@ dirnode_free(struct nexus_dirnode * dirnode)
 
 
     __clear_last_failed_lookup(dirnode);
+
+    memset(dirnode, 0, sizeof(struct nexus_dirnode));
 
     nexus_free(dirnode);
 }
@@ -987,7 +980,7 @@ dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
     struct dir_entry * dir_entry = NULL;
 
     if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_LOOKUP)) {
-        log_error("not authorized to create files\n");
+        log_error("not authorized to lookup files\n");
         return -1;
     }
 
@@ -1016,7 +1009,7 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
     struct dir_entry * dir_entry = NULL;
 
     if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_LOOKUP)) {
-        log_error("not authorized to create files\n");
+        log_error("not authorized to lookup files\n");
         return -1;
     }
 
