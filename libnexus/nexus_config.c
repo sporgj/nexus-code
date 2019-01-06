@@ -55,6 +55,7 @@ nexus_config_init()
 
         wordfree(&user_data_dir_exp);
         wordfree(&key_filename_exp);
+        wordfree(&instance_filename_exp);
     }
 
     {
@@ -75,6 +76,16 @@ nexus_config_init()
     }
 
     {
+        char * enclave_path = getenv("NEXUS_ENCLAVE_PATH");
+
+        nexus_config.enclave_path = NULL;
+
+        if (enclave_path) {
+            nexus_config.enclave_path = strndup(enclave_path, PATH_MAX);
+        }
+    }
+
+    {
         uint32_t vol_cfg_len = nexus_default_vol_cfg_end - nexus_default_vol_cfg_start;
 
         nexus_default_volume_config = calloc(1, vol_cfg_len + 1);
@@ -86,5 +97,16 @@ nexus_config_init()
 }
 
 
+void
+nexus_config_set_enclave_path(char * enclave_path)
+{
+    if (nexus_config.enclave_path) {
+        nexus_free(nexus_config.enclave_path);
+    }
+
+    if (enclave_path) {
+        nexus_config.enclave_path = strndup(enclave_path, PATH_MAX);
+    }
+}
 
 
