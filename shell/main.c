@@ -22,8 +22,10 @@
 #include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_util.h>
+#include <nexus_volume.h>
 
 #include "handler.h"
+#include "../backend_sgx/exports.h"
 
 static const char * nexus_prog_version = "Nexus Admin Shell 0.1";
 
@@ -42,6 +44,84 @@ init_main(int argc, char ** argv)
     return 0;
 }
 
+
+static int
+export_rootkey_main(int argc, char ** argv)
+{
+    struct nexus_volume * volume = NULL;
+
+    char * volume_path         = NULL;
+    char * other_instance_path = NULL;
+    char * rootkey_dest_path   = NULL;
+
+
+    if (argc < 3) {
+        printf("export_rootkey <volume_path> <other_instance_path> <rootkey_dest_path>\n");
+        return -1;
+    }
+
+
+    volume_path = strndup(argv[1], NEXUS_PATH_MAX);
+    other_instance_path = strndup(argv[2], NEXUS_PATH_MAX);
+    rootkey_dest_path = strndup(argv[3], NEXUS_PATH_MAX);
+
+    // 1 - load the volume
+    volume = nexus_mount_volume(volume_path);
+
+    if (volume == NULL) {
+        log_error("nexus_mount_volume() FAILED\n");
+        goto out_err;
+    }
+
+
+    if (sgx_backend_export_rootkey(rootkey_dest_path, other_instance_path, volume)) {
+        log_error("sgx_backend_export_rootkey() FAILED\n");
+        goto out_err;
+    }
+
+
+    nexus_free(volume_path);
+    nexus_free(other_instance_path);
+    nexus_free(rootkey_dest_path);
+
+    return 0;
+
+out_err:
+    nexus_free(volume_path);
+    nexus_free(other_instance_path);
+    nexus_free(rootkey_dest_path);
+
+    return -1;
+}
+
+
+static int
+import_rootkey_main(int argc, char ** argv)
+{
+    char * rootkey_src_path = NULL;
+
+
+    if (argc < 2) {
+        printf("import_rootkey <rootkey_src_path>");
+        return -1;
+    }
+
+    rootkey_src_path = strndup(argv[1], NEXUS_PATH_MAX);
+
+    if (sgx_backend_import_rootkey(rootkey_src_path)) {
+        log_error("sgx_backend_import_rootkey() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_free(rootkey_src_path);
+
+    return 0;
+out_err:
+    nexus_free(rootkey_src_path);
+
+    return -1;
+}
+
 extern int
 create_volume_main(int argc, char ** argv);
 extern int
@@ -57,8 +137,9 @@ static struct nexus_cmd cmds[] = { { "init", init_main, "Initialize Nexus Enviro
                                    { "create", create_volume_main, "Create a Nexus Volume" },
                                    { "delete", delete_volume_main, "Delete a Nexus Volume" },
                                    { "repl", repl_volume_main, "Shows the REPL command line" },
-                                   //    {"ls"           , ls_path_main       , "'ls' a path" },
                                    { "create_file", create_file_main, "Create a new file" },
+                                   { "export_rootkey", export_rootkey_main, "Export the rootkey exchange message" },
+                                   { "import_rootkey", import_rootkey_main, "Import the sealed rootkey into the config" },
                                    { 0, 0, 0 } };
 
 void
@@ -92,7 +173,7 @@ main(int argc, char ** argv)
 
     while (cmds[i].name) {
 
-        if (strncmp(cmds[i].name, argv[1], strlen(argv[1])) == 0) {
+        if (strncmp(cmds[i].name, argv[1], strlen(cmds[i].name)) == 0) {
 
             found = 1;
 
@@ -111,22 +192,6 @@ main(int argc, char ** argv)
         exit(-1);
     }
 
-#if 0
-
-       // initialize libnexus and mount the volume
-    {
-	int ret = -1;
-
-        ret = nexus_mount_volume(volume_path,
-				 vol_key_filename,
-				 pub_key_filename,
-				 prv_key_filename);
-	if (ret != 0) {
-	    log_error("could not mount volume\n");
-	    return -1;
-	}
-    }
-#endif
 
     return ret;
 }
