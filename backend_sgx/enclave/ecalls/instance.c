@@ -267,10 +267,10 @@ __seal_rootkey_and_export(char                    * unwrapped_buffer,
 
     struct nexus_key other_vol_rootkey;
 
-    nexus_init_key(&other_vol_rootkey, global_volumekey->type);
+    nexus_init_key(&other_vol_rootkey, VOLUMEKEY_KEY_TYPE);
 
     if (__nexus_key_from_buf(&other_vol_rootkey,
-                global_volumekey->type,
+                VOLUMEKEY_KEY_TYPE,
                 unwrapped_buffer,
                 unwrapped_buflen)) {
         log_error("could not create rootkey buffer\n");
@@ -329,9 +329,9 @@ ecall_extract_rootkey(struct ecdh_public_key  * ephemeral_pk_IN,
     unwrapped_buflen = result_len;
 
 
-    if (result_len != nexus_key_bytes(global_volumekey)) {
+    if (result_len != VOLUMEKEY_SIZE_BYTES) {
         log_error("Incorrect sizeof unwrapped rootkey: expected=%d, got=%d\n",
-                  nexus_key_bytes(global_volumekey),
+                  VOLUMEKEY_SIZE_BYTES,
                   result_len);
 
         goto err;
