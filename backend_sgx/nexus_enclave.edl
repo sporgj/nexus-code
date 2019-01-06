@@ -36,6 +36,24 @@ enclave {
                          size_t                     sealed_privkey_len
         );
 
+        public int ecall_exchange_rootkey
+        (
+            [user_check] sgx_quote_t              * other_quote_in,
+            [in]         struct ecdh_public_key   * other_pubkey_IN,
+            [user_check] struct ecdh_public_key   * ephemeral_pubkey_out,
+            [user_check] struct ecdh_nonce        * nonce_out,
+            [user_check] uint8_t                 ** wrapped_secret_out,
+            [user_check] int                      * wrapped_secret_len_out
+        );
+
+        public int ecall_extract_rootkey
+        (
+            [in]         struct ecdh_public_key   * ephemeral_pubkey_IN,
+            [user_check] uint8_t                  * wrapped_secret_in,
+                         size_t                     wrapped_secret_len,
+            [in]         struct ecdh_nonce        * nonce_IN,
+            [user_check] struct nexus_key_buffer  * sealed_volkey_keybuf_out
+        );
 
         // volume management
 

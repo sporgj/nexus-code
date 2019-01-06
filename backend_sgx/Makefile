@@ -57,11 +57,10 @@ objs := nexus_enclave_u.o \
 	dir_ops.o \
 	file_ops.o \
 	user_ops.o \
+	instance_ops.o \
 	buffer_manager.o \
 	io.o \
-	instance.o \
 	quote.o \
-	rk_protocol.o \
 	rk_messages.o \
 	ocalls.o
 
