@@ -90,9 +90,9 @@ print_stat_info(const char * path, struct nexus_stat * nexus_stat)
 
     if (nexus_stat->link_type == NEXUS_LNK) {
         file_type  = "LNK";
-        nexus_name = nexus_uuid_to_alt64(&nexus_stat->link_uuid);
+        nexus_name = nexus_uuid_to_hex(&nexus_stat->link_uuid);
     } else {
-        nexus_name = nexus_uuid_to_alt64(&nexus_stat->uuid);
+        nexus_name = nexus_uuid_to_hex(&nexus_stat->uuid);
     }
 
     printf(" %s -> [%s] %s\n", path, file_type, nexus_name);
@@ -103,7 +103,7 @@ print_stat_info(const char * path, struct nexus_stat * nexus_stat)
 static void
 print_lookup_info(const char * path, struct nexus_fs_lookup * lookup_info)
 {
-    char * nexus_name = nexus_uuid_to_alt64(&lookup_info->uuid);
+    char * nexus_name = nexus_uuid_to_hex(&lookup_info->uuid);
     char * file_type = NULL;
 
     switch (lookup_info->type) {
@@ -221,7 +221,7 @@ __fs_create(struct nexus_volume * vol, const char * path, nexus_dirent_type_t ty
 
 
     {
-        char * nexus_name = nexus_uuid_to_alt64(&uuid);
+        char * nexus_name = nexus_uuid_to_hex(&uuid);
         printf(" .created %s -> %s\n", path, nexus_name);
         fflush(stdout);
         nexus_free(nexus_name);
@@ -296,8 +296,8 @@ __fs_rename(struct nexus_volume * vol, const char * from_path, const char * to_p
     }
 
     {
-        char * nexus_name1   = nexus_uuid_to_alt64(&uuid1);
-        char * nexus_name2   = nexus_uuid_to_alt64(&lookup_info.uuid);
+        char * nexus_name1   = nexus_uuid_to_hex(&uuid1);
+        char * nexus_name2   = nexus_uuid_to_hex(&lookup_info.uuid);
 
         printf(" .rename %s/%s [%s] -> %s/%s [%s] {rm=%d}\n",
                 from_dirpath,
@@ -414,7 +414,7 @@ __fs_symlink(struct nexus_volume * vol, char * path, char * target)
 
 
     {
-        char * nexus_name = nexus_uuid_to_alt64(&stat_info.uuid);
+        char * nexus_name = nexus_uuid_to_hex(&stat_info.uuid);
         printf(" .symlink %s -> %s\n", path, nexus_name);
         nexus_free(nexus_name);
     }
@@ -481,7 +481,7 @@ __fs_hardlink(struct nexus_volume * vol, char * link_filepath, char * target_fil
     }
 
     {
-        char * nexus_name = nexus_uuid_to_alt64(&uuid);
+        char * nexus_name = nexus_uuid_to_hex(&uuid);
         printf(" .hardlink %s -> %s [%s]\n", link_filepath, target_filepath, nexus_name);
         nexus_free(nexus_name);
     }
