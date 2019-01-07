@@ -9,8 +9,9 @@ struct nexus_metadata;
 
 
 typedef enum {
-    DENTRY_PARENT_CHANGED  = 0x0001,
-    DENTRY_DELETED         = 0x0002
+    DENTRY_INITIALIZED     = 0x0001,
+    DENTRY_PARENT_CHANGED  = 0x0002,
+    DENTRY_DELETED         = 0x0004
 } dcache_flags_t;
 
 struct nexus_dentry {
@@ -37,7 +38,7 @@ struct nexus_dentry {
 
 
 
-extern struct nexus_dentry      * root_dentry;
+extern struct nexus_dentry      * global_root_dentry;
 
 
 typedef enum {
@@ -74,7 +75,7 @@ dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags);
 
 /**
  * Performs a dentry lookups
- * @param root_dentry
+ * @param global_root_dentry
  * @param path
  */
 struct nexus_dentry *

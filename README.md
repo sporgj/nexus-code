@@ -14,7 +14,7 @@ Lets begin by updating your package definitions and installing development tools
 
 ```bash
 sudo apt-get update
-sudo apt-get install uuid-dev libgoogle-perftools-dev cscope build-essential make git libncurses5-dev libfuse-dev libcurl-devel libcurl4-openssl-dev libreadline-dev
+sudo apt-get install uuid-dev libgoogle-perftools-dev cscope build-essential make git libncurses5-dev libfuse-dev libcurl4-openssl-dev libreadline-dev
 
 ```
 
@@ -84,33 +84,6 @@ This will create the volume in /tmp/vol.
 
 
 ### 3. Starting the FUSE-based volume
-
-On creating the volume, Nexus creates a ".nexus_volume.conf" file in the volume root directory. You have to change the datastore entry name to use "FUSE". Edit the file to look like this.
-
-```json
-{
-	"metadata_store": {
-		"name": "TWOLEVEL",
-		"root_path": "metadata"
-	},
-	"data_store": {
-		"name": "FUSE",
-		"root_path": "files"
-	},
-	"backend": {
-		"name": "SGX",
-		"enclave_path": "/home/vagrant/nexus/build/nexus_enclave.signed.so"
-	},
-	"volume_uuid": "eYfhAVQ2RGmhrvnRoR21Ag..",
-	"supernode_uuid": "W5oWYxv7sAaFcHGYxCpGPg.."
-}
-```
-
-
-
-> N.B: This process will be changed to a more convenient solution soon :)
-
-
 
 Now, go to `frontend_fuse/` and you can run the following
 

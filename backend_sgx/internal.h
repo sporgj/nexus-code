@@ -24,8 +24,8 @@
 #include "sgx_backend_common.h"
 #include "buffer_manager.h"
 #include "key_buffer.h"
-// #include "fs.h"
 #include "io.h"
+#include "exports.h"
 
 #include "hashtree_manager.h"
 
@@ -72,7 +72,7 @@ int
 nxs_create_instance(char * enclave_path, char * instance_fpath);
 
 int
-nxs_load_instance(char * instance_fpath);
+nxs_load_instance(char * instance_fpath, sgx_enclave_id_t enclave_id);
 
 
 int

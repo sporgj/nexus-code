@@ -72,8 +72,14 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
     ret = nexus_json_get_string(backend_cfg, "enclave_path", &sgx_backend->enclave_path);
 
     if (ret != 0) {
-        log_error("sgx_backend: no 'enclave_path' in config\n");
-        goto out;
+        if (nexus_config.enclave_path) {
+            ret = 0;
+            log_debug("Using nexus_config.enclave_path = %s\n", nexus_config.enclave_path);
+            sgx_backend->enclave_path = strndup(nexus_config.enclave_path, NEXUS_PATH_MAX);
+        } else {
+            log_error("sgx_backend: no 'enclave_path' in config\n");
+            goto out;
+        }
     }
 
 

@@ -229,6 +229,9 @@ file_open(struct my_dentry * dentry, int fid, int flags);
 void
 file_close(struct my_file * file_ptr);
 
+void
+__free_file_chunk(struct file_chunk * chunk);
+
 
 //
 // dentry.c

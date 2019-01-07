@@ -1,31 +1,16 @@
 #include "enclave_internal.h"
 
 
-struct nexus_dentry * root_dentry = NULL;
+struct nexus_dentry * global_root_dentry = NULL;
+
+
+struct list_head      dcache_pruned_dentries;
 
 
 static struct nexus_dentry *
 walk_path(struct path_walker * walker);
 
 
-
-void
-dcache_init_root()
-{
-    if (root_dentry) {
-        nexus_free(root_dentry);
-    }
-
-    root_dentry = nexus_malloc(sizeof(struct nexus_dentry));
-
-    INIT_LIST_HEAD(&root_dentry->children);
-    INIT_LIST_HEAD(&root_dentry->aliases);
-
-    nexus_uuid_copy(&global_supernode->root_uuid, &root_dentry->link_uuid);
-
-    root_dentry->dirent_type = NEXUS_DIR;
-    root_dentry->d_count     = 1;
-}
 
 static struct nexus_dentry *
 d_alloc(struct nexus_dentry * parent,
@@ -37,6 +22,7 @@ d_alloc(struct nexus_dentry * parent,
 
     INIT_LIST_HEAD(&dentry->children);
     INIT_LIST_HEAD(&dentry->aliases);
+    INIT_LIST_HEAD(&dentry->siblings);
 
     dentry->dirent_type   = type;
     dentry->name_len      = strnlen(name, NEXUS_NAME_MAX);
@@ -60,6 +46,16 @@ static void
 d_free(struct nexus_dentry * dentry)
 {
     nexus_free(dentry);
+}
+
+void
+dcache_init_root()
+{
+    if (global_root_dentry) {
+        nexus_free(global_root_dentry);
+    }
+
+    global_root_dentry = d_alloc(NULL, &global_supernode->root_uuid, "/", NEXUS_DIR);
 }
 
 static void
@@ -143,7 +139,7 @@ dentry_put(struct nexus_dentry * dentry)
     dentry->d_count -= 1;
 
     if (dentry->d_count == 0) {
-        __dcache_prune(dentry);
+        dentry_delete(dentry);
     }
 }
 
@@ -151,11 +147,13 @@ dentry_put(struct nexus_dentry * dentry)
 void
 dentry_instantiate(struct nexus_dentry * dentry, struct nexus_metadata * metadata)
 {
-    if (!list_empty(&dentry->aliases)) {
+    if (dentry->metadata) {
         abort();
     }
 
     dentry->metadata = metadata;
+
+    dentry->flags |= DENTRY_INITIALIZED;
 
     if (metadata) {
         list_add(&dentry->aliases, &metadata->dentry_list);
@@ -166,11 +164,9 @@ dentry_instantiate(struct nexus_dentry * dentry, struct nexus_metadata * metadat
 void
 dentry_invalidate(struct nexus_dentry * dentry)
 {
-    if (dentry->metadata) {
-        list_del(&dentry->aliases);
-        dentry->metadata->dentry_count -= 1;
-        dentry->metadata = NULL;
-    }
+    d_iput(dentry);
+
+    dentry->flags &= (~DENTRY_INITIALIZED);
 }
 
 void
@@ -183,10 +179,23 @@ dentry_delete(struct nexus_dentry * dentry)
     }
 
     // mark it as deleted and add it to the list of dropped dentries
-    dentry->flags |= DENTRY_DELETED;
+    dentry->flags = DENTRY_DELETED;
+
     d_iput(dentry);
 
-    __dcache_prune(dentry);
+    // we don't touch the root dentry
+    if (dentry == global_root_dentry) {
+        return;
+    }
+
+    // if it's only one reference (files and empty directories), remove it
+    if (dentry->d_count <= 1) {
+        __dcache_prune(dentry);
+        return;
+    }
+
+    // move it to the pruned list, will be collected later
+    list_add(&dentry->siblings, &dcache_pruned_dentries);
 }
 
 void
@@ -217,7 +226,9 @@ __dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
             struct list_head * curr = NULL;
 
             list_for_each(curr, &dentry->children) {
-                struct nexus_dentry * child_dentry = list_entry(curr, struct nexus_dentry, siblings);
+                struct nexus_dentry * child_dentry = NULL;
+
+                child_dentry = list_entry(curr, struct nexus_dentry, siblings);
 
                 child_dentry->flags |= DENTRY_PARENT_CHANGED;
             }
@@ -235,7 +246,9 @@ __dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 
     // instantiate the dentry
     {
-        struct nexus_metadata * metadata = nexus_vfs_load(&dentry->link_uuid, metadata_type, flags);
+        struct nexus_metadata * metadata = NULL;
+
+        metadata = nexus_vfs_load(&dentry->link_uuid, metadata_type, flags);
 
         if (metadata == NULL) {
             log_error("could not load metadata\n");
@@ -259,6 +272,12 @@ dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags)
 
     if (__dentry_revalidate(dentry, flags)) {
         return -1;
+    }
+
+    if (dentry == global_root_dentry) {
+        struct nexus_dirnode * root_dirnode = (struct nexus_dirnode *)dentry->metadata->object;
+
+        return nexus_uuid_compare(&global_supernode->root_uuid, &root_dirnode->my_uuid);
     }
 
     return nexus_metadata_verify_uuids(dentry);
@@ -305,7 +324,7 @@ walk_path(struct path_walker * walker)
                 curr_dentry = curr_dentry->parent;
 
                 if (curr_dentry == NULL) {
-                    log_error("error with path");
+                    log_error("error with path\n");
                     return NULL;
                 }
 

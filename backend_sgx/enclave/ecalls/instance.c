@@ -189,12 +189,12 @@ ecall_mount_instance(struct ecdh_public_key * pubkey_IN,
 }
 
 int
-ecall_wrap_secret(sgx_quote_t             * other_quote_in,
-                  struct ecdh_public_key  * other_pubkey_IN,
-                  struct ecdh_public_key  * ephemeral_pk_out,
-                  struct ecdh_nonce       * nonce_out,
-                  uint8_t                ** wrapped_secret_out,
-                  int                     * wrapped_secret_len_out)
+ecall_exchange_rootkey(sgx_quote_t             * other_quote_in,
+                       struct ecdh_public_key  * other_pubkey_IN,
+                       struct ecdh_public_key  * ephemeral_pk_out,
+                       struct ecdh_nonce       * nonce_out,
+                       uint8_t                ** wrapped_secret_out,
+                       int                     * wrapped_secret_len_out)
 {
     uint8_t * result     = NULL;
 
@@ -258,13 +258,42 @@ err:
     return -1;
 }
 
+static int
+__seal_rootkey_and_export(char                    * unwrapped_buffer,
+                          size_t                    unwrapped_buflen,
+                          struct nexus_key_buffer * sealed_volkey_keybuf_out)
+{
+    struct nexus_key_buffer * key_buffer = NULL;
+
+    struct nexus_key other_vol_rootkey;
+
+    nexus_init_key(&other_vol_rootkey, VOLUMEKEY_KEY_TYPE);
+
+    if (__nexus_key_from_buf(&other_vol_rootkey,
+                VOLUMEKEY_KEY_TYPE,
+                unwrapped_buffer,
+                unwrapped_buflen)) {
+        log_error("could not create rootkey buffer\n");
+        return -1;
+    }
+
+    key_buffer = key_buffer_seal(&other_vol_rootkey);
+
+    nexus_free_key(&other_vol_rootkey);
+
+    key_buffer_copy(key_buffer, sealed_volkey_keybuf_out);
+
+    key_buffer_free(key_buffer);
+
+    return 0;
+}
+
 int
-ecall_unwrap_secret(struct ecdh_public_key  * ephemeral_pk_IN,
-                    uint8_t                 * wrapped_secret_in,
-                    size_t                    wrapped_secret_len,
-                    struct ecdh_nonce       * nonce_IN,
-                    uint8_t                ** secret_out,
-                    int                     * secret_len_out)
+ecall_extract_rootkey(struct ecdh_public_key  * ephemeral_pk_IN,
+                      uint8_t                 * wrapped_secret_in,
+                      size_t                    wrapped_secret_len,
+                      struct ecdh_nonce       * nonce_IN,
+                      struct nexus_key_buffer * sealed_volkey_keybuf_out)
 {
     uint8_t * result     = NULL;
 
@@ -273,8 +302,8 @@ ecall_unwrap_secret(struct ecdh_public_key  * ephemeral_pk_IN,
 
     int       sealed_other_rootkey_len = 0;
 
-    uint8_t * other_rootkey_unwrapped = NULL;
-    size_t other_rootkey_unwrapped_len = NULL;
+    uint8_t * unwrapped_buffer = NULL;
+    size_t    unwrapped_buflen = NULL;
 
     uint8_t * wrapped_secret_copy = NULL;
 
@@ -296,31 +325,25 @@ ecall_unwrap_secret(struct ecdh_public_key  * ephemeral_pk_IN,
         return -1;
     }
 
-    other_rootkey_unwrapped = result + offset;
-    other_rootkey_unwrapped_len = result_len;
+    unwrapped_buffer = result + offset;
+    unwrapped_buflen = result_len;
 
-    // seal the rootkey and copy out
-    {
-        uint8_t * sealed_other_rootkey = crypto_seal_data(
-            other_rootkey_unwrapped, other_rootkey_unwrapped_len, &sealed_other_rootkey_len);
 
-        if (sealed_other_rootkey == NULL) {
-            log_error("sealing rootkey FAILED\n");
-            return -1;
-        }
+    if (result_len != VOLUMEKEY_SIZE_BYTES) {
+        log_error("Incorrect sizeof unwrapped rootkey: expected=%d, got=%d\n",
+                  VOLUMEKEY_SIZE_BYTES,
+                  result_len);
 
-        if (__copy_to_untrusted(sealed_other_rootkey, sealed_other_rootkey_len, secret_out)) {
-            nexus_free(sealed_other_rootkey);
-            log_error("could not copy out rootkey\n");
-            return -1;
-        }
-
-        nexus_free(sealed_other_rootkey);
+        goto err;
     }
 
 
-    *secret_len_out = sealed_other_rootkey_len;
+    if (__seal_rootkey_and_export(unwrapped_buffer, unwrapped_buflen, sealed_volkey_keybuf_out)) {
+        log_error("__seal_rootkey_and_export FAILED\n");
+        goto err;
+    }
 
+    nexus_free(result);
 
     return 0;
 err:

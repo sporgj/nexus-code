@@ -18,6 +18,8 @@ struct nexus_config {
     char * username;
 
     char * instance_path;
+
+    char * enclave_path;
 };
 
 
@@ -26,3 +28,6 @@ extern char * nexus_default_volume_config;
 
 
 int nexus_config_init(void);
+
+void
+nexus_config_set_enclave_path(char * enclave_path);

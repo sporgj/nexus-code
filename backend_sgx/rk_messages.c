@@ -164,12 +164,13 @@ store_xchg_message(const char * filepath, struct rk_exchange * message)
 {
     char * nonce_str = NULL;
     char * ciphertext_str = NULL;
-    char * ephemeral_pk_str = NULL;
+    char * ephe_pk_str = NULL;
+    char * vol_uuid_str = NULL;
 
     nonce_str = nexus_alt64_encode(message->nonce.bytes, sizeof(struct ecdh_nonce));
     ciphertext_str = nexus_alt64_encode(message->ciphertext, message->ciphertext_len);
-    ephemeral_pk_str
-        = nexus_alt64_encode((uint8_t *)&message->ephemeral_pubkey, sizeof(struct ecdh_public_key));
+    ephe_pk_str = nexus_alt64_encode((uint8_t *)&message->ephemeral_pubkey, sizeof(struct ecdh_public_key));
+    vol_uuid_str = nexus_alt64_encode((uint8_t *)&message->volume_uuid, sizeof(struct nexus_uuid));
 
     {
         nexus_json_obj_t json_obj = nexus_json_new_obj(".");
@@ -178,7 +179,8 @@ store_xchg_message(const char * filepath, struct rk_exchange * message)
 
         ret |= nexus_json_add_string(json_obj, "nonce", nonce_str);
         ret |= nexus_json_add_string(json_obj, "ctext", ciphertext_str);
-        ret |= nexus_json_add_string(json_obj, "pubkey", ephemeral_pk_str);
+        ret |= nexus_json_add_string(json_obj, "pubkey", ephe_pk_str);
+        ret |= nexus_json_add_string(json_obj, "voluuid", vol_uuid_str);
 
         if (ret) {
             log_error("could not create JSON object\n");
@@ -195,13 +197,15 @@ store_xchg_message(const char * filepath, struct rk_exchange * message)
 
     nexus_free(nonce_str);
     nexus_free(ciphertext_str);
-    nexus_free(ephemeral_pk_str);
+    nexus_free(ephe_pk_str);
+    nexus_free(vol_uuid_str);
 
     return 0;
 err:
     nexus_free(nonce_str);
     nexus_free(ciphertext_str);
-    nexus_free(ephemeral_pk_str);
+    nexus_free(ephe_pk_str);
+    nexus_free(vol_uuid_str);
 
     return -1;
 }
@@ -214,11 +218,14 @@ fetch_xchg_message(const char * filepath)
     char * nonce_str = NULL;
     char * ciphertext_str = NULL;
     char * ephemeral_pk_str = NULL;
+    char * vol_uuid_str = NULL;
 
     uint8_t * nonce_buf  = NULL;
     uint8_t * pubkey_buf = NULL;
+    uint8_t * vol_uuid_buf = NULL;
     uint32_t  nonce_len  = 0;
     uint32_t  pubkey_len = 0;
+    uint32_t  vol_uuid_len = 0;
 
     nexus_json_obj_t json_obj = NEXUS_JSON_INVALID_OBJ;
 
@@ -246,6 +253,11 @@ fetch_xchg_message(const char * filepath)
             log_error("could not get `pubkey` from JSON object\n");
             goto out;
         }
+
+        if (nexus_json_get_string(json_obj, "voluuid", &vol_uuid_str)) {
+            log_error("could not get `vol_uuid` from JSON object\n");
+            goto out;
+        }
     }
 
 
@@ -255,15 +267,44 @@ fetch_xchg_message(const char * filepath)
 
     ret |= nexus_alt64_decode(nonce_str, &nonce_buf, &nonce_len);
     ret |= nexus_alt64_decode(ephemeral_pk_str, &pubkey_buf, &pubkey_len);
-    ret |= nexus_alt64_decode(ciphertext_str, &message->ciphertext, &message->ciphertext_len);
+    ret |= nexus_alt64_decode(ciphertext_str, &message->ciphertext, (uint32_t *)&message->ciphertext_len);
+    ret |= nexus_alt64_decode(vol_uuid_str, &vol_uuid_buf, &vol_uuid_len);
+
+    if (ret != 0) {
+        log_error("Error decoding rootkey exchange message\n");
+        goto out;
+    }
+
+    if (vol_uuid_len != sizeof(struct nexus_uuid)) {
+        log_error("decoded uuid has incorrect size. expected=%zu, got=%d\n",
+                  sizeof(struct nexus_uuid),
+                  vol_uuid_len);
+
+        ret = -1;
+        goto out;
+    }
 
     memcpy(message->ephemeral_pubkey.bytes, pubkey_buf, sizeof(struct ecdh_public_key));
     memcpy(message->nonce.bytes, nonce_buf, sizeof(struct ecdh_nonce));
-out:
-    nexus_free(nonce_buf);
-    nexus_free(pubkey_buf);
+    memcpy(&message->volume_uuid, vol_uuid_buf, sizeof(struct nexus_uuid));
 
-    nexus_json_free(json_obj);
+    ret = 0;
+out:
+    if (nonce_buf) {
+        nexus_free(nonce_buf);
+    }
+
+    if (pubkey_buf) {
+        nexus_free(pubkey_buf);
+    }
+
+    if (vol_uuid_buf) {
+        nexus_free(vol_uuid_buf);
+    }
+
+    if (json_obj != NEXUS_JSON_INVALID_OBJ) {
+        nexus_json_free(json_obj);
+    }
 
     if (ret) {
         free_xchg_message(message);

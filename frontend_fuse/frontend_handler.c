@@ -79,6 +79,31 @@ __derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode
     posix_stat->st_ino = nexus_uuid_hash(&stat_info->uuid);
 }
 
+static int
+__datastore_getattr(struct my_dentry *     dentry,
+                    struct nexus_uuid *    uuid,
+                    struct nexus_fs_attr * attrs)
+{
+    int ret = -1;
+
+    // stat the datastores
+    switch (dentry->type) {
+    case NEXUS_DIR:
+        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
+        break;
+    case NEXUS_REG:
+        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, uuid, attrs);
+        break;
+    case NEXUS_LNK:
+        // we will just return stat information about its parent
+        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store,
+                                      &dentry->parent->inode->attrs.stat_info.uuid,
+                                      attrs);
+    }
+
+    return ret;
+}
+
 int
 nexus_fuse_getattr(struct my_dentry     * dentry,
                    nexus_stat_flags_t     stat_flags,
@@ -86,12 +111,39 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
 {
     struct nexus_stat * stat_info = &attrs->stat_info;
 
+    struct my_inode   * inode = dentry->inode;
+
     struct nexus_uuid * uuid = NULL;
 
-    char * path = dentry_get_fullpath(dentry);
+    char              * path = NULL;
 
     int ret = -1;
 
+
+    if (inode && inode->last_accessed) {
+        struct nexus_fs_attr attrs = { 0 };
+
+        uuid = &inode->attrs.stat_info.uuid;
+
+        if (inode->is_dirty) {
+            // then we shall use the live chunks
+            return 0;
+        }
+
+        if (__datastore_getattr(dentry, uuid, &attrs)) {
+            return -1;
+        }
+
+        // if the access time is not later...
+        if (attrs.posix_stat.st_mtime <= inode->attrs.posix_stat.st_mtime) {
+            return 0;
+        }
+
+        inode->last_accessed = attrs.posix_stat.st_atime;
+    }
+
+
+    path = dentry_get_fullpath(dentry);
 
     if (path == NULL) {
         return -1;
@@ -112,26 +164,20 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
         uuid =  &stat_info->link_uuid;
     }
 
-    // stat the datastores
-    switch (dentry->type) {
-    case NEXUS_DIR:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
-        break;
-    case NEXUS_REG:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, uuid, attrs);
-        break;
-    case NEXUS_LNK:
-        // we will just return stat information about its parent
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store,
-                                      &dentry->parent->inode->attrs.stat_info.uuid,
-                                      attrs);
-    }
-
-    if (ret) {
+    // XXX: maybe we don't need to stat this if the uuid's didn't change?
+    if (__datastore_getattr(dentry, uuid, attrs)) {
         goto out;
     }
 
     __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
+
+    if (inode->last_accessed == 0 && !inode->is_dirty) {
+        inode->filesize = attrs->posix_stat.st_size;
+    }
+
+    inode->last_accessed = attrs->posix_stat.st_atime;
+
+    ret = 0;
 out:
     nexus_free(path);
 
@@ -388,7 +434,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 {
     struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;
 
-    struct my_inode          * inode       = file_ptr->dentry->inode;
+    struct my_inode          * inode       = file_ptr->inode;
 
     struct nexus_file_handle * file_handle = NULL;
 
@@ -447,7 +493,7 @@ nexus_fuse_store(struct my_file * file_ptr)
 {
     struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;
 
-    struct my_inode          * inode       = file_ptr->dentry->inode;
+    struct my_inode          * inode       = file_ptr->inode;
 
     struct nexus_file_handle * file_handle = NULL;
 

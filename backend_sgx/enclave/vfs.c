@@ -104,8 +104,8 @@ nexus_vfs_lookup(char * filepath, nexus_io_flags_t flags)
     struct path_walker walker = {
         .remaining_path       = filepath,
         .type                 = PATH_WALK_NORMAL,
-        .parent_dentry        = root_dentry,
-        .io_flags             = flags
+        .io_flags             = flags,
+        .parent_dentry        = global_root_dentry
     };
 
     sgx_spin_lock(&traversal_lock);
@@ -119,7 +119,7 @@ struct nexus_dentry *
 nexus_vfs_lookup_parent(char * filepath, struct path_walker * walker)
 {
     walker->remaining_path = filepath;
-    walker->parent_dentry  = root_dentry;
+    walker->parent_dentry  = global_root_dentry;
     walker->type           = PATH_WALK_PARENT;
     walker->io_flags       = NEXUS_FREAD;
 
@@ -183,7 +183,7 @@ nexus_vfs_put(struct nexus_metadata * metadata)
 }
 
 int
-nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
+__vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
 {
     if (metadata->is_invalid) {
         return nexus_metadata_reload(metadata, flags);
@@ -196,10 +196,24 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, b
     }
 
     if (flags & NEXUS_FWRITE) {
+        metadata->is_locked = true;
         return buffer_layer_lock(&metadata->uuid, flags);
     }
 
     return 0;
+}
+
+int
+nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
+{
+    int ret = __vfs_revalidate(metadata, flags, has_changed);
+
+    if (ret == 0) {
+        // TODO make this into a function
+        metadata->flags = flags;
+    }
+
+    return ret;
 }
 
 struct nexus_supernode *
@@ -252,7 +266,7 @@ nexus_vfs_load(struct nexus_uuid * real_uuid, nexus_metadata_type_t type, nexus_
     }
 
     sgx_spin_lock(&mcache_lock);
-    nexus_lru_put(metadata_cache, real_uuid, metadata);
+    nexus_lru_put(metadata_cache, &metadata->uuid, metadata);
     sgx_spin_unlock(&mcache_lock);
 
     return metadata;
