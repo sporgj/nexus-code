@@ -173,7 +173,7 @@ main(int argc, char ** argv)
 
     while (cmds[i].name) {
 
-        if (strncmp(cmds[i].name, argv[1], strlen(cmds[i].name)) == 0) {
+        if (strncmp(cmds[i].name, argv[1], 128) == 0) {
 
             found = 1;
 

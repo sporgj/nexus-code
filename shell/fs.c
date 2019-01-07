@@ -497,6 +497,32 @@ out_err:
 }
 
 int
+__fs_truncate(struct nexus_volume * vol, char * filepath, size_t filesize)
+{
+    nexus_fs_attr_flags_t flags = NEXUS_FS_ATTR_SIZE;
+
+    struct nexus_fs_attr attrs = { 0 };
+
+
+    attrs.posix_stat.st_size = filesize;
+
+    if (nexus_fs_setattr(vol, filepath, &attrs, flags)) {
+        log_error("nexus_fs_setattr FAILED\n");
+        return -1;
+    }
+
+    {
+        char * nexus_name = nexus_uuid_to_hex(&attrs.stat_info.uuid);
+
+        printf(".truncate %s -> %s [size = %zu]\n", filepath, nexus_name, filesize);
+
+        nexus_free(nexus_name);
+    }
+
+    return 0;
+}
+
+int
 create_file_main(int argc, char ** argv)
 {
     struct nexus_volume * vol = NULL;
