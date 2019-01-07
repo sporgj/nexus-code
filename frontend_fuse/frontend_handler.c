@@ -171,6 +171,10 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
 
     __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
 
+    if (inode->last_accessed == 0 && !inode->is_dirty) {
+        inode->filesize = attrs->posix_stat.st_size;
+    }
+
     inode->last_accessed = attrs->posix_stat.st_atime;
 
     ret = 0;
