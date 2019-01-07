@@ -56,6 +56,8 @@ dcache_init_root()
     }
 
     global_root_dentry = d_alloc(NULL, &global_supernode->root_uuid, "/", NEXUS_DIR);
+
+    INIT_LIST_HEAD(&dcache_pruned_dentries);
 }
 
 static void
