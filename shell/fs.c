@@ -250,7 +250,7 @@ __fs_remove(struct nexus_volume * vol, const char * path)
     nexus_free(filename);
 
     if (ret != 0) {
-        log_error("creating %s FAILED\n", path);
+        log_error("removing %s FAILED\n", path);
         return -1;
     }
 
