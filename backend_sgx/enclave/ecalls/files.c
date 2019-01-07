@@ -180,7 +180,7 @@ ecall_fs_decrypt(char    * filepath_IN,
 int
 ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
 {
-    struct nexus_metadata * metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+    struct nexus_metadata * metadata = NULL;
     struct nexus_filenode * filenode = NULL;
 
 

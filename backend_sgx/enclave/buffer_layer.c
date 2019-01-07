@@ -23,6 +23,18 @@ static size_t                   buffer_count = 0;
 
 
 
+static inline struct metadata_buffer *
+__bcache_get(struct nexus_uuid * uuid)
+{
+    return (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+}
+
+static inline bool
+is_buffer_currently_writing(struct metadata_buffer * meta_buf)
+{
+    return (meta_buf && (meta_buf->flags & (NEXUS_FWRITE | NEXUS_FCREATE)));
+}
+
 static struct metadata_buffer *
 __bcache_update(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t flags)
 {
@@ -30,7 +42,7 @@ __bcache_update(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t fla
 
     sgx_spin_lock(&bcache_lock);
 
-    metadata_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+    metadata_buf = __bcache_get(uuid);
 
     if (metadata_buf == NULL) {
         metadata_buf =  nexus_malloc(sizeof(struct metadata_buffer));
@@ -97,10 +109,14 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 
 
     // check if we have a timestamp
-    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+    meta_buf = __bcache_get(uuid);
 
     if (meta_buf == NULL) {
         *should_reload = true;
+        return 0;
+    }
+
+    if (is_buffer_currently_writing(meta_buf)) {
         return 0;
     }
 
@@ -137,10 +153,10 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
     }
 
 
-    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+    meta_buf = __bcache_get(uuid);
 
     // this means that the file has been requested in a previous get with FWRITE
-    if (meta_buf && (meta_buf->flags & (NEXUS_FWRITE | NEXUS_FCREATE))) {
+    if (is_buffer_currently_writing(meta_buf)) {
         meta_buf->tmp_buffer = addr;
         meta_buf->tmp_buflen = size;
 
@@ -180,8 +196,18 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 int
 buffer_layer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 {
+    struct metadata_buffer * meta_buf = NULL;
+
     int err = -1;
     int ret = -1;
+
+
+    meta_buf = __bcache_get(uuid);
+
+    // this means that the file has already been locked
+    if (is_buffer_currently_writing(meta_buf)) {
+        return 0;
+    }
 
     err = ocall_buffer_lock(&ret, uuid, flags, global_volume);
 
@@ -244,7 +270,7 @@ buffer_layer_put(struct nexus_uuid * uuid)
 
 
     // get the metadata buffer from the cache and write it to disk
-    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
+    meta_buf = __bcache_get(uuid);
 
     if (meta_buf && meta_buf->tmp_buffer) {
         int ret = -1;

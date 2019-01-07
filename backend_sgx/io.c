@@ -1,6 +1,7 @@
 #include "internal.h"
 #include <time.h>
 #include <nexus_datastore.h>
+#include <nexus_file_handle.h>
 
 
 static struct metadata_buf *
