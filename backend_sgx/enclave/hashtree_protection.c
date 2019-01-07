@@ -131,10 +131,10 @@ hashtree_update(struct nexus_metadata * metadata)
         child_dentry = parent_dentry;
         child_uuid = &child_dentry->metadata->uuid;
         parent_dentry = parent_dentry->parent;
-    } while(child_dentry != root_dentry);
+    } while(child_dentry != global_root_dentry);
 
 
-    return __update_hashtree_root(root_dentry->metadata);
+    return __update_hashtree_root(global_root_dentry->metadata);
 }
 
 int
@@ -156,7 +156,7 @@ hashtree_verify(struct nexus_dentry * dentry)
     }
 
     // if it's the root, let's make sure we have the latest version
-    if (dentry == root_dentry) {
+    if (dentry == global_root_dentry) {
         if (hashtree_root_version > metadata->version) {
             log_error("root metadata outdated. local=%zu, remote=%zu\n",
                       (size_t) hashtree_root_version,

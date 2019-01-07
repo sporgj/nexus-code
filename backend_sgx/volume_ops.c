@@ -312,12 +312,6 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     sgx_backend->volume = volume;
 
-    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
-        log_error("backend instance needs to be initialized\n");
-        return -1;
-    }
-
-
     // create the hashtree
     if (hashtree_manager_init(sgx_backend)) {
         log_error("hashtree_mananger_init FAILED\n");
