@@ -24,12 +24,8 @@ const char * base64_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 const char * hex_table    = "0123456789abcdef";
 
 
-
-
 int
-nexus_alt64_decode(char      * alt64_str,
-		   uint8_t  ** dst,
-		   uint32_t  * dst_len)
+nexus_alt64_decode(char * alt64_str, uint8_t ** dst, uint32_t * dst_len)
 {
     uint8_t * out_buf = NULL;
     uint32_t  out_len = 0;
@@ -39,19 +35,18 @@ nexus_alt64_decode(char      * alt64_str,
     int i          = 0;
     int len        = 0;
 
-    
     if (alt64_str == 0) {
-	log_error("Error: Could not parse empty String\n");
+        log_error("Error: Could not parse empty String\n");
         return -1;
     }
 
     len = strlen(alt64_str);
-    
+
     if (len % 4) {
         log_error("Invalid Alt64 Length\n");
         return -1;
     }
-   
+
     num_chunks = len / 4;
 
     if (index(alt64_str, '.')) {
@@ -62,9 +57,9 @@ nexus_alt64_decode(char      * alt64_str,
     out_buf = (uint8_t *)nexus_malloc(out_len);
 
     for (i = 0; i < num_chunks; i++) {
-        char  * chunk   = (char *)alt64_str + (i * 4);
-        uint8_t vals[4] = {0, 0, 0, 0};
-        
+        char *  chunk   = (char *)alt64_str + (i * 4);
+        uint8_t vals[4] = { 0, 0, 0, 0 };
+
         vals[0] = index(alt64_table, (int)chunk[0]) - alt64_table;
         vals[1] = index(alt64_table, (int)chunk[1]) - alt64_table;
 
@@ -76,9 +71,7 @@ nexus_alt64_decode(char      * alt64_str,
             vals[3] = index(alt64_table, (int)chunk[3]) - alt64_table;
         }
 
-
         out_buf[(i * 3) + 0] = ((vals[0] & 0x3f) << 2) | ((vals[1] & 0x30) >> 4);
-
 
         if ((padding <= 1) || (i != num_chunks - 1)) {
             out_buf[(i * 3) + 1] = ((vals[1] & 0x0f) << 4) | ((vals[2] & 0x3c) >> 2);
@@ -95,42 +88,37 @@ nexus_alt64_decode(char      * alt64_str,
     return 0;
 }
 
-
 char *
-nexus_alt64_encode(uint8_t  * src_buf,
-		   uint32_t   src_len)
+nexus_alt64_encode(uint8_t * src_buf, uint32_t src_len)
 {
-    char    * alt64_str  = NULL;
-    uint32_t  num_chunks = (src_len / 3);
-    uint32_t  i = 0;
-
+    char *   alt64_str  = NULL;
+    uint32_t num_chunks = (src_len / 3);
+    uint32_t i          = 0;
 
     if (src_len % 3) {
         num_chunks++;
     }
 
-
     alt64_str = nexus_malloc((num_chunks * 4) + 1);
 
     if (alt64_str == NULL) {
-	log_error("Could not allocate alt64 string\n");
-	return NULL;
+        log_error("Could not allocate alt64 string\n");
+        return NULL;
     }
 
     for (i = 0; i < num_chunks; i++) {
-        uint8_t chunk[3] = {0, 0, 0};
-        int j = 0;
+        uint8_t chunk[3] = { 0, 0, 0 };
+        int     j        = 0;
 
         chunk[0] = src_buf[i * 3];
 
-        if ((i * 3) + 1 < src_len ) {
+        if ((i * 3) + 1 < src_len) {
             chunk[1] = src_buf[(i * 3) + 1];
         }
 
-        if ((i * 3) + 2 < src_len ) {
+        if ((i * 3) + 2 < src_len) {
             chunk[2] = src_buf[(i * 3) + 2];
         }
-        
 
         for (j = 0; j < 4; j++) {
             uint8_t val = 0;
@@ -145,7 +133,6 @@ nexus_alt64_encode(uint8_t  * src_buf,
             } else {
                 val = chunk[2] & 0x3f;
             }
-            
 
             c = alt64_table[val];
 
@@ -156,22 +143,15 @@ nexus_alt64_encode(uint8_t  * src_buf,
                 }
             }
 
-	    alt64_str[(i * 4) + j] = c;
+            alt64_str[(i * 4) + j] = c;
         }
     }
 
     return alt64_str;
-
 }
 
-
-
-
-
 int
-nexus_base64_decode(char      * base64_str,
-		    uint8_t  ** dst,
-		    uint32_t  * dst_len)
+nexus_base64_decode(char * base64_str, uint8_t ** dst, uint32_t * dst_len)
 {
     uint8_t * out_buf = NULL;
     uint32_t  out_len = 0;
@@ -181,19 +161,18 @@ nexus_base64_decode(char      * base64_str,
     int i          = 0;
     int len        = 0;
 
-    
     if (base64_str == 0) {
-	log_error("Error: Could not parse empty String\n");
+        log_error("Error: Could not parse empty String\n");
         return -1;
     }
-    
+
     len = strlen(base64_str);
 
     if (len % 4) {
         log_error("Invalid Base64 Length\n");
         return -1;
     }
-   
+
     num_chunks = len / 4;
 
     if (index(base64_str, '=')) {
@@ -204,9 +183,9 @@ nexus_base64_decode(char      * base64_str,
     out_buf = (uint8_t *)calloc(1, out_len);
 
     for (i = 0; i < num_chunks; i++) {
-        char  * chunk   = (char *)base64_str + (i * 4);
-        uint8_t vals[4] = {0, 0, 0, 0};
-        
+        char *  chunk   = (char *)base64_str + (i * 4);
+        uint8_t vals[4] = { 0, 0, 0, 0 };
+
         vals[0] = index(base64_table, (int)chunk[0]) - base64_table;
         vals[1] = index(base64_table, (int)chunk[1]) - base64_table;
 
@@ -218,9 +197,7 @@ nexus_base64_decode(char      * base64_str,
             vals[3] = index(base64_table, (int)chunk[3]) - base64_table;
         }
 
-
         out_buf[(i * 3) + 0] = ((vals[0] & 0x3f) << 2) | ((vals[1] & 0x30) >> 4);
-
 
         if ((padding <= 1) || (i != num_chunks - 1)) {
             out_buf[(i * 3) + 1] = ((vals[1] & 0x0f) << 4) | ((vals[2] & 0x3c) >> 2);
@@ -237,42 +214,37 @@ nexus_base64_decode(char      * base64_str,
     return 0;
 }
 
-
 char *
-nexus_base64_encode(uint8_t  * src_buf,
-		    uint32_t   src_len)
+nexus_base64_encode(uint8_t * src_buf, uint32_t src_len)
 {
-    char    * base64_str  = NULL;
-    uint32_t  num_chunks = (src_len / 3);
-    uint32_t  i = 0;
-
+    char *   base64_str = NULL;
+    uint32_t num_chunks = (src_len / 3);
+    uint32_t i          = 0;
 
     if (src_len % 3) {
         num_chunks++;
     }
 
-
     base64_str = calloc(1, (num_chunks * 4) + 1);
 
     if (base64_str == NULL) {
-	log_error("Could not allocate base64 string\n");
-	return NULL;
+        log_error("Could not allocate base64 string\n");
+        return NULL;
     }
 
     for (i = 0; i < num_chunks; i++) {
-        uint8_t chunk[3] = {0, 0, 0};
-        int j = 0;
+        uint8_t chunk[3] = { 0, 0, 0 };
+        int     j        = 0;
 
         chunk[0] = src_buf[i * 3];
 
-        if ((i * 3) + 1 < src_len ) {
+        if ((i * 3) + 1 < src_len) {
             chunk[1] = src_buf[(i * 3) + 1];
         }
 
-        if ((i * 3) + 2 < src_len ) {
+        if ((i * 3) + 2 < src_len) {
             chunk[2] = src_buf[(i * 3) + 2];
         }
-        
 
         for (j = 0; j < 4; j++) {
             uint8_t val = 0;
@@ -287,7 +259,6 @@ nexus_base64_encode(uint8_t  * src_buf,
             } else {
                 val = chunk[2] & 0x3f;
             }
-            
 
             c = base64_table[val];
 
@@ -298,64 +269,59 @@ nexus_base64_encode(uint8_t  * src_buf,
                 }
             }
 
-	    base64_str[(i * 4) + j] = c;
+            base64_str[(i * 4) + j] = c;
         }
     }
 
     return base64_str;
-
 }
 
+char *
+nexus_hex_encode(uint8_t * src_buf, uint32_t src_len)
+{
+    size_t base16_len = (src_len * 2) + 1;
+    char * base16_str = nexus_malloc(base16_len); // XXX: returns a zeroed buffer
 
+    for (size_t i = 0; i < src_len; i++) {
+        sprintf(&base16_str[(i << 1)], "%02x", src_buf[i]);
+    }
 
-/* 
- * There doesn't seem to be _any_ base58 implementation out there that isn't 
- * a pile of shit. So I guess we're fucking doing this....
- */
+    return base16_str;
+}
 
+// https://stackoverflow.com/a/53579348
+static void
+hex2bin(const uint8_t * in, size_t len, unsigned char * out)
+{
 
-/* What the hell is base58 anyway?
- * Encoding:
- * 1: Convert input buffer to a single number
- * 2: Successively divide number by 58, recording remainder using the alphabet (base58_table)
- *      Results are prepended to the output string
- * 3: Continue until number is zero
- * 4. Leading zeroes are not encoded, but rather replaced with "1"'s at start of output string
- */
+    static const unsigned char TBL[]
+        = { 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  58, 59, 60, 61, 62, 63, 64, 10, 11,
+            12, 13, 14, 15, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
+            86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 10, 11, 12, 13, 14, 15 };
 
+    static const unsigned char * LOOKUP = TBL - 48;
 
-// static const char * base58_table = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
- 
+    const uint8_t * end = in + len;
 
+    while (in < end) {
+        *(out++) = LOOKUP[*in] << 4 | LOOKUP[*(in + 1)];
+
+        in += 1;
+    }
+}
 
 int
-nexus_base58_encode(uint8_t  * in_buf,
-		    size_t     in_size,
-		    uint8_t ** out_buf,
-		    size_t   * out_size)
+nexus_hex_decode(char * base16_str, uint8_t ** dst_buf, uint32_t * dst_len)
 {
-    //    uint8_t * enc_buf  = NULL;
-    //    size_t    enc_size = 0;
+    size_t base16_len = strnlen(base16_str, 1024);
 
-    int num_zeroes = 0;
-    size_t offset    = 0;
-    
-    // Count the number of leading zeroes
-    for (offset = 0; offset < in_size; offset++) {
+    size_t    decoded_len = base16_len / 2;
+    uint8_t * decoded_buf = nexus_malloc(decoded_len);
 
-	if (in_buf[offset] != 0) {
-	    break;
-	}
+    hex2bin((uint8_t *)base16_str, base16_len, decoded_buf);
 
-	num_zeroes++;
-    }
-    
-    // Calculate size needed and allocate it
-	
-    // start processing
+    *dst_len = decoded_len;
+    *dst_buf = decoded_buf;
 
-    
-    
-    return -1;
-
+    return 0;
 }
