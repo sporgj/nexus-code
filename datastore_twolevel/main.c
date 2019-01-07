@@ -36,7 +36,7 @@ __generic_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * u
 
     int ret = 0;
 
-    filename = nexus_uuid_to_alt64(uuid);
+    filename = nexus_uuid_to_hex(uuid);
 
     if (filename == NULL) {
         log_error("Could not generate base64 string\n");

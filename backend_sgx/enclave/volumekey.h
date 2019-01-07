@@ -7,6 +7,10 @@
 
 #include <sgx_backend_common.h>
 
+#define VOLUMEKEY_KEY_TYPE        NEXUS_RAW_128_KEY
+
+#define VOLUMEKEY_SIZE_BYTES      (16)
+
 /**
  * Generates a new enclave volumekey
  * @return 0 on success

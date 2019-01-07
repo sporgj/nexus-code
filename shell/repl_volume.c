@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <limits.h>
+
 #include <nexus.h>
 #include <nexus_backend.h>
 #include <nexus_raw_file.h>
@@ -446,6 +448,37 @@ handle_fs_rename(int argc, char ** argv)
     return ret;
 }
 
+static int
+handle_fs_truncate(int argc, char ** argv)
+{
+    char * tmp      = NULL;
+    char * filepath = NULL;
+    size_t filesize = 0;
+
+    if (argc < 2) {
+        usage("fs_rename");
+        return -1;
+    }
+
+    int ret = -1;
+
+
+    filepath = strndup(argv[0], NEXUS_PATH_MAX);
+    filesize = strtoul(argv[1], &tmp, 10);
+
+    if (filesize == ULONG_MAX) {
+        nexus_free(filepath);
+        log_error("could not parse file size arg (%s)\n", argv[1]);
+        return -1;
+    }
+
+    ret = __fs_truncate(mounted_volume, filepath, filesize);
+
+    nexus_free(filepath);
+
+    return ret;
+}
+
 /////////
 
 static int
@@ -558,6 +591,7 @@ static struct _cmd cmds[]
         { "fs_readlink", handle_fs_readlink, "Read symlink target", "<path>" },
         { "fs_hardlink", handle_fs_hardlink, "Hardlink file", "<link_fpath> <target_fpath>" },
         { "fs_rename", handle_fs_rename, "Rename file", "<from_path> <to_path>" },
+        { "fs_truncate", handle_fs_truncate, "Truncate file", "<file_path>" },
 
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };

@@ -9,19 +9,19 @@
 #pragma once
 
 int
-nexus_alt64_decode(char      * alt_str,
-		   uint8_t  ** dst,
-		   uint32_t  * dst_len);
+nexus_alt64_decode(char * alt_str, uint8_t ** dst, uint32_t * dst_len);
 
 char *
-nexus_alt64_encode(uint8_t   * src_buf,
-		   uint32_t    src_len);
+nexus_alt64_encode(uint8_t * src_buf, uint32_t src_len);
 
 int
-nexus_base64_decode(char      * alt_str,
-		    uint8_t  ** dst,
-		    uint32_t  * dst_len);
+nexus_base64_decode(char * alt_str, uint8_t ** dst, uint32_t * dst_len);
 
 char *
-nexus_base64_encode(uint8_t   * src_buf,
-		    uint32_t    src_len);
+nexus_base64_encode(uint8_t * src_buf, uint32_t src_len);
+
+char *
+nexus_hex_encode(uint8_t * src_buf, uint32_t src_len);
+
+int
+nexus_hex_decode(char * base16_str, uint8_t ** dst_buf, uint32_t * dst_len);

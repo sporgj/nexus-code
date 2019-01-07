@@ -24,7 +24,7 @@ load_or_create_instance(struct sgx_backend * backend)
 
     nexus_printf("Loading instance: %s\n", nexus_config.instance_path);
 
-    return nxs_load_instance(nexus_config.instance_path);
+    return nxs_load_instance(nexus_config.instance_path, backend->enclave_id);
 }
 
 /* creates a new enclave */
@@ -125,12 +125,6 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
     int ret = -1;
 
 
-    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
-        log_error("backend instance needs to be initialized\n");
-        return -1;
-    }
-
-
     // derive the public key string
     public_key_str = __user_pubkey_str(NULL);
 
@@ -145,6 +139,12 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data)
         nexus_free(public_key_str);
 
         log_error("could not initialize the enclave\n");
+        return -1;
+    }
+
+
+    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
+        log_error("backend instance needs to be initialized\n");
         return -1;
     }
 
@@ -307,12 +307,6 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
 
     sgx_backend->volume = volume;
 
-    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
-        log_error("backend instance needs to be initialized\n");
-        return -1;
-    }
-
-
     // create the stash manager
     if (stash_manager_init(sgx_backend)) {
         log_error("could not start stash manager\n");
@@ -328,6 +322,12 @@ sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data)
         log_error("could not initialize the enclave\n");
         return -1;
     }
+
+    if (global_nxs_instance == NULL && load_or_create_instance(sgx_backend)) {
+        log_error("backend instance needs to be initialized\n");
+        return -1;
+    }
+
 
     volume->private_data = sgx_backend;
 

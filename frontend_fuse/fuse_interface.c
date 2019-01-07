@@ -17,11 +17,19 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     int code = ENOENT;
 
 
-    dentry = vfs_get_dentry(ino, &inode);
+    if (fi && fi->fh) {
+        struct my_file * file_ptr = (struct my_file *)fi->fh;
 
-    if (dentry == NULL) {
-        log_error("could not find inode (%zu)\n", ino);
-        goto exit;
+        dentry = file_ptr->dentry;
+
+        inode = inode_get(file_ptr->inode);
+    } else {
+        dentry = vfs_get_dentry(ino, &inode);
+
+        if (dentry == NULL) {
+            log_error("could not find inode (%zu)\n", ino);
+            goto exit;
+        }
     }
 
 
@@ -31,9 +39,9 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     memcpy(&stbuf, &inode->attrs.posix_stat, sizeof(struct stat));
 
-    if (dentry->inode->is_dirty) {
-        stbuf.st_size = inode->filesize;
-    }
+
+    // override the file size accordingly (inode could be dirty)
+    stbuf.st_size = inode->filesize;
 
     fuse_reply_attr(req, &stbuf, FUSE_ATTR_TIMEOUT);
 
@@ -204,8 +212,6 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
     struct my_inode  * inode   = NULL;
 
-    struct nexus_stat  nexus_stat;
-
     int code = ENOENT;
 
 
@@ -216,10 +222,16 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto exit;
     }
 
-    if (nexus_fuse_stat(dentry, NEXUS_STAT_FILE, &nexus_stat)) {
-        goto out_err;
+    // if this was not checked for awhile, let's update the stat info
+    // XXX: makes this an expiry date
+    if (!inode->last_accessed) {
+        // this updates last_accessed
+        if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
+            code = ENOENT;
+            log_error("nexus_fuse_getattr() FAILED\n");
+            goto out_err;
+        }
     }
-
 
     dir_ptr = vfs_dir_alloc(dentry);
 
@@ -229,7 +241,7 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    dir_ptr->file_count = nexus_stat.filecount;
+    dir_ptr->file_count = inode->attrs.stat_info.filecount;
 
     fi->fh = (uintptr_t)dir_ptr;
 
@@ -471,12 +483,19 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         return;
     }
 
-    // get the file attributes and cache them to the inode
-    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
-        goto out_err;
+
+    // if this was not checked for awhile, let's update the stat info
+    // XXX: makes this an expiry date
+    if (!inode->last_accessed) {
+        // this updates last_accessed
+        if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
+            code = ENOENT;
+            log_error("nexus_fuse_getattr() FAILED\n");
+            goto out_err;
+        }
     }
 
-    if (!inode_is_file(dentry->inode)) {
+    if (!inode_is_file(inode) && !(fi->flags & O_CREAT)) {
         code = EISDIR;
         log_error("tried to open directory\n");
         goto out_err;
@@ -491,10 +510,6 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto out_err;
     }
 
-
-    if (!inode->is_dirty) {
-        inode->filesize = inode->attrs.posix_stat.st_size;
-    }
 
     inode_incr_lookup(dentry->inode, 1);
 

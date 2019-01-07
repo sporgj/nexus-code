@@ -105,7 +105,7 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
 
     INIT_LIST_HEAD(&metadata->dentry_list);
 
-    if (flags & NEXUS_FWRITE) {
+    if (flags & (NEXUS_FWRITE | NEXUS_FCREATE)) {
         metadata->is_locked = true;
     }
 
@@ -179,6 +179,8 @@ nexus_metadata_free(struct nexus_metadata * metadata)
 
         metadata->dentry_count = 0;
     }
+
+    memset(metadata, 0, sizeof(struct nexus_metadata));
 
     nexus_free(metadata);
 }
@@ -257,6 +259,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     }
 
     metadata->is_invalid = false;
+
+    metadata->is_dirty = false;
 
     return 0;
 }

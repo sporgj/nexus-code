@@ -14,8 +14,6 @@
 
 #include "sgx_backend_common.h"
 
-#define ENCLAVE_PATH "./enclave/enclave.signed.so"
-
 #define SGX_VERIFY_URL "https://test-as.sgx.trustedservices.intel.com/attestation/sgx/v2/report"
 
 #define SGX_CERT_PATH "./tls-cert/prognosticlab-sgx.cert"
@@ -47,7 +45,9 @@ struct rk_exchange {
 
     uint8_t                * ciphertext;
 
-    uint32_t                 ciphertext_len;
+    int                      ciphertext_len;
+
+    struct nexus_uuid        volume_uuid;
 };
 
 
@@ -79,19 +79,4 @@ generate_quote(sgx_report_t * report, uint32_t * p_quote_size);
 
 int
 validate_quote(sgx_quote_t * quote, uint32_t quote_size);
-
-
-
-/* protocol.c */
-struct nxs_instance *
-create_nxs_instance();
-
-int
-mount_nxs_instance(struct nxs_instance * nxs_instance, sgx_enclave_id_t enclave_id);
-
-struct rk_exchange *
-create_rk_exchange(struct nxs_instance * other_instance, sgx_enclave_id_t enclave_id);
-
-uint8_t *
-extract_rk_secret(struct rk_exchange * message, sgx_enclave_id_t enclave_id, int * len);
 

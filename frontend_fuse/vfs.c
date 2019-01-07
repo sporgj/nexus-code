@@ -111,6 +111,9 @@ __icache_del(fuse_ino_t ino)
 {
     struct my_inode   * inode = NULL;
 
+    struct list_head  * curr  = NULL;
+    struct list_head  * next  = NULL;
+
     pthread_mutex_lock(&icache_mutex);
     inode = (struct my_inode *) nexus_htable_remove(icache_table, (uintptr_t)ino, 0);
     pthread_mutex_unlock(&icache_mutex);
@@ -120,12 +123,8 @@ __icache_del(fuse_ino_t ino)
     }
 
     // free the chunks
-    while (!list_empty(&inode->file_chunks)) {
-        struct file_chunk * chunk = NULL;
-
-        chunk = list_first_entry(&inode->file_chunks, struct file_chunk, node);
-
-        list_del(&chunk->node);
+    list_for_each_safe(curr, next, &inode->file_chunks) {
+        struct file_chunk * chunk = list_entry(curr, struct file_chunk, node);
 
         __free_file_chunk(chunk);
     }

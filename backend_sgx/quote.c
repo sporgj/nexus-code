@@ -97,7 +97,7 @@ validate_quote(sgx_quote_t * quote, uint32_t quote_size)
         curl_res = curl_easy_perform(curl_ctx);
 
         // FIXME: return code as quote check failure
-        nexus_printf("Verifying Quote, res = %d", (int)curl_res);
+        nexus_printf("Verifying Quote, res = %d\n", (int)curl_res);
 
         curl_easy_cleanup(curl_ctx);
     }
