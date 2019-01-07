@@ -2,6 +2,10 @@
 
 
 struct metadata_buffer {
+    int                    writers;
+
+    bool                   is_dirty;
+
     struct nexus_uuid      uuid;
 
     nexus_io_flags_t       flags;
@@ -29,10 +33,24 @@ __bcache_get(struct nexus_uuid * uuid)
     return (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
 }
 
+
 static inline bool
-is_buffer_currently_writing(struct metadata_buffer * meta_buf)
+__in_write_mode(struct metadata_buffer * meta_buf)
 {
-    return (meta_buf && (meta_buf->flags & (NEXUS_FWRITE | NEXUS_FCREATE)));
+    return meta_buf->flags & (NEXUS_FWRITE | NEXUS_FCREATE);
+}
+
+static void
+__metadata_buf_update(struct metadata_buffer * metadata_buf,
+                      size_t                   timestamp,
+                      nexus_io_flags_t         flags)
+{
+    if (flags & (NEXUS_FCREATE | NEXUS_FWRITE)) {
+        metadata_buf->writers += 1;
+    }
+
+    metadata_buf->timestamp = timestamp;
+    metadata_buf->flags     = flags;
 }
 
 static struct metadata_buffer *
@@ -54,10 +72,9 @@ __bcache_update(struct nexus_uuid * uuid, size_t timestamp, nexus_io_flags_t fla
         buffer_count += 1;
     }
 
-    sgx_spin_unlock(&bcache_lock);
+    __metadata_buf_update(metadata_buf, timestamp, flags);
 
-    metadata_buf->timestamp = timestamp;
-    metadata_buf->flags     = flags;
+    sgx_spin_unlock(&bcache_lock);
 
     return metadata_buf;
 }
@@ -109,14 +126,10 @@ buffer_layer_revalidate(struct nexus_uuid * uuid, bool * should_reload)
 
 
     // check if we have a timestamp
-    meta_buf = __bcache_get(uuid);
+    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
 
     if (meta_buf == NULL) {
         *should_reload = true;
-        return 0;
-    }
-
-    if (is_buffer_currently_writing(meta_buf)) {
         return 0;
     }
 
@@ -153,10 +166,14 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
     }
 
 
-    meta_buf = __bcache_get(uuid);
+    meta_buf = (struct metadata_buffer *)nexus_htable_search(buffer_cache, (uintptr_t)uuid);
 
     // this means that the file has been requested in a previous get with FWRITE
-    if (is_buffer_currently_writing(meta_buf)) {
+    if (meta_buf && __in_write_mode(meta_buf)) {
+        if (meta_buf->tmp_buffer) {
+            nexus_heap_free(global_heap, meta_buf->tmp_buffer);
+        }
+
         meta_buf->tmp_buffer = addr;
         meta_buf->tmp_buflen = size;
 
@@ -196,16 +213,13 @@ buffer_layer_alloc(struct nexus_uuid * uuid, size_t size)
 int
 buffer_layer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags)
 {
-    struct metadata_buffer * meta_buf = NULL;
+    struct metadata_buffer * meta_buf = __bcache_get(uuid);
 
     int err = -1;
     int ret = -1;
 
-
-    meta_buf = __bcache_get(uuid);
-
-    // this means that the file has already been locked
-    if (is_buffer_currently_writing(meta_buf)) {
+    // prevent double locking
+    if (meta_buf && __in_write_mode(meta_buf)) {
         return 0;
     }
 
@@ -242,11 +256,19 @@ buffer_layer_unlock(struct nexus_uuid * uuid)
 void *
 buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size)
 {
+    struct metadata_buffer * meta_buf = __bcache_get(uuid);
+
     uint8_t * external_addr = NULL;
 
     size_t    timestamp     = 0;
 
     int err = -1;
+
+
+    if (meta_buf && meta_buf->is_dirty) {
+        *size = meta_buf->tmp_buflen;
+        return meta_buf->tmp_buffer;
+    }
 
 
     err = ocall_buffer_get(&external_addr, uuid, flags, size, &timestamp, global_volume);
@@ -272,7 +294,20 @@ buffer_layer_put(struct nexus_uuid * uuid)
     // get the metadata buffer from the cache and write it to disk
     meta_buf = __bcache_get(uuid);
 
-    if (meta_buf && meta_buf->tmp_buffer) {
+    if (meta_buf == NULL || meta_buf->tmp_buffer == NULL) {
+        return -1;
+    }
+
+
+    // no need to flush the buffer, as they will be another
+    if (meta_buf->writers > 1) {
+        meta_buf->is_dirty = true;
+        meta_buf->writers -= 1;
+        return 0;
+    }
+
+
+    {
         int ret = -1;
         int err = ocall_buffer_put(&ret,
                                    uuid,
@@ -291,12 +326,12 @@ buffer_layer_put(struct nexus_uuid * uuid)
             return -1;
         }
 
-        __bcache_update(uuid, timestamp, NEXUS_FREAD);
-
-        return 0;
+        meta_buf->writers = 0;
+        meta_buf->is_dirty = false;
+        __metadata_buf_update(meta_buf, timestamp, NEXUS_FREAD);
     }
 
-    return -1;
+    return 0;
 }
 
 int
