@@ -438,7 +438,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     struct nexus_file_handle * file_handle = NULL;
 
-    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
+    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE];      // temporary buffer for encrypted data
 
     size_t nbytes = 0;
     size_t size   = 0;
@@ -499,7 +499,7 @@ nexus_fuse_store(struct my_file * file_ptr)
 
     struct list_head         * chunk_iter  = NULL;
 
-    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
+    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE];     // will hold encrypted output
 
 
     if (!file_ptr->is_dirty) {
