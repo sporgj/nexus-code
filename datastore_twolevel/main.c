@@ -330,11 +330,6 @@ twolevel_fwrite(struct nexus_file_handle * file_handle,
         return -1;
     }
 
-    if (nexus_file_handle_flush(file_handle)) {
-        log_error("could not flush metadata file\n");
-        return -1;
-    }
-
     return 0;
 }
 
@@ -342,6 +337,12 @@ void
 twolevel_fclose(struct nexus_file_handle * file_handle, void * priv_data)
 {
     nexus_file_handle_close(file_handle);
+}
+
+int
+twolevel_fflush(struct nexus_file_handle * file_handle, void * priv_data)
+{
+    return nexus_file_handle_flush(file_handle);
 }
 
 
@@ -713,6 +714,7 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .fread         = twolevel_fread,
     .fwrite        = twolevel_fwrite,
     .fclose        = twolevel_fclose,
+    .fflush        = twolevel_fflush,
 
     .hardlink_uuid = twolevel_hardlink_uuid,
     .rename_uuid   = twolevel_rename_uuid
