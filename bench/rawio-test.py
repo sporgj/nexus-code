@@ -1,8 +1,8 @@
 #!/usr/bin/python
 import subprocess
 
-arr = ['8k', '16k', '32k', '64k', '128k', '256k', '512k', '1M', '2M', '4M', '8M', '16M', '32M']
-rounds = 5;
+arr = ['1M', '4M', '16M', '64M']
+rounds = 10;
 
 for s in arr:
     cmd = ['./gen_file', s, str(rounds)]
