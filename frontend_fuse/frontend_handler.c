@@ -555,9 +555,14 @@ nexus_fuse_store(struct my_file * file_ptr)
     //        file_ptr->total_sent,
     //        file_ptr->total_recv);
 
-    inode_set_clean(inode);
+    if (nexus_datastore_fflush(datastore, file_handle)) {
+        log_error("nexus_datastore_fflush() FAILED\n");
+        goto out_err;
+    }
 
     nexus_datastore_fclose(datastore, file_handle);
+
+    inode_set_clean(inode);
 
     file_set_clean(file_ptr);
 
