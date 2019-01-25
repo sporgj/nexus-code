@@ -1,23 +1,31 @@
 #!/usr/bin/python
-#
-# nodejs_http_server    Basic example of node.js USDT tracing.
-#                       For Linux, uses BCC, BPF. Embedded C.
-#
-# USAGE: nodejs_http_server PID
-#
-# Copyright 2016 Netflix, Inc.
-# Licensed under the Apache License, Version 2.0 (the "License")
 
 from __future__ import print_function
 from bcc import BPF, USDT
-import atexit
-import sys, os
 from collections import deque
 
-if len(sys.argv) < 2:
-    print("USAGE: ./test.py PID")
-    exit()
-prog_pid = sys.argv[1]
+import argparse
+import atexit
+import sys, os
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", "--pid", dest="pid", type=int, help="PID")
+parser.add_argument("-c", "--comm", dest="comm", type=str, help="PROGRAM")
+
+args = parser.parse_args()
+
+if not args.pid and not args.comm:
+    printf("USAGE: must provide pid or comm")
+    parser.print_help()
+    sys.exit(-1)
+
+
+global_pid = args.pid
+global_comm = args.comm
+
+
+
 debug = 0
 
 # load BPF program
@@ -30,10 +38,10 @@ with open(src_filepath, "r") as fp:
     bpf_text = '\n'.join(fp.readlines())
 
 # enable USDT probe from given PID
-u = USDT(pid=int(prog_pid))
-u.enable_probe(probe="ecall_start", fn_name="t_ecall_enter")
+u = USDT(pid=int(global_pid))
+u.enable_probe(probe="ecall_start", fn_name="t_ecall_start")
 u.enable_probe(probe="ecall_finish", fn_name="t_ecall_exit")
-u.enable_probe(probe="iobuf_start", fn_name="t_iobuf_enter")
+u.enable_probe(probe="iobuf_start", fn_name="t_iobuf_start")
 u.enable_probe(probe="iobuf_finish", fn_name="t_iobuf_exit")
 if debug:
     print(u.get_text())
@@ -46,16 +54,19 @@ b = BPF(text=bpf_text, usdt_contexts=[u])
 g_event_labels = ['ecall', 'iobuf']
 
 g_ecall_ops = {
-        2: 'ECALL_FILLDIR' ,
-        3: 'ECALL_CREATE'  ,
-        4: 'ECALL_LOOKUP'  ,
-        5: 'ECALL_REMOVE'  ,
-        6: 'ECALL_HARDLINK',
-        7: 'ECALL_SYMLINK' ,
-        8: 'ECALL_RENAME'  ,
-        9: 'ECALL_STOREACL',
-        10: 'ECALL_ENCRYPT' ,
-        11: 'ECALL_DECRYPT'
+        0x02: 'ECALL_FILLDIR' ,
+        0x03: 'ECALL_CREATE'  ,
+        0x04: 'ECALL_LOOKUP'  ,
+        0x05: 'ECALL_STAT'  ,
+        0x06: 'ECALL_REMOVE'  ,
+
+        0x07: 'ECALL_HARDLINK',
+        0x08: 'ECALL_SYMLINK' ,
+        0x09: 'ECALL_READLINK' ,
+        0x10: 'ECALL_RENAME'  ,
+
+        0x12: 'ECALL_ENCRYPT' ,
+        0x13: 'ECALL_DECRYPT'
 }
 
 
@@ -64,12 +75,14 @@ g_ocall_ops = {
         0x102 : 'IOBUF_GET'     ,
         0x103 : 'IOBUF_PUT'     ,
         0x104 : 'IOBUF_FLUSH'   ,
-        0x105 : 'IOBUF_LOCK'    ,
         0x106 : 'IOBUF_NEW'     ,
         0x107 : 'IOBUF_DEL'     ,
         0x108 : 'IOBUF_HARDLINK',
         0x109 : 'IOBUF_RENAME'  ,
-        0x110 : 'IOBUF_STAT'
+        0x110 : 'IOBUF_STAT'    ,
+
+        0x111 : 'IOBUF_LOCK'    ,
+        0x112 : 'IOBUF_UNLOCK'
 };
 
 
@@ -144,6 +157,9 @@ while 1:
     b.perf_buffer_poll()
 '''
 
+def __real_event_name(key):
+    return 'ecall+iobuf' if key == 'ecall' else key
+
 def display():
     print()
     print('%d total events' % total_number_of_events)
@@ -152,7 +168,7 @@ def display():
     print('------------------------------------------------------')
 
     for key in sorted(total_event_count.keys()):
-        print("%-18s %-8d %-14f" % (key, total_event_count[key], total_event_duration[key]))
+        print("%-18s %-8d %-14f" % (__real_event_name(key), total_event_count[key], total_event_duration[key]))
 
     print('------------------------------------------------------')
     for key in sorted(total_ops_count.keys()):
@@ -171,11 +187,12 @@ try:
             print("value error")
             continue
 
-        if int(prog_pid) == pid:
+        if (global_pid and int(global_pid) == pid) or (global_comm and global_comm == task):
             # print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
             total_number_of_events += 1
 
             parse_event(msg, ts)
+
 
 except KeyboardInterrupt:
     print('closing now')

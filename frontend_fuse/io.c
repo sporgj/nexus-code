@@ -110,7 +110,7 @@ __file_try_add_chunk(struct my_file * file_ptr, size_t offset)
     // allocate the chunk and add to the inode list
     chunk = __alloc_file_chunk(get_base_offset(offset));
 
-    if (chunk->base < inode->filesize) {
+    if (chunk->base < inode->on_disk_size) {
         chunk->size = min(NEXUS_CHUNK_SIZE, inode->filesize - offset);
 
         if (nexus_fuse_fetch_chunk(file_ptr, chunk)) {

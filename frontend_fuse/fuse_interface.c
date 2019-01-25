@@ -1,8 +1,65 @@
 #include "nexus_fuse.h"
 
-#define FUSE_ENTRY_TIMEOUT   60
 
-#define FUSE_ATTR_TIMEOUT   30
+
+
+/* these represent expiry dates for FUSE entries and inodes */
+
+#define FUSE_ENTRY_TIMEOUT              10
+
+#define FUSE_ATTR_TIMEOUT               5
+
+
+
+
+
+/**
+ * called whenever FUSE needs to create an entry (e.g., lookup, create, mkdir etc)
+ */
+static int
+__export_fuse_entry(struct my_dentry        * dentry,
+                    struct my_inode         * inode,
+                    struct fuse_entry_param * entry_param)
+{
+    struct stat * st_dest = &entry_param->attr;
+
+    st_dest->st_mode = nexus_fs_sys_mode_from_type(dentry->type);
+
+    switch(dentry->type) {
+    case NEXUS_DIR:
+        st_dest->st_nlink = 2;
+        break;
+    default:
+        st_dest->st_nlink = 1;
+        break;
+    }
+
+    // if the inode, is fresh, just grab the attributes there
+    // XXX: there should probably be a timeout
+    if (inode->last_accessed) {
+        memcpy(st_dest, &inode->attrs.posix_stat, sizeof(struct stat));
+    } else if (nexus_fuse_stat_inode(dentry, inode)) {
+        return -1;
+    }
+
+
+    st_dest->st_ino = inode->ino;
+
+    if (dentry->type == NEXUS_REG) {
+        if (inode->is_dirty) {
+            st_dest->st_size = inode->filesize;
+        } else {
+            st_dest->st_size = inode->attrs.posix_stat.st_size;
+        }
+    }
+
+    entry_param->ino           = st_dest->st_ino;
+    entry_param->entry_timeout = FUSE_ENTRY_TIMEOUT;
+    entry_param->attr_timeout  = 0;
+
+    return 0;
+}
+
 
 
 static void
@@ -156,11 +213,10 @@ nxs_fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char * name)
     nexus_free(filename);
 
 
-    dentry_export_attrs(child_dentry, &entry_param.attr);
-
-    entry_param.ino = entry_param.attr.st_ino;
-    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
-    entry_param.attr_timeout = 0;
+    if (__export_fuse_entry(child_dentry, child_dentry->inode, &entry_param)) {
+        log_error("__export_fuse_entry FAILED\n");
+        goto out_err;
+    }
 
     inode_incr_lookup(child_dentry->inode, 1);
 
@@ -421,10 +477,12 @@ nxs_fuse_create(
         return;
     }
 
-    dentry_export_attrs(new_dentry, &entry_param.attr);
-    entry_param.ino = entry_param.attr.st_ino;
-    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
-    entry_param.attr_timeout = 0;
+    if (__export_fuse_entry(new_dentry, new_dentry->inode, &entry_param)) {
+        file_close(file_ptr);
+        log_error("__export_fuse_entry FAILED\n");
+        fuse_reply_err(req, ENOENT); // XXX EAGAIN?
+        return;
+    }
 
     inode_get(new_inode);
     inode_incr_lookup(new_dentry->inode, 1);
@@ -454,10 +512,11 @@ nxs_fuse_mkdir(fuse_req_t req, fuse_ino_t parent, const char * name, mode_t mode
         return;
     }
 
-    dentry_export_attrs(new_dentry, &entry_param.attr);
-    entry_param.ino = entry_param.attr.st_ino;
-    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
-    entry_param.attr_timeout = 0;
+    if (__export_fuse_entry(new_dentry, new_dentry->inode, &entry_param)) {
+        log_error("__export_fuse_entry FAILED\n");
+        fuse_reply_err(req, ENOENT); // XXX EAGAIN?
+        return;
+    }
 
     new_inode = new_dentry->inode;
 
@@ -633,10 +692,10 @@ nxs_fuse_symlink(fuse_req_t req, const char * link, fuse_ino_t parent, const cha
         goto out_err;
     }
 
-    dentry_export_attrs(new_dentry, &entry_param.attr);
-    entry_param.ino = entry_param.attr.st_ino;
-    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
-    entry_param.attr_timeout = 0;
+    if (__export_fuse_entry(new_dentry, new_dentry->inode, &entry_param)) {
+        log_error("__export_fuse_entry FAILED\n");
+        goto out_err;
+    }
 
     inode_incr_lookup(new_dentry->inode, 1);
 
@@ -695,10 +754,10 @@ nxs_fuse_hardlink(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const ch
         goto out_err;
     }
 
-    dentry_export_attrs(new_dentry, &entry_param.attr);
-    entry_param.ino = entry_param.attr.st_ino;
-    entry_param.entry_timeout = FUSE_ENTRY_TIMEOUT;
-    entry_param.attr_timeout = 0;
+    if (__export_fuse_entry(new_dentry, new_dentry->inode, &entry_param)) {
+        log_error("__export_fuse_entry FAILED\n");
+        goto out_err;
+    }
 
     inode_get(new_dentry->inode);
     inode_incr_lookup(new_dentry->inode, 1);
@@ -830,6 +889,23 @@ nxs_fuse_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     fuse_reply_err(req, ret);
 }
 
+static void
+nxs_fuse_init(void * userdata, struct fuse_conn_info * conn)
+{
+#if 0
+    if (conn->capable & FUSE_CAP_EXPORT_SUPPORT) {
+        log_debug("nexus-fuse: activating writeback\n");
+        conn->want |= FUSE_CAP_EXPORT_SUPPORT;
+    }
+#endif
+
+    if (conn->capable & FUSE_CAP_WRITEBACK_CACHE) {
+        nexus_printf("nexus-fuse: activating writeback\n");
+        conn->want |= FUSE_CAP_WRITEBACK_CACHE;
+    }
+}
+
+
 static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .lookup                 = nxs_fuse_lookup,
     .getattr                = nxs_fuse_getattr,
@@ -853,6 +929,8 @@ static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .read                   = nxs_fuse_read,
     .write                  = nxs_fuse_write,
     .flush                  = nxs_fuse_flush,
+
+    .init                   = nxs_fuse_init,
 };
 
 int
