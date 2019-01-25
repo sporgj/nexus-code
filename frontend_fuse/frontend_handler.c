@@ -105,6 +105,21 @@ __datastore_getattr(struct my_dentry *     dentry,
 }
 
 int
+nexus_fuse_stat_inode(struct my_dentry * dentry, struct my_inode * inode)
+{
+    struct nexus_fs_attr * attrs = &inode->attrs;
+
+    if (__datastore_getattr(dentry, &inode->uuid, attrs)) {
+        log_error("__datastore_getattr() FAILED\n");
+        return -1;
+    }
+
+    inode->attrs.posix_stat.st_ino = inode->ino;
+
+    return 0;
+}
+
+int
 nexus_fuse_getattr(struct my_dentry     * dentry,
                    nexus_stat_flags_t     stat_flags,
                    struct nexus_fs_attr * attrs)
@@ -176,6 +191,7 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
     }
 
     inode->last_accessed = attrs->posix_stat.st_atime;
+    inode->on_disk_size  = attrs->posix_stat.st_size;
 
     ret = 0;
 out:
@@ -561,6 +577,8 @@ nexus_fuse_store(struct my_file * file_ptr)
     }
 
     nexus_datastore_fclose(datastore, file_handle);
+
+    inode->on_disk_size  = inode->filesize;
 
     inode_set_clean(inode);
 

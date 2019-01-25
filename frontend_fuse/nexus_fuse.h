@@ -74,3 +74,6 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * file_chunk
 
 int
 nexus_fuse_store(struct my_file * file_ptr);
+
+int
+nexus_fuse_stat_inode(struct my_dentry * dentry, struct my_inode * inode);
