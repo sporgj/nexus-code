@@ -105,6 +105,21 @@ __datastore_getattr(struct my_dentry *     dentry,
 }
 
 int
+nexus_fuse_stat_inode(struct my_dentry * dentry, struct my_inode * inode)
+{
+    struct nexus_fs_attr * attrs = &inode->attrs;
+
+    if (__datastore_getattr(dentry, &inode->uuid, attrs)) {
+        log_error("__datastore_getattr() FAILED\n");
+        return -1;
+    }
+
+    inode->attrs.posix_stat.st_ino = inode->ino;
+
+    return 0;
+}
+
+int
 nexus_fuse_getattr(struct my_dentry     * dentry,
                    nexus_stat_flags_t     stat_flags,
                    struct nexus_fs_attr * attrs)
@@ -176,6 +191,7 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
     }
 
     inode->last_accessed = attrs->posix_stat.st_atime;
+    inode->on_disk_size  = attrs->posix_stat.st_size;
 
     ret = 0;
 out:
@@ -438,7 +454,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     struct nexus_file_handle * file_handle = NULL;
 
-    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
+    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE];      // temporary buffer for encrypted data
 
     size_t nbytes = 0;
     size_t size   = 0;
@@ -499,7 +515,7 @@ nexus_fuse_store(struct my_file * file_ptr)
 
     struct list_head         * chunk_iter  = NULL;
 
-    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE] = { 0 };
+    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE];     // will hold encrypted output
 
 
     if (!file_ptr->is_dirty) {
@@ -555,9 +571,16 @@ nexus_fuse_store(struct my_file * file_ptr)
     //        file_ptr->total_sent,
     //        file_ptr->total_recv);
 
-    inode_set_clean(inode);
+    if (nexus_datastore_fflush(datastore, file_handle)) {
+        log_error("nexus_datastore_fflush() FAILED\n");
+        goto out_err;
+    }
 
     nexus_datastore_fclose(datastore, file_handle);
+
+    inode->on_disk_size  = inode->filesize;
+
+    inode_set_clean(inode);
 
     file_set_clean(file_ptr);
 

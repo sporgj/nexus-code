@@ -61,6 +61,7 @@ struct my_inode {
 
 
     size_t                 filesize;
+    size_t                 on_disk_size;
 
     size_t                 chunk_count;
 
@@ -264,10 +265,6 @@ dentry_get_fullpath(struct my_dentry * dentry);
 char *
 dentry_get_parent_fullpath(struct my_dentry * dentry);
 
-
-// copies the inode stat attributes into a destination buffer
-void
-dentry_export_attrs(struct my_dentry * dentry, struct stat * st_dest);
 
 
 struct my_dentry *

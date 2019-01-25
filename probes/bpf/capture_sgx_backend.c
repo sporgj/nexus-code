@@ -1,7 +1,7 @@
 #include <uapi/linux/ptrace.h>
 
 int
-t_ecall_enter(struct pt_regs * ctx)
+t_ecall_start(struct pt_regs * ctx)
 {
     int op = 0;
 
@@ -23,7 +23,7 @@ t_ecall_exit(struct pt_regs * ctx)
 };
 
 int
-t_iobuf_enter(struct pt_regs * ctx)
+t_iobuf_start(struct pt_regs * ctx)
 {
     int op = 0;
 

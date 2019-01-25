@@ -236,18 +236,25 @@ nexus_datastore_fread(struct nexus_datastore    * datastore,
 
 int
 nexus_datastore_fwrite(struct nexus_datastore   * datastore,
-                       struct nexus_file_handle  * file_handle,
-                       uint8_t                   * buf,
-                       size_t                      size)
+                       struct nexus_file_handle * file_handle,
+                       uint8_t                  * buf,
+                       size_t                     size)
 {
     return datastore->impl->fwrite(file_handle, buf, size, datastore->priv_data);
+}
+
+int
+nexus_datastore_fflush(struct nexus_datastore   * datastore,
+                       struct nexus_file_handle * file_handle)
+{
+    return datastore->impl->fflush(file_handle, datastore->priv_data);
 }
 
 void
 nexus_datastore_fclose(struct nexus_datastore   * datastore,
                        struct nexus_file_handle * file_handle)
 {
-    return datastore->impl->fclose(file_handle, datastore->priv_data);
+    datastore->impl->fclose(file_handle, datastore->priv_data);
 }
 
 

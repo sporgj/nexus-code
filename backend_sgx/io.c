@@ -142,8 +142,6 @@ __io_buffer_put(struct nexus_uuid   * uuid,
 
     struct metadata_buf * metadata_buf = NULL;
 
-    int ret = -1;
-
 
     metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
@@ -152,17 +150,14 @@ __io_buffer_put(struct nexus_uuid   * uuid,
         return -1;
     }
 
-    ret = nexus_datastore_fwrite(volume->metadata_store,
-                                 metadata_buf->locked_file,
-                                 buffer,
-                                 size);
-
-    if (ret != 0) {
-        nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
-        metadata_buf->locked_file = NULL;
-
+    if (nexus_datastore_fwrite(volume->metadata_store, metadata_buf->locked_file, buffer, size)) {
         log_error("could not write metadata file\n");
-        return -1;
+        goto out_err;
+    }
+
+    if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->locked_file)) {
+        log_error("nexus_datastore_fflush() FAILED\n");
+        goto out_err;
     }
 
     nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
@@ -174,6 +169,12 @@ __io_buffer_put(struct nexus_uuid   * uuid,
     *timestamp = metadata_buf->timestamp;
 
     return 0;
+
+out_err:
+    nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
+    metadata_buf->locked_file = NULL;
+
+    return -1;
 }
 
 int

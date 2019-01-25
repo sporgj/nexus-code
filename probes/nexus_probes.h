@@ -2,21 +2,19 @@
 
 // TODO revise constant values
 typedef enum {
-    ECALL_FILLDIR       = 2,
-    ECALL_CREATE        = 3,
-    ECALL_LOOKUP        = 4,
-    ECALL_STAT          = 0x10,
-    ECALL_REMOVE        = 5,
+    ECALL_FILLDIR       = 0x02,
+    ECALL_CREATE        = 0x03,
+    ECALL_LOOKUP        = 0x04,
+    ECALL_STAT          = 0x05,
+    ECALL_REMOVE        = 0x06,
 
-    ECALL_HARDLINK      = 6,
-    ECALL_SYMLINK       = 7,
-    ECALL_READLINK      = 0x11,
-    ECALL_RENAME        = 8,
+    ECALL_HARDLINK      = 0x07,
+    ECALL_SYMLINK       = 0x08,
+    ECALL_READLINK      = 0x09,
+    ECALL_RENAME        = 0x10,
 
-    ECALL_STOREACL      = 9,
-
-    ECALL_ENCRYPT       = 10,
-    ECALL_DECRYPT       = 11
+    ECALL_ENCRYPT       = 0x12,
+    ECALL_DECRYPT       = 0x13
 } ecall_op;
 
 typedef enum {
@@ -24,12 +22,14 @@ typedef enum {
     IOBUF_GET           = 0x102,
     IOBUF_PUT           = 0x103,
     IOBUF_FLUSH         = 0x104,
-    IOBUF_LOCK          = 0x105,
     IOBUF_NEW           = 0x106,
     IOBUF_DEL           = 0x107,
     IOBUF_HARDLINK      = 0x108,
     IOBUF_RENAME        = 0x109,
-    IOBUF_STAT          = 0x110
+    IOBUF_STAT          = 0x110,
+
+    IOBUF_LOCK          = 0x111,
+    IOBUF_UNLOCK        = 0x112,
 } ocall_op;
 
 

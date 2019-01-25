@@ -93,6 +93,9 @@ void
 nexus_datastore_fclose(struct nexus_datastore   * datastore,
                        struct nexus_file_handle * file_handle);
 
+int
+nexus_datastore_fflush(struct nexus_datastore   * datastore,
+                       struct nexus_file_handle * file_handle);
 
 
 
@@ -254,6 +257,11 @@ struct nexus_datastore_impl {
                        uint8_t                  * buf,
                        size_t                     size,
                        void                     * priv_data);
+
+    /**
+     * Flushes the file
+     */
+    int (*fflush)(struct nexus_file_handle * file_handle, void * priv_data);
 
     /**
      * Closes the file

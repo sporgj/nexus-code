@@ -203,21 +203,3 @@ dentry_get_parent_fullpath(struct my_dentry * dentry)
     return dentry_get_fullpath(dentry->parent);
 }
 
-void
-dentry_export_attrs(struct my_dentry * dentry, struct stat * st_dest)
-{
-    st_dest->st_mode = nexus_fs_sys_mode_from_type(dentry->type);
-
-    st_dest->st_ino = nexus_uuid_hash(&dentry->lookup_info.uuid);
-
-    switch(dentry->type) {
-    case NEXUS_DIR:
-        st_dest->st_nlink = 2;
-        break;
-    case NEXUS_REG:
-        // TODO add handling for hardlinks
-    default:
-        st_dest->st_nlink = 1;
-        break;
-    }
-}
