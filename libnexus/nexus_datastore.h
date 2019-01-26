@@ -124,6 +124,12 @@ nexus_datastore_new_uuid(struct nexus_datastore      * datastore,
                          char                        * path);
 
 int
+nexus_datastore_touch_uuid(struct nexus_datastore    * datastore,
+                           struct nexus_uuid         * uuid,
+                           mode_t                      mode,
+                           char                      * path);
+
+int
 nexus_datastore_del_uuid(struct nexus_datastore      * datastore,
                          struct nexus_uuid           * uuid,
                          char                        * path);
@@ -277,6 +283,8 @@ struct nexus_datastore_impl {
      * @param priv_data
      */
     int (*new_uuid)(struct nexus_uuid * uuid, char * path, void * priv_data);
+
+    int (*touch_uuid)(struct nexus_uuid * uuid, mode_t mode, char * path, void * priv_data);
 
     /**
      * Removes uuid from the metadata store

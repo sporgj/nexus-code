@@ -19,8 +19,6 @@ struct nexus_filenode {
     struct nexus_uuid          root_uuid;
     struct nexus_uuid          parent_uuid;
 
-    nexus_file_mode_t          mode;
-
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
 
@@ -40,9 +38,6 @@ struct nexus_filenode {
 
 void
 filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out);
-
-void
-filenode_set_mode(struct nexus_filenode * filenode, nexus_file_mode_t mode);
 
 void
 filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid);

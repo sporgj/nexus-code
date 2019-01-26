@@ -92,7 +92,6 @@ enclave {
             [in, string] char                * directory_IN,
             [in, string] char                * filename_IN,
                          nexus_dirent_type_t   type_IN,
-                         nexus_file_mode_t     mode,
                    [out] struct nexus_uuid   * uuid_out
         );
 
@@ -109,13 +108,6 @@ enclave {
             [in, string] char                    * directory_IN,
             [in, string] char                    * filename_IN,
             [user_check] struct nexus_fs_lookup  * lookup_out
-        );
-
-        public int ecall_fs_set_mode
-        (
-            [in, string] char                * filepath_IN,
-                         nexus_file_mode_t     mode,
-            [user_check] struct nexus_stat   * stat_out
         );
 
         public int ecall_fs_stat

@@ -22,14 +22,21 @@ struct nexus_volume;
 #define NEXUS_NAME_MAX  256
 #define NEXUS_PATH_MAX  1024
 
+
+// this will be the flags to create metadata/data files
+#define NEXUS_POSIX_OPEN_MODE (S_IRUSR | S_IWUSR | \
+                               S_IRGRP | S_IWGRP | \
+                               S_IROTH | S_IWOTH)
+
+#define NEXUS_POSIX_EXEC_MODE (S_IXUSR | S_IXGRP | S_IXOTH)
+
+
 typedef enum {
     NEXUS_REG = 1,  /* regular file */
     NEXUS_DIR = 2,  /* directory    */
     NEXUS_LNK = 3   /* symlink      */
 } nexus_dirent_type_t;
 
-
-typedef uint32_t   nexus_file_mode_t; // POSIX mode is 4 bytes
 
 typedef enum {
     NEXUS_FREAD          = 0x00000001,
@@ -62,7 +69,6 @@ struct nexus_stat {
         size_t          filecount;
     };
 
-    nexus_file_mode_t   mode;
     nexus_dirent_type_t type;
     struct nexus_uuid   uuid;
 
@@ -124,7 +130,6 @@ nexus_fs_create(struct nexus_volume  * volume,
                 char                 * parent_dir,
                 char                 * plain_name,
                 nexus_dirent_type_t    type,
-                nexus_file_mode_t      mode,
                 struct nexus_uuid    * uuid);
 
 int

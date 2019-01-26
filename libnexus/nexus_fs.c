@@ -20,7 +20,6 @@ nexus_fs_create(struct nexus_volume  * volume,
                 char                 * dirpath,
                 char                 * name,
                 nexus_dirent_type_t    type,
-                nexus_file_mode_t      mode,
                 struct nexus_uuid    * uuid)
 {
     struct nexus_backend * backend = volume->backend;
@@ -30,7 +29,7 @@ nexus_fs_create(struct nexus_volume  * volume,
         return -1;
     }
 
-    return backend->impl->fs_create(volume, dirpath, name, type, mode, uuid, backend->priv_data);
+    return backend->impl->fs_create(volume, dirpath, name, type, uuid, backend->priv_data);
 }
 
 int

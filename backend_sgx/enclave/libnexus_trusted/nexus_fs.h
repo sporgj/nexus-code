@@ -32,8 +32,6 @@ typedef enum {
 } nexus_stat_flags_t;
 
 
-typedef uint32_t nexus_file_mode_t;
-
 
 struct nexus_dirent {
     char                name[NEXUS_NAME_MAX];
@@ -50,7 +48,6 @@ struct nexus_stat {
         size_t          filecount;
     };
 
-    nexus_file_mode_t   mode;
     nexus_dirent_type_t type;
     struct nexus_uuid   uuid;
 

@@ -91,7 +91,6 @@ struct nexus_backend_impl {
                      char                 * dirpath,
                      char                 * plain_name,
                      nexus_dirent_type_t    type,
-                     nexus_file_mode_t      mode,
                      struct nexus_uuid    * uuid,
                      void                 * priv_data);
 

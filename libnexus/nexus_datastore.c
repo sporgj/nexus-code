@@ -311,6 +311,15 @@ nexus_datastore_new_uuid(struct nexus_datastore * datastore, struct nexus_uuid *
 }
 
 int
+nexus_datastore_touch_uuid(struct nexus_datastore * datastore,
+                           struct nexus_uuid      * uuid,
+                           mode_t                   mode,
+                           char                   * path)
+{
+    return datastore->impl->touch_uuid(uuid, mode, path, datastore->priv_data);
+}
+
+int
 nexus_datastore_del_uuid(struct nexus_datastore * datastore, struct nexus_uuid * uuid, char * path)
 {
     return datastore->impl->del_uuid(uuid, path, datastore->priv_data);

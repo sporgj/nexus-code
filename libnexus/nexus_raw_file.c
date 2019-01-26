@@ -110,9 +110,9 @@ nexus_write_raw_file(char * path, void * buf, size_t size)
 }
 
 int
-nexus_touch_raw_file(char * filepath)
+nexus_touch_raw_file2(char * filepath, mode_t mode)
 {
-    int fd = open(filepath, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    int fd = open(filepath, O_CREAT, mode);
 
     if (fd < 0) {
         log_error("could not create file (%s)\n", filepath);
@@ -122,6 +122,12 @@ nexus_touch_raw_file(char * filepath)
     close(fd);
 
     return 0;
+}
+
+int
+nexus_touch_raw_file(char * filepath)
+{
+    return nexus_touch_raw_file2(filepath, NEXUS_POSIX_OPEN_MODE);
 }
 
 int

@@ -209,7 +209,7 @@ __fs_create(struct nexus_volume * vol, const char * path, nexus_dirent_type_t ty
 
     nexus_splitpath(path, &dirpath, &filename);
 
-    ret = nexus_fs_create(vol, dirpath, filename, type, 0, &uuid);
+    ret = nexus_fs_create(vol, dirpath, filename, type, &uuid);
 
     nexus_free(dirpath);
     nexus_free(filename);

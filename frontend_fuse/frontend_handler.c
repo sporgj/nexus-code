@@ -59,7 +59,9 @@ nexus_fuse_stat(struct my_dentry * dentry, nexus_stat_flags_t stat_flags, struct
 }
 
 static void
-__derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode_t file_type)
+__derive_stat_info(struct stat *         posix_stat,
+                   struct nexus_stat *   stat_info,
+                   struct my_dentry * dentry)
 {
     switch (stat_info->type) {
     case NEXUS_REG:
@@ -68,15 +70,19 @@ __derive_stat_info(struct stat * posix_stat, struct nexus_stat * stat_info, mode
         break;
     case NEXUS_DIR:
         posix_stat->st_nlink = 2;
+        posix_stat->st_size = 0;
         break;
     case NEXUS_LNK:
+        posix_stat->st_size = 0;
         posix_stat->st_nlink = 1;
         break;
     }
 
-    posix_stat->st_mode = (stat_info->mode | file_type);
+    // remove the previous bit for type, and set it to directory
+    posix_stat->st_mode &= ~(S_IFREG | S_IFDIR);
+    posix_stat->st_mode |= nexus_fs_sys_mode_from_type(dentry->type);
 
-    posix_stat->st_ino = nexus_uuid_hash(&stat_info->uuid);
+    posix_stat->st_ino = dentry->inode->ino;
 }
 
 static int
@@ -184,7 +190,7 @@ nexus_fuse_getattr(struct my_dentry     * dentry,
         goto out;
     }
 
-    __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
+    __derive_stat_info(&attrs->posix_stat, stat_info, dentry);
 
     if (inode->last_accessed == 0 && !inode->is_dirty) {
         inode->filesize = attrs->posix_stat.st_size;
@@ -239,7 +245,7 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
         return -1;
     }
 
-    __derive_stat_info(&attrs->posix_stat, stat_info, nexus_fs_sys_mode_from_type(dentry->type));
+    __derive_stat_info(&attrs->posix_stat, stat_info, dentry);
 
     nexus_free(path);
 
@@ -285,14 +291,16 @@ nexus_fuse_create(struct my_dentry  * dentry,
                         parent_dirpath,
                         filename,
                         type,
-                        (nexus_file_mode_t)mode,
                         &nexus_stat->uuid)) {
         nexus_free(parent_dirpath);
         return -1;
     }
 
     if (type == NEXUS_REG) {
-        if (nexus_datastore_new_uuid(nexus_fuse_volume->data_store, &nexus_stat->uuid, NULL)) {
+        if (nexus_datastore_touch_uuid(nexus_fuse_volume->data_store,
+                                       &nexus_stat->uuid,
+                                       mode,
+                                       NULL)) {
             nexus_free(parent_dirpath);
             log_error("could not create datastore file\n");
             return -1;
@@ -454,7 +462,6 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     struct nexus_file_handle * file_handle = NULL;
 
-    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE];      // temporary buffer for encrypted data
 
     size_t nbytes = 0;
     size_t size   = 0;
@@ -473,7 +480,8 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     size = min(NEXUS_CHUNK_SIZE, inode->filesize - chunk->base);
 
-    nbytes = read(file_handle->fd, encrypted_buffer, size);
+
+    nbytes = read(file_handle->fd, chunk->buffer, size);
 
     if (nbytes != size) {
         log_error("fetching chunk %zu file='%s' (tried=%zu, got=%zu)\n",
@@ -485,7 +493,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     if (nexus_fs_decrypt(nexus_fuse_volume,
                          file_ptr->filepath,
-                         encrypted_buffer,
+                         chunk->buffer,
                          chunk->buffer,
                          chunk->base,
                          chunk->size,
@@ -515,8 +523,8 @@ nexus_fuse_store(struct my_file * file_ptr)
 
     struct list_head         * chunk_iter  = NULL;
 
-    uint8_t encrypted_buffer[NEXUS_CHUNK_SIZE];     // will hold encrypted output
 
+    uint8_t * encrypted_buffer = NULL;
 
     if (!file_ptr->is_dirty) {
         return 0;
@@ -536,6 +544,9 @@ nexus_fuse_store(struct my_file * file_ptr)
                   inode->filesize);
         goto out_err;
     }
+
+
+    encrypted_buffer = nexus_malloc(min(NEXUS_CHUNK_SIZE, inode->filesize));
 
     list_for_each(chunk_iter, &inode->file_chunks) {
         struct file_chunk * chunk = list_entry(chunk_iter, struct file_chunk, node);
@@ -578,6 +589,8 @@ nexus_fuse_store(struct my_file * file_ptr)
 
     nexus_datastore_fclose(datastore, file_handle);
 
+    nexus_free(encrypted_buffer);
+
     inode->on_disk_size  = inode->filesize;
 
     inode_set_clean(inode);
@@ -588,5 +601,10 @@ nexus_fuse_store(struct my_file * file_ptr)
 
 out_err:
     nexus_datastore_fclose(datastore, file_handle);
+
+    if (encrypted_buffer) {
+        nexus_free(encrypted_buffer);
+    }
+
     return -1;
 }

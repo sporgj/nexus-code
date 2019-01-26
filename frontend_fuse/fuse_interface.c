@@ -98,7 +98,9 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
 
     // override the file size accordingly (inode could be dirty)
-    stbuf.st_size = inode->filesize;
+    if (dentry->type == NEXUS_REG) {
+        stbuf.st_size = inode->filesize;
+    }
 
     fuse_reply_attr(req, &stbuf, FUSE_ATTR_TIMEOUT);
 

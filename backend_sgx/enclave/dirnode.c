@@ -10,8 +10,6 @@ struct __dirnode_hdr {
     struct nexus_uuid   root_uuid;
     struct nexus_uuid   parent_uuid;
 
-    nexus_file_mode_t   mode;
-
     uint32_t            symlink_count;
     uint32_t            symlink_buflen;
 
@@ -117,8 +115,6 @@ __parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t 
     dirnode->dir_entry_buflen = header->dir_entry_buflen;
 
     dirnode->bucket_count     = header->bucket_count;
-
-    dirnode->mode             = header->mode;
 
     return buffer + sizeof(struct __dirnode_hdr);
 }
@@ -228,13 +224,6 @@ out_err:
     return ret;
 }
 
-
-void
-dirnode_set_mode(struct nexus_dirnode * dirnode, nexus_file_mode_t mode)
-{
-    dirnode->mode = mode;
-    __dirnode_set_dirty(dirnode);
-}
 
 void
 dirnode_set_parent(struct nexus_dirnode * dirnode, struct nexus_uuid * parent_uuid)
@@ -371,8 +360,6 @@ __serialize_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer)
     header->dir_entry_buflen = dirnode->dir_entry_buflen;
 
     header->bucket_count     = dirnode->bucket_count;
-
-    header->mode             = dirnode->mode;
 
     return buffer + sizeof(struct __dirnode_hdr);
 }
@@ -1232,7 +1219,6 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
 void
 dirnode_export_stat(struct nexus_dirnode * dirnode, struct nexus_stat * stat_out)
 {
-    stat_out->mode = dirnode->mode;
     stat_out->type = NEXUS_DIR;
     stat_out->filecount = dirnode->dir_entry_count;
     nexus_uuid_copy(&dirnode->my_uuid, &stat_out->uuid);

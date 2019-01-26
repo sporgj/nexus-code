@@ -469,11 +469,15 @@ twolevel_stat_uuid(struct nexus_uuid * uuid,
 }
 
 
+
 static int
-twolevel_new_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
+twolevel_touch_uuid(struct nexus_uuid * uuid, mode_t mode, char * path, void * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
     char *                      filepath  = NULL;
+
+
+    mode_t real_mode = NEXUS_POSIX_OPEN_MODE | (mode & NEXUS_POSIX_EXEC_MODE);
 
     int ret = -1;
 
@@ -484,11 +488,17 @@ twolevel_new_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
         return -1;
     }
 
-    ret = nexus_touch_raw_file(filepath);
+    ret = nexus_touch_raw_file2(filepath, real_mode);
 
     nexus_free(filepath);
 
     return ret;
+}
+
+static int
+twolevel_new_uuid(struct nexus_uuid * uuid, char * path, void * priv_data)
+{
+    return twolevel_touch_uuid(uuid, NEXUS_POSIX_OPEN_MODE, path, priv_data);
 }
 
 static int
@@ -655,6 +665,19 @@ twolevel_setattr(struct nexus_uuid     * uuid,
         return -1;
     }
 
+    if (flags & (NEXUS_FS_ATTR_MODE)) {
+        // we only take the execute bits
+        mode_t real_mode = new_stat->st_mode & NEXUS_POSIX_EXEC_MODE;
+
+        if (real_mode && chmod(filepath, real_mode | NEXUS_POSIX_OPEN_MODE)) {
+            log_error("could not update the mode\n");
+            nexus_free(filepath);
+            return -1;
+        }
+
+        old_stat.st_mode = new_stat->st_mode;
+    }
+
 
     // update the new stat accordingly
     if (flags & (NEXUS_FS_ATTR_ATIME | NEXUS_FS_ATTR_MTIME)) {
@@ -708,6 +731,7 @@ static struct nexus_datastore_impl twolevel_datastore = {
 
     .stat_uuid     = twolevel_stat_uuid,
     .new_uuid      = twolevel_new_uuid,
+    .touch_uuid    = twolevel_touch_uuid,
     .del_uuid      = twolevel_del_uuid,
 
     .fopen         = twolevel_fopen,
