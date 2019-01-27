@@ -219,6 +219,11 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
     int ret = -1;
 
 
+    if (dentry->is_deleted) {
+        return 0;
+    }
+
+
     if (path == NULL) {
         return -1;
     }

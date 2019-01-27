@@ -61,6 +61,21 @@ __update_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_
     return nbytes;
 }
 
+static uint8_t *
+__get_readable_file_chunk(struct file_chunk * chunk,
+                          size_t              offset,
+                          size_t              len,
+                          size_t            * readable_bytes)
+{
+    assert(offset <= chunk->base + NEXUS_CHUNK_SIZE);
+
+    size_t shift = offset - chunk->base;
+
+    *readable_bytes = min(len, (NEXUS_CHUNK_SIZE - shift));
+
+    return (chunk->buffer + shift);
+}
+
 // returns the number of bytes read
 static size_t
 __read_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_t * output_buffer)
@@ -165,11 +180,8 @@ file_read(struct my_file * file_ptr,
     size_t total_bytes = 0;
 
 
-    pthread_rwlock_rdlock(&file_ptr->io_lock);
-
     if (file_ptr->inode->filesize == 0) {
         *output_buflen = 0;
-        pthread_rwlock_unlock(&file_ptr->io_lock);
         return 0;
     }
 
@@ -200,17 +212,29 @@ file_read(struct my_file * file_ptr,
 
     *output_buflen = total_bytes;
 
-    // printf("{read} filepath=%s [%d] (ino=%d), offset=%zu, bytes_written=%zu, filesize=%zu\n",
-    //        file_ptr->filepath,
-    //        file_ptr->fid,
-    //        (int)file_ptr->inode->ino,
-    //        offset,
-    //        *output_buflen,
-    //        file_ptr->inode->filesize);
-
     pthread_rwlock_unlock(&file_ptr->io_lock);
 
     return 0;
+}
+
+const uint8_t *
+file_read_dataptr(struct my_file * file_ptr, size_t offset, size_t len, size_t * readable_bytes)
+{
+    struct file_chunk * chunk = NULL;
+
+    if (file_ptr->inode->filesize == 0) {
+        *readable_bytes = 0;
+        return 0;
+    }
+
+    chunk = __file_load_chunk(file_ptr, offset);
+
+    if (chunk == NULL) {
+        log_error("chunk at offset %zu not found. filepath=%s\n", offset, file_ptr->filepath);
+        return NULL;
+    }
+
+    return __get_readable_file_chunk(chunk, offset, len, readable_bytes);
 }
 
 int
@@ -229,8 +253,6 @@ file_write(struct my_file * file_ptr,
     if (file_ptr->flags & O_APPEND) {
         curpos = file_ptr->offset;
     }
-
-    pthread_rwlock_wrlock(&file_ptr->io_lock);
 
     do {
         size_t              nbytes = 0;
@@ -265,16 +287,6 @@ file_write(struct my_file * file_ptr,
     }
 
     file_set_dirty(file_ptr);
-
-    // printf("{write} filepath=%s [%d] (%d), offset=%zu, bytes_written=%zu, filesize=%zu\n",
-    //        file_ptr->filepath,
-    //        file_ptr->fid,
-    //        (int)file_ptr->inode->ino,
-    //        offset,
-    //        *bytes_written,
-    //        file_ptr->inode->filesize);
-
-    pthread_rwlock_unlock(&file_ptr->io_lock);
 
     return 0;
 }

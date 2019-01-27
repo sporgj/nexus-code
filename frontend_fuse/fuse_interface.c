@@ -623,7 +623,9 @@ nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
         return;
     }
 
-    vfs_forget_dentry(dentry, (char *)name);
+    dentry->is_deleted = true;
+
+    // vfs_forget_dentry(dentry, (char *)name);
 
     fuse_reply_err(req, 0);
 
@@ -844,10 +846,14 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
-    uint8_t * buffer = nexus_malloc(size);
-    size_t    buflen = 0;
+    const uint8_t * buffer = NULL;
+    size_t          buflen = 0;
 
-    if (file_read(file_ptr, off, size, buffer, &buflen)) {
+    pthread_rwlock_rdlock(&file_ptr->io_lock);
+
+    buffer = file_read_dataptr(file_ptr, off, size, &buflen);
+
+    if (buffer == NULL) {
         fuse_reply_err(req, EIO);
         return;
     }
@@ -856,7 +862,7 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 
     file_ptr->total_sent += buflen;
 
-    free(buffer);
+    pthread_rwlock_unlock(&file_ptr->io_lock);
 }
 
 static void
@@ -869,6 +875,8 @@ nxs_fuse_write(fuse_req_t              req,
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
+    pthread_rwlock_wrlock(&file_ptr->io_lock);
+
     size_t bytes_read = 0;
 
     if (file_write(file_ptr, off, size, (uint8_t *)buffer, &bytes_read)) {
@@ -879,6 +887,8 @@ nxs_fuse_write(fuse_req_t              req,
     file_ptr->total_recv += size;
 
     fuse_reply_write(req, (int)bytes_read);
+
+    pthread_rwlock_unlock(&file_ptr->io_lock);
 }
 
 static void
@@ -894,16 +904,9 @@ nxs_fuse_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 static void
 nxs_fuse_init(void * userdata, struct fuse_conn_info * conn)
 {
-#if 0
-    if (conn->capable & FUSE_CAP_EXPORT_SUPPORT) {
-        log_debug("nexus-fuse: activating writeback\n");
-        conn->want |= FUSE_CAP_EXPORT_SUPPORT;
-    }
-#endif
-
     if (conn->capable & FUSE_CAP_WRITEBACK_CACHE) {
-        nexus_printf("nexus-fuse: activating writeback\n");
-        conn->want |= FUSE_CAP_WRITEBACK_CACHE;
+        // nexus_printf("nexus-fuse: activating writeback\n");
+        // conn->want |= FUSE_CAP_WRITEBACK_CACHE;
     }
 }
 
