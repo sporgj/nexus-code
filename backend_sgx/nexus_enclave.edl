@@ -108,14 +108,14 @@ enclave {
             [in, string] char                    * directory_IN,
             [in, string] char                    * filename_IN,
             [user_check] struct nexus_fs_lookup  * lookup_out
-        );
+        ) transition_using_threads;
 
         public int ecall_fs_stat
         (
             [in, string] char                * path_IN,
                          nexus_stat_flags_t    stat_flags,
             [user_check] struct nexus_stat   * stat_out
-        );
+        ) transition_using_threads;
 
         // #define NEXUS_NAME_MAX  256
         public int ecall_fs_filldir
@@ -250,14 +250,14 @@ enclave {
             [in]         struct nexus_uuid   * metadata_uuid,
                          nexus_io_flags_t      flags,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         int
         ocall_buffer_unlock
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         uint8_t *
         ocall_buffer_get
@@ -284,14 +284,14 @@ enclave {
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         int
         ocall_buffer_del
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         int
         ocall_buffer_stattime
@@ -299,7 +299,7 @@ enclave {
             [in]         struct nexus_uuid   * uuid,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
 
 
