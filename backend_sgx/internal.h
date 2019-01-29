@@ -186,6 +186,26 @@ sgx_backend_fs_decrypt(struct nexus_volume * volume,
                        size_t                filesize,
                        void                * priv_data);
 
+struct nexus_file_crypto *
+sgx_backend_fs_file_encrypt_start(struct nexus_volume * volume,
+                                  char                * filepath,
+                                  size_t                filesize,
+                                  void                * priv_data);
+
+struct nexus_file_crypto *
+sgx_backend_fs_file_decrypt_start(struct nexus_volume * volume, char * filepath, void * priv_data);
+
+int sgx_backend_fs_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset);
+
+int sgx_backend_fs_file_crypto_update(struct nexus_file_crypto * file_crypto,
+                                      const uint8_t            * input,
+                                      uint8_t                  * output,
+                                      size_t                     size,
+                                      size_t                   * processed_bytes);
+
+int sgx_backend_fs_file_crypto_finish(struct nexus_file_crypto * file_crypto);
+
+
 
 int
 sgx_backend_user_list(struct nexus_volume * volume, void * priv_data);

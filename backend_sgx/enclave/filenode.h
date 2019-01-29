@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <stdbool.h>
+
 #include <nexus_list.h>
 #include <nexus_mac.h>
 
@@ -85,11 +87,11 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize);
  * Gets the chunk at the particular offset in the file
  * @param filenode
  * @param offset
+ * @pararm regnerate if to update the crypto context before returning it (dirties the filenode)
  * @return nexus_crypto_ctx.
  */
-// TODO change API to prevent misuse
 struct nexus_crypto_ctx *
-filenode_get_chunk(struct nexus_filenode * filenode, size_t offset);
+filenode_get_chunk(struct nexus_filenode * filenode, size_t offset, bool regenerate);
 
 
 

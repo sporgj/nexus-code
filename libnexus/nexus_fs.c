@@ -228,56 +228,78 @@ nexus_fs_rename(struct nexus_volume     * volume,
 }
 
 
-
-int
-nexus_fs_encrypt(struct nexus_volume * volume,
-                 char                * path,
-                 uint8_t             * in_buf,
-                 uint8_t             * out_buf,
-                 off_t                 offset,
-                 size_t                size,
-                 size_t                filesize)
+struct nexus_file_crypto *
+nexus_fs_file_encrypt_start(struct nexus_volume * volume, char * filepath, size_t filesize)
 {
     struct nexus_backend * backend = volume->backend;
 
-    if (backend->impl->fs_encrypt == NULL) {
-	log_error("fs_encrypt NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+    if (backend->impl->fs_file_encrypt_start == NULL) {
+        log_error("fs_file_encrypt_start is NOT implemented\n");
+        return NULL;
     }
 
-    return backend->impl->fs_encrypt(volume,
-                                     path,
-                                     in_buf,
-                                     out_buf,
-                                     offset,
-                                     size,
-                                     filesize,
-                                     backend->priv_data);
+    return backend->impl->fs_file_encrypt_start(volume, filepath, filesize, backend->priv_data);
 }
 
-int
-nexus_fs_decrypt(struct nexus_volume * volume,
-                 char                * path,
-                 uint8_t             * in_buf,
-                 uint8_t             * out_buf,
-                 off_t                 offset,
-                 size_t                size,
-                 size_t                filesize)
+struct nexus_file_crypto *
+nexus_fs_file_decrypt_start(struct nexus_volume * volume, char * filepath)
 {
     struct nexus_backend * backend = volume->backend;
 
-    if (backend->impl->fs_encrypt == NULL) {
-	log_error("fs_encrypt NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
+    if (backend->impl->fs_file_decrypt_start == NULL) {
+        log_error("fs_file_decrypt_start is NOT implemented\n");
+        return NULL;
     }
 
-    return backend->impl->fs_decrypt(volume,
-                                     path,
-                                     in_buf,
-                                     out_buf,
-                                     offset,
-                                     size,
-                                     filesize,
-                                     backend->priv_data);
+    return backend->impl->fs_file_decrypt_start(volume, filepath, backend->priv_data);
 }
 
+int
+nexus_fs_file_crypto_seek(struct nexus_volume      * volume,
+                          struct nexus_file_crypto * file_crypto,
+                          size_t                     offset)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_file_crypto_seek == NULL) {
+        log_error("fs_file_crypto_seek is NOT implemented\n");
+        return -1;
+    }
+
+    return backend->impl->fs_file_crypto_seek(file_crypto, offset);
+}
+
+int
+nexus_fs_file_crypto_update(struct nexus_volume      * volume,
+                            struct nexus_file_crypto * file_crypto,
+                            const uint8_t            * input,
+                            uint8_t                  * output,
+                            size_t                     size,
+                            size_t                   * processed_bytes)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_file_crypto_update == NULL) {
+        log_error("fs_file_crypto_update is NOT implemented\n");
+        return -1;
+    }
+
+    return backend->impl->fs_file_crypto_update(file_crypto,
+                                                input,
+                                                output,
+                                                size,
+                                                processed_bytes);
+}
+
+int
+nexus_fs_file_crypto_finish(struct nexus_volume * volume, struct nexus_file_crypto * file_crypto)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_file_crypto_finish == NULL) {
+        log_error("fs_file_crypto_finish is NOT implemented\n");
+        return -1;
+    }
+
+    return backend->impl->fs_file_crypto_finish(file_crypto);
+}

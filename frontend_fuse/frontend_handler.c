@@ -219,11 +219,6 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
     int ret = -1;
 
 
-    if (dentry->is_deleted) {
-        return 0;
-    }
-
-
     if (path == NULL) {
         return -1;
     }
@@ -467,9 +462,12 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     struct nexus_file_handle * file_handle = NULL;
 
+    struct nexus_file_crypto * file_crypto = NULL;
+
 
     size_t nbytes = 0;
     size_t size   = 0;
+    size_t processed = 0;
 
 
     file_handle = nexus_datastore_fopen(datastore, &inode->uuid, NULL, NEXUS_FREAD);
@@ -479,12 +477,19 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
         return -1;
     }
 
+    file_crypto = nexus_fs_file_decrypt_start(nexus_fuse_volume, file_ptr->filepath);
+
+    if (file_crypto == NULL) {
+        log_error("nexus_fs_file_encrypt_start() FAILED\n");
+        goto out_err;
+    }
+
+
     if (chunk->base) {
         lseek(file_handle->fd, chunk->base, SEEK_SET);
     }
 
     size = min(NEXUS_CHUNK_SIZE, inode->filesize - chunk->base);
-
 
     nbytes = read(file_handle->fd, chunk->buffer, size);
 
@@ -496,14 +501,26 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 
     chunk->size = size;
 
-    if (nexus_fs_decrypt(nexus_fuse_volume,
-                         file_ptr->filepath,
-                         chunk->buffer,
-                         chunk->buffer,
-                         chunk->base,
-                         chunk->size,
-                         file_ptr->inode->filesize)) {
-        log_error("nexus_fs_decrypt() failed (offset=%zu, size=%zu)\n", chunk->base, chunk->size);
+    if (nexus_fs_file_crypto_seek(nexus_fuse_volume, file_crypto, chunk->base)) {
+        log_error("nexus_fs_file_crypto_seek() FAILED\n");
+        goto out_err;
+    }
+
+    if (nexus_fs_file_crypto_update(nexus_fuse_volume,
+                                    file_crypto,
+                                    chunk->buffer,
+                                    chunk->buffer,
+                                    size,
+                                    &processed)) {
+        log_error("nexus_fs_file_crypto_update() FAILED\n");
+        goto out_err;
+    }
+
+    chunk->size = processed;
+
+    if (nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto)) {
+        file_crypto = NULL;
+        log_error("nexus_fs_file_crypto_finish() FAILED\n");
         goto out_err;
     }
 
@@ -512,6 +529,10 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
     return 0;
 
 out_err:
+    if (file_crypto) {
+        nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto);
+    }
+
     nexus_datastore_fclose(datastore, file_handle);
 
     return -1;
@@ -525,6 +546,8 @@ nexus_fuse_store(struct my_file * file_ptr)
     struct my_inode          * inode       = file_ptr->inode;
 
     struct nexus_file_handle * file_handle = NULL;
+
+    struct nexus_file_crypto * file_crypto = NULL;
 
     struct list_head         * chunk_iter  = NULL;
 
@@ -543,6 +566,14 @@ nexus_fuse_store(struct my_file * file_ptr)
     }
 
 
+    file_crypto = nexus_fs_file_encrypt_start(nexus_fuse_volume, file_ptr->filepath, inode->filesize);
+
+    if (file_crypto == NULL) {
+        log_error("nexus_fs_file_encrypt_start() FAILED\n");
+        goto out_err;
+    }
+
+
     if (ftruncate(file_handle->fd, inode->filesize)) {
         log_error("ftruncate FAILED (datafile=%s, size=%zu)\n",
                   file_handle->filepath,
@@ -557,15 +588,20 @@ nexus_fuse_store(struct my_file * file_ptr)
         struct file_chunk * chunk = list_entry(chunk_iter, struct file_chunk, node);
 
         size_t size = min(NEXUS_CHUNK_SIZE, inode->filesize - chunk->base);
+        size_t processed = 0;
 
-        if (nexus_fs_encrypt(nexus_fuse_volume,
-                             file_ptr->filepath,
-                             chunk->buffer,
-                             encrypted_buffer,
-                             chunk->base,
-                             size,
-                             inode->filesize)) {
-            log_error("could not encrypt the buffer\n");
+        if (nexus_fs_file_crypto_seek(nexus_fuse_volume, file_crypto, chunk->base)) {
+            log_error("nexus_fs_file_crypto_seek() FAILED\n");
+            goto out_err;
+        }
+
+        if (nexus_fs_file_crypto_update(nexus_fuse_volume,
+                                        file_crypto,
+                                        chunk->buffer,
+                                        encrypted_buffer,
+                                        size,
+                                        &processed)) {
+            log_error("nexus_fs_file_crypto_update() FAILED\n");
             goto out_err;
         }
 
@@ -579,13 +615,12 @@ nexus_fuse_store(struct my_file * file_ptr)
         }
     }
 
-    // printf("file stored (%s):: fpath=%s [fid=%d], fsize=%zu, tsent=%zu, trecv=%zu\n",
-    //        file_handle->filepath,
-    //        file_ptr->filepath,
-    //        file_ptr->fid,
-    //        inode->filesize,
-    //        file_ptr->total_sent,
-    //        file_ptr->total_recv);
+
+    if (nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto)) {
+        file_crypto = NULL;
+        log_error("nexus_fs_file_crypto_finish() FAILED\n");
+        goto out_err;
+    }
 
     if (nexus_datastore_fflush(datastore, file_handle)) {
         log_error("nexus_datastore_fflush() FAILED\n");
@@ -605,6 +640,10 @@ nexus_fuse_store(struct my_file * file_ptr)
     return 0;
 
 out_err:
+    if (file_crypto) {
+        nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto);
+    }
+
     nexus_datastore_fclose(datastore, file_handle);
 
     if (encrypted_buffer) {

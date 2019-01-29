@@ -28,7 +28,7 @@ INCLUDE := -I$(SGX_SDK)/include \
 	-Ilibnexus_trusted \
 	-I..
 
-CFLAGS  += -nostdinc \
+CFLAGS  += -nostdinc -pedantic \
 	-fvisibility=hidden -fpie -fPIC -fstack-protector -mpclmul -maes -mavx -w \
 	-W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
 	-Werror=implicit-function-declaration
@@ -112,6 +112,7 @@ objs := nexus_enclave_t.o \
 	bucket.o \
 	filenode.o \
 	supernode.o \
+	file_crypto.o \
 	main.o
 
 

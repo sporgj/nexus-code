@@ -78,11 +78,6 @@ struct nexus_backend_impl {
 
     int (*volume_close)(struct nexus_uuid * uuid);
 
-    // int (*user_add)(struct nexus_uuid * vol_uuid,
-    //                 struct nexus_key  * user_pub_key,
-    //                 char              * user_name);
-
-    // int (*user_del)(struct nexus_uuid * vol_uuid, struct nexus_key * user_name);
 
     /**
      * Creates a new file
@@ -183,6 +178,24 @@ struct nexus_backend_impl {
                       size_t                filesize,
                       void                * priv_data);
 
+
+    struct nexus_file_crypto *
+    (*fs_file_encrypt_start)(struct nexus_volume * volume, char * filepath, size_t filesize, void * priv_data);
+
+    struct nexus_file_crypto *
+    (*fs_file_decrypt_start)(struct nexus_volume * volume, char * filepath, void * priv_data);
+
+    int (*fs_file_crypto_seek)(struct nexus_file_crypto * file_crypto, size_t offset);
+
+    int (*fs_file_crypto_update)(struct nexus_file_crypto * file_crypto,
+                                 const uint8_t            * input,
+                                 uint8_t                  * output,
+                                 size_t                     size,
+                                 size_t                   * processed_bytes);
+
+    int (*fs_file_crypto_finish)(struct nexus_file_crypto * file_crypto);
+
+
     int (*user_list)(struct nexus_volume * volume, void * priv_data);
 
     int (*user_add)(struct nexus_volume * volume,
@@ -200,86 +213,13 @@ struct nexus_backend_impl {
 };
 
 
-#define nexus_register_backend(backend)							\
-    static struct nexus_backend_impl * _nexus_backend					\
-    __attribute__((used))								\
-	 __attribute__((unused, __section__("_nexus_backends"),				\
-			aligned(sizeof(void *))))					\
-	 = &backend;
-
-
-
+#define nexus_register_backend(backend)                                                            \
+    static struct nexus_backend_impl * _nexus_backend __attribute__((used))                        \
+        __attribute__((unused, __section__("_nexus_backends"), aligned(sizeof(void *))))           \
+        = &backend;
 
 int
 nexus_backend_init();
 
 int
 nexus_backend_exit();
-
-
-
-
-
-
-
-#if 0
-
-// authenticates with the backend
-
-extern int
-nexus_backend_authenticate(struct nexus_supernode * supernode,
-			   struct nexus_vol_key   * vol_key,
-			   struct nexus_pub_key   * pub_key,
-			   struct nexus_prv_key   * prv_key);
-
-
-
-
-
-
-
-// volume management
-extern int
-backend_volume_create(struct uuid *      supernode_uuid,
-                      struct uuid *      root_uuid,
-		      char *       publickey_fpath,
-                      struct supernode * supernode_out,
-                      struct dirnode *   dirnode_out,
-                      struct volumekey * volume_out);
-
-// dirnode management
-extern int
-backend_dirnode_new(struct uuid *     dirnode_uuid,
-                    struct uuid *     root_uuid,
-                    struct dirnode ** p_dirnode);
-
-extern int
-backend_dirnode_add(struct dirnode *    parent_dirnode,
-                    struct uuid *       uuid,
-                    const char *        fname,
-                    nexus_fs_obj_type_t type);
-
-extern int
-backend_dirnode_find_by_uuid(struct dirnode *      dirnode,
-                             struct uuid *         uuid,
-                             char **               p_fname,
-                             nexus_fs_obj_type_t * p_type);
-
-extern int
-backend_dirnode_find_by_name(struct dirnode *      dirnode,
-                             char *                fname,
-                             struct uuid *         uuid,
-                             nexus_fs_obj_type_t * p_type);
-
-extern int
-backend_dirnode_remove(struct dirnode *      dirnode,
-                       char *                fname,
-                       struct uuid *         uuid,
-                       nexus_fs_obj_type_t * p_type);
-
-extern int
-backend_dirnode_serialize(struct dirnode *  dirnode,
-                          struct dirnode ** p_sealed_dirnode);
-
-
-#endif

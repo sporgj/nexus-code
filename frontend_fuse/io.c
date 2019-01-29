@@ -163,6 +163,11 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
 
     chunk = __file_try_add_chunk(file_ptr, offset);
 
+    if (chunk == NULL) {
+        log_error("__file_try_add_chunk() FAILED\n");
+        return NULL;
+    }
+
     if (chunk->is_valid) {
         return chunk;
     }

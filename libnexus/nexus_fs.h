@@ -79,6 +79,10 @@ struct nexus_stat {
 };
 
 
+// this will be implemented by the backend
+struct nexus_file_xfer;
+
+
 // this is derived from fuse_lowlevel.h
 // https://github.com/libfuse/libfuse/blob/master/include/fuse_lowlevel.h
 typedef enum {
@@ -108,6 +112,7 @@ struct nexus_fs_attr {
 };
 
 
+
 static inline mode_t
 nexus_fs_sys_mode_from_type(nexus_dirent_type_t type)
 {
@@ -119,6 +124,7 @@ nexus_fs_sys_mode_from_type(nexus_dirent_type_t type)
 
     return S_IFLNK;
 }
+
 
 
 /**
@@ -206,20 +212,50 @@ nexus_fs_rename(struct nexus_volume     * volume,
 
 
 
-int
-nexus_fs_encrypt(struct nexus_volume * volume,
-                 char                * path,
-                 uint8_t             * in_buf,
-                 uint8_t             * out_buf,
-                 off_t                 offset,
-                 size_t                size,
-                 size_t                filesize);
+// this contains the file interface for performing crypto
 
+/**
+ * Starts the process for file encryption
+ * @param volume
+ * @param filepath
+ * @param filesize
+ * @return @struct nexus_file_crypto
+ */
+struct nexus_file_crypto *
+nexus_fs_file_encrypt_start(struct nexus_volume * volume, char * filepath, size_t filesize);
+
+/**
+ * Same as @nexus_fs_file_encrypt_start, but decryption instead
+ */
+struct nexus_file_crypto *
+nexus_fs_file_decrypt_start(struct nexus_volume * volume, char * filepath);
+
+/**
+ * Performs a seek to the offset.
+ * When encrypting, this might return false if a chunk is not completed
+ * @param file_crypto
+ * @param offset
+ * @return -1 on failure
+ */
 int
-nexus_fs_decrypt(struct nexus_volume * volume,
-                 char                * path,
-                 uint8_t             * in_buf,
-                 uint8_t             * out_buf,
-                 off_t                 offset,
-                 size_t                size,
-                 size_t                filesize);
+nexus_fs_file_crypto_seek(struct nexus_volume * volume, struct nexus_file_crypto * file_crypto, size_t offset);
+
+/**
+ * Used for encrypting/decrypting data. Note that the offset is shifted by the amount
+ * of processed data.
+ *
+ * Returns -1 on FAILURE
+ */
+int
+nexus_fs_file_crypto_update(struct nexus_volume      * volume,
+                            struct nexus_file_crypto * file_crypto,
+                            const uint8_t            * input,
+                            uint8_t                  * output,
+                            size_t                     size,
+                            size_t                   * processed_bytes);
+
+/**
+ * Terminates the crypto process and writes out the filenode metadata.
+ */
+int
+nexus_fs_file_crypto_finish(struct nexus_volume * volume, struct nexus_file_crypto * file_crypto);

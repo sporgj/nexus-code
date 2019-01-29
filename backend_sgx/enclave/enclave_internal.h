@@ -38,6 +38,7 @@
 #include "dirnode.h"
 #include "bucket.h"
 #include "filenode.h"
+#include "file_crypto.h"
 
 #include <nexus_volume.h>
 #include <nexus_fs.h>

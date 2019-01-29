@@ -322,3 +322,53 @@ io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_vo
 
     return 0;
 }
+
+struct nexus_file_crypto *
+io_file_crypto_start(int                  trusted_xfer_id,
+                     file_crypto_mode     mode,
+                     char               * filepath,
+                     struct sgx_backend * sgx_backend)
+{
+    struct nexus_file_crypto * file_crypto = nexus_malloc(sizeof(struct nexus_file_crypto));
+
+    file_crypto->mode = mode;
+
+    file_crypto->trusted_xfer_id = trusted_xfer_id;
+
+    file_crypto->filepath = strndup(filepath, PATH_MAX);
+
+    file_crypto->sgx_backend = sgx_backend;
+
+    return file_crypto;
+}
+
+int
+io_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset)
+{
+    file_crypto->offset = offset;
+
+    return 0;
+}
+
+int
+io_file_crypto_update(struct nexus_file_crypto * file_crypto,
+                      const uint8_t            * input,
+                      uint8_t                  * output,
+                      size_t                     nbytes)
+{
+    (void)input;
+    (void)output;
+
+    file_crypto->offset += nbytes;
+
+    return 0;
+}
+
+int
+io_file_crypto_finish(struct nexus_file_crypto * file_crypto)
+{
+    nexus_free(file_crypto->filepath);
+    nexus_free(file_crypto);
+
+    return 0;
+}

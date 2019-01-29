@@ -623,8 +623,6 @@ nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
         return;
     }
 
-    dentry->is_deleted = true;
-
     // vfs_forget_dentry(dentry, (char *)name);
 
     fuse_reply_err(req, 0);

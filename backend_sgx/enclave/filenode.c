@@ -422,13 +422,22 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
 }
 
 struct nexus_crypto_ctx *
-filenode_get_chunk(struct nexus_filenode * filenode, size_t offset)
+filenode_get_chunk(struct nexus_filenode * filenode, size_t offset, bool regenerate)
 {
     size_t chunk_num = get_chunk_number(filenode, offset);
 
     struct chunk_entry * chunk_entry = nexus_list_get(&filenode->chunk_list, chunk_num);
 
-    return chunk_entry ? &chunk_entry->crypto_ctx : NULL;
+    if (chunk_entry == NULL) {
+        return NULL;
+    }
+
+    if (regenerate) {
+        nexus_crypto_ctx_generate(&chunk_entry->crypto_ctx);
+        __filenode_set_dirty(filenode);
+    }
+
+    return &chunk_entry->crypto_ctx;
 }
 
 void

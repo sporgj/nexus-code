@@ -173,25 +173,37 @@ enclave {
 
         // file operations
 
-        // TODO add argument to indicate moredata
-        public int ecall_fs_encrypt
+        public int ecall_fs_file_encrypt_start
         (
             [in, string] char                * filepath_IN,
-            [user_check] uint8_t             * input_buffer_in,
-            [user_check] uint8_t             * output_buffer_in,
-                         size_t                offset,
-                         size_t                size,
-                         size_t                filesize
+                         size_t                filesize,
+            [user_check] int                 * xfer_id_out
         );
 
-        public int ecall_fs_decrypt
+        public int ecall_fs_file_decrypt_start
         (
             [in, string] char                * filepath_IN,
+            [user_check] int                 * xfer_id_out
+        );
+
+        public int ecall_fs_file_crypto_seek
+        (
+                         int                   xfer_id,
+                         int                   offset
+        );
+
+        public int ecall_fs_file_crypto_update
+        (
+                         int                   xfer_id,
             [user_check] uint8_t             * input_buffer_in,
-            [user_check] uint8_t             * output_buffer_in,
-                         size_t                offset,
+            [user_check] uint8_t             * output_buffer_out,
                          size_t                size,
-                         size_t                filesize
+            [user_check] size_t              * processed_bytes
+        );
+
+        public int ecall_fs_file_crypto_finish
+        (
+                         int                   xfer_id
         );
 
         public int ecall_fs_truncate
