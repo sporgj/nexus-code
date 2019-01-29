@@ -153,8 +153,8 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
 
     mbedtls_gcm_context gcm_context;
 
-    uint8_t input_buffer[CRYPTO_BUFFER_SIZE]  = { 0 }; // XXX: is zeroing really necessary?
-    uint8_t output_buffer[CRYPTO_BUFFER_SIZE] = { 0 };
+    // uint8_t input_buffer[CRYPTO_BUFFER_SIZE]  = { 0 }; // XXX: is zeroing really necessary?
+    // uint8_t output_buffer[CRYPTO_BUFFER_SIZE] = { 0 };
 
     int bytes_left = 0;
     int size       = 0;
@@ -186,15 +186,15 @@ crypto_gcm_encrypt(struct nexus_crypto_ctx * crypto_context,
     while (bytes_left > 0) {
         size = min(bytes_left, CRYPTO_BUFFER_SIZE);
 
-        memcpy(input_buffer, plaintext, size);
+        // memcpy(input_buffer, plaintext, size);
 
-        ret = mbedtls_gcm_update(&gcm_context, size, input_buffer, output_buffer);
+        ret = mbedtls_gcm_update(&gcm_context, size, plaintext, ciphertext);
         if (ret != 0) {
             log_error("mbedtls_gcm_update() FAILED\n");
             goto out;
         }
 
-        memcpy(ciphertext, output_buffer, size);
+        // memcpy(ciphertext, output_buffer, size);
 
         bytes_left -= size;
 
@@ -235,8 +235,8 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 
     mbedtls_gcm_context gcm_context;
 
-    uint8_t input_buffer[CRYPTO_BUFFER_SIZE]  = { 0 }; // XXX: is zeroing really necessary?
-    uint8_t output_buffer[CRYPTO_BUFFER_SIZE] = { 0 };
+    // uint8_t input_buffer[CRYPTO_BUFFER_SIZE]  = { 0 }; // XXX: is zeroing really necessary?
+    // uint8_t output_buffer[CRYPTO_BUFFER_SIZE] = { 0 };
 
     struct nexus_mac computed_mac;
 
@@ -268,16 +268,16 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
     while (bytes_left > 0) {
         size = min(bytes_left, CRYPTO_BUFFER_SIZE);
 
-        memcpy(input_buffer, ciphertext, size);
+        // memcpy(input_buffer, ciphertext, size);
 
 
-        ret = mbedtls_gcm_update(&gcm_context, size, input_buffer, output_buffer);
+        ret = mbedtls_gcm_update(&gcm_context, size, ciphertext, plaintext);
         if (ret != 0) {
             log_error("mbedtls_gcm_update FAILED\n");
             goto out;
         }
 
-        memcpy(plaintext, output_buffer, size);
+        // memcpy(plaintext, output_buffer, size);
 
         bytes_left -= size;
 
