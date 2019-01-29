@@ -2,6 +2,12 @@
 
 #include <nexus_file_handle.h>
 
+
+static uint8_t __file_crypto_buffer__[NEXUS_CHUNK_SIZE] __attribute__ ((__aligned__(4096)));
+
+static pthread_mutex_t  __file_crypto_buffer_mutex__;
+
+
 struct nexus_dirent *
 nexus_fuse_readdir(struct my_dentry * dentry,
                    size_t             offset,
@@ -37,7 +43,9 @@ nexus_fuse_readdir(struct my_dentry * dentry,
 }
 
 int
-nexus_fuse_stat(struct my_dentry * dentry, nexus_stat_flags_t stat_flags, struct nexus_stat * stat_info)
+nexus_fuse_stat(struct my_dentry *  dentry,
+                nexus_stat_flags_t  stat_flags,
+                struct nexus_stat * stat_info)
 {
     char * dirpath = dentry_get_fullpath(dentry);
 
@@ -552,8 +560,6 @@ nexus_fuse_store(struct my_file * file_ptr)
     struct list_head         * chunk_iter  = NULL;
 
 
-    uint8_t * encrypted_buffer = NULL;
-
     if (!file_ptr->is_dirty) {
         return 0;
     }
@@ -582,8 +588,6 @@ nexus_fuse_store(struct my_file * file_ptr)
     }
 
 
-    encrypted_buffer = nexus_malloc(min(NEXUS_CHUNK_SIZE, inode->filesize));
-
     list_for_each(chunk_iter, &inode->file_chunks) {
         struct file_chunk * chunk = list_entry(chunk_iter, struct file_chunk, node);
 
@@ -595,10 +599,13 @@ nexus_fuse_store(struct my_file * file_ptr)
             goto out_err;
         }
 
+        pthread_mutex_lock(&__file_crypto_buffer_mutex__);
+
+        // TODO handle processed correctly
         if (nexus_fs_file_crypto_update(nexus_fuse_volume,
                                         file_crypto,
                                         chunk->buffer,
-                                        encrypted_buffer,
+                                        __file_crypto_buffer__,
                                         size,
                                         &processed)) {
             log_error("nexus_fs_file_crypto_update() FAILED\n");
@@ -607,10 +614,17 @@ nexus_fuse_store(struct my_file * file_ptr)
 
         lseek(file_handle->fd, chunk->base, SEEK_SET);
 
-        size_t nbytes = write(file_handle->fd, encrypted_buffer, size);
+        size_t nbytes = write(file_handle->fd, __file_crypto_buffer__, size);
+
+        pthread_mutex_unlock(&__file_crypto_buffer_mutex__);
+
 
         if (nbytes != size) {
-            log_error("writing chunk %zu (tried=%zu, got=%zu)\n", chunk->index, size, nbytes);
+            log_error("writing chunk %zu (tried=%zu, got=%zu, processed=%zu)\n",
+                      chunk->index,
+                      size,
+                      nbytes,
+                      processed);
             goto out_err;
         }
     }
@@ -629,8 +643,6 @@ nexus_fuse_store(struct my_file * file_ptr)
 
     nexus_datastore_fclose(datastore, file_handle);
 
-    nexus_free(encrypted_buffer);
-
     inode->on_disk_size  = inode->filesize;
 
     inode_set_clean(inode);
@@ -645,10 +657,6 @@ out_err:
     }
 
     nexus_datastore_fclose(datastore, file_handle);
-
-    if (encrypted_buffer) {
-        nexus_free(encrypted_buffer);
-    }
 
     return -1;
 }

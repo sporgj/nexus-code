@@ -26,7 +26,7 @@ __alloc_file_chunk(size_t base)
 
     chunk->base   = base;
     chunk->index  = get_chunk_number(base);
-    chunk->buffer = nexus_malloc(NEXUS_CHUNK_SIZE);
+    chunk->buffer = valloc(NEXUS_CHUNK_SIZE);
 
     INIT_LIST_HEAD(&chunk->node);
 
