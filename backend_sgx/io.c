@@ -34,6 +34,7 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
     buf->timestamp = time(NULL);
 }
 
+
 static inline uint8_t *
 __io_buffer_get(struct nexus_uuid   * uuid,
                 nexus_io_flags_t      flags,
@@ -131,6 +132,7 @@ io_buffer_get(struct nexus_uuid   * uuid,
     return result;
 }
 
+
 static int
 __io_buffer_put(struct nexus_uuid   * uuid,
                 uint8_t             * buffer,
@@ -140,10 +142,7 @@ __io_buffer_put(struct nexus_uuid   * uuid,
 {
     struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
 
-    struct metadata_buf * metadata_buf = NULL;
-
-
-    metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
     if (metadata_buf == NULL || metadata_buf->locked_file == NULL) {
         log_error("no locked file on metadata\n");
@@ -192,6 +191,7 @@ io_buffer_put(struct nexus_uuid   * uuid,
 
     return ret;
 }
+
 
 static inline struct metadata_buf *
 __io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
@@ -245,6 +245,8 @@ __io_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
 
     if (metadata_buf && metadata_buf->locked_file) {
         nexus_datastore_fclose(volume->metadata_store, metadata_buf->locked_file);
+
+        metadata_buf->locked_file = NULL;
 
         return metadata_buf;
     }
@@ -322,6 +324,8 @@ io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_vo
 
     return 0;
 }
+
+
 
 struct nexus_file_crypto *
 io_file_crypto_start(int                  trusted_xfer_id,

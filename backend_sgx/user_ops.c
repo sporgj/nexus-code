@@ -27,7 +27,7 @@ sgx_backend_user_list(struct nexus_volume * volume, void * priv_data)
 {
     struct sgx_backend      * sgx_backend = (struct sgx_backend *)priv_data;
 
-    struct nxs_user_buffer    buffer_array[BUFFER_ARRAY_SIZE];
+    struct nxs_user_buffer    buffer_array[BUFFER_ARRAY_SIZE]; // TODO revise this
 
     size_t offset       = 0;
     size_t total_count  = 0;
@@ -37,8 +37,6 @@ sgx_backend_user_list(struct nexus_volume * volume, void * priv_data)
     int ret = -1;
 
     do {
-        memset(buffer_array, 0, sizeof(buffer_array));
-
         err = ecall_user_ls(sgx_backend->enclave_id,
                             &ret,
                             (struct nxs_user_buffer *)&buffer_array,

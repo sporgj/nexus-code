@@ -119,47 +119,6 @@ sgx_backend_fs_stat(struct nexus_volume * volume,
 }
 
 int
-sgx_backend_fs_filldir(struct nexus_volume  * volume,
-                       char                 * dirpath,
-                       char                 * nexus_name,
-                       char                ** plain_name,
-                       void                 * priv_data)
-{
-    struct sgx_backend * sgx_backend = NULL;
-
-    char filename[NEXUS_NAME_MAX] = { 0 };
-
-    struct nexus_uuid uuid;
-
-    int err = -1;
-    int ret = -1;
-
-
-    sgx_backend = (struct sgx_backend *)priv_data;
-
-    ret = nexus_uuid_from_alt64(&uuid, nexus_name);
-    if (ret != 0) {
-        log_error("could not derive uuid from '%s'\n", nexus_name);
-        return -1;
-    }
-
-    BACKEND_SGX_ECALL_START(ECALL_FILLDIR);
-
-    err = ecall_fs_filldir(sgx_backend->enclave_id, &ret, dirpath, &uuid, filename);
-
-    BACKEND_SGX_ECALL_FINISH(ECALL_FILLDIR);
-
-    if (err) {
-        log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
-        return -1;
-    }
-
-    *plain_name = strndup(filename, NEXUS_NAME_MAX);
-
-    return ret;
-}
-
-int
 sgx_backend_fs_readdir(struct nexus_volume  * volume,
                        char                 * dirpath,
                        struct nexus_dirent  * dirent_buffer_array,

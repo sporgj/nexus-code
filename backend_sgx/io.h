@@ -17,6 +17,7 @@ typedef enum {
 } file_crypto_mode;
 
 
+// structure manages the streaming interface for encrypting/decrypting file content
 struct nexus_file_crypto {
     file_crypto_mode     mode;
 
@@ -29,6 +30,11 @@ struct nexus_file_crypto {
     struct sgx_backend * sgx_backend;
 };
 
+
+
+// ------------------------
+//  metadata operations
+// ------------------------
 
 uint8_t *
 io_buffer_alloc(struct nexus_uuid * uuid, size_t size, struct nexus_volume * volume);
@@ -62,22 +68,11 @@ io_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 int
 io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 
-int
-io_buffer_hardlink(struct nexus_uuid   * link_uuid,
-                   struct nexus_uuid   * target_uuid,
-                   struct nexus_volume * volume);
-
-int
-io_buffer_rename(struct nexus_uuid   * from_uuid,
-                 struct nexus_uuid   * to_uuid,
-                 struct nexus_volume * volume);
 
 
-int
-io_manager_flush_dirty(struct sgx_backend * sgx_backend);
-
-
-
+// ------------------------
+//  file crypto operations
+// ------------------------
 
 struct nexus_file_crypto *
 io_file_crypto_start(int                  trusted_xfer_id,

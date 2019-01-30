@@ -47,9 +47,6 @@ struct sgx_backend {
     size_t                        mmap_len;
 
 
-    struct fs_manager           * fs_manager;
-
-
     struct nexus_volume         * volume;
 
     char                        * enclave_path;
@@ -59,10 +56,7 @@ struct sgx_backend {
 // main.c
 
 int
-nxs_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id);
-
-int
-nxs_destroy_enclave(sgx_enclave_id_t enclave_id);
+main_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id);
 
 
 // manages the instance
@@ -79,6 +73,10 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data);
 int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data);
 
+
+// --------------------
+// directory operations
+// --------------------
 
 int
 sgx_backend_fs_create(struct nexus_volume  * volume,
@@ -114,13 +112,6 @@ sgx_backend_fs_stat(struct nexus_volume * volume,
                     nexus_stat_flags_t    stat_flags,
                     struct nexus_stat   * nexus_stat,
                     void                * priv_data);
-
-int
-sgx_backend_fs_filldir(struct nexus_volume  * volume,
-                       char                 * dirpath,
-                       char                 * nexus_name,
-                       char                ** plain_name,
-                       void                 * priv_data);
 
 int
 sgx_backend_fs_readdir(struct nexus_volume  * volume,
@@ -166,25 +157,10 @@ sgx_backend_fs_rename(struct nexus_volume     * volume,
                       bool                    * should_remove,
                       void                    * priv_data);
 
-int
-sgx_backend_fs_encrypt(struct nexus_volume * volume,
-                       char                * filepath,
-                       uint8_t             * in_buf,
-                       uint8_t             * out_buf,
-                       size_t                offset,
-                       size_t                size,
-                       size_t                filesize,
-                       void                * priv_data);
 
-int
-sgx_backend_fs_decrypt(struct nexus_volume * volume,
-                       char                * filepath,
-                       uint8_t             * in_buf,
-                       uint8_t             * out_buf,
-                       size_t                offset,
-                       size_t                size,
-                       size_t                filesize,
-                       void                * priv_data);
+// --------------------
+// file operations
+// --------------------
 
 struct nexus_file_crypto *
 sgx_backend_fs_file_encrypt_start(struct nexus_volume * volume,
@@ -195,17 +171,24 @@ sgx_backend_fs_file_encrypt_start(struct nexus_volume * volume,
 struct nexus_file_crypto *
 sgx_backend_fs_file_decrypt_start(struct nexus_volume * volume, char * filepath, void * priv_data);
 
-int sgx_backend_fs_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset);
+int
+sgx_backend_fs_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset);
 
-int sgx_backend_fs_file_crypto_update(struct nexus_file_crypto * file_crypto,
-                                      const uint8_t            * input,
-                                      uint8_t                  * output,
-                                      size_t                     size,
-                                      size_t                   * processed_bytes);
+int
+sgx_backend_fs_file_crypto_update(struct nexus_file_crypto * file_crypto,
+                                  const uint8_t            * input,
+                                  uint8_t                  * output,
+                                  size_t                     size,
+                                  size_t                   * processed_bytes);
 
-int sgx_backend_fs_file_crypto_finish(struct nexus_file_crypto * file_crypto);
+int
+sgx_backend_fs_file_crypto_finish(struct nexus_file_crypto * file_crypto);
 
 
+
+// --------------------
+// user operations
+// --------------------
 
 int
 sgx_backend_user_list(struct nexus_volume * volume, void * priv_data);
@@ -229,16 +212,3 @@ sgx_backend_user_findname(struct nexus_volume * volume, char * username, void * 
 
 int
 sgx_backend_user_findkey(struct nexus_volume * volume, char * pubkey, void * priv_data);
-
-
-
-
-
-
-
-
-int
-uuid_equal_func(uintptr_t key1, uintptr_t key2);
-
-uint32_t
-uuid_hash_func(uintptr_t key);

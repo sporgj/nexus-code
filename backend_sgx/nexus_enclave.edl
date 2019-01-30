@@ -117,14 +117,6 @@ enclave {
             [user_check] struct nexus_stat   * stat_out
         ) transition_using_threads;
 
-        // #define NEXUS_NAME_MAX  256
-        public int ecall_fs_filldir
-        (
-            [in, string] char                * directory_IN,
-                    [in] struct nexus_uuid   * uuid_IN,
-            [user_check] char                  filename_out[256]
-        );
-
         public int ecall_fs_readdir
         (
             [in, string] char                * directory_IN,

@@ -24,7 +24,7 @@
 extern sgx_spid_t global_spid;
 
 
-// all the messages
+// an instance denotes a single nexus installation. (the contents of .nexus)
 struct nxs_instance {
     sgx_quote_t            * quote;
 
@@ -38,6 +38,8 @@ struct nxs_instance {
 };
 
 
+// represents a single exchange message. The recipient passes this structure into
+// the enclave to extract the enclosed rootkey.
 struct rk_exchange {
     struct ecdh_public_key   ephemeral_pubkey;
 
@@ -53,13 +55,13 @@ struct rk_exchange {
 
 
 int
-store_init_message(const char * filepath, struct nxs_instance * message);
+store_nxs_instance(struct nxs_instance * message, const char * filepath);
 
 struct nxs_instance *
-fetch_init_message(const char * filepath);
+fetch_nxs_instance(const char * filepath);
 
 void
-free_init_message(struct nxs_instance * message);
+free_nxs_instance(struct nxs_instance * message);
 
 
 
