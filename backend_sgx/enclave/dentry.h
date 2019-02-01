@@ -56,6 +56,7 @@ struct path_walker {
     path_walk_type_t      type;
 };
 
+
 // initializes the root dentry
 void
 dcache_init_root();

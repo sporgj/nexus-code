@@ -41,12 +41,16 @@ static size_t                xfer_counter = 0;
 
 
 int
-__compare_function(const void                     * hashmap_cmp_fn_data,
-                   const struct data_xfer_context * c1,
-                   const struct data_xfer_context * c2,
+_isequals_function(const void                     * hashmap_cmp_fn_data,
+                   const struct data_xfer_context * xfer_ctx1,
+                   const struct data_xfer_context * xfer_ctx2,
                    const void                     * keydata)
 {
-    return c1->id != c2->id;
+    if (xfer_ctx1->id == xfer_ctx2->id) {
+        return 0;
+    }
+
+    return -1;
 }
 
 
@@ -56,7 +60,7 @@ __put_context(struct data_xfer_context * xfer_context)
     if (xfer_table == NULL) {
         xfer_table = nexus_malloc(sizeof(struct hashmap));
 
-        hashmap_init(xfer_table, (hashmap_cmp_fn)__compare_function, NULL, 16);
+        hashmap_init(xfer_table, (hashmap_cmp_fn)_isequals_function, NULL, 16);
     }
 
     xfer_counter += 1;
@@ -87,7 +91,6 @@ __del_context(struct data_xfer_context * xfer_context)
     __hashmap_remove_entry(xfer_table, &xfer_context->entry);
     nexus_free(xfer_context);
 }
-
 
 
 
@@ -152,7 +155,8 @@ file_crypto_seek(int xfer_id, size_t offset)
     }
 
     if (offset % global_chunk_size) {
-        log_error("offset (%zu) is not a multiple of chunk size (%zu)\n", offset, global_chunk_size);
+        log_error("offset (%zu) is not a multiple of chunk size (%zu)\n",
+                  offset, global_chunk_size);
         return -1;
     }
 

@@ -153,7 +153,6 @@ bucket_load_from_buffer(struct dir_bucket    * bucket,
                         struct nexus_dirnode * dirnode,
                         uint8_t              * input_ptr)
 {
-
     for (size_t i = 0; i < bucket->num_items; i++) {
         struct dir_entry * new_dir_entry = NULL;
 
@@ -165,7 +164,6 @@ bucket_load_from_buffer(struct dir_bucket    * bucket,
 
         __dirnode_index_direntry(dirnode, new_dir_entry);
     }
-
 
     return 0;
 }
@@ -295,11 +293,9 @@ out_err:
 int
 bucket_add_direntry(struct dir_bucket * bucket, struct dir_entry * dir_entry)
 {
-    // XXX
     if ((bucket->num_items >= bucket->capacity) || (dir_entry->bucket)) {
         return -1;
     }
-
 
     bucket->num_items  += 1;
     bucket->size_bytes += dir_entry->dir_rec.rec_len;
@@ -314,7 +310,6 @@ bucket_add_direntry(struct dir_bucket * bucket, struct dir_entry * dir_entry)
 int
 bucket_del_direntry(struct dir_bucket * bucket, struct dir_entry * dir_entry)
 {
-    // XXX might be too much
     if ((bucket->num_items == 0) || (bucket != dir_entry->bucket)) {
         return -1;
     }

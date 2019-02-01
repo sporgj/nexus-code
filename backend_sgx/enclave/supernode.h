@@ -29,9 +29,6 @@ struct nexus_supernode {
     struct nexus_uuid          usertable_uuid;
     struct nexus_mac           usertable_mac;
 
-    uint32_t                   hardlink_count;
-    struct nexus_list          hardlink_table;
-
     struct nexus_metadata    * metadata;
 
     struct nexus_usertable   * usertable;
@@ -80,31 +77,3 @@ supernode_store(struct nexus_supernode * supernode, int version, struct nexus_ma
 
 void
 supernode_free(struct nexus_supernode * supernode);
-
-
-struct nexus_uuid *
-supernode_get_reallink(struct nexus_supernode  * supernode, struct nexus_uuid * link_uuid);
-
-int
-supernode_add_hardlink(struct nexus_supernode  * supernode,
-                       struct nexus_uuid       * src_uuid,
-                       struct nexus_uuid       * dst_uuid);
-
-bool
-supernode_del_hardlink(struct nexus_supernode  * supernode,
-                       struct nexus_uuid       * link_uuid,
-                       struct nexus_uuid      ** real_uuid);
-
-/**
- * renames all hardlinks with the said UUID
- * @param supernode
- * @param old_uuid
- * @param new_uuid
- * @param is_real_file if whether a "real" file has been renamed
- * @return true if any renaming occured
- */
-bool
-supernode_rename_link(struct nexus_supernode   * supernode,
-                      struct nexus_uuid        * old_uuid,
-                      struct nexus_uuid        * new_uuid,
-                      bool                     * is_real_file);

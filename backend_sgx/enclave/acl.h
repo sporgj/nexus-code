@@ -1,5 +1,10 @@
 #pragma once
 
+/**
+ * a small ACL-based permission system
+ * @author Judicael Briand
+ */
+
 #include <stdint.h>
 
 #include "user.h"
