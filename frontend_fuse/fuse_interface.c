@@ -623,7 +623,7 @@ nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
         return;
     }
 
-    // vfs_forget_dentry(dentry, (char *)name);
+    vfs_forget_dentry(dentry, (char *)name);
 
     fuse_reply_err(req, 0);
 
@@ -844,21 +844,69 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
-    const uint8_t * buffer = NULL;
-    size_t          buflen = 0;
+    const uint8_t * first_buffer = NULL;    // we will try to fit all the data here
+    const uint8_t * other_buffer = NULL;
+
+    size_t          first_buflen = 0;
+    size_t          other_buflen = 0;
+
+    struct fuse_bufvec * bufvec  = NULL;    // this will hold buffer vectors
+
+
 
     pthread_rwlock_rdlock(&file_ptr->io_lock);
 
-    buffer = file_read_dataptr(file_ptr, off, size, &buflen);
+    first_buffer = file_read_dataptr(file_ptr, off, size, &first_buflen);
 
-    if (buffer == NULL) {
+    if (first_buffer == NULL) {
+        log_error("file_read_dataptr(). file=%s, size=%zu FAILED\n", file_ptr->filepath,
+                  file_ptr->inode->filesize);
+        pthread_rwlock_unlock(&file_ptr->io_lock);
         fuse_reply_err(req, EIO);
         return;
     }
 
-    fuse_reply_buf(req, (const char *)buffer, buflen);
 
-    file_ptr->total_sent += buflen;
+    // we have all the data, we can return early
+    if (first_buflen == size) {
+        fuse_reply_buf(req, (const char *)first_buffer, first_buflen);
+        goto exit;
+    }
+
+
+    // otherwise, we may need to read from two chunks
+    {
+        size_t new_offset = off + first_buflen;
+        size_t new_length = size - first_buflen;
+
+        other_buffer = file_read_dataptr(file_ptr, new_offset, new_length, &other_buflen);
+
+        if (other_buffer == NULL) {
+            log_error("file_read_dataptr() FAILED\n");
+            pthread_rwlock_unlock(&file_ptr->io_lock);
+            fuse_reply_err(req, EIO);
+            return;
+        }
+
+
+        bufvec = nexus_malloc(sizeof(struct fuse_bufvec) + sizeof(struct fuse_buf));
+
+        bufvec->count       = 2;
+
+        bufvec->buf[0].size = first_buflen;
+        bufvec->buf[0].mem  = (void *)first_buffer;
+
+        bufvec->buf[1].size = other_buflen;
+        bufvec->buf[1].mem  = (void *)other_buffer;
+
+        fuse_reply_data(req, bufvec, FUSE_BUF_NO_SPLICE);
+
+        nexus_free(bufvec);
+    }
+
+
+exit:
+    file_ptr->total_sent += (first_buflen + other_buflen);
 
     pthread_rwlock_unlock(&file_ptr->io_lock);
 }
@@ -878,11 +926,13 @@ nxs_fuse_write(fuse_req_t              req,
     size_t bytes_read = 0;
 
     if (file_write(file_ptr, off, size, (uint8_t *)buffer, &bytes_read)) {
+        log_error("writing file failed\n");
+        pthread_rwlock_unlock(&file_ptr->io_lock);
         fuse_reply_err(req, EIO);
         return;
     }
 
-    file_ptr->total_recv += size;
+    file_ptr->total_recv += bytes_read;
 
     fuse_reply_write(req, (int)bytes_read);
 
