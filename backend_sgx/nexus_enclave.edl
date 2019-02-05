@@ -169,13 +169,16 @@ enclave {
         (
             [in, string] char                * filepath_IN,
                          size_t                filesize,
-            [user_check] int                 * xfer_id_out
+            [user_check] int                 * xfer_id_out,
+            [user_check] struct nexus_uuid   * uuid_out
         );
 
         public int ecall_fs_file_decrypt_start
         (
             [in, string] char                * filepath_IN,
-            [user_check] int                 * xfer_id_out
+            [user_check] int                 * xfer_id_out,
+            [user_check] struct nexus_uuid   * uuid_out,
+            [user_check] size_t              * filesize_out
         );
 
         public int ecall_fs_file_crypto_seek

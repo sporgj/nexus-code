@@ -43,8 +43,10 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
 int
 __nxs_file_crypto_start(char              * filepath_IN,
                         size_t              filesize,
+                        nexus_crypto_mode_t crypto_mode,
                         int               * xfer_id_out,
-                        nexus_crypto_mode_t crypto_mode)
+                        struct nexus_uuid * uuid_out,
+                        size_t            * filesize_out_opt)
 {
     struct nexus_metadata * metadata = NULL;
 
@@ -55,6 +57,7 @@ __nxs_file_crypto_start(char              * filepath_IN,
 
     sgx_spin_lock(&vfs_ops_lock);
 
+    io_mode |= NEXUS_IO_FCRYPTO;
     metadata = nexus_vfs_get(filepath_IN, io_mode);
 
     if (metadata == NULL) {
@@ -79,7 +82,13 @@ __nxs_file_crypto_start(char              * filepath_IN,
     }
 
 
+    if (filesize_out_opt) {
+        *filesize_out_opt = metadata->filenode->filesize;
+    }
+
     *xfer_id_out = xfer_id;
+
+    nexus_uuid_copy(&metadata->uuid, uuid_out);
 
     sgx_spin_unlock(&vfs_ops_lock);
 
@@ -92,15 +101,21 @@ out_err:
 }
 
 int
-ecall_fs_file_encrypt_start(char * filepath_IN, size_t filesize, int * xfer_id_out)
+ecall_fs_file_encrypt_start(char *              filepath_IN,
+                            size_t              filesize,
+                            int *               xfer_id_out,
+                            struct nexus_uuid * uuid_out)
 {
-    return __nxs_file_crypto_start(filepath_IN, filesize, xfer_id_out, NEXUS_ENCRYPT);
+    return __nxs_file_crypto_start(filepath_IN, filesize, NEXUS_ENCRYPT, xfer_id_out, uuid_out, NULL);
 }
 
 int
-ecall_fs_file_decrypt_start(char * filepath_IN, int * xfer_id_out)
+ecall_fs_file_decrypt_start(char *              filepath_IN,
+                            int *               xfer_id_out,
+                            struct nexus_uuid * uuid_out,
+                            size_t *            filesize_out)
 {
-    return __nxs_file_crypto_start(filepath_IN, 0, xfer_id_out, NEXUS_DECRYPT);
+    return __nxs_file_crypto_start(filepath_IN, 0, NEXUS_DECRYPT, xfer_id_out, uuid_out, filesize_out);
 }
 
 

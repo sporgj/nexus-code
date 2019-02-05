@@ -10,6 +10,8 @@
 
 struct sgx_backend;
 
+struct metadata_buf;
+
 
 typedef enum {
     FILE_ENCRYPT = 1,
@@ -25,7 +27,11 @@ struct nexus_file_crypto {
 
     size_t               offset; // current_offset
 
+    size_t               filesize;
+
     char               * filepath;
+
+    struct metadata_buf * metadata_buf;
 
     struct sgx_backend * sgx_backend;
 };
@@ -76,7 +82,9 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 
 struct nexus_file_crypto *
 io_file_crypto_start(int                  trusted_xfer_id,
+                     struct nexus_uuid  * uuid,
                      file_crypto_mode     mode,
+                     size_t               filesize,
                      char               * filepath,
                      struct sgx_backend * sgx_backend);
 
@@ -84,10 +92,12 @@ int
 io_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset);
 
 int
-io_file_crypto_update(struct nexus_file_crypto * file_crypto,
-                      const uint8_t            * input,
-                      uint8_t                  * output,
-                      size_t                     nbytes);
+io_file_crypto_read(struct nexus_file_crypto * file_crypto, uint8_t * output_buffer, size_t nbytes);
+
+int
+io_file_crypto_write(struct nexus_file_crypto  * file_crypto,
+                     const uint8_t             * input_buffer,
+                     size_t                      nbytes);
 
 int
 io_file_crypto_finish(struct nexus_file_crypto * file_crypto);

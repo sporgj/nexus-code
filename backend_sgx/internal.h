@@ -175,11 +175,17 @@ int
 sgx_backend_fs_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset);
 
 int
-sgx_backend_fs_file_crypto_update(struct nexus_file_crypto * file_crypto,
-                                  const uint8_t            * input,
-                                  uint8_t                  * output,
-                                  size_t                     size,
-                                  size_t                   * processed_bytes);
+sgx_backend_fs_file_crypto_encrypt(struct nexus_file_crypto * file_crypto,
+                                   const uint8_t            * plaintext_input,
+                                   uint8_t                  * encrypted_output,
+                                   size_t                     size,
+                                   size_t                   * processed_bytes);
+
+int
+sgx_backend_fs_file_crypto_decrypt(struct nexus_file_crypto * file_crypto,
+                                   uint8_t                  * decrypted_output,
+                                   size_t                     size,
+                                   size_t                   * processed_bytes);
 
 int
 sgx_backend_fs_file_crypto_finish(struct nexus_file_crypto * file_crypto);

@@ -123,6 +123,9 @@ nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_
 int
 nexus_metadata_store(struct nexus_metadata * metadata);
 
+int
+nexus_metadata_lock(struct nexus_metadata * metadata, nexus_io_flags_t flags);
+
 /**
  * Unlocks a locked metadata file
  */

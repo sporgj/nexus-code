@@ -22,7 +22,10 @@ typedef enum {
     NEXUS_FRDWR          = NEXUS_FREAD | NEXUS_FWRITE,
 
     NEXUS_FCREATE        = 0x00000004,
-    NEXUS_FDELETE        = 0x00000008
+    NEXUS_FDELETE        = 0x00000008,
+
+    NEXUS_IO_FNODE       = 0x00000010,
+    NEXUS_IO_FCRYPTO     = 0x00000020,
 } nexus_io_flags_t;
 
 

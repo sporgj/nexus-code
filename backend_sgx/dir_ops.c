@@ -137,7 +137,6 @@ sgx_backend_fs_readdir(struct nexus_volume  * volume,
     sgx_backend = (struct sgx_backend *)priv_data;
 
 
-    // TODO add ECALL_READDIR
     err = ecall_fs_readdir(sgx_backend->enclave_id,
                            &ret,
                            dirpath,

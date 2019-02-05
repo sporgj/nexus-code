@@ -131,7 +131,8 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .fs_file_encrypt_start = sgx_backend_fs_file_encrypt_start,
     .fs_file_decrypt_start = sgx_backend_fs_file_decrypt_start,
     .fs_file_crypto_seek   = sgx_backend_fs_file_crypto_seek,
-    .fs_file_crypto_update = sgx_backend_fs_file_crypto_update,
+    .fs_file_crypto_decrypt = sgx_backend_fs_file_crypto_decrypt,
+    .fs_file_crypto_encrypt = sgx_backend_fs_file_crypto_encrypt,
     .fs_file_crypto_finish = sgx_backend_fs_file_crypto_finish,
 
     .user_list       = sgx_backend_user_list,
