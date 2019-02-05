@@ -44,7 +44,10 @@ typedef enum {
     NEXUS_FRDWR          = NEXUS_FREAD | NEXUS_FWRITE,
 
     NEXUS_FCREATE        = 0x00000004,
-    NEXUS_FDELETE        = 0x00000008
+    NEXUS_FDELETE        = 0x00000008,
+
+    NEXUS_IO_FNODE       = 0x00000010,
+    NEXUS_IO_FCRYPTO     = 0x00000020,
 } nexus_io_flags_t;
 
 
@@ -81,21 +84,6 @@ struct nexus_stat {
 
 // this will be implemented by the backend
 struct nexus_file_xfer;
-
-
-// this is derived from fuse_lowlevel.h
-// https://github.com/libfuse/libfuse/blob/master/include/fuse_lowlevel.h
-typedef enum {
-    NEXUS_FS_ATTR_MODE      = (1 << 0),
-    NEXUS_FS_ATTR_UID       = (1 << 1),
-    NEXUS_FS_ATTR_GID       = (1 << 2),
-    NEXUS_FS_ATTR_SIZE      = (1 << 3),
-    NEXUS_FS_ATTR_ATIME     = (1 << 4),
-    NEXUS_FS_ATTR_MTIME     = (1 << 5),
-    NEXUS_FS_ATTR_ATIME_NOW = (1 << 7),
-    NEXUS_FS_ATTR_MTIME_NOW = (1 << 8),
-    NEXUS_FS_ATTR_CTIME     = (1 << 10)
-} nexus_fs_attr_flags_t;
 
 
 struct nexus_fs_lookup {
@@ -150,12 +138,6 @@ nexus_fs_lookup(struct nexus_volume    * volume,
                 char                   * parent_dir,
                 char                   * plain_name,
                 struct nexus_fs_lookup * lookup_info);
-
-int
-nexus_fs_setattr(struct nexus_volume   * volume,
-                 char                  * path,
-                 struct nexus_fs_attr  * attrs,
-                 nexus_fs_attr_flags_t   flags);
 
 
 int
@@ -241,19 +223,26 @@ int
 nexus_fs_file_crypto_seek(struct nexus_volume * volume, struct nexus_file_crypto * file_crypto, size_t offset);
 
 /**
- * Used for encrypting/decrypting data. Note that the offset is shifted by the amount
+ * Used for encrypting data. Note that the offset is shifted by the amount
  * of processed data.
  *
  * Returns -1 on FAILURE
  */
 int
-nexus_fs_file_crypto_update(struct nexus_volume      * volume,
-                            struct nexus_file_crypto * file_crypto,
-                            const uint8_t            * input,
-                            uint8_t                  * output,
-                            size_t                     size,
-                            size_t                   * processed_bytes);
+nexus_fs_file_crypto_encrypt(struct nexus_volume      * volume,
+                             struct nexus_file_crypto * file_crypto,
+                             const uint8_t            * plaintext_input,
+                             uint8_t                  * encrypted_input,
+                             size_t                     size,
+                             size_t                   * processed_bytes);
 
+// @see nexus_fs_file_crypto_encrypt
+int
+nexus_fs_file_crypto_decrypt(struct nexus_volume      * volume,
+                             struct nexus_file_crypto * file_crypto,
+                             uint8_t                  * decrypted_output,
+                             size_t                     size,
+                             size_t                   * processed_bytes);
 /**
  * Terminates the crypto process and writes out the filenode metadata.
  */

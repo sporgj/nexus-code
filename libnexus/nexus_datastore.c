@@ -291,17 +291,40 @@ nexus_datastore_getattr(struct nexus_datastore * datastore,
 }
 
 int
-nexus_datastore_setattr(struct nexus_datastore  * datastore,
-                        struct nexus_uuid       * uuid,
-                        struct nexus_fs_attr    * attrs,
-                        nexus_fs_attr_flags_t     flags)
+nexus_datastore_set_mode(struct nexus_datastore * datastore, struct nexus_uuid * uuid, mode_t mode)
 {
-    if (datastore->impl->setattr == NULL) {
-        log_error("setattr NOT Implemented for %s datastore\n", datastore->impl->name);
+    if (datastore->impl->set_mode == NULL) {
+        log_error("set_mode NOT Implemented for %s datastore\n", datastore->impl->name);
         return -1;
     }
 
-    return datastore->impl->setattr(uuid, attrs, flags, datastore->priv_data);
+    return datastore->impl->set_mode(uuid, mode, datastore->priv_data);
+}
+
+int
+nexus_datastore_truncate(struct nexus_datastore * datastore, struct nexus_uuid * uuid, size_t size)
+{
+    if (datastore->impl->truncate == NULL) {
+        log_error("truncate NOT Implemented for %s datastore\n", datastore->impl->name);
+        return -1;
+    }
+
+    return datastore->impl->truncate(uuid, size, datastore->priv_data);
+}
+
+int
+nexus_datastore_set_times(struct nexus_datastore  * datastore,
+                          struct nexus_uuid       * uuid,
+                          size_t                    access_time,
+                          size_t                    mod_time)
+{
+    if (datastore->impl->set_times == NULL) {
+        log_error("set_times NOT Implemented for %s datastore\n", datastore->impl->name);
+        return -1;
+    }
+
+    return datastore->impl->set_times(uuid, access_time, mod_time, datastore->priv_data);
+
 }
 
 int

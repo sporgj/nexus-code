@@ -113,10 +113,16 @@ nexus_datastore_getattr(struct nexus_datastore * datastore,
                         struct nexus_fs_attr   * attrs);
 
 int
-nexus_datastore_setattr(struct nexus_datastore  * datastore,
-                        struct nexus_uuid       * uuid,
-                        struct nexus_fs_attr    * attrs,
-                        nexus_fs_attr_flags_t     flags);
+nexus_datastore_set_mode(struct nexus_datastore * datastore, struct nexus_uuid * uuid, mode_t mode);
+
+int
+nexus_datastore_truncate(struct nexus_datastore * datastore, struct nexus_uuid * uuid, size_t size);
+
+int
+nexus_datastore_set_times(struct nexus_datastore  * datastore,
+                          struct nexus_uuid       * uuid,
+                          size_t                    access_time,
+                          size_t                    mod_time);
 
 int
 nexus_datastore_new_uuid(struct nexus_datastore      * datastore,
@@ -193,6 +199,15 @@ struct nexus_datastore_impl {
                    struct nexus_fs_attr  * attrs,
                    nexus_fs_attr_flags_t   flags,
                    void                  * priv_data);
+
+    int (*set_mode)(struct nexus_uuid * uuid, mode_t mode, void * priv_data);
+
+    int (*truncate)(struct nexus_uuid * uuid, size_t size, void * priv_data);
+
+    int (*set_times)(struct nexus_uuid * uuid,
+                     size_t              access_time,
+                     size_t              mod_time,
+                     void              * priv_data);
 
     /**
      * Gets uuid content
@@ -324,11 +339,10 @@ struct nexus_datastore_impl {
 };
 
 
-#define nexus_register_datastore(datastore)				\
-    static struct nexus_datastore_impl * _nexus_datastore		\
-    __attribute__((used))						\
-         __attribute__((unused, __section__("_nexus_datastores"),	\
-                        aligned(sizeof(void *))))			\
-         = &datastore;
 
+
+#define nexus_register_datastore(datastore)                                                        \
+    static struct nexus_datastore_impl * _nexus_datastore __attribute__((used))                    \
+        __attribute__((unused, __section__("_nexus_datastores"), aligned(sizeof(void *))))         \
+        = &datastore;
 

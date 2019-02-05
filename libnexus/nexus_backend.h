@@ -108,12 +108,6 @@ struct nexus_backend_impl {
                      struct nexus_stat    * nexus_stat,
                      void                 * priv_data);
 
-    int (*fs_setattr)(struct nexus_volume   * volume,
-                      char                  * path,
-                      struct nexus_fs_attr  * attrs,
-                      nexus_fs_attr_flags_t   flags,
-                      void                  * priv_data);
-
     int (*fs_filldir)(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * nexus_name,
@@ -160,6 +154,13 @@ struct nexus_backend_impl {
                      bool                    * should_remove,
                      void                    * priv_data);
 
+
+    int (*fs_truncate)(struct nexus_volume   * volume,
+                       char                  * path,
+                       struct nexus_uuid     * uuid,
+                       size_t                  size,
+                       void                  * priv_data);
+
     int (*fs_encrypt)(struct nexus_volume * volume,
                       char                * path,
                       uint8_t             * in_buf,
@@ -187,11 +188,16 @@ struct nexus_backend_impl {
 
     int (*fs_file_crypto_seek)(struct nexus_file_crypto * file_crypto, size_t offset);
 
-    int (*fs_file_crypto_update)(struct nexus_file_crypto * file_crypto,
-                                 const uint8_t            * input,
-                                 uint8_t                  * output,
-                                 size_t                     size,
-                                 size_t                   * processed_bytes);
+    int (*fs_file_crypto_encrypt)(struct nexus_file_crypto * file_crypto,
+                                  const uint8_t            * plaintext_input,
+                                  uint8_t                  * encrypted_output,
+                                  size_t                     size,
+                                  size_t                   * processed_bytes);
+
+    int (*fs_file_crypto_decrypt)(struct nexus_file_crypto * file_crypto,
+                                  uint8_t                  * decrypted_output,
+                                  size_t                     size,
+                                  size_t                   * processed_bytes);
 
     int (*fs_file_crypto_finish)(struct nexus_file_crypto * file_crypto);
 
