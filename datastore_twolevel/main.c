@@ -639,19 +639,13 @@ twolevel_getattr(struct nexus_uuid * uuid, struct nexus_fs_attr * attrs, void * 
 }
 
 static int
-twolevel_setattr(struct nexus_uuid     * uuid,
-                 struct nexus_fs_attr  * attrs,
-                 nexus_fs_attr_flags_t   flags,
-                 void                  * priv_data)
+twolevel_setmode(struct nexus_uuid * uuid, mode_t mode, void * priv_data)
 {
     struct twolevel_datastore * datastore = priv_data;
-    struct stat               * new_stat  = &attrs->posix_stat;
-
-    struct stat   old_stat;
 
     char * filepath = __get_full_path(datastore, uuid);
 
-    int ret = 0;
+    mode_t real_mode = mode & NEXUS_POSIX_EXEC_MODE;
 
 
     if (filepath == NULL) {
@@ -659,57 +653,75 @@ twolevel_setattr(struct nexus_uuid     * uuid,
         return -1;
     }
 
-    if (stat(filepath, &old_stat)) {
-        log_error("could not stat file (%s)\n", filepath);
+    if (real_mode && chmod(filepath, real_mode | NEXUS_POSIX_OPEN_MODE)) {
+        log_error("could not update the mode\n");
         nexus_free(filepath);
         return -1;
     }
 
-    if (flags & (NEXUS_FS_ATTR_MODE)) {
-        // we only take the execute bits
-        mode_t real_mode = new_stat->st_mode & NEXUS_POSIX_EXEC_MODE;
+    nexus_free(filepath);
 
-        if (real_mode && chmod(filepath, real_mode | NEXUS_POSIX_OPEN_MODE)) {
-            log_error("could not update the mode\n");
-            nexus_free(filepath);
-            return -1;
-        }
+    return 0;
+}
 
-        old_stat.st_mode = new_stat->st_mode;
+static int
+twolevel_truncate(struct nexus_uuid * uuid, size_t size, void * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    char * filepath = __get_full_path(datastore, uuid);
+
+
+    if (filepath == NULL) {
+        log_error("could not get fullpath\n");
+        return -1;
     }
 
-
-    // update the new stat accordingly
-    if (flags & (NEXUS_FS_ATTR_ATIME | NEXUS_FS_ATTR_MTIME)) {
-        struct utimbuf file_time;
-
-        if (flags & NEXUS_FS_ATTR_ATIME) {
-            file_time.actime = old_stat.st_atime = new_stat->st_atime;
-        }
-
-        if (flags & NEXUS_FS_ATTR_MTIME) {
-            file_time.modtime = old_stat.st_mtime = new_stat->st_mtime;
-        }
-
-        ret = utime(filepath, &file_time);
+    if (truncate(filepath, size)) {
+        log_error("truncate on file (%s) FAILED\n", filepath);
+        nexus_free(filepath);
+        return -1;
     }
-
-    // we need to truncate
-    if (flags & NEXUS_FS_ATTR_SIZE) {
-        old_stat.st_size = new_stat->st_size;
-
-        ret = truncate(filepath, new_stat->st_size);
-    }
-
 
     nexus_free(filepath);
 
-    if (ret == 0) {
-        memcpy(new_stat, &old_stat, sizeof(struct stat));
-        return 0;
+    return 0;
+}
+
+
+static int
+twolevel_settimes(struct nexus_uuid * uuid, size_t access_time, size_t mod_time, void * priv_data)
+{
+    struct twolevel_datastore * datastore = priv_data;
+
+    struct utimbuf file_time = { 0 };
+
+    char * filepath = __get_full_path(datastore, uuid);
+
+
+    if (filepath == NULL) {
+        log_error("could not get fullpath\n");
+        return -1;
     }
 
-    return ret;
+    if (access_time) {
+        file_time.actime = access_time;
+    }
+
+    if (mod_time) {
+        file_time.modtime = mod_time;
+    }
+
+
+    if (utime(filepath, &file_time)) {
+        log_error("utime(%s) FAILED\n", filepath);
+        nexus_free(filepath);
+        return -1;
+    }
+
+    nexus_free(filepath);
+
+    return 0;
 }
 
 
@@ -727,7 +739,10 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .update_uuid   = twolevel_update_uuid, // TODO remove
 
     .getattr       = twolevel_getattr,
-    .setattr       = twolevel_setattr,
+
+    .set_mode      = twolevel_setmode,
+    .truncate      = twolevel_truncate,
+    .set_times     = twolevel_settimes,
 
     .stat_uuid     = twolevel_stat_uuid,
     .new_uuid      = twolevel_new_uuid,
