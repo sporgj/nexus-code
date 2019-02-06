@@ -95,7 +95,15 @@ print_stat_info(const char * path, struct nexus_stat * nexus_stat)
         nexus_name = nexus_uuid_to_hex(&nexus_stat->uuid);
     }
 
-    printf(" %s -> [%s] %s\n", path, file_type, nexus_name);
+    printf(" %s -> [%s] %s", path, file_type, nexus_name);
+
+    if (nexus_stat->type == NEXUS_REG) {
+        printf(". filesize=%zu", nexus_stat->filesize);
+    } else if (nexus_stat->type == NEXUS_DIR) {
+        printf(". dirsize=%zu", nexus_stat->filesize);
+    }
+
+    printf("\n");
 
     nexus_free(nexus_name);
 }
@@ -499,20 +507,15 @@ out_err:
 int
 __fs_truncate(struct nexus_volume * vol, char * filepath, size_t filesize)
 {
-    nexus_fs_attr_flags_t flags = NEXUS_FS_ATTR_SIZE;
+    struct nexus_stat nexus_stat;
 
-    struct nexus_fs_attr attrs = { 0 };
-
-
-    attrs.posix_stat.st_size = filesize;
-
-    if (nexus_fs_setattr(vol, filepath, &attrs, flags)) {
+    if (nexus_fs_truncate(vol, filepath, filesize, &nexus_stat)) {
         log_error("nexus_fs_setattr FAILED\n");
         return -1;
     }
 
     {
-        char * nexus_name = nexus_uuid_to_hex(&attrs.stat_info.uuid);
+        char * nexus_name = nexus_uuid_to_hex(&nexus_stat.uuid);
 
         printf(".truncate %s -> %s [size = %zu]\n", filepath, nexus_name, filesize);
 
