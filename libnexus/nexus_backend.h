@@ -157,27 +157,9 @@ struct nexus_backend_impl {
 
     int (*fs_truncate)(struct nexus_volume   * volume,
                        char                  * path,
-                       struct nexus_uuid     * uuid,
                        size_t                  size,
+                       struct nexus_stat     * stat,
                        void                  * priv_data);
-
-    int (*fs_encrypt)(struct nexus_volume * volume,
-                      char                * path,
-                      uint8_t             * in_buf,
-                      uint8_t             * out_buf,
-                      size_t                offset,
-                      size_t                size,
-                      size_t                filesize,
-                      void                * priv_data);
-
-    int (*fs_decrypt)(struct nexus_volume * volume,
-                      char                * path,
-                      uint8_t             * in_buf,
-                      uint8_t             * out_buf,
-                      size_t                offset,
-                      size_t                size,
-                      size_t                filesize,
-                      void                * priv_data);
 
 
     struct nexus_file_crypto *

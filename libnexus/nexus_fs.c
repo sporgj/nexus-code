@@ -66,23 +66,6 @@ nexus_fs_lookup(struct nexus_volume    * volume,
 }
 
 int
-nexus_fs_setattr(struct nexus_volume   * volume,
-                 char                  * path,
-                 struct nexus_fs_attr  * attrs,
-                 nexus_fs_attr_flags_t   flags)
-{
-    struct nexus_backend * backend = volume->backend;
-
-    if (backend->impl->fs_setattr == NULL) {
-        log_error("fs_setattr NOT Implemented for %s backend\n", backend->impl->name);
-        return -1;
-    }
-
-    return backend->impl->fs_setattr(volume, path, attrs, flags, backend->priv_data);
-}
-
-
-int
 nexus_fs_stat(struct nexus_volume  * volume,
               char                 * path,
               nexus_stat_flags_t     stat_flags,
@@ -225,6 +208,23 @@ nexus_fs_rename(struct nexus_volume     * volume,
                                     overriden_entry,
                                     should_remove,
                                     backend->priv_data);
+}
+
+
+int
+nexus_fs_truncate(struct nexus_volume * volume,
+                  char                * filepath,
+                  size_t                size,
+                  struct nexus_stat   * stat)
+{
+    struct nexus_backend * backend = volume->backend;
+
+    if (backend->impl->fs_truncate == NULL) {
+        log_error("fs_truncate NOT Implemented for %s backend\n", backend->impl->name);
+        return -1;
+    }
+
+    return backend->impl->fs_truncate(volume, filepath, size, stat, backend->priv_data);
 }
 
 

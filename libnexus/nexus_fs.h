@@ -1,4 +1,4 @@
-/* 
+/**
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -192,7 +192,11 @@ nexus_fs_rename(struct nexus_volume     * volume,
                 struct nexus_fs_lookup  * overriden_entry,
                 bool                    * should_remove);
 
-
+int
+nexus_fs_truncate(struct nexus_volume * volume,
+                  char                * filepath,
+                  size_t                size,
+                  struct nexus_stat   * stat);
 
 // this contains the file interface for performing crypto
 
