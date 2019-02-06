@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <utime.h>
 #include <limits.h>
 
@@ -694,7 +695,7 @@ twolevel_settimes(struct nexus_uuid * uuid, size_t access_time, size_t mod_time,
 {
     struct twolevel_datastore * datastore = priv_data;
 
-    struct utimbuf file_time = { 0 };
+    struct timeval file_time[2];
 
     char * filepath = __get_full_path(datastore, uuid);
 
@@ -704,16 +705,23 @@ twolevel_settimes(struct nexus_uuid * uuid, size_t access_time, size_t mod_time,
         return -1;
     }
 
+    file_time[0].tv_sec  = 0;
+    file_time[1].tv_sec  = 0;
+    file_time[0].tv_usec = UTIME_OMIT;
+    file_time[1].tv_usec = UTIME_OMIT;
+
     if (access_time) {
-        file_time.actime = access_time;
+        file_time[0].tv_sec  = access_time;
+        file_time[0].tv_usec = 0;
     }
 
     if (mod_time) {
-        file_time.modtime = mod_time;
+        file_time[1].tv_sec  = mod_time;
+        file_time[1].tv_usec = 0;
     }
 
 
-    if (utime(filepath, &file_time)) {
+    if (utimes(filepath, file_time)) {
         log_error("utime(%s) FAILED\n", filepath);
         nexus_free(filepath);
         return -1;
