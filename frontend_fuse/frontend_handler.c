@@ -90,6 +90,9 @@ __derive_stat_info(struct stat *         posix_stat,
     posix_stat->st_mode &= ~(S_IFREG | S_IFDIR);
     posix_stat->st_mode |= nexus_fs_sys_mode_from_type(dentry->type);
 
+    posix_stat->st_uid = current_user_id;
+    posix_stat->st_gid = current_user_id;
+
     posix_stat->st_ino = dentry->inode->ino;
 }
 
@@ -103,10 +106,8 @@ __datastore_getattr(struct my_dentry *     dentry,
     // stat the datastores
     switch (dentry->type) {
     case NEXUS_DIR:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
-        break;
     case NEXUS_REG:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->data_store, uuid, attrs);
+        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
         break;
     case NEXUS_LNK:
         // we will just return stat information about its parent
@@ -121,14 +122,26 @@ __datastore_getattr(struct my_dentry *     dentry,
 int
 nexus_fuse_stat_inode(struct my_dentry * dentry, struct my_inode * inode)
 {
-    struct nexus_fs_attr * attrs = &inode->attrs;
+    struct nexus_fs_attr attrs;
 
-    if (__datastore_getattr(dentry, &inode->uuid, attrs)) {
+    struct stat * inode_posix_stat = &inode->attrs.posix_stat;
+
+    if (__datastore_getattr(dentry, &inode->uuid, &attrs)) {
         log_error("__datastore_getattr() FAILED\n");
         return -1;
     }
 
-    inode->attrs.posix_stat.st_ino = inode->ino;
+    inode_posix_stat->st_mode  = (attrs.posix_stat.st_mode & ~(S_IFREG | S_IFDIR));
+    inode_posix_stat->st_mode |= nexus_fs_sys_mode_from_type(dentry->type);
+
+    inode_posix_stat->st_uid = current_user_id;
+    inode_posix_stat->st_gid = current_user_id;
+
+    inode_posix_stat->st_ino = inode->ino;
+
+    inode_posix_stat->st_atime = attrs.posix_stat.st_atime;
+    inode_posix_stat->st_mtime = attrs.posix_stat.st_mtime;
+    inode_posix_stat->st_ctime = attrs.posix_stat.st_ctime;
 
     return 0;
 }
@@ -216,48 +229,62 @@ out:
 
 
 int
-nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int to_set)
+nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int flags)
 {
-    struct nexus_stat * stat_info = &attrs->stat_info;
+    struct nexus_uuid * uuid = &dentry->inode->uuid;
 
-    nexus_fs_attr_flags_t flags = to_set; // the to_set flags and nexus flags are the same
+    struct nexus_stat * stat_info = &dentry->inode->attrs.stat_info;
+
+    struct stat * old_stat = &dentry->inode->attrs.posix_stat;
+    struct stat * new_stat = &attrs->posix_stat;
 
     char * path = dentry_get_fullpath(dentry);
-
-    int ret = -1;
 
 
     if (path == NULL) {
         return -1;
     }
 
-    if (nexus_fs_setattr(nexus_fuse_volume, path, attrs, flags)) {
-        log_error("could not stat backend (filepath=%s)\n", path);
-        nexus_free(path);
-        return -1;
+    if (flags & FUSE_SET_ATTR_SIZE) {
+        if (nexus_fs_truncate(nexus_fuse_volume, path, new_stat->st_size, stat_info)) {
+            log_error("could not stat backend (filepath=%s)\n", path);
+            nexus_free(path);
+            return -1;
+        }
+    } else if (flags & FUSE_SET_ATTR_MODE) {
+        if (nexus_datastore_set_mode(nexus_fuse_volume->metadata_store, uuid, new_stat->st_mode)) {
+            log_error("nexus_datastore_set_mode() FAILED\n");
+            goto out_err;
+        }
+
+        old_stat->st_atime = new_stat->st_atime;
+    } else if ((flags & FUSE_SET_ATTR_ATIME) || (flags & FUSE_SET_ATTR_MTIME)) {
+        size_t atime = (flags & FUSE_SET_ATTR_ATIME) ? new_stat->st_atime : 0;
+        size_t mtime = (flags & FUSE_SET_ATTR_MTIME) ? new_stat->st_mtime : 0;
+
+        if (nexus_datastore_set_times(nexus_fuse_volume->metadata_store, uuid, atime, mtime)) {
+            log_error("nexus_datastore_set_times() FAILED\n");
+            goto out_err;
+        }
+
+        if (flags & FUSE_SET_ATTR_ATIME) {
+            old_stat->st_atime = new_stat->st_atime;
+        }
+
+        if (flags & FUSE_SET_ATTR_MTIME) {
+            old_stat->st_mtime = new_stat->st_mtime;
+        }
     }
 
-    // XXX: need to revise this at a future time
-    // there's no need to split this away from the backend (nexus_fs_setattr). but I want to try this for now
-    if (dentry->type == NEXUS_REG) {
-        ret = nexus_datastore_setattr(
-            nexus_fuse_volume->data_store, &stat_info->uuid, attrs, flags);
-    } else if (dentry->type == NEXUS_DIR) {
-        ret = nexus_datastore_setattr(
-            nexus_fuse_volume->metadata_store, &stat_info->uuid, attrs, flags);
-    }
-
-    if (ret) {
-        log_error("nexus_datastore_setattr FAILED\n");
-        nexus_free(path);
-        return -1;
-    }
-
-    __derive_stat_info(&attrs->posix_stat, stat_info, dentry);
+    __derive_stat_info(new_stat, stat_info, dentry);
 
     nexus_free(path);
 
     return 0;
+
+out_err:
+    nexus_free(path);
+    return -1;
 }
 
 int
@@ -304,13 +331,10 @@ nexus_fuse_create(struct my_dentry  * dentry,
         return -1;
     }
 
-    if (type == NEXUS_REG) {
-        if (nexus_datastore_touch_uuid(nexus_fuse_volume->data_store,
-                                       &nexus_stat->uuid,
-                                       mode,
-                                       NULL)) {
+    if (type == NEXUS_REG && (mode & NEXUS_POSIX_EXEC_MODE)) {
+        if (nexus_datastore_set_mode(nexus_fuse_volume->metadata_store, &nexus_stat->uuid, mode)) {
+            log_error("nexus_datastore_set_mode() FAILED\n");
             nexus_free(parent_dirpath);
-            log_error("could not create datastore file\n");
             return -1;
         }
     }
@@ -327,27 +351,22 @@ int
 nexus_fuse_remove(struct my_dentry * dentry, char * filename, fuse_ino_t * ino)
 {
     struct nexus_fs_lookup lookup_info;
-    char * parent_dirpath = dentry_get_fullpath(dentry);
+    char * dirpath = dentry_get_fullpath(dentry);
 
     bool should_remove = true;
 
-    if (parent_dirpath == NULL) {
+    if (dirpath == NULL) {
         return -1;
     }
 
-    if (nexus_fs_remove(
-            nexus_fuse_volume, parent_dirpath, filename, &lookup_info, &should_remove)) {
-        nexus_free(parent_dirpath);
+    if (nexus_fs_remove(nexus_fuse_volume, dirpath, filename, &lookup_info, &should_remove)) {
+        nexus_free(dirpath);
         return -1;
     }
 
     *ino = nexus_uuid_hash(&lookup_info.uuid);
 
-    if (should_remove && lookup_info.type == NEXUS_REG) {
-        nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &lookup_info.uuid, NULL);
-    }
-
-    nexus_free(parent_dirpath);
+    nexus_free(dirpath);
 
     return 0;
 }
@@ -449,14 +468,15 @@ nexus_fuse_rename(struct my_dentry * from_dentry,
                               &entry_uuid,
                               &overwrite_entry,
                               &should_remove);
-
-        if (ret == 0 && should_remove && overwrite_entry.type == NEXUS_REG) {
-            nexus_datastore_del_uuid(nexus_fuse_volume->data_store, &overwrite_entry.uuid, NULL);
-        }
     }
 
-    nexus_free(from_dirpath);
-    nexus_free(to_dirpath);
+    if (from_dirpath) {
+        nexus_free(from_dirpath);
+    }
+
+    if (to_dirpath) {
+        nexus_free(to_dirpath);
+    }
 
     return ret;
 }
@@ -464,26 +484,13 @@ nexus_fuse_rename(struct my_dentry * from_dentry,
 int
 nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
 {
-    struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;
-
     struct my_inode          * inode       = file_ptr->inode;
-
-    struct nexus_file_handle * file_handle = NULL;
 
     struct nexus_file_crypto * file_crypto = NULL;
 
-
-    size_t nbytes = 0;
     size_t size   = 0;
     size_t processed = 0;
 
-
-    file_handle = nexus_datastore_fopen(datastore, &inode->uuid, NULL, NEXUS_FREAD);
-
-    if (file_handle == NULL) {
-        log_error("could not get the file handle from datastore\n");
-        return -1;
-    }
 
     file_crypto = nexus_fs_file_decrypt_start(nexus_fuse_volume, file_ptr->filepath);
 
@@ -493,19 +500,7 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
     }
 
 
-    if (chunk->base) {
-        lseek(file_handle->fd, chunk->base, SEEK_SET);
-    }
-
     size = min(NEXUS_CHUNK_SIZE, inode->filesize - chunk->base);
-
-    nbytes = read(file_handle->fd, chunk->buffer, size);
-
-    if (nbytes != size) {
-        log_error("fetching chunk %zu file='%s' (tried=%zu, got=%zu)\n",
-                  chunk->index, file_handle->filepath, size, nbytes);
-        goto out_err;
-    }
 
     chunk->size = size;
 
@@ -514,13 +509,15 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
         goto out_err;
     }
 
-    if (nexus_fs_file_crypto_update(nexus_fuse_volume,
-                                    file_crypto,
-                                    chunk->buffer,
-                                    chunk->buffer,
-                                    size,
-                                    &processed)) {
-        log_error("nexus_fs_file_crypto_update() FAILED\n");
+    if (nexus_fs_file_crypto_decrypt(nexus_fuse_volume,
+                                     file_crypto,
+                                     chunk->buffer,
+                                     size,
+                                     &processed)) {
+        log_error("nexus_fs_file_crypto_decrypt() FAILED. chunk %zu (size=%zu, processed=%zu)\n",
+                chunk->index,
+                size,
+                processed);
         goto out_err;
     }
 
@@ -532,8 +529,6 @@ nexus_fuse_fetch_chunk(struct my_file * file_ptr, struct file_chunk * chunk)
         goto out_err;
     }
 
-    nexus_datastore_fclose(datastore, file_handle);
-
     return 0;
 
 out_err:
@@ -541,19 +536,13 @@ out_err:
         nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto);
     }
 
-    nexus_datastore_fclose(datastore, file_handle);
-
     return -1;
 }
 
 int
 nexus_fuse_store(struct my_file * file_ptr)
 {
-    struct nexus_datastore   * datastore   = nexus_fuse_volume->data_store;
-
     struct my_inode          * inode       = file_ptr->inode;
-
-    struct nexus_file_handle * file_handle = NULL;
 
     struct nexus_file_crypto * file_crypto = NULL;
 
@@ -564,26 +553,11 @@ nexus_fuse_store(struct my_file * file_ptr)
         return 0;
     }
 
-    file_handle = nexus_datastore_fopen(datastore, &inode->uuid, NULL, NEXUS_FRDWR);
-
-    if (file_handle == NULL) {
-        log_error("could not get file handle from datastore\n");
-        return -1;
-    }
-
 
     file_crypto = nexus_fs_file_encrypt_start(nexus_fuse_volume, file_ptr->filepath, inode->filesize);
 
     if (file_crypto == NULL) {
         log_error("nexus_fs_file_encrypt_start() FAILED\n");
-        goto out_err;
-    }
-
-
-    if (ftruncate(file_handle->fd, inode->filesize)) {
-        log_error("ftruncate FAILED (datafile=%s, size=%zu)\n",
-                  file_handle->filepath,
-                  inode->filesize);
         goto out_err;
     }
 
@@ -602,31 +576,20 @@ nexus_fuse_store(struct my_file * file_ptr)
         pthread_mutex_lock(&__file_crypto_buffer_mutex__);
 
         // TODO handle processed correctly
-        if (nexus_fs_file_crypto_update(nexus_fuse_volume,
-                                        file_crypto,
-                                        chunk->buffer,
-                                        __file_crypto_buffer__,
-                                        size,
-                                        &processed)) {
-            log_error("nexus_fs_file_crypto_update() FAILED\n");
-            goto out_err;
-        }
-
-        lseek(file_handle->fd, chunk->base, SEEK_SET);
-
-        size_t nbytes = write(file_handle->fd, __file_crypto_buffer__, size);
-
-        pthread_mutex_unlock(&__file_crypto_buffer_mutex__);
-
-
-        if (nbytes != size) {
-            log_error("writing chunk %zu (tried=%zu, got=%zu, processed=%zu)\n",
+        if (nexus_fs_file_crypto_encrypt(nexus_fuse_volume,
+                                         file_crypto,
+                                         chunk->buffer,
+                                         __file_crypto_buffer__,
+                                         size,
+                                         &processed)) {
+            log_error("nexus_fs_file_crypto_encrypt() FAILED. chunk %zu (size=%zu, processed=%zu)\n",
                       chunk->index,
                       size,
-                      nbytes,
                       processed);
             goto out_err;
         }
+
+        pthread_mutex_unlock(&__file_crypto_buffer_mutex__);
     }
 
 
@@ -635,13 +598,6 @@ nexus_fuse_store(struct my_file * file_ptr)
         log_error("nexus_fs_file_crypto_finish() FAILED\n");
         goto out_err;
     }
-
-    if (nexus_datastore_fflush(datastore, file_handle)) {
-        log_error("nexus_datastore_fflush() FAILED\n");
-        goto out_err;
-    }
-
-    nexus_datastore_fclose(datastore, file_handle);
 
     inode->on_disk_size  = inode->filesize;
 
@@ -655,8 +611,6 @@ out_err:
     if (file_crypto) {
         nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto);
     }
-
-    nexus_datastore_fclose(datastore, file_handle);
 
     return -1;
 }

@@ -23,7 +23,14 @@ __export_fuse_entry(struct my_dentry        * dentry,
 {
     struct stat * st_dest = &entry_param->attr;
 
-    st_dest->st_mode = nexus_fs_sys_mode_from_type(dentry->type);
+
+    if (nexus_fuse_stat_inode(dentry, inode)) {
+        log_error("nexus_fuse_stat_inode() FAILED\n");
+        return -1;
+    }
+
+
+    memcpy(st_dest, &inode->attrs.posix_stat, sizeof(struct stat));
 
     switch(dentry->type) {
     case NEXUS_DIR:
@@ -33,17 +40,6 @@ __export_fuse_entry(struct my_dentry        * dentry,
         st_dest->st_nlink = 1;
         break;
     }
-
-    // if the inode, is fresh, just grab the attributes there
-    // XXX: there should probably be a timeout
-    if (inode->last_accessed) {
-        memcpy(st_dest, &inode->attrs.posix_stat, sizeof(struct stat));
-    } else if (nexus_fuse_stat_inode(dentry, inode)) {
-        return -1;
-    }
-
-
-    st_dest->st_ino = inode->ino;
 
     if (dentry->type == NEXUS_REG) {
         if (inode->is_dirty) {
@@ -280,15 +276,11 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto exit;
     }
 
-    // if this was not checked for awhile, let's update the stat info
-    // XXX: makes this an expiry date
-    if (!inode->last_accessed) {
-        // this updates last_accessed
-        if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
-            code = ENOENT;
-            log_error("nexus_fuse_getattr() FAILED\n");
-            goto out_err;
-        }
+    // this updates last_accessed
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
+        code = ENOENT;
+        log_error("nexus_fuse_getattr() FAILED\n");
+        goto out_err;
     }
 
     dir_ptr = vfs_dir_alloc(dentry);
@@ -426,8 +418,6 @@ __create_file_or_dir(fuse_req_t               req,
                      nexus_dirent_type_t      type,
                      struct nexus_stat      * nexus_stat)
 {
-    char             * filename = strndup(name, NEXUS_NAME_MAX);
-
     struct my_inode  * inode    = NULL;
 
     struct my_dentry * dentry   = vfs_get_dentry(parent, &inode);
@@ -437,7 +427,7 @@ __create_file_or_dir(fuse_req_t               req,
         return NULL;
     }
 
-    if (nexus_fuse_create(dentry, filename, type, mode, nexus_stat)) {
+    if (nexus_fuse_create(dentry, (char *)name, type, mode, nexus_stat)) {
         inode_put(inode);
         log_error("nexus_fuse_touch (%s/) -> (%s) FAILED\n", dentry->name, name);
         return NULL;
@@ -445,7 +435,7 @@ __create_file_or_dir(fuse_req_t               req,
 
     inode_put(inode);
 
-    return vfs_cache_dentry(dentry, filename, &nexus_stat->uuid, nexus_stat->type);
+    return vfs_cache_dentry(dentry, (char *)name, &nexus_stat->uuid, nexus_stat->type);
 }
 
 static void
@@ -486,8 +476,8 @@ nxs_fuse_create(
         return;
     }
 
-    inode_get(new_inode);
-    inode_incr_lookup(new_dentry->inode, 1);
+    new_inode = inode_get(new_dentry->inode);
+    inode_incr_lookup(new_inode, 1);
     inode_put(new_inode);
 
     fi->fh = (uintptr_t)file_ptr;
@@ -545,15 +535,11 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    // if this was not checked for awhile, let's update the stat info
-    // XXX: makes this an expiry date
-    if (!inode->last_accessed) {
-        // this updates last_accessed
-        if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
-            code = ENOENT;
-            log_error("nexus_fuse_getattr() FAILED\n");
-            goto out_err;
-        }
+    // this updates last_accessed
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
+        code = ENOENT;
+        log_error("nexus_fuse_getattr() FAILED\n");
+        goto out_err;
     }
 
     if (!inode_is_file(inode) && !(fi->flags & O_CREAT)) {

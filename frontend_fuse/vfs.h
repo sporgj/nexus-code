@@ -133,6 +133,9 @@ struct my_dir {
 };
 
 
+extern uid_t current_user_id;
+
+
 int
 vfs_init();
 

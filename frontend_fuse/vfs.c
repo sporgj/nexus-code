@@ -20,6 +20,9 @@ static struct my_inode        * root_inode       = NULL;
 static int                      vfs_file_counter = 0;
 
 
+uid_t current_user_id;
+
+
 static struct my_inode *
 __icache_alloc(fuse_ino_t ino, struct nexus_uuid * uuid);
 
@@ -54,6 +57,8 @@ vfs_init()
     root_inode->lookup_count = 1;
 
     dentry_instantiate(root_dentry, root_inode);
+
+    current_user_id = getuid();
 
     return 0;
 }

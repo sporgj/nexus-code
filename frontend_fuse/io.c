@@ -153,13 +153,14 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
 {
     struct file_chunk * chunk = NULL;
 
-    if (offset >= file_ptr->inode->filesize && !(file_ptr->flags & O_WRONLY)) {
+    if (offset >= file_ptr->inode->filesize && !(file_ptr->flags & O_RDWR)) {
         log_error("trying to read past file size (path=%s, filesize=%zu, offset=%zu)\n",
                   file_ptr->filepath,
                   file_ptr->inode->filesize,
                   offset);
         return NULL;
     }
+
 
     chunk = __file_try_add_chunk(file_ptr, offset);
 
@@ -228,8 +229,9 @@ file_read_dataptr(struct my_file * file_ptr, size_t offset, size_t len, size_t *
     struct file_chunk * chunk = NULL;
 
     if (file_ptr->inode->filesize == 0) {
+        static uint8_t tmp_buffer = 0;
         *readable_bytes = 0;
-        return 0;
+        return &tmp_buffer;
     }
 
     chunk = __file_load_chunk(file_ptr, offset);
