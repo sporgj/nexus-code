@@ -4,12 +4,11 @@ int
 ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
 {
     struct nexus_metadata * metadata = NULL;
-    struct nexus_filenode * filenode = NULL;
 
 
     sgx_spin_lock(&vfs_ops_lock);
 
-    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR | NEXUS_IO_FCRYPTO | NEXUS_IO_FNODE);
 
     if (metadata == NULL) {
         log_error("could not get metadata (%s)\n", filepath_IN);
@@ -18,10 +17,8 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
     }
 
 
-    filenode = metadata->filenode;
-
     // TODO check access control
-    filenode_set_filesize(filenode, size);
+    filenode_set_filesize(metadata->filenode, size);
 
     if (nexus_metadata_store(metadata)) {
         nexus_vfs_put(metadata);

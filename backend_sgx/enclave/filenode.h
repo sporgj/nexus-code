@@ -24,6 +24,7 @@ struct nexus_filenode {
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
 
+    size_t                     encrypted_length;
 
     size_t                     link_count;
 
@@ -82,6 +83,9 @@ filenode_free(struct nexus_filenode * filenode);
  */
 int
 filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize);
+
+void
+filenode_update_encrypted_pos(struct nexus_filenode * filenode, size_t encrypted_pos);
 
 /**
  * Gets the chunk at the particular offset in the file

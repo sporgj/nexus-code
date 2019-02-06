@@ -101,12 +101,6 @@ sgx_backend_fs_lookup(struct nexus_volume    * volume,
                       struct nexus_fs_lookup * lookup_info,
                       void                   * priv_data);
 int
-sgx_backend_fs_setattr(struct nexus_volume   * volume,
-                       char                  * path,
-                       struct nexus_fs_attr  * attrs,
-                       nexus_fs_attr_flags_t   flags,
-                       void                  * priv_data);
-int
 sgx_backend_fs_stat(struct nexus_volume * volume,
                     char                * dirpath,
                     nexus_stat_flags_t    stat_flags,
@@ -190,6 +184,13 @@ sgx_backend_fs_file_crypto_decrypt(struct nexus_file_crypto * file_crypto,
 int
 sgx_backend_fs_file_crypto_finish(struct nexus_file_crypto * file_crypto);
 
+
+int
+sgx_backend_fs_truncate(struct nexus_volume * volume,
+                        char                * filepath,
+                        size_t                filesize,
+                        struct nexus_stat   * stat,
+                        void                * priv_data);
 
 
 // --------------------

@@ -185,7 +185,13 @@ __flush_data_buffer(struct data_xfer_context * xfer_context)
 
     if (xfer_context->mode == NEXUS_ENCRYPT) {
         nexus_data_buf_flush(xfer_context->data_buffer, &crypto_ctx->mac);
-    } else {
+
+        filenode_update_encrypted_pos(xfer_context->filenode, xfer_context->offset);
+    } else if (xfer_context->offset < xfer_context->filenode->encrypted_length) {
+        // FIXME: When a file gets truncated, we only shorten the file without re-encrypting its
+        // now shortened content (new mac). So, until we change this procedure, we shall just
+        // skip verification of last chunks. FIX IT SOON !!!
+        //
         // DECRYPT
         struct nexus_mac computed_mac;
 
@@ -238,6 +244,7 @@ file_crypto_update(int       xfer_id,
     *processed_bytes = nbytes;
 
     xfer_context->chunk_left -= nbytes;
+    xfer_context->offset     += nbytes;
 
     // if there is no chunk left, let's close this data buffer
     if ((xfer_context->chunk_left == 0) && __flush_data_buffer(xfer_context)) {

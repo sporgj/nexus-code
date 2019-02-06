@@ -75,6 +75,9 @@ int
 io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 
 
+int
+io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend * sgx_backend);
+
 
 // ------------------------
 //  file crypto operations
@@ -101,3 +104,4 @@ io_file_crypto_write(struct nexus_file_crypto  * file_crypto,
 
 int
 io_file_crypto_finish(struct nexus_file_crypto * file_crypto);
+

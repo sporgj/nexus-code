@@ -151,5 +151,35 @@ sgx_backend_fs_file_crypto_finish(struct nexus_file_crypto * file_crypto)
         return -1;
     }
 
+    // FIXME: VERY BAD design, this should be from an OCALL
     return io_file_crypto_finish(file_crypto);
+}
+
+int
+sgx_backend_fs_truncate(struct nexus_volume * volume,
+                        char                * filepath,
+                        size_t                filesize,
+                        struct nexus_stat   * stat,
+                        void                * priv_data)
+{
+    struct sgx_backend * sgx_backend = priv_data;
+
+    int err = -1;
+    int ret = -1;
+
+
+    err = ecall_fs_truncate(sgx_backend->enclave_id, &ret, filepath, filesize, stat);
+
+    if (err || ret) {
+        log_error("ecall_fs_truncate() FAILED\n");
+        return -1;
+    }
+
+    // FIXME: this is VERY VERY BAD, this must come in as an OCALL.
+    if (io_buffer_truncate(&stat->uuid, filesize, sgx_backend)) {
+        log_error("io_buffer_truncate() FAILED\n");
+        return -1;
+    }
+
+    return 0;
 }

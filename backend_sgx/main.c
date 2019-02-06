@@ -121,12 +121,13 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .fs_remove       = sgx_backend_fs_remove,
     .fs_lookup       = sgx_backend_fs_lookup,
     .fs_stat         = sgx_backend_fs_stat,
-    .fs_setattr      = sgx_backend_fs_setattr,
     .fs_readdir      = sgx_backend_fs_readdir,
     .fs_symlink      = sgx_backend_fs_symlink,
     .fs_readlink     = sgx_backend_fs_readlink,
     .fs_hardlink     = sgx_backend_fs_hardlink,
     .fs_rename       = sgx_backend_fs_rename,
+
+    .fs_truncate     = sgx_backend_fs_truncate,
 
     .fs_file_encrypt_start = sgx_backend_fs_file_encrypt_start,
     .fs_file_decrypt_start = sgx_backend_fs_file_decrypt_start,

@@ -530,14 +530,9 @@ __store_file_metadata(struct metadata_buf * metadata_buf,
 
     struct __filenode_info  filenode_info;
 
-    size_t   total_size    = 0;
-
     int nbytes = -1;
 
 
-    total_size = filesize + metadata_buf->size + sizeof(struct __filenode_info);
-
-    // write the metadata content
     nbytes = write(file_handle->fd, metadata_buf->addr, metadata_buf->size);
 
     if (nbytes != (int)metadata_buf->size) {
@@ -561,12 +556,6 @@ __store_file_metadata(struct metadata_buf * metadata_buf,
         return -1;
     }
 
-
-    if (ftruncate(file_handle->fd, total_size)) {
-        log_error("ftruncate FAILED (%s)\n", file_handle->filepath);
-        return -1;
-    }
-
     if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->locked_file)) {
         log_error("nexus_datastore_fflush() FAILED\n");
         return -1;
@@ -582,12 +571,21 @@ io_file_crypto_finish(struct nexus_file_crypto * file_crypto)
 
     struct nexus_volume * volume = file_crypto->sgx_backend->volume;
 
+    size_t total_size = 0;
+
     int ret = -1;
 
 
     if (file_crypto->mode == FILE_ENCRYPT) {
+        total_size = file_crypto->filesize + file_crypto->metadata_buf->size + sizeof(struct __filenode_info);
+
         // seek to the end of the data portion (the filesize)
         if (file_crypto->offset != file_crypto->filesize) {
+            if (ftruncate(file_handle->fd, total_size)) {
+                log_error("ftruncate FAILED (%s)\n", file_handle->filepath);
+                goto out;
+            }
+
             if (lseek(file_handle->fd, file_crypto->filesize, SEEK_SET) == -1) {
                 log_error("lseek on file handle FAILED\n");
                 goto out;
@@ -603,8 +601,6 @@ io_file_crypto_finish(struct nexus_file_crypto * file_crypto)
 
     ret = 0;
 out:
-    // XXX in case ret is non-zero, maybe "clear" the file to prevent flushing blocks on close
-
     nexus_datastore_fclose(volume->metadata_store, file_crypto->metadata_buf->locked_file);
 
     file_crypto->metadata_buf->locked_file = NULL;
@@ -613,4 +609,55 @@ out:
     nexus_free(file_crypto);
 
     return ret;
+}
+
+
+int
+io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend * sgx_backend)
+{
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+
+    struct nexus_file_handle * file_handle = NULL;
+
+    size_t total_size = 0;
+
+
+    if (metadata_buf == NULL) {
+        log_error("buffer_manager_find() FAILED\n");
+        return -1;
+    }
+
+    if (metadata_buf->locked_file == NULL) {
+        log_error("metadata_buffer has no locked_file\n");
+        return -1;
+    }
+
+
+    file_handle = metadata_buf->locked_file;
+
+    total_size = filesize + metadata_buf->size + sizeof(struct __filenode_info);
+
+    if (ftruncate(file_handle->fd, total_size)) {
+        log_error("ftruncate FAILED (%s)\n", file_handle->filepath);
+        goto out_err;
+    }
+
+    if (lseek(file_handle->fd, filesize, SEEK_SET) == -1) {
+        log_error("lseek on file handle FAILED\n");
+        goto out_err;
+    }
+
+    if (__store_file_metadata(metadata_buf, filesize, sgx_backend->volume)) {
+        log_error("__store_file_metadata() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_datastore_fclose(sgx_backend->volume->metadata_store, file_handle);
+
+    return 0;
+
+out_err:
+    nexus_datastore_fclose(sgx_backend->volume->metadata_store, file_handle);
+
+    return -1;
 }
