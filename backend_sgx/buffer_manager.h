@@ -4,6 +4,13 @@
 
 #pragma once
 
+
+struct __filenode_info {
+    uint32_t    metadata_size;
+    uint32_t    filesize;
+} __attribute__((packed));
+
+
 struct metadata_buf {
     struct nexus_uuid          uuid;
 
@@ -13,8 +20,14 @@ struct metadata_buf {
 
     size_t                     timestamp; // last time it was read on disk
 
+    size_t                     locked_file_read_offset; // offset where metadata is stored
+  
+    nexus_io_flags_t           locked_file_flags;
+
     struct nexus_file_handle * locked_file; // when writing to a metadata object
 };
+
+
 
 struct buffer_manager;
 

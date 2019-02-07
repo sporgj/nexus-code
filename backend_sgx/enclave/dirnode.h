@@ -37,7 +37,6 @@ struct __dir_rec {
 } __attribute__((packed));
 
 
-// the list of all dir_entries in the dirnode
 struct __hashed_name {
     struct hashmap_entry     hash_entry;
 
@@ -51,6 +50,7 @@ struct __hashed_uuid {
 };
 
 
+/* a dir_entry is just a runtime version of a directory record */
 struct dir_entry {
     struct dir_bucket      * bucket;
 
@@ -68,8 +68,6 @@ struct nexus_dirnode {
     struct nexus_uuid       my_uuid;
     struct nexus_uuid       root_uuid;
     struct nexus_uuid       parent_uuid;
-
-    nexus_file_mode_t       mode;
 
     size_t                  symlink_count;
     size_t                  symlink_buflen;
@@ -89,6 +87,7 @@ struct nexus_dirnode {
 
     struct nexus_list       symlink_list;
 
+    // the list of all dir_entries in the dirnode
     struct list_head        dirents_list;
 
     struct hashmap          filename_hashmap;
@@ -100,9 +99,6 @@ struct nexus_dirnode {
 };
 
 
-
-void
-dirnode_set_mode(struct nexus_dirnode * dirnode, nexus_file_mode_t mode);
 
 void
 dirnode_export_stat(struct nexus_dirnode * dirnode, struct nexus_stat * stat_out);

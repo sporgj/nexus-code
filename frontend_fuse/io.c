@@ -26,7 +26,7 @@ __alloc_file_chunk(size_t base)
 
     chunk->base   = base;
     chunk->index  = get_chunk_number(base);
-    chunk->buffer = nexus_malloc(NEXUS_CHUNK_SIZE);
+    chunk->buffer = valloc(NEXUS_CHUNK_SIZE);
 
     INIT_LIST_HEAD(&chunk->node);
 
@@ -59,6 +59,21 @@ __update_file_chunk(struct file_chunk * chunk, size_t offset, size_t len, uint8_
     inode_set_dirty(chunk->inode);
 
     return nbytes;
+}
+
+static uint8_t *
+__get_readable_file_chunk(struct file_chunk * chunk,
+                          size_t              offset,
+                          size_t              len,
+                          size_t            * readable_bytes)
+{
+    assert(offset <= chunk->base + NEXUS_CHUNK_SIZE);
+
+    size_t shift = offset - chunk->base;
+
+    *readable_bytes = min(len, (NEXUS_CHUNK_SIZE - shift));
+
+    return (chunk->buffer + shift);
 }
 
 // returns the number of bytes read
@@ -138,7 +153,7 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
 {
     struct file_chunk * chunk = NULL;
 
-    if (offset >= file_ptr->inode->filesize && !(file_ptr->flags & O_WRONLY)) {
+    if (offset >= file_ptr->inode->filesize && !(file_ptr->flags & O_RDWR)) {
         log_error("trying to read past file size (path=%s, filesize=%zu, offset=%zu)\n",
                   file_ptr->filepath,
                   file_ptr->inode->filesize,
@@ -146,7 +161,13 @@ __file_load_chunk(struct my_file * file_ptr, size_t offset)
         return NULL;
     }
 
+
     chunk = __file_try_add_chunk(file_ptr, offset);
+
+    if (chunk == NULL) {
+        log_error("__file_try_add_chunk() FAILED\n");
+        return NULL;
+    }
 
     if (chunk->is_valid) {
         return chunk;
@@ -165,11 +186,8 @@ file_read(struct my_file * file_ptr,
     size_t total_bytes = 0;
 
 
-    pthread_rwlock_rdlock(&file_ptr->io_lock);
-
     if (file_ptr->inode->filesize == 0) {
         *output_buflen = 0;
-        pthread_rwlock_unlock(&file_ptr->io_lock);
         return 0;
     }
 
@@ -200,17 +218,30 @@ file_read(struct my_file * file_ptr,
 
     *output_buflen = total_bytes;
 
-    // printf("{read} filepath=%s [%d] (ino=%d), offset=%zu, bytes_written=%zu, filesize=%zu\n",
-    //        file_ptr->filepath,
-    //        file_ptr->fid,
-    //        (int)file_ptr->inode->ino,
-    //        offset,
-    //        *output_buflen,
-    //        file_ptr->inode->filesize);
-
     pthread_rwlock_unlock(&file_ptr->io_lock);
 
     return 0;
+}
+
+const uint8_t *
+file_read_dataptr(struct my_file * file_ptr, size_t offset, size_t len, size_t * readable_bytes)
+{
+    struct file_chunk * chunk = NULL;
+
+    if (file_ptr->inode->filesize == 0) {
+        static uint8_t tmp_buffer = 0;
+        *readable_bytes = 0;
+        return &tmp_buffer;
+    }
+
+    chunk = __file_load_chunk(file_ptr, offset);
+
+    if (chunk == NULL) {
+        log_error("chunk at offset %zu not found. filepath=%s\n", offset, file_ptr->filepath);
+        return NULL;
+    }
+
+    return __get_readable_file_chunk(chunk, offset, len, readable_bytes);
 }
 
 int
@@ -229,8 +260,6 @@ file_write(struct my_file * file_ptr,
     if (file_ptr->flags & O_APPEND) {
         curpos = file_ptr->offset;
     }
-
-    pthread_rwlock_wrlock(&file_ptr->io_lock);
 
     do {
         size_t              nbytes = 0;
@@ -265,16 +294,6 @@ file_write(struct my_file * file_ptr,
     }
 
     file_set_dirty(file_ptr);
-
-    // printf("{write} filepath=%s [%d] (%d), offset=%zu, bytes_written=%zu, filesize=%zu\n",
-    //        file_ptr->filepath,
-    //        file_ptr->fid,
-    //        (int)file_ptr->inode->ino,
-    //        offset,
-    //        *bytes_written,
-    //        file_ptr->inode->filesize);
-
-    pthread_rwlock_unlock(&file_ptr->io_lock);
 
     return 0;
 }

@@ -174,6 +174,10 @@ dentry_invalidate(struct nexus_dentry * dentry)
 void
 dentry_delete(struct nexus_dentry * dentry)
 {
+    if (dentry && dentry->flags & DENTRY_DELETED) {
+        return;
+    }
+
     if (dentry->parent) {
         dentry_put(dentry->parent);
         list_del(&dentry->siblings);

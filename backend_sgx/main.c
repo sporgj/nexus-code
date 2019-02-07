@@ -4,20 +4,9 @@
 
 #define  HEAP_SIZE      (1 << 25)
 
-int
-uuid_equal_func(uintptr_t key1, uintptr_t key2)
-{
-    return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
-}
-
-uint32_t
-uuid_hash_func(uintptr_t key)
-{
-    return nexus_uuid_hash((struct nexus_uuid *)key);
-}
 
 int
-nxs_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id)
+main_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id)
 {
     sgx_launch_token_t launch_token        = { 0 };
     int                launch_token_update = 0;
@@ -37,11 +26,6 @@ nxs_create_enclave(const char * enclave_path, sgx_enclave_id_t * enclave_id)
     return 0;
 }
 
-int
-nxs_destroy_enclave(sgx_enclave_id_t enclave_id)
-{
-    return sgx_destroy_enclave(enclave_id);
-}
 
 static int
 sgx_backend_exit(struct sgx_backend * sgx_backend)
@@ -54,31 +38,31 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
         munmap(sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
 
+    if (sgx_backend->enclave_path) {
+        nexus_free(sgx_backend->enclave_path);
+    }
+
     nexus_free(sgx_backend);
 
     return 0;
 }
 
+
+/**
+ * Initializes the backend runtime
+ */
 static void *
 sgx_backend_init(nexus_json_obj_t backend_cfg)
 {
-    struct sgx_backend * sgx_backend = NULL;
+    struct sgx_backend * sgx_backend = nexus_malloc(sizeof(struct sgx_backend));
 
-    int ret = -1;
-
-
-    sgx_backend = nexus_malloc(sizeof(struct sgx_backend));
-
-    ret = nexus_json_get_string(backend_cfg, "enclave_path", &sgx_backend->enclave_path);
-
-    if (ret != 0) {
+    if (nexus_json_get_string(backend_cfg, "enclave_path", &sgx_backend->enclave_path)) {
         if (nexus_config.enclave_path) {
-            ret = 0;
             log_debug("Using nexus_config.enclave_path = %s\n", nexus_config.enclave_path);
             sgx_backend->enclave_path = strndup(nexus_config.enclave_path, NEXUS_PATH_MAX);
         } else {
             log_error("sgx_backend: no 'enclave_path' in config\n");
-            goto out;
+            goto out_err;
         }
     }
 
@@ -89,7 +73,7 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 
         if (buf_manager == NULL) {
             log_error("could not create a new buf manager\n");
-            goto out;
+            goto out_err;
         }
 
         sgx_backend->buf_manager = buf_manager;
@@ -109,9 +93,8 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 
         if (sgx_backend->mmap_ptr == MAP_FAILED) {
             log_error("could not mmap %zu bytes\n", sgx_backend->mmap_len);
-            goto out;
+            goto out_err;
         }
-
 
         nexus_heap_init(&sgx_backend->heap_manager, sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
@@ -119,7 +102,7 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
     sgx_backend->volume_chunk_size = NEXUS_CHUNK_SIZE;
 
     return sgx_backend;
-out:
+out_err:
     if (sgx_backend) {
         sgx_backend_exit(sgx_backend);
     }
@@ -138,15 +121,20 @@ static struct nexus_backend_impl sgx_backend_impl = {
     .fs_remove       = sgx_backend_fs_remove,
     .fs_lookup       = sgx_backend_fs_lookup,
     .fs_stat         = sgx_backend_fs_stat,
-    .fs_setattr      = sgx_backend_fs_setattr,
-    .fs_filldir      = sgx_backend_fs_filldir,
     .fs_readdir      = sgx_backend_fs_readdir,
     .fs_symlink      = sgx_backend_fs_symlink,
     .fs_readlink     = sgx_backend_fs_readlink,
     .fs_hardlink     = sgx_backend_fs_hardlink,
     .fs_rename       = sgx_backend_fs_rename,
-    .fs_encrypt      = sgx_backend_fs_encrypt,
-    .fs_decrypt      = sgx_backend_fs_decrypt,
+
+    .fs_truncate     = sgx_backend_fs_truncate,
+
+    .fs_file_encrypt_start = sgx_backend_fs_file_encrypt_start,
+    .fs_file_decrypt_start = sgx_backend_fs_file_decrypt_start,
+    .fs_file_crypto_seek   = sgx_backend_fs_file_crypto_seek,
+    .fs_file_crypto_decrypt = sgx_backend_fs_file_crypto_decrypt,
+    .fs_file_crypto_encrypt = sgx_backend_fs_file_crypto_encrypt,
+    .fs_file_crypto_finish = sgx_backend_fs_file_crypto_finish,
 
     .user_list       = sgx_backend_user_list,
     .user_add        = sgx_backend_user_add,

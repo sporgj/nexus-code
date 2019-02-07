@@ -6,7 +6,7 @@
 struct nexus_raw_buf;
 
 /**
- * Creates sealed_buffer from preallocated buffer
+ * Creates raw_buffer from preallocated buffer
  * @param uuid
  * @return a sealed_buffer
  */

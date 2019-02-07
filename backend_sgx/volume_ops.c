@@ -35,7 +35,7 @@ init_enclave(struct sgx_backend * backend)
     int ret = -1;
 
     if (backend->enclave_id == 0) {
-        ret = nxs_create_enclave(backend->enclave_path, &backend->enclave_id);
+        ret = main_create_enclave(backend->enclave_path, &backend->enclave_id);
 
         if (ret != 0) {
             log_error("Could not open enclave(%s): ret=%#x\n", backend->enclave_path, ret);
@@ -63,7 +63,7 @@ exit_enclave(struct sgx_backend * backend)
 
     log_debug("Destroying enclave (eid=%zu)", backend->enclave_id);
 
-    ret = nxs_destroy_enclave(backend->enclave_id);
+    ret = sgx_destroy_enclave(backend->enclave_id);
 
     backend->enclave_id = 0;
 

@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <sys/stat.h>
+
 #include <stdint.h>
 #include <stdio.h>
 
@@ -33,6 +35,8 @@ nexus_write_raw_file(char * path, void * buf, size_t len);
 int
 nexus_touch_raw_file(char * path);
 
+int
+nexus_touch_raw_file2(char * path, mode_t mode);
 
 /*
  * This will delete a single file

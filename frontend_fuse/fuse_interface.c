@@ -23,7 +23,14 @@ __export_fuse_entry(struct my_dentry        * dentry,
 {
     struct stat * st_dest = &entry_param->attr;
 
-    st_dest->st_mode = nexus_fs_sys_mode_from_type(dentry->type);
+
+    if (nexus_fuse_stat_inode(dentry, inode)) {
+        log_error("nexus_fuse_stat_inode() FAILED\n");
+        return -1;
+    }
+
+
+    memcpy(st_dest, &inode->attrs.posix_stat, sizeof(struct stat));
 
     switch(dentry->type) {
     case NEXUS_DIR:
@@ -33,17 +40,6 @@ __export_fuse_entry(struct my_dentry        * dentry,
         st_dest->st_nlink = 1;
         break;
     }
-
-    // if the inode, is fresh, just grab the attributes there
-    // XXX: there should probably be a timeout
-    if (inode->last_accessed) {
-        memcpy(st_dest, &inode->attrs.posix_stat, sizeof(struct stat));
-    } else if (nexus_fuse_stat_inode(dentry, inode)) {
-        return -1;
-    }
-
-
-    st_dest->st_ino = inode->ino;
 
     if (dentry->type == NEXUS_REG) {
         if (inode->is_dirty) {
@@ -98,7 +94,9 @@ nxs_fuse_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 
 
     // override the file size accordingly (inode could be dirty)
-    stbuf.st_size = inode->filesize;
+    if (dentry->type == NEXUS_REG) {
+        stbuf.st_size = inode->filesize;
+    }
 
     fuse_reply_attr(req, &stbuf, FUSE_ATTR_TIMEOUT);
 
@@ -278,15 +276,11 @@ nxs_fuse_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
         goto exit;
     }
 
-    // if this was not checked for awhile, let's update the stat info
-    // XXX: makes this an expiry date
-    if (!inode->last_accessed) {
-        // this updates last_accessed
-        if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
-            code = ENOENT;
-            log_error("nexus_fuse_getattr() FAILED\n");
-            goto out_err;
-        }
+    // this updates last_accessed
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
+        code = ENOENT;
+        log_error("nexus_fuse_getattr() FAILED\n");
+        goto out_err;
     }
 
     dir_ptr = vfs_dir_alloc(dentry);
@@ -424,8 +418,6 @@ __create_file_or_dir(fuse_req_t               req,
                      nexus_dirent_type_t      type,
                      struct nexus_stat      * nexus_stat)
 {
-    char             * filename = strndup(name, NEXUS_NAME_MAX);
-
     struct my_inode  * inode    = NULL;
 
     struct my_dentry * dentry   = vfs_get_dentry(parent, &inode);
@@ -435,7 +427,7 @@ __create_file_or_dir(fuse_req_t               req,
         return NULL;
     }
 
-    if (nexus_fuse_create(dentry, filename, type, mode, nexus_stat)) {
+    if (nexus_fuse_create(dentry, (char *)name, type, mode, nexus_stat)) {
         inode_put(inode);
         log_error("nexus_fuse_touch (%s/) -> (%s) FAILED\n", dentry->name, name);
         return NULL;
@@ -443,7 +435,7 @@ __create_file_or_dir(fuse_req_t               req,
 
     inode_put(inode);
 
-    return vfs_cache_dentry(dentry, filename, &nexus_stat->uuid, nexus_stat->type);
+    return vfs_cache_dentry(dentry, (char *)name, &nexus_stat->uuid, nexus_stat->type);
 }
 
 static void
@@ -484,8 +476,8 @@ nxs_fuse_create(
         return;
     }
 
-    inode_get(new_inode);
-    inode_incr_lookup(new_dentry->inode, 1);
+    new_inode = inode_get(new_dentry->inode);
+    inode_incr_lookup(new_inode, 1);
     inode_put(new_inode);
 
     fi->fh = (uintptr_t)file_ptr;
@@ -543,15 +535,11 @@ nxs_fuse_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
     }
 
 
-    // if this was not checked for awhile, let's update the stat info
-    // XXX: makes this an expiry date
-    if (!inode->last_accessed) {
-        // this updates last_accessed
-        if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
-            code = ENOENT;
-            log_error("nexus_fuse_getattr() FAILED\n");
-            goto out_err;
-        }
+    // this updates last_accessed
+    if (nexus_fuse_getattr(dentry, NEXUS_STAT_FILE, &inode->attrs)) {
+        code = ENOENT;
+        log_error("nexus_fuse_getattr() FAILED\n");
+        goto out_err;
     }
 
     if (!inode_is_file(inode) && !(fi->flags & O_CREAT)) {
@@ -842,19 +830,71 @@ nxs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
-    uint8_t * buffer = nexus_malloc(size);
-    size_t    buflen = 0;
+    const uint8_t * first_buffer = NULL;    // we will try to fit all the data here
+    const uint8_t * other_buffer = NULL;
 
-    if (file_read(file_ptr, off, size, buffer, &buflen)) {
+    size_t          first_buflen = 0;
+    size_t          other_buflen = 0;
+
+    struct fuse_bufvec * bufvec  = NULL;    // this will hold buffer vectors
+
+
+
+    pthread_rwlock_rdlock(&file_ptr->io_lock);
+
+    first_buffer = file_read_dataptr(file_ptr, off, size, &first_buflen);
+
+    if (first_buffer == NULL) {
+        log_error("file_read_dataptr(). file=%s, size=%zu FAILED\n", file_ptr->filepath,
+                  file_ptr->inode->filesize);
+        pthread_rwlock_unlock(&file_ptr->io_lock);
         fuse_reply_err(req, EIO);
         return;
     }
 
-    fuse_reply_buf(req, (const char *)buffer, buflen);
 
-    file_ptr->total_sent += buflen;
+    // we have all the data, we can return early
+    if (first_buflen == size) {
+        fuse_reply_buf(req, (const char *)first_buffer, first_buflen);
+        goto exit;
+    }
 
-    free(buffer);
+
+    // otherwise, we may need to read from two chunks
+    {
+        size_t new_offset = off + first_buflen;
+        size_t new_length = size - first_buflen;
+
+        other_buffer = file_read_dataptr(file_ptr, new_offset, new_length, &other_buflen);
+
+        if (other_buffer == NULL) {
+            log_error("file_read_dataptr() FAILED\n");
+            pthread_rwlock_unlock(&file_ptr->io_lock);
+            fuse_reply_err(req, EIO);
+            return;
+        }
+
+
+        bufvec = nexus_malloc(sizeof(struct fuse_bufvec) + sizeof(struct fuse_buf));
+
+        bufvec->count       = 2;
+
+        bufvec->buf[0].size = first_buflen;
+        bufvec->buf[0].mem  = (void *)first_buffer;
+
+        bufvec->buf[1].size = other_buflen;
+        bufvec->buf[1].mem  = (void *)other_buffer;
+
+        fuse_reply_data(req, bufvec, FUSE_BUF_NO_SPLICE);
+
+        nexus_free(bufvec);
+    }
+
+
+exit:
+    file_ptr->total_sent += (first_buflen + other_buflen);
+
+    pthread_rwlock_unlock(&file_ptr->io_lock);
 }
 
 static void
@@ -867,16 +907,22 @@ nxs_fuse_write(fuse_req_t              req,
 {
     struct my_file * file_ptr = (struct my_file *)fi->fh;
 
+    pthread_rwlock_wrlock(&file_ptr->io_lock);
+
     size_t bytes_read = 0;
 
     if (file_write(file_ptr, off, size, (uint8_t *)buffer, &bytes_read)) {
+        log_error("writing file failed\n");
+        pthread_rwlock_unlock(&file_ptr->io_lock);
         fuse_reply_err(req, EIO);
         return;
     }
 
-    file_ptr->total_recv += size;
+    file_ptr->total_recv += bytes_read;
 
     fuse_reply_write(req, (int)bytes_read);
+
+    pthread_rwlock_unlock(&file_ptr->io_lock);
 }
 
 static void
@@ -892,16 +938,9 @@ nxs_fuse_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 static void
 nxs_fuse_init(void * userdata, struct fuse_conn_info * conn)
 {
-#if 0
-    if (conn->capable & FUSE_CAP_EXPORT_SUPPORT) {
-        log_debug("nexus-fuse: activating writeback\n");
-        conn->want |= FUSE_CAP_EXPORT_SUPPORT;
-    }
-#endif
-
     if (conn->capable & FUSE_CAP_WRITEBACK_CACHE) {
-        nexus_printf("nexus-fuse: activating writeback\n");
-        conn->want |= FUSE_CAP_WRITEBACK_CACHE;
+        // nexus_printf("nexus-fuse: activating writeback\n");
+        // conn->want |= FUSE_CAP_WRITEBACK_CACHE;
     }
 }
 

@@ -51,24 +51,13 @@ struct nexus_usertable {
     struct nexus_supernode * supernode;
 };
 
+
 void
 __usertable_set_supernode(struct nexus_usertable * usertable, struct nexus_supernode * supernode);
 
-/**
- * Allocates a usertable.
- *
- * @param supernode_uuid
- * @return a nexus_usertable
- */
 struct nexus_usertable *
 nexus_usertable_create(char * user_pubkey);
 
-/**
- * Frees an allocated usertable
- *
- *
- * @param usertable
- */
 void
 nexus_usertable_free(struct nexus_usertable * usertable);
 

@@ -92,7 +92,6 @@ enclave {
             [in, string] char                * directory_IN,
             [in, string] char                * filename_IN,
                          nexus_dirent_type_t   type_IN,
-                         nexus_file_mode_t     mode,
                    [out] struct nexus_uuid   * uuid_out
         );
 
@@ -109,29 +108,14 @@ enclave {
             [in, string] char                    * directory_IN,
             [in, string] char                    * filename_IN,
             [user_check] struct nexus_fs_lookup  * lookup_out
-        );
-
-        public int ecall_fs_set_mode
-        (
-            [in, string] char                * filepath_IN,
-                         nexus_file_mode_t     mode,
-            [user_check] struct nexus_stat   * stat_out
-        );
+        ) transition_using_threads;
 
         public int ecall_fs_stat
         (
             [in, string] char                * path_IN,
                          nexus_stat_flags_t    stat_flags,
             [user_check] struct nexus_stat   * stat_out
-        );
-
-        // #define NEXUS_NAME_MAX  256
-        public int ecall_fs_filldir
-        (
-            [in, string] char                * directory_IN,
-                    [in] struct nexus_uuid   * uuid_IN,
-            [user_check] char                  filename_out[256]
-        );
+        ) transition_using_threads;
 
         public int ecall_fs_readdir
         (
@@ -181,25 +165,40 @@ enclave {
 
         // file operations
 
-        // TODO add argument to indicate moredata
-        public int ecall_fs_encrypt
+        public int ecall_fs_file_encrypt_start
         (
             [in, string] char                * filepath_IN,
-            [user_check] uint8_t             * input_buffer_in,
-            [user_check] uint8_t             * output_buffer_in,
-                         size_t                offset,
-                         size_t                size,
-                         size_t                filesize
+                         size_t                filesize,
+            [user_check] int                 * xfer_id_out,
+            [user_check] struct nexus_uuid   * uuid_out
         );
 
-        public int ecall_fs_decrypt
+        public int ecall_fs_file_decrypt_start
         (
             [in, string] char                * filepath_IN,
+            [user_check] int                 * xfer_id_out,
+            [user_check] struct nexus_uuid   * uuid_out,
+            [user_check] size_t              * filesize_out
+        );
+
+        public int ecall_fs_file_crypto_seek
+        (
+                         int                   xfer_id,
+                         int                   offset
+        );
+
+        public int ecall_fs_file_crypto_update
+        (
+                         int                   xfer_id,
             [user_check] uint8_t             * input_buffer_in,
-            [user_check] uint8_t             * output_buffer_in,
-                         size_t                offset,
+            [user_check] uint8_t             * output_buffer_out,
                          size_t                size,
-                         size_t                filesize
+            [user_check] size_t              * processed_bytes
+        );
+
+        public int ecall_fs_file_crypto_finish
+        (
+                         int                   xfer_id
         );
 
         public int ecall_fs_truncate
@@ -258,14 +257,14 @@ enclave {
             [in]         struct nexus_uuid   * metadata_uuid,
                          nexus_io_flags_t      flags,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         int
         ocall_buffer_unlock
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         uint8_t *
         ocall_buffer_get
@@ -292,14 +291,14 @@ enclave {
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         int
         ocall_buffer_del
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
         int
         ocall_buffer_stattime
@@ -307,7 +306,7 @@ enclave {
             [in]         struct nexus_uuid   * uuid,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
-        );
+        ) transition_using_threads;
 
 
 

@@ -75,7 +75,9 @@ bucket_from_record(size_t capacity, struct __bucket_rec * _rec);
  * return 0 on success
  */
 int
-bucket_load_from_buffer(struct dir_bucket * bucket, struct nexus_dirnode * dirnode, uint8_t * input_ptr);
+bucket_load_from_buffer(struct dir_bucket    * bucket,
+                        struct nexus_dirnode * dirnode,
+                        uint8_t              * input_ptr);
 
 int
 bucket_load_from_uuid(struct dir_bucket    * bucket,
@@ -98,8 +100,6 @@ bucket_del_direntry(struct dir_bucket * bucket, struct dir_entry * dir_entry);
 
 
 
-
-
 // dir entry API
 
 struct dir_entry *
@@ -107,5 +107,3 @@ __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char *
 
 void
 __free_dir_entry(struct dir_entry * dir_entry);
-
-

@@ -5,11 +5,11 @@ struct __filenode_hdr {
     struct nexus_uuid         root_uuid;
     struct nexus_uuid         parent_uuid;
 
-    nexus_file_mode_t         mode;
+    uint64_t                  encrypted_length;     // how much of the file is "encrypted
 
-    uint16_t                  link_count;
-
+    uint8_t                   link_count;
     uint32_t                  nchunks;
+
     uint8_t                   log2chunksize;
     uint64_t                  filesize;
 } __attribute__((packed));
@@ -88,13 +88,6 @@ filenode_set_chunksize(struct nexus_filenode * filenode, size_t log2chunksize)
 }
 
 void
-filenode_set_mode(struct nexus_filenode * filenode, nexus_file_mode_t mode)
-{
-    filenode->mode = mode;
-    __filenode_set_dirty(filenode);
-}
-
-void
 filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid)
 {
     nexus_uuid_copy(parent_uuid, &filenode->parent_uuid);
@@ -156,9 +149,9 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
 
     filenode->nchunks  = header->nchunks;
     filenode->filesize = header->filesize;
+    filenode->encrypted_length = header->encrypted_length;
 
     filenode->link_count = header->link_count;
-    filenode->mode       = header->mode;
 
     nexus_uuid_copy(&header->my_uuid, &filenode->my_uuid);
     nexus_uuid_copy(&header->root_uuid, &filenode->root_uuid);
@@ -287,7 +280,8 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
     header->filesize      = filenode->filesize;
 
     header->link_count    = filenode->link_count;
-    header->mode          = filenode->mode;
+
+    header->encrypted_length = filenode->encrypted_length;
 
     nexus_uuid_copy(&filenode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&filenode->root_uuid, &header->root_uuid);
@@ -421,6 +415,10 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
         return 0;
     }
 
+    if (filenode->encrypted_length > filesize) {
+        filenode->encrypted_length = filesize;
+    }
+
     filenode->nchunks  = nchunks;
     filenode->filesize = filesize;
 
@@ -442,19 +440,39 @@ filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize)
 }
 
 struct nexus_crypto_ctx *
-filenode_get_chunk(struct nexus_filenode * filenode, size_t offset)
+filenode_get_chunk(struct nexus_filenode * filenode, size_t offset, bool regenerate)
 {
     size_t chunk_num = get_chunk_number(filenode, offset);
 
     struct chunk_entry * chunk_entry = nexus_list_get(&filenode->chunk_list, chunk_num);
 
-    return chunk_entry ? &chunk_entry->crypto_ctx : NULL;
+    if (chunk_entry == NULL) {
+        return NULL;
+    }
+
+    if (regenerate) {
+        nexus_crypto_ctx_generate(&chunk_entry->crypto_ctx);
+        __filenode_set_dirty(filenode);
+    }
+
+    return &chunk_entry->crypto_ctx;
 }
+
+
+void
+filenode_update_encrypted_pos(struct nexus_filenode * filenode, size_t encrypted_pos)
+{
+    if (encrypted_pos > filenode->encrypted_length) {
+        filenode->encrypted_length = encrypted_pos;
+        __filenode_set_dirty(filenode);
+    }
+}
+
 
 void
 filenode_incr_linkcount(struct nexus_filenode * filenode)
 {
-#define MAX_LINKS   (UINT16_MAX)
+#define MAX_LINKS   (UINT8_MAX)
 
     assert(filenode->link_count != MAX_LINKS);     // TODO handle overflow
     filenode->link_count += 1;
@@ -479,7 +497,6 @@ filenode_get_linkcount(struct nexus_filenode * filenode)
 void
 filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out)
 {
-    stat_out->mode = filenode->mode;
     stat_out->type = NEXUS_REG;
     stat_out->filesize = filenode->filesize;
     stat_out->link_count = filenode->link_count;

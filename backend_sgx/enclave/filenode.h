@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <stdbool.h>
+
 #include <nexus_list.h>
 #include <nexus_mac.h>
 
@@ -19,11 +21,10 @@ struct nexus_filenode {
     struct nexus_uuid          root_uuid;
     struct nexus_uuid          parent_uuid;
 
-    nexus_file_mode_t          mode;
-
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
 
+    size_t                     encrypted_length;
 
     struct nexus_mac           mac;
 
@@ -43,9 +44,6 @@ struct nexus_filenode {
 
 void
 filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out);
-
-void
-filenode_set_mode(struct nexus_filenode * filenode, nexus_file_mode_t mode);
 
 void
 filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid);
@@ -89,15 +87,18 @@ filenode_free(struct nexus_filenode * filenode);
 int
 filenode_set_filesize(struct nexus_filenode * filenode, size_t filesize);
 
+void
+filenode_update_encrypted_pos(struct nexus_filenode * filenode, size_t encrypted_pos);
+
 /**
  * Gets the chunk at the particular offset in the file
  * @param filenode
  * @param offset
+ * @pararm regnerate if to update the crypto context before returning it (dirties the filenode)
  * @return nexus_crypto_ctx.
  */
-// TODO change API to prevent misuse
 struct nexus_crypto_ctx *
-filenode_get_chunk(struct nexus_filenode * filenode, size_t offset);
+filenode_get_chunk(struct nexus_filenode * filenode, size_t offset, bool regenerate);
 
 
 

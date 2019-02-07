@@ -194,6 +194,10 @@ __read_object(struct nexus_uuid     * uuid,
     struct nexus_crypto_buf * crypto_buf = NULL;
 
 
+    if (type == NEXUS_FILENODE) {
+        flags |= NEXUS_IO_FNODE;
+    }
+
     crypto_buf = nexus_crypto_buf_create(uuid, flags);
 
     if (crypto_buf == NULL) {
@@ -354,6 +358,28 @@ void
 nexus_metadata_put(struct nexus_metadata * metadata)
 {
     metadata->ref_count -= 1;
+}
+
+
+int
+nexus_metadata_lock(struct nexus_metadata * metadata, nexus_io_flags_t flags)
+{
+    if (metadata->is_locked) {
+        return 0;
+    }
+
+    if (metadata->type == NEXUS_FILENODE) {
+        flags |= NEXUS_IO_FNODE;
+    }
+
+    if (buffer_layer_lock(&metadata->uuid, flags)) {
+        log_error("buffer_layer_lock() FAILED\n");
+        return -1;
+    }
+
+    metadata->is_locked = true;
+
+    return 0;
 }
 
 void

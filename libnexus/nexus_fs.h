@@ -1,4 +1,4 @@
-/* 
+/**
  * Copyright (c) 2017, Jack Lange <jacklange@cs.pitt.edu>
  * All rights reserved.
  *
@@ -22,6 +22,15 @@ struct nexus_volume;
 #define NEXUS_NAME_MAX  256
 #define NEXUS_PATH_MAX  1024
 
+
+// this will be the flags to create metadata/data files
+#define NEXUS_POSIX_OPEN_MODE (S_IRUSR | S_IWUSR | \
+                               S_IRGRP | S_IWGRP | \
+                               S_IROTH | S_IWOTH)
+
+#define NEXUS_POSIX_EXEC_MODE (S_IXUSR | S_IXGRP | S_IXOTH)
+
+
 typedef enum {
     NEXUS_REG = 1,  /* regular file */
     NEXUS_DIR = 2,  /* directory    */
@@ -29,15 +38,16 @@ typedef enum {
 } nexus_dirent_type_t;
 
 
-typedef uint32_t   nexus_file_mode_t; // POSIX mode is 4 bytes
-
 typedef enum {
     NEXUS_FREAD          = 0x00000001,
     NEXUS_FWRITE         = 0x00000002,
     NEXUS_FRDWR          = NEXUS_FREAD | NEXUS_FWRITE,
 
     NEXUS_FCREATE        = 0x00000004,
-    NEXUS_FDELETE        = 0x00000008
+    NEXUS_FDELETE        = 0x00000008,
+
+    NEXUS_IO_FNODE       = 0x00000010,
+    NEXUS_IO_FCRYPTO     = 0x00000020,
 } nexus_io_flags_t;
 
 
@@ -62,7 +72,6 @@ struct nexus_stat {
         size_t          filecount;
     };
 
-    nexus_file_mode_t   mode;
     nexus_dirent_type_t type;
     struct nexus_uuid   uuid;
 
@@ -73,19 +82,8 @@ struct nexus_stat {
 };
 
 
-// this is derived from fuse_lowlevel.h
-// https://github.com/libfuse/libfuse/blob/master/include/fuse_lowlevel.h
-typedef enum {
-    NEXUS_FS_ATTR_MODE      = (1 << 0),
-    NEXUS_FS_ATTR_UID       = (1 << 1),
-    NEXUS_FS_ATTR_GID       = (1 << 2),
-    NEXUS_FS_ATTR_SIZE      = (1 << 3),
-    NEXUS_FS_ATTR_ATIME     = (1 << 4),
-    NEXUS_FS_ATTR_MTIME     = (1 << 5),
-    NEXUS_FS_ATTR_ATIME_NOW = (1 << 7),
-    NEXUS_FS_ATTR_MTIME_NOW = (1 << 8),
-    NEXUS_FS_ATTR_CTIME     = (1 << 10)
-} nexus_fs_attr_flags_t;
+// this will be implemented by the backend
+struct nexus_file_xfer;
 
 
 struct nexus_fs_lookup {
@@ -102,6 +100,7 @@ struct nexus_fs_attr {
 };
 
 
+
 static inline mode_t
 nexus_fs_sys_mode_from_type(nexus_dirent_type_t type)
 {
@@ -115,6 +114,7 @@ nexus_fs_sys_mode_from_type(nexus_dirent_type_t type)
 }
 
 
+
 /**
  * Creates a new file/dir
  * @param parent
@@ -124,7 +124,6 @@ nexus_fs_create(struct nexus_volume  * volume,
                 char                 * parent_dir,
                 char                 * plain_name,
                 nexus_dirent_type_t    type,
-                nexus_file_mode_t      mode,
                 struct nexus_uuid    * uuid);
 
 int
@@ -139,12 +138,6 @@ nexus_fs_lookup(struct nexus_volume    * volume,
                 char                   * parent_dir,
                 char                   * plain_name,
                 struct nexus_fs_lookup * lookup_info);
-
-int
-nexus_fs_setattr(struct nexus_volume   * volume,
-                 char                  * path,
-                 struct nexus_fs_attr  * attrs,
-                 nexus_fs_attr_flags_t   flags);
 
 
 int
@@ -199,22 +192,63 @@ nexus_fs_rename(struct nexus_volume     * volume,
                 struct nexus_fs_lookup  * overriden_entry,
                 bool                    * should_remove);
 
-
-
 int
-nexus_fs_encrypt(struct nexus_volume * volume,
-                 char                * path,
-                 uint8_t             * in_buf,
-                 uint8_t             * out_buf,
-                 off_t                 offset,
-                 size_t                size,
-                 size_t                filesize);
+nexus_fs_truncate(struct nexus_volume * volume,
+                  char                * filepath,
+                  size_t                size,
+                  struct nexus_stat   * stat);
 
+// this contains the file interface for performing crypto
+
+/**
+ * Starts the process for file encryption
+ * @param volume
+ * @param filepath
+ * @param filesize
+ * @return @struct nexus_file_crypto
+ */
+struct nexus_file_crypto *
+nexus_fs_file_encrypt_start(struct nexus_volume * volume, char * filepath, size_t filesize);
+
+/**
+ * Same as @nexus_fs_file_encrypt_start, but decryption instead
+ */
+struct nexus_file_crypto *
+nexus_fs_file_decrypt_start(struct nexus_volume * volume, char * filepath);
+
+/**
+ * Performs a seek to the offset.
+ * When encrypting, this might return false if a chunk is not completed
+ * @param file_crypto
+ * @param offset
+ * @return -1 on failure
+ */
 int
-nexus_fs_decrypt(struct nexus_volume * volume,
-                 char                * path,
-                 uint8_t             * in_buf,
-                 uint8_t             * out_buf,
-                 off_t                 offset,
-                 size_t                size,
-                 size_t                filesize);
+nexus_fs_file_crypto_seek(struct nexus_volume * volume, struct nexus_file_crypto * file_crypto, size_t offset);
+
+/**
+ * Used for encrypting data. Note that the offset is shifted by the amount
+ * of processed data.
+ *
+ * Returns -1 on FAILURE
+ */
+int
+nexus_fs_file_crypto_encrypt(struct nexus_volume      * volume,
+                             struct nexus_file_crypto * file_crypto,
+                             const uint8_t            * plaintext_input,
+                             uint8_t                  * encrypted_input,
+                             size_t                     size,
+                             size_t                   * processed_bytes);
+
+// @see nexus_fs_file_crypto_encrypt
+int
+nexus_fs_file_crypto_decrypt(struct nexus_volume      * volume,
+                             struct nexus_file_crypto * file_crypto,
+                             uint8_t                  * decrypted_output,
+                             size_t                     size,
+                             size_t                   * processed_bytes);
+/**
+ * Terminates the crypto process and writes out the filenode metadata.
+ */
+int
+nexus_fs_file_crypto_finish(struct nexus_volume * volume, struct nexus_file_crypto * file_crypto);

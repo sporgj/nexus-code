@@ -84,7 +84,7 @@ err:
 int
 nxs_load_instance(char * instance_fpath, sgx_enclave_id_t enclave_id)
 {
-    struct nxs_instance * new_instance = fetch_init_message(instance_fpath);
+    struct nxs_instance * new_instance = fetch_nxs_instance(instance_fpath);
 
     if (new_instance == NULL) {
         log_error("could not load: %s\n", instance_fpath);
@@ -102,14 +102,14 @@ nxs_load_instance(char * instance_fpath, sgx_enclave_id_t enclave_id)
                                    new_instance->privkey_size);
 
         if (err || ret) {
-            free_init_message(new_instance);
+            free_nxs_instance(new_instance);
             log_error("ecall_mount_instance FAILED, err=0x%x, ret=%d\n", err, ret);
             return -1;
         }
     }
 
     if (global_nxs_instance) {
-        free_init_message(global_nxs_instance);
+        free_nxs_instance(global_nxs_instance);
     }
 
     global_nxs_instance = new_instance;
@@ -127,7 +127,7 @@ nxs_create_instance(char * enclave_path, char * instance_fpath)
     sgx_enclave_id_t enclave_id;
 
 
-    if (nxs_create_enclave(enclave_path, &enclave_id)) {
+    if (main_create_enclave(enclave_path, &enclave_id)) {
         log_error("could not create the enclave (%s)\n", enclave_path);
         return -1;
     }
@@ -140,21 +140,21 @@ nxs_create_instance(char * enclave_path, char * instance_fpath)
         goto err;
     }
 
-    if (store_init_message(instance_fpath, instance)) {
+    if (store_nxs_instance(instance, instance_fpath)) {
         log_error("could not serialize key file\n");
         goto err;
     }
 
-    nxs_destroy_enclave(enclave_id);
+    sgx_destroy_enclave(enclave_id);
 
-    free_init_message(instance);
+    free_nxs_instance(instance);
 
     return 0;
 
 err:
-    nxs_destroy_enclave(enclave_id);
+    sgx_destroy_enclave(enclave_id);
 
-    free_init_message(instance);
+    free_nxs_instance(instance);
 
     return -1;
 }
@@ -203,7 +203,7 @@ sgx_backend_export_rootkey(char                * destination_path,
         return -1;
     }
 
-    other_instance = fetch_init_message(other_instance_fpath);
+    other_instance = fetch_nxs_instance(other_instance_fpath);
 
     if (other_instance == NULL) {
         log_error("could not load: %s\n", other_instance_fpath);
@@ -237,11 +237,11 @@ sgx_backend_export_rootkey(char                * destination_path,
     }
 
 
-    free_init_message(other_instance);
+    free_nxs_instance(other_instance);
 
     return 0;
 err:
-    free_init_message(other_instance);
+    free_nxs_instance(other_instance);
 
     return -1;
 }
@@ -313,7 +313,7 @@ sgx_backend_import_rootkey(char * rk_exchange_path)
 
 
 
-    if (nxs_create_enclave(nexus_config.enclave_path, &enclave_id)) {
+    if (main_create_enclave(nexus_config.enclave_path, &enclave_id)) {
         log_error("could not create the enclave (%s)\n", nexus_config.enclave_path);
         return -1;
     }
@@ -353,7 +353,7 @@ sgx_backend_import_rootkey(char * rk_exchange_path)
 
     free_xchg_message(rk_exchange_msg);
 
-    nxs_destroy_enclave(enclave_id);
+    sgx_destroy_enclave(enclave_id);
 
     return 0;
 err:
@@ -363,7 +363,7 @@ err:
         free_xchg_message(rk_exchange_msg);
     }
 
-    nxs_destroy_enclave(enclave_id);
+    sgx_destroy_enclave(enclave_id);
 
     return -1;
 }

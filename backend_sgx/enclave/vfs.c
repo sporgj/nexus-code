@@ -196,8 +196,7 @@ __vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool 
     }
 
     if (flags & NEXUS_FWRITE) {
-        metadata->is_locked = true;
-        return buffer_layer_lock(&metadata->uuid, flags);
+        return nexus_metadata_lock(metadata, flags);
     }
 
     return 0;

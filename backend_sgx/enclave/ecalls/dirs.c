@@ -5,36 +5,14 @@ inline static int
 __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
                 char                  * filename_IN,
                 nexus_dirent_type_t     type_IN,
-                nexus_file_mode_t       mode,
                 struct nexus_uuid     * entry_uuid)
 {
     nexus_uuid_gen(entry_uuid);
 
-    struct nexus_mac entry_mac;
-
-
-    // create the new metadata
-    {
-        struct nexus_metadata * metadata = nexus_metadata_create(entry_uuid, type_IN);
-
-        if (type_IN == NEXUS_DIR) {
-            dirnode_set_mode(metadata->dirnode, mode);
-        } else {
-            filenode_set_mode(metadata->filenode, mode);
-        }
-
-        if (nexus_metadata_store(metadata)) {
-            nexus_metadata_free(metadata);
-
-            log_error("could not save metadata for new file\n");
-            return -1;
-        }
-
-        nexus_metadata_get_mac(metadata, &entry_mac);
-
-        nexus_metadata_free(metadata);
+    if (buffer_layer_new(entry_uuid)) {
+        log_error("buffer_layer_new() FAILED\n");
+        return -1;
     }
-
 
     // update the parent dirnode
     if (dirnode_add(parent_dirnode, filename_IN, type_IN, entry_uuid)) {
@@ -54,7 +32,6 @@ int
 ecall_fs_create(char                * dirpath_IN,
                 char                * filename_IN,
                 nexus_dirent_type_t   type_IN,
-                nexus_file_mode_t     mode,
                 struct nexus_uuid   * uuid_out)
 {
     struct nexus_metadata * metadata = NULL;
@@ -75,7 +52,7 @@ ecall_fs_create(char                * dirpath_IN,
     }
 
     // perform the create operation
-    ret = __nxs_fs_create(metadata->dirnode, filename_IN, type_IN, mode, &entry_uuid);
+    ret = __nxs_fs_create(metadata->dirnode, filename_IN, type_IN, &entry_uuid);
     if (ret != 0) {
         log_error("__nxs_fs_create() FAILED\n");
         goto out;
@@ -852,46 +829,4 @@ out:
     sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
-}
-
-int
-ecall_fs_set_mode(char * filepath_IN, nexus_file_mode_t mode, struct nexus_stat * stat_out)
-{
-    struct nexus_metadata * metadata = NULL;
-
-
-    sgx_spin_lock(&vfs_ops_lock);
-    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
-
-    if (metadata == NULL) {
-        log_error("could not get metadata (%s)\n", filepath_IN);
-        sgx_spin_unlock(&vfs_ops_lock);
-        return -1;
-    }
-
-    // TODO check access control
-    if (metadata->type == NEXUS_FILENODE) {
-        filenode_set_mode(metadata->filenode, mode);
-    } else if (metadata->type == NEXUS_DIRNODE) {
-        dirnode_set_mode(metadata->dirnode, mode);
-    }
-
-    if (nexus_metadata_store(metadata)) {
-        nexus_vfs_put(metadata);
-        sgx_spin_unlock(&vfs_ops_lock);
-        log_error("nexus_metadata_store FAILED\n");
-        return -1;
-    }
-
-    if (metadata->type == NEXUS_FILENODE) {
-        filenode_export_stat(metadata->filenode, stat_out);
-    } else if (metadata->type == NEXUS_DIRNODE) {
-        dirnode_export_stat(metadata->dirnode, stat_out);
-    }
-
-    nexus_vfs_put(metadata);
-
-    sgx_spin_unlock(&vfs_ops_lock);
-
-    return 0;
 }

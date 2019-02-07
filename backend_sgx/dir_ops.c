@@ -5,7 +5,6 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
                       char                 * dirpath,
                       char                 * name,
                       nexus_dirent_type_t    type,
-                      nexus_file_mode_t      mode,
                       struct nexus_uuid    * uuid,
                       void                 * priv_data)
 {
@@ -19,7 +18,7 @@ sgx_backend_fs_create(struct nexus_volume  * volume,
 
     BACKEND_SGX_ECALL_START(ECALL_CREATE);
 
-    err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, name, type, mode, uuid);
+    err = ecall_fs_create(sgx_backend->enclave_id, &ret, dirpath, name, type, uuid);
 
     BACKEND_SGX_ECALL_FINISH(ECALL_CREATE);
 
@@ -120,47 +119,6 @@ sgx_backend_fs_stat(struct nexus_volume * volume,
 }
 
 int
-sgx_backend_fs_filldir(struct nexus_volume  * volume,
-                       char                 * dirpath,
-                       char                 * nexus_name,
-                       char                ** plain_name,
-                       void                 * priv_data)
-{
-    struct sgx_backend * sgx_backend = NULL;
-
-    char filename[NEXUS_NAME_MAX] = { 0 };
-
-    struct nexus_uuid uuid;
-
-    int err = -1;
-    int ret = -1;
-
-
-    sgx_backend = (struct sgx_backend *)priv_data;
-
-    ret = nexus_uuid_from_alt64(&uuid, nexus_name);
-    if (ret != 0) {
-        log_error("could not derive uuid from '%s'\n", nexus_name);
-        return -1;
-    }
-
-    BACKEND_SGX_ECALL_START(ECALL_FILLDIR);
-
-    err = ecall_fs_filldir(sgx_backend->enclave_id, &ret, dirpath, &uuid, filename);
-
-    BACKEND_SGX_ECALL_FINISH(ECALL_FILLDIR);
-
-    if (err) {
-        log_error("ecall_fs_filldir() FAILED. (err=0x%x)\n", err);
-        return -1;
-    }
-
-    *plain_name = strndup(filename, NEXUS_NAME_MAX);
-
-    return ret;
-}
-
-int
 sgx_backend_fs_readdir(struct nexus_volume  * volume,
                        char                 * dirpath,
                        struct nexus_dirent  * dirent_buffer_array,
@@ -179,7 +137,6 @@ sgx_backend_fs_readdir(struct nexus_volume  * volume,
     sgx_backend = (struct sgx_backend *)priv_data;
 
 
-    // TODO add ECALL_READDIR
     err = ecall_fs_readdir(sgx_backend->enclave_id,
                            &ret,
                            dirpath,
@@ -327,69 +284,6 @@ sgx_backend_fs_rename(struct nexus_volume     * volume,
     if (err || ret) {
         log_error("ecall_fs_rename() FAILED. (err=0x%x, ret=%d)\n", err, ret);
         return -1;
-    }
-
-    return 0;
-}
-
-static int
-__backend_set_mode(struct sgx_backend * sgx_backend,
-                   char               * path,
-                   nexus_file_mode_t    mode,
-                   struct nexus_stat  * stat)
-{
-    int ret = -1;
-    int err = -1;
-
-
-    err = ecall_fs_set_mode(sgx_backend->enclave_id, &ret, path, mode, stat);
-
-    if (err || ret) {
-        log_error("ecall_fs_set_mode FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    return 0;
-}
-
-static int
-__backend_set_filesize(struct sgx_backend * sgx_backend,
-                       char               * path,
-                       size_t               size,
-                       struct nexus_stat  * stat)
-{
-    int ret = -1;
-    int err = -1;
-
-
-    err = ecall_fs_truncate(sgx_backend->enclave_id, &ret, path, size, stat);
-
-    if (err || ret) {
-        log_error("ecall_fs_truncate FAILED (err=%d, ret=%d)\n", err, ret);
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-sgx_backend_fs_setattr(struct nexus_volume   * volume,
-                       char                  * path,
-                       struct nexus_fs_attr  * attrs,
-                       nexus_fs_attr_flags_t   flags,
-                       void                  * priv_data)
-{
-    struct sgx_backend * sgx_backend = (struct sgx_backend *)priv_data;
-
-    struct stat * stat_buf = &attrs->posix_stat;
-
-
-    if (flags & NEXUS_FS_ATTR_SIZE) {
-        return __backend_set_filesize(sgx_backend, path, stat_buf->st_size, &attrs->stat_info);
-    } else if (flags & NEXUS_FS_ATTR_MODE) {
-        return __backend_set_mode(sgx_backend, path, stat_buf->st_mode, &attrs->stat_info);
-    } else {
-        return sgx_backend_fs_stat(volume, path, NEXUS_STAT_FILE, &attrs->stat_info, priv_data);
     }
 
     return 0;

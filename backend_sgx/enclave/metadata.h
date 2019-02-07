@@ -132,6 +132,9 @@ nexus_metadata_store(struct nexus_metadata * metadata);
 int
 __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac);
 
+int
+nexus_metadata_lock(struct nexus_metadata * metadata, nexus_io_flags_t flags);
+
 /**
  * Unlocks a locked metadata file
  */

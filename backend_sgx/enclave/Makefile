@@ -28,7 +28,7 @@ INCLUDE := -I$(SGX_SDK)/include \
 	-Ilibnexus_trusted \
 	-I..
 
-CFLAGS  += -nostdinc \
+CFLAGS  += -nostdinc -pedantic \
 	-fvisibility=hidden -fpie -fPIC -fstack-protector -mpclmul -maes -mavx -w \
 	-W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
 	-Werror=implicit-function-declaration
@@ -37,8 +37,8 @@ CFLAGS  += -nostdinc \
 
 
 LDFLAGS += -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_SDK)/lib64 \
-           -Wl,--whole-archive -l$(sgx_trts_lib) -Wl,--no-whole-archive \
-           -Wl,--start-group -lsgx_tstdc -lsgx_tstdcxx -lsgx_tcrypto -l$(sgx_svc_lib) -Wl,--end-group \
+           -Wl,--whole-archive -lsgx_tswitchless -l$(sgx_trts_lib) -Wl,--no-whole-archive \
+           -Wl,--start-group -lsgx_tstdc -lsgx_tcrypto -l$(sgx_svc_lib) -Wl,--end-group \
            -Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
            -Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
            -Wl,--defsym,__ImageBase=0 \
@@ -113,6 +113,7 @@ objs := nexus_enclave_t.o \
 	filenode.o \
 	supernode.o \
 	hashtree_protection.o\
+	file_crypto.o \
 	main.o
 
 

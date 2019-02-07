@@ -78,11 +78,6 @@ struct nexus_backend_impl {
 
     int (*volume_close)(struct nexus_uuid * uuid);
 
-    // int (*user_add)(struct nexus_uuid * vol_uuid,
-    //                 struct nexus_key  * user_pub_key,
-    //                 char              * user_name);
-
-    // int (*user_del)(struct nexus_uuid * vol_uuid, struct nexus_key * user_name);
 
     /**
      * Creates a new file
@@ -91,7 +86,6 @@ struct nexus_backend_impl {
                      char                 * dirpath,
                      char                 * plain_name,
                      nexus_dirent_type_t    type,
-                     nexus_file_mode_t      mode,
                      struct nexus_uuid    * uuid,
                      void                 * priv_data);
 
@@ -113,12 +107,6 @@ struct nexus_backend_impl {
                      nexus_stat_flags_t     stat_flags,
                      struct nexus_stat    * nexus_stat,
                      void                 * priv_data);
-
-    int (*fs_setattr)(struct nexus_volume   * volume,
-                      char                  * path,
-                      struct nexus_fs_attr  * attrs,
-                      nexus_fs_attr_flags_t   flags,
-                      void                  * priv_data);
 
     int (*fs_filldir)(struct nexus_volume  * volume,
                       char                 * dirpath,
@@ -166,23 +154,35 @@ struct nexus_backend_impl {
                      bool                    * should_remove,
                      void                    * priv_data);
 
-    int (*fs_encrypt)(struct nexus_volume * volume,
-                      char                * path,
-                      uint8_t             * in_buf,
-                      uint8_t             * out_buf,
-                      size_t                offset,
-                      size_t                size,
-                      size_t                filesize,
-                      void                * priv_data);
 
-    int (*fs_decrypt)(struct nexus_volume * volume,
-                      char                * path,
-                      uint8_t             * in_buf,
-                      uint8_t             * out_buf,
-                      size_t                offset,
-                      size_t                size,
-                      size_t                filesize,
-                      void                * priv_data);
+    int (*fs_truncate)(struct nexus_volume   * volume,
+                       char                  * path,
+                       size_t                  size,
+                       struct nexus_stat     * stat,
+                       void                  * priv_data);
+
+
+    struct nexus_file_crypto *
+    (*fs_file_encrypt_start)(struct nexus_volume * volume, char * filepath, size_t filesize, void * priv_data);
+
+    struct nexus_file_crypto *
+    (*fs_file_decrypt_start)(struct nexus_volume * volume, char * filepath, void * priv_data);
+
+    int (*fs_file_crypto_seek)(struct nexus_file_crypto * file_crypto, size_t offset);
+
+    int (*fs_file_crypto_encrypt)(struct nexus_file_crypto * file_crypto,
+                                  const uint8_t            * plaintext_input,
+                                  uint8_t                  * encrypted_output,
+                                  size_t                     size,
+                                  size_t                   * processed_bytes);
+
+    int (*fs_file_crypto_decrypt)(struct nexus_file_crypto * file_crypto,
+                                  uint8_t                  * decrypted_output,
+                                  size_t                     size,
+                                  size_t                   * processed_bytes);
+
+    int (*fs_file_crypto_finish)(struct nexus_file_crypto * file_crypto);
+
 
     int (*user_list)(struct nexus_volume * volume, void * priv_data);
 
@@ -201,86 +201,13 @@ struct nexus_backend_impl {
 };
 
 
-#define nexus_register_backend(backend)							\
-    static struct nexus_backend_impl * _nexus_backend					\
-    __attribute__((used))								\
-	 __attribute__((unused, __section__("_nexus_backends"),				\
-			aligned(sizeof(void *))))					\
-	 = &backend;
-
-
-
+#define nexus_register_backend(backend)                                                            \
+    static struct nexus_backend_impl * _nexus_backend __attribute__((used))                        \
+        __attribute__((unused, __section__("_nexus_backends"), aligned(sizeof(void *))))           \
+        = &backend;
 
 int
 nexus_backend_init();
 
 int
 nexus_backend_exit();
-
-
-
-
-
-
-
-#if 0
-
-// authenticates with the backend
-
-extern int
-nexus_backend_authenticate(struct nexus_supernode * supernode,
-			   struct nexus_vol_key   * vol_key,
-			   struct nexus_pub_key   * pub_key,
-			   struct nexus_prv_key   * prv_key);
-
-
-
-
-
-
-
-// volume management
-extern int
-backend_volume_create(struct uuid *      supernode_uuid,
-                      struct uuid *      root_uuid,
-		      char *       publickey_fpath,
-                      struct supernode * supernode_out,
-                      struct dirnode *   dirnode_out,
-                      struct volumekey * volume_out);
-
-// dirnode management
-extern int
-backend_dirnode_new(struct uuid *     dirnode_uuid,
-                    struct uuid *     root_uuid,
-                    struct dirnode ** p_dirnode);
-
-extern int
-backend_dirnode_add(struct dirnode *    parent_dirnode,
-                    struct uuid *       uuid,
-                    const char *        fname,
-                    nexus_fs_obj_type_t type);
-
-extern int
-backend_dirnode_find_by_uuid(struct dirnode *      dirnode,
-                             struct uuid *         uuid,
-                             char **               p_fname,
-                             nexus_fs_obj_type_t * p_type);
-
-extern int
-backend_dirnode_find_by_name(struct dirnode *      dirnode,
-                             char *                fname,
-                             struct uuid *         uuid,
-                             nexus_fs_obj_type_t * p_type);
-
-extern int
-backend_dirnode_remove(struct dirnode *      dirnode,
-                       char *                fname,
-                       struct uuid *         uuid,
-                       nexus_fs_obj_type_t * p_type);
-
-extern int
-backend_dirnode_serialize(struct dirnode *  dirnode,
-                          struct dirnode ** p_sealed_dirnode);
-
-
-#endif

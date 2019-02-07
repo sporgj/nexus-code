@@ -4,7 +4,6 @@
 
 #include <nexus_hashtable.h>
 
-#define HASHTABLE_SIZE 127
 
 struct buffer_manager {
     struct nexus_hashtable * buffers_table;
@@ -15,7 +14,21 @@ struct buffer_manager {
 };
 
 
-void
+
+static int
+uuid_equal_func(uintptr_t key1, uintptr_t key2)
+{
+    return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
+}
+
+static uint32_t
+uuid_hash_func(uintptr_t key)
+{
+    return nexus_uuid_hash((struct nexus_uuid *)key);
+}
+
+
+static void
 free_buf(struct metadata_buf * buf)
 {
     nexus_free(buf->addr);
@@ -27,7 +40,7 @@ buffer_manager_init()
 {
     struct buffer_manager * buf_manager = nexus_malloc(sizeof(struct buffer_manager));
 
-    buf_manager->buffers_table = nexus_create_htable(HASHTABLE_SIZE,
+    buf_manager->buffers_table = nexus_create_htable(128,
                                                      uuid_hash_func,
                                                      uuid_equal_func);
 
@@ -43,9 +56,22 @@ buffer_manager_init()
 void
 buffer_manager_destroy(struct buffer_manager * buf_manager)
 {
-    // TODO: free buf->addr
-    // only free the values
-    nexus_free_htable(buf_manager->buffers_table, 1, 0);
+    struct nexus_hashtable_iter * iter = nexus_htable_create_iter(buf_manager->buffers_table);
+
+    if (iter->entry) {
+        struct metadata_buf * metadata_buf = NULL;
+
+        do {
+            metadata_buf = (struct metadata_buf *)nexus_htable_get_iter_value(iter);
+
+            free_buf(metadata_buf);
+        } while(nexus_htable_iter_advance(iter));
+    }
+
+    nexus_htable_free_iter(iter);
+
+    // only frees the table
+    nexus_free_htable(buf_manager->buffers_table, 0, 0);
     nexus_free(buf_manager);
 }
 

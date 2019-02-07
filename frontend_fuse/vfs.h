@@ -133,6 +133,9 @@ struct my_dir {
 };
 
 
+extern uid_t current_user_id;
+
+
 int
 vfs_init();
 
@@ -216,6 +219,9 @@ file_read(struct my_file * file_ptr,
           size_t           size,
           uint8_t        * output_buffer,
           size_t         * output_buflen);
+
+const uint8_t *
+file_read_dataptr(struct my_file * file_ptr, size_t offset, size_t len, size_t * readable_bytes);
 
 int
 file_write(struct my_file * file_ptr,

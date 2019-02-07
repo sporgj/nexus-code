@@ -6,7 +6,12 @@
 #include <nexus_key.h>
 #include <nexus_mac.h>
 
+#include <tweetnacl.h>
+
 #include "crypto_context.h"
+
+#define crypto_randombytes  randombytes
+
 
 // ---- GCM stuff ----
 #define GCM128_KEY_SIZE (16)
@@ -18,8 +23,11 @@
 
 
 struct ecdh_public_key;
-struct ecdh_secret_key;
 struct ecdh_nonce;
+
+struct ecdh_secret_key {
+    uint8_t  bytes[crypto_box_SECRETKEYBYTES];
+} __attribute__((packed));
 
 
 #define CRYPTO_BUFFER_SIZE 4096 // let's try 4KB
@@ -86,9 +94,9 @@ crypto_gcm_decrypt(struct nexus_crypto_ctx * crypto_context,
 uint8_t *
 crypto_ecdh_encrypt(struct ecdh_public_key  * pk,
                     struct ecdh_secret_key  * sk,
-                    uint8_t            * data,
-                    size_t               in_len,
-                    int                * out_len,
+                    uint8_t                 * data,
+                    size_t                    in_len,
+                    int                     * out_len,
                     struct ecdh_nonce       * nonce);
 
 /**
@@ -97,10 +105,10 @@ crypto_ecdh_encrypt(struct ecdh_public_key  * pk,
 uint8_t *
 crypto_ecdh_decrypt(struct ecdh_public_key  * pk,
                     struct ecdh_secret_key  * sk,
-                    uint8_t            * data,
-                    size_t               total_len,
-                    int                * plain_len,
-                    int                * offset,
+                    uint8_t                 * data,
+                    size_t                    total_len,
+                    int                     * plain_len,
+                    int                     * offset,
                     struct ecdh_nonce       * nonce);
 
 

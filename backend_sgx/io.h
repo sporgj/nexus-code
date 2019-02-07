@@ -1,7 +1,46 @@
 #pragma once
 
+#include <nexus_fs.h>
+
+/**
+ * Manages all the I/O operations on disk. Called from ocalls and during file crypto
+ *
+ * @author Judicael Briand Djoko <jbriand@cs.pitt.edu>
+ */
+
 struct sgx_backend;
 
+struct metadata_buf;
+
+
+typedef enum {
+    FILE_ENCRYPT = 1,
+    FILE_DECRYPT = 2
+} file_crypto_mode;
+
+
+// structure manages the streaming interface for encrypting/decrypting file content
+struct nexus_file_crypto {
+    file_crypto_mode     mode;
+
+    size_t               trusted_xfer_id;
+
+    size_t               offset; // current_offset
+
+    size_t               filesize;
+
+    char               * filepath;
+
+    struct metadata_buf * metadata_buf;
+
+    struct sgx_backend * sgx_backend;
+};
+
+
+
+// ------------------------
+//  metadata operations
+// ------------------------
 
 uint8_t *
 io_buffer_alloc(struct nexus_uuid * uuid, size_t size, struct nexus_volume * volume);
@@ -35,16 +74,34 @@ io_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 int
 io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 
-int
-io_buffer_hardlink(struct nexus_uuid   * link_uuid,
-                   struct nexus_uuid   * target_uuid,
-                   struct nexus_volume * volume);
 
 int
-io_buffer_rename(struct nexus_uuid   * from_uuid,
-                 struct nexus_uuid   * to_uuid,
-                 struct nexus_volume * volume);
+io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend * sgx_backend);
 
+
+// ------------------------
+//  file crypto operations
+// ------------------------
+
+struct nexus_file_crypto *
+io_file_crypto_start(int                  trusted_xfer_id,
+                     struct nexus_uuid  * uuid,
+                     file_crypto_mode     mode,
+                     size_t               filesize,
+                     char               * filepath,
+                     struct sgx_backend * sgx_backend);
 
 int
-io_manager_flush_dirty(struct sgx_backend * sgx_backend);
+io_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset);
+
+int
+io_file_crypto_read(struct nexus_file_crypto * file_crypto, uint8_t * output_buffer, size_t nbytes);
+
+int
+io_file_crypto_write(struct nexus_file_crypto  * file_crypto,
+                     const uint8_t             * input_buffer,
+                     size_t                      nbytes);
+
+int
+io_file_crypto_finish(struct nexus_file_crypto * file_crypto);
+

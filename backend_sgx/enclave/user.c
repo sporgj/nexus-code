@@ -10,8 +10,6 @@ struct __user {
     char               name[NEXUS_MAX_NAMELEN]; // XXX  future 0 byte array impl...
 } __attribute__((packed));
 
-// my initial iteration has the usertable embedded inside the supernode (which is
-// practically empty at this point).
 struct __table_hdr {
     struct nexus_uuid my_uuid;
 

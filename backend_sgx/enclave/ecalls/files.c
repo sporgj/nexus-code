@@ -1,192 +1,14 @@
 #include "../enclave_internal.h"
 
-static int
-__nxs_chunk_crypto(struct nexus_filenode * filenode,
-                   uint8_t               * input_buffer_in,
-                   uint8_t               * output_buffer_in,
-                   size_t                  offset,
-                   size_t                  size,
-                   size_t                  filesize,
-                   nexus_crypto_mode_t     mode)
-{
-    struct nexus_data_buf * data_buffer  = NULL;
-
-    struct nexus_crypto_ctx * crypto_ctx = NULL;
-
-    int ret = -1;
-
-
-    crypto_ctx = filenode_get_chunk(filenode, offset);
-
-    if (crypto_ctx == NULL) {
-        log_error("filenode_get_chunk(offset=%zu)\n", offset);
-        return -1;
-    }
-
-    if (mode == NEXUS_ENCRYPT) {
-        nexus_crypto_ctx_generate(crypto_ctx);
-    }
-
-
-    data_buffer = nexus_data_buf_new(crypto_ctx, global_chunk_size, mode);
-
-    if (data_buffer == NULL) {
-        log_error("could not create a new data_buffer\n");
-        return -1;
-    }
-
-
-    ret = nexus_data_buf_write(data_buffer, input_buffer_in, output_buffer_in, size);
-
-    if (ret != 0) {
-        log_error("could not write data_buffer\n");
-        goto out;
-    }
-
-    // store the generated mac
-    if (mode == NEXUS_ENCRYPT) {
-        nexus_data_buf_flush(data_buffer, &crypto_ctx->mac);
-    } else {
-        // DECRYPT
-        struct nexus_mac computed_mac;
-
-        nexus_data_buf_flush(data_buffer, &computed_mac);
-
-        if (nexus_mac_compare(&crypto_ctx->mac, &computed_mac)) {
-            ret = -1;
-            log_error("mac comparison FAILED\n");
-            goto out;
-        }
-    }
-
-    ret = 0;
-out:
-    nexus_data_buf_free(data_buffer);
-
-    return ret;
-}
-
-int
-__nxs_fs_crypto(char              * filepath_IN,
-                uint8_t           * input_buffer_in,
-                uint8_t           * output_buffer_in,
-                size_t              offset,
-                size_t              size,
-                size_t              filesize,
-                nexus_crypto_mode_t mode)
-{
-    struct nexus_metadata * metadata = NULL;
-
-    nexus_io_flags_t io_mode = (mode == NEXUS_ENCRYPT) ? NEXUS_FRDWR : NEXUS_FREAD;
-
-    int ret = -1;
-
-
-    metadata = nexus_vfs_get(filepath_IN, io_mode);
-
-    if (metadata == NULL) {
-        log_error("could not get metadata (%s)\n", filepath_IN);
-        return -1;
-    }
-
-    if (mode == NEXUS_ENCRYPT) {
-        ret = filenode_set_filesize(metadata->filenode, filesize);
-
-        if (ret != 0) {
-            log_error("filenode_set_filesize(%zu) FAILED\n", filesize);
-            goto out;
-        }
-    }
-
-    ret = __nxs_chunk_crypto(metadata->filenode,
-                             input_buffer_in,
-                             output_buffer_in,
-                             offset,
-                             size,
-                             filesize,
-                             mode);
-
-    if (ret != 0) {
-        log_error("chunk processing failed\n");
-        goto out;
-    }
-
-
-    ret = nexus_metadata_store(metadata);
-
-    if (ret != 0) {
-        log_error("nexus_metadata_store FAILED\n");
-        goto out;
-    }
-
-    ret = 0;
-out:
-    nexus_vfs_put(metadata);
-
-    return ret;
-}
-
-
-int
-ecall_fs_encrypt(char    * filepath_IN,
-                 uint8_t * input_buffer_in,
-                 uint8_t * output_buffer_in,
-                 size_t    offset,
-                 size_t    size,
-                 size_t    filesize)
-{
-    int ret = -1;
-
-    sgx_spin_lock(&vfs_ops_lock);
-
-    ret  = __nxs_fs_crypto(filepath_IN,
-                           input_buffer_in,
-                           output_buffer_in,
-                           offset,
-                           size,
-                           filesize,
-                           NEXUS_ENCRYPT);
-
-    sgx_spin_unlock(&vfs_ops_lock);
-
-    return ret;
-}
-
-int
-ecall_fs_decrypt(char    * filepath_IN,
-                 uint8_t * input_buffer_in,
-                 uint8_t * output_buffer_in,
-                 size_t    offset,
-                 size_t    size,
-                 size_t    filesize)
-{
-    int ret = -1;
-
-    sgx_spin_lock(&vfs_ops_lock);
-
-    ret  = __nxs_fs_crypto(filepath_IN,
-                           input_buffer_in,
-                           output_buffer_in,
-                           offset,
-                           size,
-                           filesize,
-                           NEXUS_DECRYPT);
-
-    sgx_spin_unlock(&vfs_ops_lock);
-
-    return ret;
-}
-
 int
 ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
 {
     struct nexus_metadata * metadata = NULL;
-    struct nexus_filenode * filenode = NULL;
 
 
     sgx_spin_lock(&vfs_ops_lock);
 
-    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR | NEXUS_IO_FCRYPTO | NEXUS_IO_FNODE);
 
     if (metadata == NULL) {
         log_error("could not get metadata (%s)\n", filepath_IN);
@@ -195,10 +17,8 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
     }
 
 
-    filenode = metadata->filenode;
-
     // TODO check access control
-    filenode_set_filesize(filenode, size);
+    filenode_set_filesize(metadata->filenode, size);
 
     if (nexus_metadata_store(metadata)) {
         nexus_vfs_put(metadata);
@@ -213,4 +33,108 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
     sgx_spin_unlock(&vfs_ops_lock);
 
     return 0;
+}
+
+
+
+int
+__nxs_file_crypto_start(char              * filepath_IN,
+                        size_t              filesize,
+                        nexus_crypto_mode_t crypto_mode,
+                        int               * xfer_id_out,
+                        struct nexus_uuid * uuid_out,
+                        size_t            * filesize_out_opt)
+{
+    struct nexus_metadata * metadata = NULL;
+
+    nexus_io_flags_t io_mode = (crypto_mode == NEXUS_ENCRYPT) ? NEXUS_FRDWR : NEXUS_FREAD;
+
+    int xfer_id = -1;
+
+
+    sgx_spin_lock(&vfs_ops_lock);
+
+    io_mode |= NEXUS_IO_FCRYPTO;
+    metadata = nexus_vfs_get(filepath_IN, io_mode);
+
+    if (metadata == NULL) {
+        sgx_spin_unlock(&vfs_ops_lock);
+        log_error("could not get metadata (%s)\n", filepath_IN);
+        return -1;
+    }
+
+
+    if (crypto_mode == NEXUS_ENCRYPT && filenode_set_filesize(metadata->filenode, filesize)) {
+        log_error("filenode_set_filesize(%zu) FAILED\n", filesize);
+        goto out_err;
+    }
+
+
+    // the file crypto takes control of the metadata object
+    xfer_id = file_crypto_new(metadata, crypto_mode);
+
+    if (xfer_id == -1) {
+        log_error("file_crypto_new() FAILED\n");
+        goto out_err;
+    }
+
+
+    if (filesize_out_opt) {
+        *filesize_out_opt = metadata->filenode->filesize;
+    }
+
+    *xfer_id_out = xfer_id;
+
+    nexus_uuid_copy(&metadata->uuid, uuid_out);
+
+    sgx_spin_unlock(&vfs_ops_lock);
+
+    return 0;
+
+out_err:
+    nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
+    return -1;
+}
+
+int
+ecall_fs_file_encrypt_start(char *              filepath_IN,
+                            size_t              filesize,
+                            int *               xfer_id_out,
+                            struct nexus_uuid * uuid_out)
+{
+    return __nxs_file_crypto_start(filepath_IN, filesize, NEXUS_ENCRYPT, xfer_id_out, uuid_out, NULL);
+}
+
+int
+ecall_fs_file_decrypt_start(char *              filepath_IN,
+                            int *               xfer_id_out,
+                            struct nexus_uuid * uuid_out,
+                            size_t *            filesize_out)
+{
+    return __nxs_file_crypto_start(filepath_IN, 0, NEXUS_DECRYPT, xfer_id_out, uuid_out, filesize_out);
+}
+
+
+int
+ecall_fs_file_crypto_seek(int xfer_id, int offset)
+{
+    return file_crypto_seek(xfer_id, offset);
+}
+
+int
+ecall_fs_file_crypto_update(int       xfer_id,
+                            uint8_t * input_buffer_in,
+                            uint8_t * output_buffer_out,
+                            size_t    size,
+                            size_t *  processed_bytes)
+{
+    return file_crypto_update(xfer_id, input_buffer_in, output_buffer_out, size, processed_bytes);
+}
+
+
+int
+ecall_fs_file_crypto_finish(int xfer_id)
+{
+    return file_crypto_finish(xfer_id);
 }
