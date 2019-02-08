@@ -20,11 +20,6 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
         return -1;
     }
 
-    if (dirnode_hashtree_update(parent_dirnode, entry_uuid, &entry_mac, 1)) {
-        log_error("dirnode_update_direntry_mac FAILED\n");
-        return -1;
-    }
-
     return 0;
 }
 
