@@ -1169,10 +1169,15 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
 {
     struct list_head * curr = NULL;
 
-    struct nexus_dirent * dirent = NULL;
+    struct nexus_dirent * dirent = dirent_buffer_array;
 
-    int pos = 0;
+    int copied = 0;
 
+
+    if (dirent_buffer_count < 1) {
+        log_error("the dirent buffer count is invalid (%zu)\n", dirent_buffer_count);
+        return -1;
+    }
 
     if (offset >= dirnode->dir_entry_count) {
         // I'm not completely sure if this is the better approach. But this makes
@@ -1183,35 +1188,29 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
         return 0;
     }
 
-    list_for_each(curr, &dirnode->dirents_list) {
-        if (offset == 0) {
-            break;
-        }
-
-        offset -= 1;
-    }
-
-    dirent = dirent_buffer_array;
-
     // copy data into the buffer
     list_for_each(curr, &dirnode->dirents_list) {
-        struct dir_entry * dir_entry = __dir_entry_from_dirents_list(curr);
-
-        pos += 1;
-
-        if (pos == dirent_buffer_count) {
-            break;
+        if (offset) {
+            offset -= 1;
+            continue;
         }
+
+        struct dir_entry * dir_entry = __dir_entry_from_dirents_list(curr);
 
         nexus_uuid_copy(&dir_entry->dir_rec.link_uuid, &dirent->uuid);
         strncpy(dirent->name, dir_entry->dir_rec.name, NEXUS_NAME_MAX);
         dirent->type = dir_entry->dir_rec.type;
 
+        copied += 1;
         dirent += 1;
+
+        if (copied == dirent_buffer_count) {
+            break;
+        }
     }
 
     *directory_size = dirnode->dir_entry_count;
-    *result_count = pos;
+    *result_count = copied;
 
     return 0;
 }
