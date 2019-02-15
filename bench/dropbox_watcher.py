@@ -38,7 +38,7 @@ def is_dropbox_running():
     return "dropbox" in cmdline
 
 
-def poll_dropbox_status(timeout_secs=CHECK_TIMEOUT_SECONDS):
+def poll_dropbox_status(timeout_secs=CHECK_TIMEOUT_SECONDS, elapsed_time={}):
     '''
     Loops and queryies the dropbox socket to get the status
 
@@ -58,25 +58,30 @@ def poll_dropbox_status(timeout_secs=CHECK_TIMEOUT_SECONDS):
     sock.send("get_dropbox_status\ndone\n".encode())
 
     first_time = time.monotonic()
-    start_time = 0
+    last_time = 0
+    sync_time = 0
 
     while True:
         data = str(sock.recv(4096))
 
         if data.find("Up to date") != -1:
-            if start_time > 0:
-                # print("\nYAY!!! time = {:.6f}s".format(time.monotonic() - start_time))
+            if sync_time > 0:
+                last_time = time.monotonic()
+                # print("\nYAY!!! time = {:.6f}s".format(time.monotonic() - sync_time))
                 break
-        elif data.find("Syncing") != -1 and start_time == 0:
-            start_time = time.monotonic()
+        elif data.find("Syncing") != -1 and sync_time == 0:
+            sync_time = time.monotonic()
 
         sock.send("get_dropbox_status\ndone\n".encode())
 
         time.sleep(CHECK_INTERVAL_SECONDS)
 
-        if start_time == 0 and (time.monotonic() - first_time) > timeout_secs:
+        if sync_time == 0 and (time.monotonic() - first_time) > timeout_secs:
+            last_time = time.monotonic()
+            elapsed_time['time'] = last_time - first_time
             sock.close()
             return DROPBOX_STATUS_TIMEOUT
 
     sock.close()
+    elapsed_time['time'] = last_time - first_time
     return DROPBOX_STATUS_OK
