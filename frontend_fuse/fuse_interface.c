@@ -331,11 +331,10 @@ nxs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
     struct my_dentry    * dentry  = vfs_get_dentry(ino, &inode);
     struct nexus_dirent * entries = NULL;
 
-    size_t real_offset    = off; // FIXME: this MIGHT only works for off=0
     size_t result_count   = 0;
     size_t directory_size = 0;
 
-    off_t next_offset = real_offset;
+    off_t next_offset     = dir_ptr->readdir_offset;
 
     char * readdir_buffer = NULL;
     char * readdir_ptr    = NULL;
@@ -355,7 +354,7 @@ nxs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
         return;
     }
 
-    entries = nexus_fuse_readdir(dentry, real_offset, &result_count, &directory_size);
+    entries = nexus_fuse_readdir(dentry, dir_ptr->readdir_offset, &result_count, &directory_size);
 
     if (entries == NULL) {
         code = EINVAL;
