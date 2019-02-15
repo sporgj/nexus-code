@@ -269,7 +269,6 @@ file_write(struct my_file * file_ptr,
 
         if (chunk == NULL) {
             log_error("chunk not found (file=%s, offset=%zu)\n", file_ptr->filepath, curpos);
-            pthread_rwlock_unlock(&file_ptr->io_lock);
             return -1;
         }
 
@@ -314,6 +313,10 @@ file_open(struct my_dentry * dentry, int fid, int flags)
         file_ptr->offset = file_ptr->inode->filesize;
     }
 
+    pthread_mutex_lock(&file_ptr->inode->lock);
+    file_ptr->inode->openers += 1;
+    pthread_mutex_unlock(&file_ptr->inode->lock);
+
     pthread_rwlock_init(&file_ptr->io_lock, NULL);
 
     return file_ptr;
@@ -322,6 +325,10 @@ file_open(struct my_dentry * dentry, int fid, int flags)
 void
 file_close(struct my_file * file_ptr)
 {
+    pthread_mutex_lock(&file_ptr->inode->lock);
+    file_ptr->inode->openers -= 1;
+    pthread_mutex_unlock(&file_ptr->inode->lock);
+
     dentry_put(file_ptr->dentry);
     nexus_free(file_ptr->filepath);
     nexus_free(file_ptr);

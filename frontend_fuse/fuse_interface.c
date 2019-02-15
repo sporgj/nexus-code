@@ -613,6 +613,11 @@ nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
 
     fuse_reply_err(req, 0);
 
+    if (inode->attrs.stat_info.link_count <= 1) {
+        // XXX:
+        inode->is_deleted = true;
+    }
+
     inode_put(inode);
 }
 

@@ -52,6 +52,7 @@ struct my_inode {
 
     bool                   is_dirty;
 
+    bool                   is_deleted;
 
     size_t                 dentry_count;
 
@@ -68,6 +69,7 @@ struct my_inode {
     struct list_head       file_chunks;
 
 
+    size_t                 openers;
     pthread_mutex_t        lock;
 };
 

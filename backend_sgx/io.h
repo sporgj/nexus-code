@@ -21,19 +21,25 @@ typedef enum {
 
 // structure manages the streaming interface for encrypting/decrypting file content
 struct nexus_file_crypto {
-    file_crypto_mode     mode;
+    size_t                      trusted_xfer_id;
 
-    size_t               trusted_xfer_id;
+    size_t                      filesize;
 
-    size_t               offset; // current_offset
 
-    size_t               filesize;
 
-    char               * filepath;
+    file_crypto_mode            mode;
 
-    struct metadata_buf * metadata_buf;
+    size_t                      offset; // current_offset
 
-    struct sgx_backend * sgx_backend;
+    char                      * filepath;
+
+
+    struct nexus_file_handle  * file_handle;
+
+
+    struct metadata_buf       * metadata_buf;
+
+    struct sgx_backend        * sgx_backend;
 };
 
 

@@ -1,14 +1,12 @@
 /**
  * Manages buffer_manager allocated in untrusted memory
  */
-
 #pragma once
 
+#include <stdint.h>
+#include <sys/time.h>
 
-struct __filenode_info {
-    uint32_t    metadata_size;
-    uint32_t    filesize;
-} __attribute__((packed));
+#include <nexus_fs.h>
 
 
 struct metadata_buf {
@@ -18,13 +16,16 @@ struct metadata_buf {
 
     size_t                     size;
 
-    size_t                     timestamp; // last time it was read on disk
+    time_t                     timestamp; // last time it was read on disk
 
-    size_t                     locked_file_read_offset; // offset where metadata is stored
-  
-    nexus_io_flags_t           locked_file_flags;
 
-    struct nexus_file_handle * locked_file; // when writing to a metadata object
+    size_t                     openers;
+
+    nexus_io_flags_t           handle_flags;
+
+    struct nexus_file_handle * file_handle; // when writing to a metadata object
+
+    struct sgx_backend       * sgx_backend;
 };
 
 
@@ -63,3 +64,5 @@ buffer_manager_find(struct buffer_manager * buffer_manager, struct nexus_uuid * 
 void
 buffer_manager_del(struct buffer_manager * buffer_manager, struct nexus_uuid * uuid);
 
+void
+__free_metadata_buf(struct metadata_buf * buf);
