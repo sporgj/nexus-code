@@ -220,8 +220,8 @@ __open_metadata_file(struct metadata_buf * metadata_buf, nexus_io_flags_t flags)
         return __acquire_metadata_buf(metadata_buf);
     }
 
-
-    metadata_buf->file_handle = nexus_datastore_fopen(volume->metadata_store, &metadata_buf->uuid, NULL, flags);
+    metadata_buf->file_handle
+        = nexus_datastore_fopen(volume->metadata_store, &metadata_buf->uuid, NULL, flags);
 
     if (metadata_buf->file_handle == NULL) {
         log_error("nexus_datastore_fopen FAILED\n");
@@ -267,6 +267,26 @@ __read_metadata_file(struct metadata_buf * metadata_buf)
 }
 
 
+static inline int
+__flush_metadata_file(struct metadata_buf * metadata_buf)
+{
+    struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
+
+    if (metadata_buf->is_dirty == false) {
+        return 0;
+    }
+
+    if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
+        log_error("nexus_datastore_fflush() FAILED\n");
+        return -1;
+    }
+
+    metadata_buf->is_dirty = false;
+
+    metadata_buf->last_write = time(NULL);
+
+    return 0;
+}
 
 
 static inline uint8_t *
@@ -402,8 +422,8 @@ __io_buffer_put(struct nexus_uuid   * uuid,
         goto out_err;
     }
 
-    if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
-        log_error("nexus_datastore_fflush() FAILED\n");
+    if (__flush_metadata_file(metadata_buf)) {
+        log_error("__flush_metadata_file() FAILED\n");
         goto out_err;
     }
 
@@ -437,7 +457,6 @@ io_buffer_put(struct nexus_uuid   * uuid,
     return ret;
 }
 
-
 static inline struct metadata_buf *
 __io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
 {
@@ -458,6 +477,25 @@ __io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_
     return metadata_buf;
 }
 
+
+// TODO rework this
+static inline struct metadata_buf *
+__io_buffer_trylock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
+{
+    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
+
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+
+
+    // if we are in batch mode, trylock just returns the buffer
+    if (metadata_buf && sgx_backend->buf_manager->batch_mode) {
+        return metadata_buf;
+    }
+
+    return __io_buffer_lock(uuid, flags, volume);
+}
+
+
 struct metadata_buf *
 io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
 {
@@ -465,7 +503,7 @@ io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_vo
 
     BACKEND_SGX_IOBUF_START(IOBUF_LOCK);
 
-    result = __io_buffer_lock(uuid, flags, volume);
+    result = __io_buffer_trylock(uuid, flags, volume);
 
     BACKEND_SGX_IOBUF_FINISH(IOBUF_LOCK);
 
@@ -748,4 +786,66 @@ out_err:
     __release_metadata_buf(metadata_buf, file_handle);
 
     return -1;
+}
+
+
+static int
+__sync_fnode_metadata_file(struct metadata_buf * metadata_buf)
+{
+    // TODO
+    return -1;
+}
+
+int
+__io_sync_all_buffers(struct sgx_backend * backend)
+{
+    struct metadata_buf * metadata_buf = NULL;
+    struct nexus_hashtable_iter * iter = NULL;
+
+    int ret = -1;
+
+
+    pthread_mutex_lock(&backend->batch_mutex);
+    iter = nexus_htable_create_iter(backend->buf_manager->buffers_table);
+
+    if (!iter->entry) {
+        ret = 0;
+        goto out;
+    }
+
+
+    do {
+        metadata_buf = (struct metadata_buf *)nexus_htable_get_iter_value(iter);
+
+        if (metadata_buf->is_dirty == false) {
+            continue;
+        }
+
+        if (mode & NEXUS_IO_FNODE) {
+            ret = __sync_fnode_metadata_file(metadata_buf);
+        } else {
+            ret = __flush_metadata_file(metadata_buf);
+        }
+
+        if (ret != 0) {
+            log_error("could not flush metadata file\n");
+            goto out;
+        }
+    } while(nexus_htable_iter_advance(iter));
+
+
+    ret = 0;
+out:
+    nexus_htable_free_iter(iter);
+
+    pthread_mutex_unlock(&backend->batch_mutex);
+
+    return ret;
+}
+
+
+int
+io_sync_all_buffers(struct sgx_backend * backend)
+{
+    return __io_sync_all_buffers(backend);
 }

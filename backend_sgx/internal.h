@@ -26,6 +26,7 @@
 #include "key_buffer.h"
 #include "io.h"
 #include "exports.h"
+#include "commander.h"
 
 
 // For every run of NeXUS, there will be a unique instance
@@ -50,6 +51,10 @@ struct sgx_backend {
     struct nexus_volume         * volume;
 
     char                        * enclave_path;
+
+
+    // are we batching the writes to memory?
+    bool                          batch_mode;
 };
 
 

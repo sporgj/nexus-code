@@ -10,27 +10,40 @@
 
 
 struct metadata_buf {
-    struct nexus_uuid          uuid;
+    struct nexus_uuid             uuid;
 
-    uint8_t                  * addr;
+    uint8_t                     * addr;
 
-    size_t                     size;
+    size_t                        size;
 
-    time_t                     timestamp; // last time it was read on disk
+    time_t                        timestamp; // last time it was read on disk
 
 
-    size_t                     openers;
+    size_t                        openers;
 
-    nexus_io_flags_t           handle_flags;
+    nexus_io_flags_t              handle_flags;
 
-    struct nexus_file_handle * file_handle; // when writing to a metadata object
 
-    struct sgx_backend       * sgx_backend;
+    bool                          is_dirty; // if it is unflushed
+
+    time_t                        last_write;
+
+    struct nexus_file_handle    * file_handle; // file handle to the datastore
+
+    struct sgx_backend          * sgx_backend;
 };
 
 
+struct buffer_manager {
+    struct nexus_hashtable      * buffers_table;
 
-struct buffer_manager;
+    size_t                        table_size;
+
+    // TODO it may be helpful to have the total size occupied by the buffers
+
+    pthread_mutex_t               batch_mutex;
+    bool                          batch_mode;
+};
 
 struct buffer_manager *
 buffer_manager_init();
@@ -66,3 +79,10 @@ buffer_manager_del(struct buffer_manager * buffer_manager, struct nexus_uuid * u
 
 void
 __free_metadata_buf(struct metadata_buf * buf);
+
+
+int
+buffer_manager_enable_batch_mode(struct sgx_backend * backend);
+
+int
+buffer_manager_disable_batch_mode(struct sgx_backend * backend);
