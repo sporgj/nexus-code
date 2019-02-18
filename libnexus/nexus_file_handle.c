@@ -84,18 +84,25 @@ out:
     return NULL;
 }
 
-void
+int
 nexus_file_handle_close(struct nexus_file_handle * file_handle)
 {
     if (file_handle->is_locked) {
         flock(file_handle->fd, LOCK_UN);
     }
 
-    close(file_handle->fd);
+    int ret = close(file_handle->fd);
+
+    if (ret) {
+        log_error("closing (%s) FAILED\n", file_handle->filepath);
+        perror("handle_close:");
+    }
 
     nexus_free(file_handle->filepath);
 
     nexus_free(file_handle);
+
+    return ret;
 }
 
 int

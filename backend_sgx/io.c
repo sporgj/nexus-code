@@ -4,13 +4,14 @@
 #include <nexus_file_handle.h>
 
 
-
 struct __filenode_info {
     uint32_t    metadata_size;
     uint32_t    filedata_size;
 } __attribute__((packed));
 
 
+static int
+__flush_metadata_file(struct metadata_buf * metadata_buf);
 
 
 static inline size_t
@@ -81,8 +82,6 @@ __store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * fi
 {
     struct nexus_file_handle * file_handle = metadata_buf->file_handle;
 
-    struct nexus_volume      * volume      = metadata_buf->sgx_backend->volume;
-
     int nbytes = -1;
 
 
@@ -113,8 +112,8 @@ __store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * fi
         return -1;
     }
 
-    if (nexus_datastore_fflush(volume->metadata_store, file_handle)) {
-        log_error("nexus_datastore_fflush() FAILED\n");
+    if (__flush_metadata_file(metadata_buf)) {
+        log_error("flushing metadata_buf FAILED\n");
         return -1;
     }
 
@@ -186,23 +185,34 @@ __acquire_metadata_buf(struct metadata_buf * metadata_buf)
  * @param metadata_buf
  * @param handle
  */
-static void
+static int
 __release_metadata_buf(struct metadata_buf * metadata_buf, struct nexus_file_handle * handle)
 {
     struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
 
+    int ret = -1;
+
+
     if (handle == NULL || metadata_buf->openers == 0 || metadata_buf->file_handle != handle) {
         // TODO log a warning here
-        return;
+        return 0;
     }
 
     metadata_buf->openers -= 1;
 
-    if (metadata_buf->openers == 0) {
-        nexus_datastore_fclose(volume->metadata_store, metadata_buf->file_handle);
-        metadata_buf->file_handle  = NULL;
-        metadata_buf->handle_flags = 0;
+    if (metadata_buf->openers) {
+        return 0;
     }
+
+    ret = nexus_datastore_fclose(volume->metadata_store, metadata_buf->file_handle);
+    metadata_buf->file_handle  = NULL;
+    metadata_buf->handle_flags = 0;
+
+    if (ret != 0) {
+        log_error("nexus_datastore_fclose() FAILED\n");
+    }
+
+    return ret;
 }
 
 
@@ -267,6 +277,20 @@ __read_metadata_file(struct metadata_buf * metadata_buf)
 }
 
 
+static int
+__flush_metadata_file(struct metadata_buf * metadata_buf)
+{
+    struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
+
+    if (metadata_buf->sgx_backend->fsync_mode) {
+        if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
+            log_error("nexus_datastore_fflush() FAILED\n");
+            return -1;
+        }
+    }
+
+    return 0;
+}
 
 
 static inline uint8_t *
@@ -402,12 +426,15 @@ __io_buffer_put(struct nexus_uuid   * uuid,
         goto out_err;
     }
 
-    if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
-        log_error("nexus_datastore_fflush() FAILED\n");
+    if (__flush_metadata_file(metadata_buf)) {
+        log_error("__flush_metadata_file() FAILED\n");
         goto out_err;
     }
 
-    __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
+    if (__release_metadata_buf(metadata_buf, metadata_buf->file_handle)) {
+        log_error("__release_metadata_buf() FAILED\n");
+        return -1;
+    }
 
     __update_metadata_buf(metadata_buf, buffer, size, true);
 
@@ -416,7 +443,9 @@ __io_buffer_put(struct nexus_uuid   * uuid,
     return 0;
 
 out_err:
-    __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
+    if (__release_metadata_buf(metadata_buf, metadata_buf->file_handle)) {
+        log_error("__release_metadata_buf() FAILED\n");
+    }
 
     return -1;
 }
@@ -740,9 +769,7 @@ io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend
         goto out_err;
     }
 
-    __release_metadata_buf(metadata_buf, file_handle);
-
-    return 0;
+    return __release_metadata_buf(metadata_buf, file_handle);
 
 out_err:
     __release_metadata_buf(metadata_buf, file_handle);

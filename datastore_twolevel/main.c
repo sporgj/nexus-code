@@ -334,10 +334,10 @@ twolevel_fwrite(struct nexus_file_handle * file_handle,
     return 0;
 }
 
-void
+int
 twolevel_fclose(struct nexus_file_handle * file_handle, void * priv_data)
 {
-    nexus_file_handle_close(file_handle);
+    return nexus_file_handle_close(file_handle);
 }
 
 int

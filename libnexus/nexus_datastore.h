@@ -89,7 +89,7 @@ nexus_datastore_fwrite(struct nexus_datastore   * datastore,
                        uint8_t                  * buf,
                        size_t                     size);
 
-void
+int
 nexus_datastore_fclose(struct nexus_datastore   * datastore,
                        struct nexus_file_handle * file_handle);
 
@@ -279,7 +279,7 @@ struct nexus_datastore_impl {
     /**
      * Closes the file
      */
-    void (*fclose)(struct nexus_file_handle * file_handle, void * priv_data);
+    int (*fclose)(struct nexus_file_handle * file_handle, void * priv_data);
 
 
 

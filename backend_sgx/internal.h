@@ -46,6 +46,7 @@ struct sgx_backend {
 
     size_t                        mmap_len;
 
+    bool                          fsync_mode;   // flush the buffer explicitly
 
     struct nexus_volume         * volume;
 

@@ -250,11 +250,11 @@ nexus_datastore_fflush(struct nexus_datastore   * datastore,
     return datastore->impl->fflush(file_handle, datastore->priv_data);
 }
 
-void
+int
 nexus_datastore_fclose(struct nexus_datastore   * datastore,
                        struct nexus_file_handle * file_handle)
 {
-    datastore->impl->fclose(file_handle, datastore->priv_data);
+    return datastore->impl->fclose(file_handle, datastore->priv_data);
 }
 
 
