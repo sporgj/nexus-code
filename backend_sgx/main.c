@@ -66,6 +66,17 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
         }
     }
 
+    {
+        char * fsync_mode_str = NULL;
+
+        if (nexus_json_get_string(backend_cfg, "fsync_mode", &fsync_mode_str) == 0) {
+            if (strncmp("1", fsync_mode_str, 1) == 0) {
+                sgx_backend->fsync_mode = true;
+            }
+        }
+
+        nexus_printf("backend_sgx: fsync_mode=%s\n", (sgx_backend->fsync_mode ? "TRUE" : "FALSE"));
+    }
 
     // create the buffer_table
     {

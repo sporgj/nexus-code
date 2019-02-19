@@ -110,6 +110,42 @@ buffer_manager_del(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
 }
 
 
+static int
+initialize_local_datastore(struct buffer_manager * buf_manager, char * root_path)
+{
+    nexus_json_obj_t config_json = nexus_json_new_obj("data_store");
+
+    if (config_json == NEXUS_JSON_INVALID_OBJ) {
+        log_error("nexus_json_new_obj() FAILED\n");
+        return -1;
+    }
+
+    if (nexus_json_set_string(config_json, "name", "TWOLEVEL")) {
+        log_error("nexus_json_set_string FAILED\n");
+        goto out_err;
+    }
+
+    if (nexus_json_set_string(config_json, "root_path", root_path)) {
+        log_error("nexus_json_set_string FAILED\n");
+        goto out_err;
+    }
+
+    buf_manager->batch_datastore = nexus_datastore_create("TWOLEVEL", config_json);
+    if (buf_manager->batch_datastore == NULL) {
+        log_error("nexus_datastore_create() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_json_free(config_json);
+
+    return 0;
+
+out_err:
+    nexus_json_free(config_json);
+
+    return -1;
+}
+
 
 // I/O commands
 

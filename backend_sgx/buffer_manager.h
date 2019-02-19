@@ -19,16 +19,18 @@ struct metadata_buf {
     time_t                        timestamp; // last time it was read on disk
 
 
-    size_t                        openers;
-
     nexus_io_flags_t              handle_flags;
 
+    pthread_mutex_t               file_mutex;
 
-    bool                          is_dirty; // if it is unflushed
+    struct nexus_file_handle    * file_handle;  // file handle to the datastore
+
+    struct nexus_file_handle    * batch_file;   // used in batch mode
+
+
+    bool                          is_dirty;     // if it is unflushed
 
     time_t                        last_write;
-
-    struct nexus_file_handle    * file_handle; // file handle to the datastore
 
     struct sgx_backend          * sgx_backend;
 };
@@ -43,6 +45,8 @@ struct buffer_manager {
 
     pthread_mutex_t               batch_mutex;
     bool                          batch_mode;
+
+    struct nexus_datastore      * batch_datastore;
 };
 
 struct buffer_manager *

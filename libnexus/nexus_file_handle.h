@@ -22,7 +22,7 @@ struct nexus_file_handle {
 struct nexus_file_handle *
 nexus_file_handle_open(char * filepath, nexus_io_flags_t mode);
 
-void
+int
 nexus_file_handle_close(struct nexus_file_handle * file_handle);
 
 int

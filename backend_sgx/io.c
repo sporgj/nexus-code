@@ -1,8 +1,11 @@
-#include "internal.h"
+#include <pthread.h>
 #include <time.h>
+
 #include <nexus_datastore.h>
 #include <nexus_file_handle.h>
+#include <nexus_hashtable.h>
 
+#include "internal.h"
 
 
 struct __filenode_info {
@@ -11,6 +14,9 @@ struct __filenode_info {
 } __attribute__((packed));
 
 
+
+static int
+__flush_metadata_file(struct metadata_buf * metadata_buf);
 
 
 static inline size_t
@@ -81,8 +87,6 @@ __store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * fi
 {
     struct nexus_file_handle * file_handle = metadata_buf->file_handle;
 
-    struct nexus_volume      * volume      = metadata_buf->sgx_backend->volume;
-
     int nbytes = -1;
 
 
@@ -113,8 +117,8 @@ __store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * fi
         return -1;
     }
 
-    if (nexus_datastore_fflush(volume->metadata_store, file_handle)) {
-        log_error("nexus_datastore_fflush() FAILED\n");
+    if (__flush_metadata_file(metadata_buf)) {
+        log_error("flushing metadata_buf FAILED\n");
         return -1;
     }
 
@@ -131,6 +135,8 @@ __alloc_metadata_buf(struct nexus_uuid * uuid, struct sgx_backend * sgx_backend)
     nexus_uuid_copy(uuid, &buf->uuid);
 
     buf->sgx_backend = sgx_backend;
+
+    pthread_mutex_init(&buf->file_lock, NULL);
 
     return buf;
 }
@@ -166,6 +172,16 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
 }
 
 
+static struct nexus_file_handle *
+__metadata_buf_get_handle(struct metadata_buf * metadata_buf)
+{
+    if (metadata_buf->sgx_backend->buf_manager->batch_mode) {
+        return metadata_buf->batch_file;
+    }
+
+    return metadata_buf->file_handle;
+}
+
 /**
  * Returns a reference to the metadata buffer
  * @return metadata_buf->file_handle
@@ -173,36 +189,40 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
 static struct nexus_file_handle *
 __acquire_metadata_buf(struct metadata_buf * metadata_buf)
 {
-    if (metadata_buf->file_handle) {
-        metadata_buf->openers += 1;
-        return metadata_buf->file_handle;
+    struct nexus_file_handle * file_handle = __metadata_buf_get_handle(metadata_buf);
+
+    if (file_handle == NULL) {
+        return NULL;
     }
 
-    return NULL;
+    pthread_mutex_lock(&metadata_buf->file_mutex);
+
+    return file_handle;
 }
 
 /**
  * Returns the file handle unto the metadata_buf. Decrements the number of openers
  * @param metadata_buf
- * @param handle
  */
-static void
-__release_metadata_buf(struct metadata_buf * metadata_buf, struct nexus_file_handle * handle)
+static int
+__release_metadata_buf(struct metadata_buf * metadata_buf)
 {
     struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
 
-    if (handle == NULL || metadata_buf->openers == 0 || metadata_buf->file_handle != handle) {
+    if (metadata_buf->file_handle == NULL) {
         // TODO log a warning here
-        return;
+        return 0;
     }
 
-    metadata_buf->openers -= 1;
+    ret = nexus_datastore_fclose(volume->metadata_store, metadata_buf->file_handle);
+    metadata_buf->file_handle  = NULL;
+    metadata_buf->handle_flags = 0;
 
-    if (metadata_buf->openers == 0) {
-        nexus_datastore_fclose(volume->metadata_store, metadata_buf->file_handle);
-        metadata_buf->file_handle  = NULL;
-        metadata_buf->handle_flags = 0;
+    if (ret != 0) {
+        log_error("nexus_datastore_fclose() FAILED\n");
     }
+
+    return ret;
 }
 
 
@@ -266,19 +286,29 @@ __read_metadata_file(struct metadata_buf * metadata_buf)
     return 0;
 }
 
+static inline int
+__write_metadata_file(struct metadata_buf * metadata_buf, uint8_t * buffer, size_t size)
+{
+    struct nexus_file_handle * file_handle = metadata_buf->file_handle;
+
+    if (metadata_buf->sgx_backend->buf_manager->
+
+    if (nexus_datastore_fwrite(volume->metadata_store, metadata_buf->file_handle, buffer, size)) {
+        log_error("could not write metadata file\n");
+        goto out_err;
+    }
+}
 
 static inline int
 __flush_metadata_file(struct metadata_buf * metadata_buf)
 {
     struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
 
-    if (metadata_buf->is_dirty == false) {
-        return 0;
-    }
-
-    if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
-        log_error("nexus_datastore_fflush() FAILED\n");
-        return -1;
+    if (metadata_buf->sgx_backend->fsync_mode) {
+        if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
+            log_error("nexus_datastore_fflush() FAILED\n");
+            return -1;
+        }
     }
 
     metadata_buf->is_dirty = false;
@@ -347,7 +377,7 @@ read_datastore:
 
     // close the file if we are NOT in write/fcrypto mode
     if (!((flags & NEXUS_FWRITE) || (flags & NEXUS_IO_FCRYPTO))) {
-        __release_metadata_buf(metadata_buf, file_handle);
+        __release_metadata_buf(metadata_buf);
     }
 
     if (is_new) {
@@ -363,7 +393,7 @@ early_exit:
 
 out_err:
     if (file_handle) {
-        __release_metadata_buf(metadata_buf, file_handle);
+        __release_metadata_buf(metadata_buf);
     }
 
     if (metadata_buf && is_new) {
@@ -410,15 +440,12 @@ __io_buffer_put(struct nexus_uuid   * uuid,
 
     if (metadata_buf->handle_flags & NEXUS_IO_FCRYPTO) {
         // this will be saved in io_file_crypto_finish()
-        // we drop the refcount from __io_buffer_get
-
-        __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
         __update_metadata_buf(metadata_buf, buffer, size, true);
         return 0;
     }
 
-    if (nexus_datastore_fwrite(volume->metadata_store, metadata_buf->file_handle, buffer, size)) {
-        log_error("could not write metadata file\n");
+    if (__write_metadata_file(metadata_buf, buffer, size)) {
+        log_error("__write_metadata_file() FAILED\n");
         goto out_err;
     }
 
@@ -427,7 +454,10 @@ __io_buffer_put(struct nexus_uuid   * uuid,
         goto out_err;
     }
 
-    __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
+    if (__release_metadata_buf(metadata_buf) {
+        log_error("__release_metadata_buf() FAILED\n");
+        return -1;
+    }
 
     __update_metadata_buf(metadata_buf, buffer, size, true);
 
@@ -436,7 +466,9 @@ __io_buffer_put(struct nexus_uuid   * uuid,
     return 0;
 
 out_err:
-    __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
+    if (__release_metadata_buf(metadata_buf) {
+        log_error("__release_metadata_buf() FAILED\n");
+    }
 
     return -1;
 }
@@ -519,7 +551,7 @@ __io_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
     struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
     if (metadata_buf && metadata_buf->file_handle) {
-        __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
+        __release_metadata_buf(metadata_buf);
 
         return metadata_buf;
     }
@@ -623,7 +655,7 @@ io_file_crypto_start(int                  trusted_xfer_id,
     file_crypto->file_handle = __acquire_metadata_buf(file_crypto->metadata_buf);
 
     if (file_crypto->file_handle == NULL) {
-        log_error("__acquire_metadata_buf() returned NULL for %s", filepath);
+        log_error("__acquire_metadata_buf() returned NULL for %s\n", filepath);
         nexus_free(file_crypto);
         return NULL;
     }
@@ -723,7 +755,7 @@ io_file_crypto_finish(struct nexus_file_crypto * file_crypto)
 
     ret = 0;
 out:
-    __release_metadata_buf(file_crypto->metadata_buf, file_crypto->file_handle);
+    __release_metadata_buf(file_crypto->metadata_buf);
 
     nexus_free(file_crypto->filepath);
     nexus_free(file_crypto);
@@ -778,12 +810,10 @@ io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend
         goto out_err;
     }
 
-    __release_metadata_buf(metadata_buf, file_handle);
-
-    return 0;
+    return __release_metadata_buf(metadata_buf);
 
 out_err:
-    __release_metadata_buf(metadata_buf, file_handle);
+    __release_metadata_buf(metadata_buf);
 
     return -1;
 }
@@ -805,7 +835,7 @@ __io_sync_all_buffers(struct sgx_backend * backend)
     int ret = -1;
 
 
-    pthread_mutex_lock(&backend->batch_mutex);
+    pthread_mutex_lock(&backend->buf_manager->batch_mutex);
     iter = nexus_htable_create_iter(backend->buf_manager->buffers_table);
 
     if (!iter->entry) {
@@ -821,7 +851,7 @@ __io_sync_all_buffers(struct sgx_backend * backend)
             continue;
         }
 
-        if (mode & NEXUS_IO_FNODE) {
+        if (metadata_buf->handle_flags & NEXUS_IO_FNODE) {
             ret = __sync_fnode_metadata_file(metadata_buf);
         } else {
             ret = __flush_metadata_file(metadata_buf);
@@ -838,7 +868,7 @@ __io_sync_all_buffers(struct sgx_backend * backend)
 out:
     nexus_htable_free_iter(iter);
 
-    pthread_mutex_unlock(&backend->batch_mutex);
+    pthread_mutex_unlock(&backend->buf_manager->batch_mutex);
 
     return ret;
 }
