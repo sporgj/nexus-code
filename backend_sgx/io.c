@@ -614,7 +614,7 @@ io_file_crypto_start(int                  trusted_xfer_id,
     file_crypto->file_handle = __acquire_metadata_buf(file_crypto->metadata_buf);
 
     if (file_crypto->file_handle == NULL) {
-        log_error("__acquire_metadata_buf() returned NULL for %s", filepath);
+        log_error("__acquire_metadata_buf() returned NULL for %s\n", filepath);
         nexus_free(file_crypto);
         return NULL;
     }
