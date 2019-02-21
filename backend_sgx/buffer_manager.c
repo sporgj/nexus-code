@@ -1,18 +1,9 @@
 #include "internal.h"
 
 #include <time.h>
+#include <pthread.h>
 
 #include <nexus_hashtable.h>
-
-
-struct buffer_manager {
-    struct nexus_hashtable * buffers_table;
-
-    size_t                   table_size;
-
-    // TODO it may be helpful to have the total size occupied by the buffers
-};
-
 
 
 static int
@@ -43,6 +34,8 @@ buffer_manager_init()
         return NULL;
     }
 
+    pthread_mutex_init(&buf_manager->batch_mutex, NULL);
+
     return buf_manager;
 }
 
@@ -65,6 +58,9 @@ buffer_manager_destroy(struct buffer_manager * buf_manager)
 
     // only frees the table
     nexus_free_htable(buf_manager->buffers_table, 0, 0);
+
+    pthread_mutex_destroy(&buf_manager->batch_mutex);
+
     nexus_free(buf_manager);
 }
 
@@ -111,3 +107,60 @@ buffer_manager_del(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
     __free_metadata_buf(buf);
 }
 
+
+static int
+initialize_local_datastore(struct buffer_manager * buf_manager, char * root_path)
+{
+    nexus_json_obj_t config_json = nexus_json_new_obj("data_store");
+
+    if (config_json == NEXUS_JSON_INVALID_OBJ) {
+        log_error("nexus_json_new_obj() FAILED\n");
+        return -1;
+    }
+
+    if (nexus_json_set_string(config_json, "name", "TWOLEVEL")) {
+        log_error("nexus_json_set_string FAILED\n");
+        goto out_err;
+    }
+
+    if (nexus_json_set_string(config_json, "root_path", root_path)) {
+        log_error("nexus_json_set_string FAILED\n");
+        goto out_err;
+    }
+
+    buf_manager->batch_datastore = nexus_datastore_create("TWOLEVEL", config_json);
+    if (buf_manager->batch_datastore == NULL) {
+        log_error("nexus_datastore_create() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_json_free(config_json);
+
+    return 0;
+
+out_err:
+    nexus_json_free(config_json);
+
+    return -1;
+}
+
+
+// I/O commands
+
+int
+buffer_manager_enable_batch_mode(struct sgx_backend * backend)
+{
+    pthread_mutex_lock(&backend->buf_manager->batch_mutex);
+    backend->buf_manager->batch_mode = true;
+    pthread_mutex_unlock(&backend->buf_manager->batch_mutex);
+
+    return 0;
+}
+
+int
+buffer_manager_disable_batch_mode(struct sgx_backend * backend)
+{
+    backend->buf_manager->batch_mode = false;
+
+    return 0;
+}

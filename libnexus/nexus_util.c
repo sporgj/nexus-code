@@ -127,6 +127,37 @@ nexus_hexdump(void * ptr, size_t size)
 }
 
 int
+nexus_copy_file(const char * src_filepath, const char * dst_filepath)
+{
+    int status = 0;
+
+    if (src_filepath == NULL || dst_filepath == NULL) {
+        log_error("incorrect arguments\n");
+        return -1;
+    }
+
+    pid = fork();
+
+    if (pid < 0) {
+        perror("failure");
+        return -1;
+    }
+
+    if (pid == 0) {
+        execl("/bin/cp", "-p", src_filepath, dst_filepath);
+        perror("exec() FAILURE\n");
+        _exit(1);
+    } else {
+        if (waitpid(pid, &status, 0) < 0) {
+            perror("waitpid()");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int
 nexus_strtou8(char    * str,
 	      uint8_t * value)
 {
