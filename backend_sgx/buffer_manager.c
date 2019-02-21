@@ -7,6 +7,9 @@
 
 
 static int
+initialize_local_datastore(struct buffer_manager * buf_manager, char * root_path);
+
+static int
 uuid_equal_func(uintptr_t key1, uintptr_t key2)
 {
     return (nexus_uuid_compare((struct nexus_uuid *)key1, (struct nexus_uuid *)key2) == 0);
@@ -24,6 +27,11 @@ buffer_manager_init()
 {
     struct buffer_manager * buf_manager = nexus_malloc(sizeof(struct buffer_manager));
 
+    if (initialize_local_datastore(buf_manager, "/tmp/zxcvbn")) {
+        nexus_free(buf_manager);
+        return NULL;
+    }
+
     buf_manager->buffers_table = nexus_create_htable(128,
                                                      uuid_hash_func,
                                                      uuid_equal_func);
@@ -31,6 +39,7 @@ buffer_manager_init()
     if (buf_manager->buffers_table == NULL) {
         nexus_free(buf_manager);
         log_error("nexus_create_htable FAILED\n");
+        // TODO free batch_datastore
         return NULL;
     }
 

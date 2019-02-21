@@ -26,6 +26,7 @@
 #include "key_buffer.h"
 #include "io.h"
 #include "exports.h"
+#include "commander.h"
 
 
 // For every run of NeXUS, there will be a unique instance

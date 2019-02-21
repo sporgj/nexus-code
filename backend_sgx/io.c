@@ -1,8 +1,11 @@
-#include "internal.h"
+#include <pthread.h>
 #include <time.h>
+
 #include <nexus_datastore.h>
 #include <nexus_file_handle.h>
+#include <nexus_hashtable.h>
 
+#include "internal.h"
 
 struct __filenode_info {
     uint32_t    metadata_size;
@@ -10,9 +13,9 @@ struct __filenode_info {
 } __attribute__((packed));
 
 
+
 static int
 __flush_metadata_file(struct metadata_buf * metadata_buf);
-
 
 static inline size_t
 __filenode_total_size(size_t filesize, struct metadata_buf * metadata_buf)
@@ -75,53 +78,6 @@ __parse_filenode(struct nexus_file_handle * file_handle, uint8_t ** p_buffer, si
 }
 
 
-// writes the filenode info inside the metadata_buf's file_handle
-// preconditions: file position must be at end of data portion and file must be truncated
-static int
-__store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * filenode_info)
-{
-    struct nexus_file_handle * file_handle = metadata_buf->file_handle;
-
-    int nbytes = -1;
-
-
-    // seek to the end of the data portion (the filesize)
-    if (lseek(file_handle->fd, filenode_info->filedata_size, SEEK_SET) == -1) {
-        log_error("lseek on file handle FAILED\n");
-        return -1;
-    }
-
-    nbytes = write(file_handle->fd, metadata_buf->addr, metadata_buf->size);
-
-    if (nbytes != (int)metadata_buf->size) {
-        log_error("could not write metadata content on file_crypto. tried=%zu, got=%d\n",
-                  metadata_buf->size,
-                  nbytes);
-        return -1;
-    }
-
-
-    filenode_info->metadata_size = metadata_buf->size;
-
-    nbytes = write(file_handle->fd, filenode_info, sizeof(struct __filenode_info));
-
-    if (nbytes != (int)sizeof(struct __filenode_info)) {
-        log_error("writing filenode_info FAILED. tried=%zu, got=%d\n",
-                  sizeof(struct __filenode_info),
-                  nbytes);
-        return -1;
-    }
-
-    if (__flush_metadata_file(metadata_buf)) {
-        log_error("flushing metadata_buf FAILED\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-
-
 static struct metadata_buf *
 __alloc_metadata_buf(struct nexus_uuid * uuid, struct sgx_backend * sgx_backend)
 {
@@ -129,7 +85,9 @@ __alloc_metadata_buf(struct nexus_uuid * uuid, struct sgx_backend * sgx_backend)
 
     nexus_uuid_copy(uuid, &buf->uuid);
 
-    buf->sgx_backend = sgx_backend;
+    buf->backend = sgx_backend;
+
+    pthread_mutex_init(&buf->file_mutex, NULL);
 
     return buf;
 }
@@ -165,6 +123,16 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
 }
 
 
+static struct nexus_file_handle *
+__metadata_buf_get_handle(struct metadata_buf * metadata_buf)
+{
+    if (metadata_buf->backend->buf_manager->batch_mode) {
+        return metadata_buf->batch_file;
+    }
+
+    return metadata_buf->file_handle;
+}
+
 /**
  * Returns a reference to the metadata buffer
  * @return metadata_buf->file_handle
@@ -172,35 +140,30 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
 static struct nexus_file_handle *
 __acquire_metadata_buf(struct metadata_buf * metadata_buf)
 {
-    if (metadata_buf->file_handle) {
-        metadata_buf->openers += 1;
-        return metadata_buf->file_handle;
+    struct nexus_file_handle * file_handle = __metadata_buf_get_handle(metadata_buf);
+
+    if (file_handle == NULL) {
+        return NULL;
     }
 
-    return NULL;
+    pthread_mutex_lock(&metadata_buf->file_mutex);
+
+    return file_handle;
 }
 
 /**
  * Returns the file handle unto the metadata_buf. Decrements the number of openers
  * @param metadata_buf
- * @param handle
  */
 static int
-__release_metadata_buf(struct metadata_buf * metadata_buf, struct nexus_file_handle * handle)
+__release_metadata_buf(struct metadata_buf * metadata_buf)
 {
-    struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
+    struct nexus_volume * volume = metadata_buf->backend->volume;
 
     int ret = -1;
 
-
-    if (handle == NULL || metadata_buf->openers == 0 || metadata_buf->file_handle != handle) {
-        // TODO log a warning here
-        return 0;
-    }
-
-    metadata_buf->openers -= 1;
-
-    if (metadata_buf->openers) {
+    if (metadata_buf->file_handle == NULL) {
+        // XXX log a warning here
         return 0;
     }
 
@@ -219,7 +182,9 @@ __release_metadata_buf(struct metadata_buf * metadata_buf, struct nexus_file_han
 static struct nexus_file_handle *
 __open_metadata_file(struct metadata_buf * metadata_buf, nexus_io_flags_t flags)
 {
-    struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
+    struct nexus_volume * volume = metadata_buf->backend->volume;
+
+    struct nexus_datastore * datastore = volume->metadata_store;
 
     if (metadata_buf->file_handle) {
         if ((flags & metadata_buf->handle_flags) != flags) {
@@ -230,8 +195,7 @@ __open_metadata_file(struct metadata_buf * metadata_buf, nexus_io_flags_t flags)
         return __acquire_metadata_buf(metadata_buf);
     }
 
-
-    metadata_buf->file_handle = nexus_datastore_fopen(volume->metadata_store, &metadata_buf->uuid, NULL, flags);
+    metadata_buf->file_handle = nexus_datastore_fopen(datastore, &metadata_buf->uuid, NULL, flags);
 
     if (metadata_buf->file_handle == NULL) {
         log_error("nexus_datastore_fopen FAILED\n");
@@ -248,7 +212,7 @@ static inline int
 __read_metadata_file(struct metadata_buf * metadata_buf)
 {
     struct nexus_file_handle * file_handle = metadata_buf->file_handle;
-    struct nexus_volume      * volume      = metadata_buf->sgx_backend->volume;
+    struct nexus_volume      * volume      = metadata_buf->backend->volume;
     nexus_io_flags_t           flags       = metadata_buf->handle_flags;
 
     uint8_t * addr = NULL;
@@ -276,13 +240,27 @@ __read_metadata_file(struct metadata_buf * metadata_buf)
     return 0;
 }
 
+static inline int
+__write_metadata_file(struct metadata_buf * metadata_buf, uint8_t * buffer, size_t size)
+{
+    struct nexus_file_handle * file_handle = __metadata_buf_get_handle(metadata_buf);
 
-static int
+    struct nexus_volume * volume = metadata_buf->backend->volume;
+
+    if (nexus_datastore_fwrite(volume->metadata_store, file_handle, buffer, size)) {
+        log_error("could not write metadata file\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static inline int
 __flush_metadata_file(struct metadata_buf * metadata_buf)
 {
-    struct nexus_volume * volume = metadata_buf->sgx_backend->volume;
+    struct nexus_volume * volume = metadata_buf->backend->volume;
 
-    if (metadata_buf->sgx_backend->fsync_mode) {
+    if (metadata_buf->backend->fsync_mode) {
         if (nexus_datastore_fflush(volume->metadata_store, metadata_buf->file_handle)) {
             log_error("nexus_datastore_fflush() FAILED\n");
             return -1;
@@ -351,7 +329,7 @@ read_datastore:
 
     // close the file if we are NOT in write/fcrypto mode
     if (!((flags & NEXUS_FWRITE) || (flags & NEXUS_IO_FCRYPTO))) {
-        __release_metadata_buf(metadata_buf, file_handle);
+        __release_metadata_buf(metadata_buf);
     }
 
     if (is_new) {
@@ -367,7 +345,7 @@ early_exit:
 
 out_err:
     if (file_handle) {
-        __release_metadata_buf(metadata_buf, file_handle);
+        __release_metadata_buf(metadata_buf);
     }
 
     if (metadata_buf && is_new) {
@@ -396,10 +374,83 @@ io_buffer_get(struct nexus_uuid   * uuid,
 }
 
 
+// writes the filenode info inside the metadata_buf's file_handle
+// preconditions: file must be truncated to size
+static int
+__store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * filenode_info)
+{
+    struct nexus_file_handle * file_handle = __metadata_buf_get_handle(metadata_buf);
+
+    size_t total_size = 0;
+
+    int nbytes = -1;
+
+
+    total_size = __filenode_total_size(filenode_info->filedata_size, metadata_buf);
+
+    if (ftruncate(file_handle->fd, total_size)) {
+        log_error("ftruncate FAILED (%s)\n", file_handle->filepath);
+        return -1;
+    }
+
+    // seek to the end of the data portion (the filesize)
+    if (lseek(file_handle->fd, filenode_info->filedata_size, SEEK_SET) == -1) {
+        log_error("lseek on file handle FAILED\n");
+        return -1;
+    }
+
+    nbytes = write(file_handle->fd, metadata_buf->addr, metadata_buf->size);
+
+    if (nbytes != (int)metadata_buf->size) {
+        log_error("could not write metadata content on file_crypto. tried=%zu, got=%d\n",
+                  metadata_buf->size,
+                  nbytes);
+        return -1;
+    }
+
+
+    filenode_info->metadata_size = metadata_buf->size;
+
+    nbytes = write(file_handle->fd, filenode_info, sizeof(struct __filenode_info));
+
+    if (nbytes != (int)sizeof(struct __filenode_info)) {
+        log_error("writing filenode_info FAILED. tried=%zu, got=%d\n",
+                  sizeof(struct __filenode_info),
+                  nbytes);
+        return -1;
+    }
+
+    if (__flush_metadata_file(metadata_buf)) {
+        log_error("flushing metadata_buf FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static int
+__io_buffer_filenode_put(struct metadata_buf * metadata_buf,
+                         uint8_t             * buffer,
+                         size_t                metadata_size,
+                         size_t                data_size)
+{
+    struct __filenode_info filenode_info   = { .filedata_size = data_size };
+
+    if (__store_filenode(metadata_buf, &filenode_info)) {
+        log_error("__store_filenode() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
 static int
 __io_buffer_put(struct nexus_uuid   * uuid,
                 uint8_t             * buffer,
-                size_t                size,
+                size_t                metadata_size,
+                size_t                data_size,
                 size_t              * timestamp,
                 struct nexus_volume * volume)
 {
@@ -412,60 +463,64 @@ __io_buffer_put(struct nexus_uuid   * uuid,
         return -1;
     }
 
-    if (metadata_buf->handle_flags & NEXUS_IO_FCRYPTO) {
-        // this will be saved in io_file_crypto_finish()
-        // we drop the refcount from __io_buffer_get
+    if (metadata_buf->handle_flags & NEXUS_IO_FNODE) {
+        if (__io_buffer_filenode_put(metadata_buf, buffer, metadata_size, data_size)) {
+            log_error("__io_buffer_filenode_put() FAILED\n");
+            goto out_err;
+        }
 
-        __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
-        __update_metadata_buf(metadata_buf, buffer, size, true);
-        return 0;
+        goto flush_metadata;
     }
 
-    if (nexus_datastore_fwrite(volume->metadata_store, metadata_buf->file_handle, buffer, size)) {
-        log_error("could not write metadata file\n");
+    if (__write_metadata_file(metadata_buf, buffer, metadata_size)) {
+        log_error("__write_metadata_file() FAILED\n");
         goto out_err;
     }
 
+flush_metadata:
     if (__flush_metadata_file(metadata_buf)) {
         log_error("__flush_metadata_file() FAILED\n");
         goto out_err;
     }
 
-    if (__release_metadata_buf(metadata_buf, metadata_buf->file_handle)) {
+    if (__release_metadata_buf(metadata_buf)) {
         log_error("__release_metadata_buf() FAILED\n");
         return -1;
     }
 
-    __update_metadata_buf(metadata_buf, buffer, size, true);
+    __update_metadata_buf(metadata_buf, buffer, metadata_size, true);
+
+    metadata_buf->data_size = data_size;
 
     *timestamp = metadata_buf->timestamp;
 
     return 0;
 
 out_err:
-    if (__release_metadata_buf(metadata_buf, metadata_buf->file_handle)) {
+    if (__release_metadata_buf(metadata_buf)) {
         log_error("__release_metadata_buf() FAILED\n");
     }
 
     return -1;
 }
 
+
 int
 io_buffer_put(struct nexus_uuid   * uuid,
               uint8_t             * buffer,
-              size_t                size,
+              size_t                metadata_size,
+              size_t                data_size,
               size_t              * timestamp,
               struct nexus_volume * volume)
 {
     BACKEND_SGX_IOBUF_START(IOBUF_PUT);
 
-    int ret = __io_buffer_put(uuid, buffer, size, timestamp, volume);
+    int ret = __io_buffer_put(uuid, buffer, metadata_size, data_size, timestamp, volume);
 
     BACKEND_SGX_IOBUF_FINISH(IOBUF_PUT);
 
     return ret;
 }
-
 
 static inline struct metadata_buf *
 __io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
@@ -487,6 +542,25 @@ __io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_
     return metadata_buf;
 }
 
+
+// TODO rework this
+static inline struct metadata_buf *
+__io_buffer_trylock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
+{
+    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
+
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+
+
+    // if we are in batch mode, trylock just returns the buffer
+    if (metadata_buf && sgx_backend->buf_manager->batch_mode) {
+        return metadata_buf;
+    }
+
+    return __io_buffer_lock(uuid, flags, volume);
+}
+
+
 struct metadata_buf *
 io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
 {
@@ -494,7 +568,7 @@ io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_vo
 
     BACKEND_SGX_IOBUF_START(IOBUF_LOCK);
 
-    result = __io_buffer_lock(uuid, flags, volume);
+    result = __io_buffer_trylock(uuid, flags, volume);
 
     BACKEND_SGX_IOBUF_FINISH(IOBUF_LOCK);
 
@@ -510,7 +584,7 @@ __io_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
     struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
     if (metadata_buf && metadata_buf->file_handle) {
-        __release_metadata_buf(metadata_buf, metadata_buf->file_handle);
+        __release_metadata_buf(metadata_buf);
 
         return metadata_buf;
     }
@@ -601,7 +675,6 @@ io_file_crypto_start(int                  trusted_xfer_id,
 {
     struct nexus_file_crypto * file_crypto = nexus_malloc(sizeof(struct nexus_file_crypto));
 
-
     file_crypto->metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
     if (file_crypto->metadata_buf == NULL) {
@@ -611,7 +684,7 @@ io_file_crypto_start(int                  trusted_xfer_id,
     }
 
 
-    file_crypto->file_handle = __acquire_metadata_buf(file_crypto->metadata_buf);
+    file_crypto->file_handle = __metadata_buf_get_handle(file_crypto->metadata_buf);
 
     if (file_crypto->file_handle == NULL) {
         log_error("__acquire_metadata_buf() returned NULL for %s\n", filepath);
@@ -631,28 +704,23 @@ io_file_crypto_start(int                  trusted_xfer_id,
 int
 io_file_crypto_seek(struct nexus_file_crypto * file_crypto, size_t offset)
 {
-    struct nexus_file_handle * file_handle = file_crypto->metadata_buf->file_handle;
-
-    file_crypto->offset = offset;
-
-    if (lseek(file_handle->fd, offset, SEEK_SET) == -1) {
+    if (lseek(file_crypto->file_handle->fd, offset, SEEK_SET) == -1) {
         return -1;
     }
+
+    file_crypto->offset = offset;
 
     return 0;
 }
 
-
 int
 io_file_crypto_read(struct nexus_file_crypto * file_crypto, uint8_t * output_buffer, size_t nbytes)
 {
-    struct nexus_file_handle * file_handle = file_crypto->metadata_buf->file_handle;
-
-    int bytes_read = read(file_handle->fd, output_buffer, nbytes);
+    int bytes_read = read(file_crypto->file_handle->fd, output_buffer, nbytes);
 
     if (bytes_read != (int)nbytes) {
         log_error("reading file (%s) failed. tried=%zu, got=%d\n",
-                  file_handle->filepath,
+                  file_crypto->file_handle->filepath,
                   nbytes,
                   bytes_read);
         return -1;
@@ -668,13 +736,11 @@ io_file_crypto_write(struct nexus_file_crypto  * file_crypto,
                      const uint8_t             * input_buffer,
                      size_t                      nbytes)
 {
-    struct nexus_file_handle * file_handle = file_crypto->metadata_buf->file_handle;
-
-    int bytes_written = write(file_handle->fd, (uint8_t *)input_buffer, nbytes);
+    int bytes_written = write(file_crypto->file_handle->fd, (uint8_t *)input_buffer, nbytes);
 
     if (bytes_written != (int)nbytes) {
         log_error("reading file (%s) failed. tried=%zu, got=%d\n",
-                  file_handle->filepath,
+                  file_crypto->file_handle->filepath,
                   nbytes,
                   bytes_written);
         return -1;
@@ -688,91 +754,79 @@ io_file_crypto_write(struct nexus_file_crypto  * file_crypto,
 int
 io_file_crypto_finish(struct nexus_file_crypto * file_crypto)
 {
-    struct nexus_file_handle * file_handle = file_crypto->file_handle;
+    nexus_free(file_crypto->filepath);
+    nexus_free(file_crypto);
+
+    return 0;
+}
+
+
+static int
+__sync_on_disk_metadata_buffer(struct metadata_buf * metadata_buf)
+{
+    //TODO
+    return -1;
+}
+
+// synchronizes buffers in memory`
+// precondition: the batch mode musr be switched off
+static int
+__sync_in_memory_metadata_buffer(struct metadata_buf * metadata_buf)
+{
+    //TODO
+    return -1;
+}
+
+static int
+__io_sync_all_buffers(struct sgx_backend * backend)
+{
+    struct metadata_buf * metadata_buf = NULL;
+    struct nexus_hashtable_iter * iter = NULL;
 
     int ret = -1;
 
 
-    if (file_crypto->mode == FILE_ENCRYPT) {
-        size_t total_size = 0;
+    pthread_mutex_lock(&backend->buf_manager->batch_mutex);
+    iter = nexus_htable_create_iter(backend->buf_manager->buffers_table);
 
-        total_size = __filenode_total_size(file_crypto->filesize, file_crypto->metadata_buf);
-
-        if (ftruncate(file_handle->fd, total_size)) {
-            log_error("ftruncate FAILED (%s)\n", file_handle->filepath);
-            goto out;
-        }
-
-        struct __filenode_info filenode_info = { .filedata_size = file_crypto->filesize };
-
-        if (__store_filenode(file_crypto->metadata_buf, &filenode_info)) {
-            log_error("__store_filenode() FAILED\n");
-            goto out;
-        }
+    if (!iter->entry) {
+        ret = 0;
+        goto out;
     }
+
+
+    do {
+        metadata_buf = (struct metadata_buf *)nexus_htable_get_iter_value(iter);
+
+        if (metadata_buf->is_dirty == false) {
+            continue;
+        }
+
+        if (metadata_buf->handle_flags & NEXUS_IO_FNODE) {
+            ret = __sync_on_disk_metadata_buffer(metadata_buf);
+        } else {
+            ret = __sync_in_memory_metadata_buffer(metadata_buf);
+        }
+
+        if (ret != 0) {
+            log_error("could not flush metadata file\n");
+            goto out;
+        }
+    } while(nexus_htable_iter_advance(iter));
 
 
     ret = 0;
 out:
-    __release_metadata_buf(file_crypto->metadata_buf, file_crypto->file_handle);
+    nexus_htable_free_iter(iter);
 
-    nexus_free(file_crypto->filepath);
-    nexus_free(file_crypto);
+    pthread_mutex_unlock(&backend->buf_manager->batch_mutex);
 
     return ret;
 }
 
 
-
 int
-io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend * sgx_backend)
+io_sync_all_buffers(struct sgx_backend * backend)
 {
-    struct metadata_buf      * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
-
-    struct nexus_file_handle * file_handle  = NULL;
-
-    struct __filenode_info    filenode_info = { 0 };
-
-    size_t total_size = 0;
-
-
-    if (metadata_buf == NULL) {
-        log_error("buffer_manager_find() FAILED\n");
-        return -1;
-    }
-
-    file_handle = __acquire_metadata_buf(metadata_buf);
-
-    if (file_handle == NULL) {
-        log_error("metadata_buffer has no file_handle\n");
-        return -1;
-    }
-
-
-    total_size = __filenode_total_size(filesize, metadata_buf);
-
-    if (ftruncate(file_handle->fd, total_size)) {
-        log_error("ftruncate FAILED (%s)\n", file_handle->filepath);
-        goto out_err;
-    }
-
-    if (lseek(file_handle->fd, filesize, SEEK_SET) == -1) {
-        log_error("lseek on file handle FAILED\n");
-        goto out_err;
-    }
-
-
-    filenode_info.filedata_size = filesize;
-
-    if (__store_filenode(metadata_buf, &filenode_info)) {
-        log_error("__store_filenode() FAILED\n");
-        goto out_err;
-    }
-
-    return __release_metadata_buf(metadata_buf, file_handle);
-
-out_err:
-    __release_metadata_buf(metadata_buf, file_handle);
-
-    return -1;
+    return __io_sync_all_buffers(backend);
 }

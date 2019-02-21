@@ -46,6 +46,8 @@ struct nexus_crypto_buf {
 
     uint32_t                    version;
 
+    size_t                      data_size;
+
     struct nexus_uuid           uuid;
 
     uint8_t                   * external_addr;
@@ -149,6 +151,12 @@ uint32_t
 nexus_crypto_buf_version(struct nexus_crypto_buf * buf)
 {
     return buf->version;
+}
+
+void
+nexus_crypto_buf_set_datasize(struct nexus_crypto_buf * buf, size_t data_size)
+{
+    buf->data_size = data_size;
 }
 
 int
@@ -444,7 +452,7 @@ nexus_crypto_buf_put(struct nexus_crypto_buf * crypto_buf,
     memcpy(crypto_buf->external_addr, buf_hdr, __get_header_len());
 
 
-    ret = buffer_layer_put(&crypto_buf->uuid);
+    ret = buffer_layer_put(&crypto_buf->uuid, crypto_buf->data_size);
 out:
     if (buf_hdr) {
         nexus_free(buf_hdr);

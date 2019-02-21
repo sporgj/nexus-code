@@ -43,11 +43,12 @@ ocall_buffer_get(struct nexus_uuid   * uuid,
 int
 ocall_buffer_put(struct nexus_uuid   * uuid,
                  uint8_t             * buffer,
-                 size_t                size,
+                 size_t                metadata_size,
+                 size_t                data_size,
                  size_t              * timestamp,
                  struct nexus_volume * volume)
 {
-    return io_buffer_put(uuid, buffer, size, timestamp, volume);
+    return io_buffer_put(uuid, buffer, metadata_size, data_size, timestamp, volume);
 }
 
 int

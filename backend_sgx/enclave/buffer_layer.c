@@ -284,7 +284,7 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
 }
 
 int
-buffer_layer_put(struct nexus_uuid * uuid)
+buffer_layer_put(struct nexus_uuid * uuid, size_t data_size)
 {
     struct metadata_buffer * meta_buf = NULL;
 
@@ -313,6 +313,7 @@ buffer_layer_put(struct nexus_uuid * uuid)
                                    uuid,
                                    meta_buf->tmp_buffer,
                                    meta_buf->tmp_buflen,
+                                   data_size,
                                    &timestamp,
                                    global_volume);
 

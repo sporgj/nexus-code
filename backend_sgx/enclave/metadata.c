@@ -229,7 +229,7 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     metadata->flags = flags;
     __set_metadata_object(metadata, object);
 
-    if (flags & NEXUS_FWRITE) {
+    if (flags & (NEXUS_IO_FCRYPTO | NEXUS_FWRITE)) {
         metadata->is_locked = true;
     }
 

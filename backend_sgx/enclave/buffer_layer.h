@@ -54,7 +54,7 @@ buffer_layer_get(struct nexus_uuid * uuid, nexus_io_flags_t flags, size_t * size
  * @return 0 on success
  */
 int
-buffer_layer_put(struct nexus_uuid * uuid);
+buffer_layer_put(struct nexus_uuid * uuid, size_t data_size);
 
 /**
  * Creates an empty file on the datastore

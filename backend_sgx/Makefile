@@ -62,6 +62,7 @@ objs := nexus_enclave_u.o \
 	io.o \
 	quote.o \
 	rk_messages.o \
+	commander.o \
 	ocalls.o
 
 

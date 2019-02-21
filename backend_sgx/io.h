@@ -2,6 +2,8 @@
 
 #include <nexus_fs.h>
 
+#include <pthread.h>
+
 /**
  * Manages all the I/O operations on disk. Called from ocalls and during file crypto
  *
@@ -60,7 +62,8 @@ io_buffer_get(struct nexus_uuid   * uuid,
 int
 io_buffer_put(struct nexus_uuid   * uuid,
               uint8_t             * buffer,
-              size_t                size,
+              size_t                metadata_size,
+              size_t                data_size,
               size_t              * timestamp,
               struct nexus_volume * volume);
 
