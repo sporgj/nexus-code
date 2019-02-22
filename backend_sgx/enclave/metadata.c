@@ -82,9 +82,8 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
 
     INIT_LIST_HEAD(&metadata->dentry_list);
 
-    if (flags & (NEXUS_FWRITE | NEXUS_FCREATE)) {
-        metadata->is_locked = true;
-    }
+    metadata->is_locked = nexus_io_in_lock_mode(flags);
+
 
     return metadata;
 }
@@ -229,9 +228,7 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     metadata->flags = flags;
     __set_metadata_object(metadata, object);
 
-    if (flags & (NEXUS_IO_FCRYPTO | NEXUS_FWRITE)) {
-        metadata->is_locked = true;
-    }
+    metadata->is_locked = nexus_io_in_lock_mode(flags);
 
     metadata->is_invalid = false;
 
@@ -285,7 +282,14 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         metadata->version += 1;
         metadata->is_locked = false;
     } else {
+        nexus_io_flags_t flags = 0;
         metadata->is_invalid = true;
+
+        if (buffer_layer_lock_status(&metadata->uuid, &flags) == 0) {
+            metadata->is_locked = nexus_io_in_lock_mode(flags);
+        } else {
+            metadata->is_locked = false;
+        }
     }
 
     return ret;

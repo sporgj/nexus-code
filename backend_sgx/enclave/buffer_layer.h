@@ -22,6 +22,16 @@ int
 buffer_layer_unlock(struct nexus_uuid * uuid);
 
 /**
+ * Used for querying lock status of buffer layer. Used mostly in metadata_store
+ * to handle failed store operations.
+ * @param uuid
+ * @param flags_out
+ * @return -1 if buffer is not in found
+ */
+int
+buffer_layer_lock_status(struct nexus_uuid * uuid, nexus_io_flags_t * flags_out);
+
+/**
  * Removes the metadata from the buffer layer cache
  * @param uuid
  */

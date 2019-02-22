@@ -28,12 +28,12 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         }
 
         // create the supernode file on disk
-        if (buffer_layer_new(&supernode->my_uuid)) {
+        if (buffer_layer_lock(&supernode->my_uuid, NEXUS_FCREATE)) {
             log_error("could not create supernode file\n");
             goto out;
         }
 
-        if (buffer_layer_new(&supernode->usertable->my_uuid)) {
+        if (buffer_layer_lock(&supernode->usertable->my_uuid, NEXUS_FCREATE)) {
             log_error("could not create usertable file\n");
             goto out;
         }
@@ -58,7 +58,7 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         // make the dirnode's uuid the root uuid
         nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
 
-        if (buffer_layer_new(&root_dirnode->my_uuid)) {
+        if (buffer_layer_lock(&root_dirnode->my_uuid, NEXUS_FCREATE)) {
             log_error("could not create root dirnode file\n");
             goto out;
         }

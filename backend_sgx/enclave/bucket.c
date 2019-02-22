@@ -248,8 +248,11 @@ bucket_store(struct dir_bucket * bucket)
 
     size_t                    buflen        = 0;
 
+    nexus_io_flags_t          flags         = bucket->on_disk ? NEXUS_FWRITE : NEXUS_FCREATE;
 
-    if (!bucket->on_disk && buffer_layer_lock(&bucket->uuid, NEXUS_FCREATE)) {
+
+    if (buffer_layer_lock(&bucket->uuid, flags)) {
+        // XXX: we should probably handle NEXUS_FCREATE failures specially
         log_error("could not create bucket metadata file on disk\n");
         return -1;
     }
