@@ -114,7 +114,7 @@ twolevel_datastore_create(const char * root_path)
         return NULL;
     }
 
-    ret = mkdir(root_path, 0770);
+    int ret = mkdir(root_path, 0770);
 
     if (ret == -1) {
         if (errno == EEXIST) {
@@ -730,78 +730,6 @@ twolevel_settimes(struct nexus_uuid * uuid, size_t access_time, size_t mod_time,
     return 0;
 }
 
-static int
-twolevel_copy_uuid(struct nexus_datastore * src_datastore,
-                   struct nexus_uuid      * uuid,
-                   bool                     force_copy,
-                   void                   * priv_data)
-{
-    struct twolevel_datastore * dst_2lvl_datastore = priv_data;
-    struct twolevel_datastore * src_2lvl_datastore = NULL;
-
-    char * dst_filepath = NULL;
-    char * src_filepath = NULL;
-
-    struct stat dst_stat;
-    struct stat src_stat;
-
-    int ret1 = -1;
-    int ret2 = -1;
-
-
-    if (strncmp("TWOLEVEL", src_datastore->impl->name, 100) != 0) {
-        log_error("Only TWOLEVEL to TWOLEVEL copy is allowed at this time\n");
-        return -1;
-    }
-
-    src_2lvl_datastore = src_datastore->priv_data;
-
-    dst_filepath = __get_full_path(dst_2lvl_datastore, uuid);
-    src_filepath = __make_full_path(src_2lvl_datastore, uuid);
-    if (dst_filepath == NULL || src_filepath == NULL) {
-        log_error("src_filepath or dst_filepath could not be derived");
-        goto out_err;
-    }
-
-    // stat the files
-    ret1 = twolevel_stat_uuid(uuid, NULL, &src_stat, src_2lvl_datastore);
-    ret2 = twolevel_stat_uuid(uuid, NULL, &dst_stat, dst_2lvl_datastore);
-
-    if (ret1 == -1) {
-        log_error("could not stat src_file (%s)\n", src_filepath);
-        goto out_err;
-    }
-
-    // check which file newer
-    if (ret2 == 0 && force_copy) {
-        if (difftime(src_stat.st_mtime, dst_stat.st_mtime) > 0) {
-            goto out_success;
-        }
-    }
-
-    if (nexus_copy_file(src_filepath, dst_filepath)) {
-        log_error("nexus_copy_file FAILED\n");
-        goto out_err;
-    }
-
-out_success:
-    nexus_free(dst_filepath);
-    nexus_free(src_filepath);
-
-    return 0;
-
-out_err:
-    if (dst_filepath) {
-        nexus_free(dst_filepath);
-    }
-
-    if (src_filepath) {
-        nexus_free(src_filepath);
-    }
-
-    return -1;
-}
-
 
 static struct nexus_datastore_impl twolevel_datastore = {
     .name          = "TWOLEVEL",
@@ -826,8 +754,6 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .new_uuid      = twolevel_new_uuid,
     .touch_uuid    = twolevel_touch_uuid,
     .del_uuid      = twolevel_del_uuid,
-
-    .copy_uuid     = twolevel_copy_uuid,
 
     .fopen         = twolevel_fopen,
     .fread         = twolevel_fread,

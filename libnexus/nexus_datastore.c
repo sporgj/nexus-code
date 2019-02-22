@@ -380,12 +380,3 @@ nexus_datastore_rename_uuid(struct nexus_datastore   * datastore,
                                         to_path,
                                         datastore->priv_data);
 }
-
-int
-nexus_datastore_copy_uuid(struct nexus_datastore * src_datastore,
-                          struct nexus_datastore * dst_datastore,
-                          struct nexus_uuid      * uuid,
-                          bool                     force_copy)
-{
-    return datastore->impl->copy_uuid(src_datastore, uuid, force_copy, dst_datastore->priv_data);
-}

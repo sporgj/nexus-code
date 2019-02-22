@@ -46,8 +46,6 @@ nexus_splitpath(const char * filepath, char ** dirpath, char ** filename);
 
 void nexus_hexdump(void * ptr, size_t size);
 
-int nexus_copy_file(const char * src_filepath, const char * dst_filepath);
-
 int nexus_strtoi8 (char * str, int8_t   * value);
 int nexus_strtou8 (char * str, uint8_t  * value);
 int nexus_strtoi16(char * str, int16_t  * value);

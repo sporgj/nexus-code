@@ -50,6 +50,10 @@ typedef enum {
     NEXUS_IO_FCRYPTO     = 0x00000020,
 } nexus_io_flags_t;
 
+static inline bool nexus_io_in_lock_mode(nexus_io_flags_t flags) {
+    return ((flags & (NEXUS_FWRITE | NEXUS_FCREATE | NEXUS_IO_FCRYPTO)) != 0);
+}
+
 
 typedef enum {
     NEXUS_STAT_LINK      = 0x0001, // lstat
