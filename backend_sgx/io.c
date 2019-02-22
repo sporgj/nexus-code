@@ -126,10 +126,6 @@ __update_metadata_buf(struct metadata_buf * buf, uint8_t * ptr, size_t size, boo
 static struct nexus_file_handle *
 __metadata_buf_get_handle(struct metadata_buf * metadata_buf)
 {
-    if (metadata_buf->backend->buf_manager->batch_mode) {
-        return metadata_buf->batch_file;
-    }
-
     return metadata_buf->file_handle;
 }
 
@@ -146,7 +142,9 @@ __acquire_metadata_buf(struct metadata_buf * metadata_buf)
         return NULL;
     }
 
-    pthread_mutex_lock(&metadata_buf->file_mutex);
+    if (nexus_io_in_lock_mode(metadata_buf->handle_flags)) {
+        pthread_mutex_lock(&metadata_buf->file_mutex);
+    }
 
     return file_handle;
 }
@@ -160,6 +158,8 @@ __release_metadata_buf(struct metadata_buf * metadata_buf)
 {
     struct nexus_volume * volume = metadata_buf->backend->volume;
 
+    nexus_io_flags_t flags;
+
     int ret = -1;
 
     if (metadata_buf->file_handle == NULL) {
@@ -167,12 +167,18 @@ __release_metadata_buf(struct metadata_buf * metadata_buf)
         return 0;
     }
 
+    flags = metadata_buf->handle_flags;
+
     ret = nexus_datastore_fclose(volume->metadata_store, metadata_buf->file_handle);
     metadata_buf->file_handle  = NULL;
     metadata_buf->handle_flags = 0;
 
     if (ret != 0) {
         log_error("nexus_datastore_fclose() FAILED\n");
+    }
+
+    if (nexus_io_in_lock_mode(flags)) {
+        pthread_mutex_unlock(&metadata_buf->file_mutex);
     }
 
     return ret;
@@ -271,6 +277,79 @@ __flush_metadata_file(struct metadata_buf * metadata_buf)
 }
 
 
+static struct metadata_buf *
+__io_buffer_read(struct nexus_uuid * uuid, struct stat * stat_buf, struct sgx_backend * sgx_backend)
+{
+    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
+
+    bool is_new = false;
+    bool file_was_opened_here = false;
+
+
+    if (metadata_buf == NULL) {
+        metadata_buf = __alloc_metadata_buf(uuid, sgx_backend);
+        is_new = true;
+        goto read_datastore;
+    }
+
+    if (difftime(metadata_buf->timestamp, stat_buf->st_mtime) >= 0) {
+        // then the metadata_buf contains up-to-date information
+        goto early_exit;
+    }
+
+read_datastore:
+    // if the file is empty, just set it to an empty buffer
+    if (stat_buf->st_size == 0) {
+        __update_metadata_buf(metadata_buf, nexus_malloc(1), 0, false);
+        goto early_exit;
+    }
+
+    // try getting the file handle from a previously locked file
+    if (__metadata_buf_get_handle(metadata_buf) == NULL) {
+        if (__open_metadata_file(metadata_buf, NEXUS_FREAD) == NULL) {
+            log_error("__open_metadata_file() FAILED\n");
+            goto out_err;
+        }
+
+        file_was_opened_here = true;
+    }
+
+    if (__read_metadata_file(metadata_buf)) {
+        log_error("__read_metadata_file() FAILE\n");
+        goto out_err;
+    }
+
+    if (file_was_opened_here) {
+        __release_metadata_buf(metadata_buf);
+    }
+
+early_exit:
+    if (is_new) {
+        buffer_manager_add(sgx_backend->buf_manager, metadata_buf);
+    }
+
+    return metadata_buf;
+
+out_err:
+    if (file_was_opened_here) {
+        __release_metadata_buf(metadata_buf);
+    }
+
+    if (metadata_buf && is_new) {
+        __free_metadata_buf(metadata_buf);
+    }
+
+    return NULL;
+}
+
+static inline struct metadata_buf *
+io_buffer_read(struct nexus_uuid * uuid, struct stat * stat_buf, struct sgx_backend * sgx_backend)
+{
+    // TODO add BPF
+    struct metadata_buf * metadata_buf = __io_buffer_read(uuid, stat_buf, sgx_backend);
+    return metadata_buf;
+}
+
 static inline uint8_t *
 __io_buffer_get(struct nexus_uuid   * uuid,
                 nexus_io_flags_t      flags,
@@ -282,12 +361,7 @@ __io_buffer_get(struct nexus_uuid   * uuid,
 
     struct metadata_buf      * metadata_buf = NULL;
 
-    struct nexus_file_handle * file_handle  = NULL;
-
-    bool                       is_new       = false;
-
     struct stat stat_buf;
-
 
 
     if (nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_buf)) {
@@ -295,64 +369,28 @@ __io_buffer_get(struct nexus_uuid   * uuid,
         return NULL;
     }
 
-    // first check the cached metadata buffer
-    metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
-
-    if (metadata_buf == NULL) {
-        // if none, create an empty entry and go read contents from disk
-        is_new       = true;
-
-        metadata_buf = __alloc_metadata_buf(uuid, sgx_backend);
-        goto read_datastore;
+    // if writing, let's lock the file
+    if (flags & (NEXUS_FWRITE | NEXUS_IO_FCRYPTO)) {
+        metadata_buf = io_buffer_lock(uuid, flags, volume);
+        if (metadata_buf == NULL) {
+            log_error("__io_buffer_lock() FAILED\n");
+            return NULL;
+        }
     }
 
-    // if nothing changed and we are just reading, just return the buffer
-    if (stat_buf.st_mtime <= (int)metadata_buf->timestamp && !(flags & NEXUS_FWRITE)) {
-        goto early_exit;
+    // if reading, let's check if the metadata buffer
+    if (flags & NEXUS_FREAD) {
+        metadata_buf = io_buffer_read(uuid, &stat_buf, sgx_backend);
+        if (metadata_buf == NULL) {
+            log_error("io_buffer_read() FAILED\n");
+            return NULL;
+        }
     }
 
-read_datastore:
-    file_handle = __open_metadata_file(metadata_buf, flags);    // acquires the file handle
-
-    if (file_handle == NULL) {
-        log_error("__open_metadata_file() FAILED\n");
-        goto out_err;
-    }
-
-    // read the metadata file
-    if (stat_buf.st_size == 0) {
-        __update_metadata_buf(metadata_buf, nexus_malloc(1), 0, false);
-    } else if (__read_metadata_file(metadata_buf)) {
-        log_error("__read_metadata_file() FAILE\n");
-        goto out_err;
-    }
-
-    // close the file if we are NOT in write/fcrypto mode
-    if (!((flags & NEXUS_FWRITE) || (flags & NEXUS_IO_FCRYPTO))) {
-        __release_metadata_buf(metadata_buf);
-    }
-
-    if (is_new) {
-        buffer_manager_add(sgx_backend->buf_manager, metadata_buf);
-    }
-
-
-early_exit:
     *p_timestamp = metadata_buf->timestamp;
     *p_size      = metadata_buf->size;
 
     return metadata_buf->addr;
-
-out_err:
-    if (file_handle) {
-        __release_metadata_buf(metadata_buf);
-    }
-
-    if (metadata_buf && is_new) {
-        __free_metadata_buf(metadata_buf);
-    }
-
-    return NULL;
 }
 
 uint8_t *
@@ -542,25 +580,6 @@ __io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_
     return metadata_buf;
 }
 
-
-// TODO rework this
-static inline struct metadata_buf *
-__io_buffer_trylock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
-{
-    struct sgx_backend  * sgx_backend  = (struct sgx_backend *)volume->private_data;
-
-    struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
-
-
-    // if we are in batch mode, trylock just returns the buffer
-    if (metadata_buf && sgx_backend->buf_manager->batch_mode) {
-        return metadata_buf;
-    }
-
-    return __io_buffer_lock(uuid, flags, volume);
-}
-
-
 struct metadata_buf *
 io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_volume * volume)
 {
@@ -568,7 +587,7 @@ io_buffer_lock(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_vo
 
     BACKEND_SGX_IOBUF_START(IOBUF_LOCK);
 
-    result = __io_buffer_trylock(uuid, flags, volume);
+    result = __io_buffer_lock(uuid, flags, volume);
 
     BACKEND_SGX_IOBUF_FINISH(IOBUF_LOCK);
 
@@ -627,7 +646,6 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 
     int result = -1;
 
-
     buffer_manager_del(sgx_backend->buf_manager, metadata_uuid);
 
     BACKEND_SGX_IOBUF_START(IOBUF_DEL);
@@ -653,7 +671,7 @@ io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_vo
     BACKEND_SGX_IOBUF_FINISH(IOBUF_STAT);
 
     if (result) {
-        log_error("could not stat metadata file\n");
+        log_error("could not statmetadata file\n");
         return -1;
     }
 
@@ -687,7 +705,7 @@ io_file_crypto_start(int                  trusted_xfer_id,
     file_crypto->file_handle = __metadata_buf_get_handle(file_crypto->metadata_buf);
 
     if (file_crypto->file_handle == NULL) {
-        log_error("__acquire_metadata_buf() returned NULL for %s\n", filepath);
+        log_error("__metadata_buf_get_handle() returned NULL for %s\n", filepath);
         nexus_free(file_crypto);
         return NULL;
     }
@@ -739,7 +757,7 @@ io_file_crypto_write(struct nexus_file_crypto  * file_crypto,
     int bytes_written = write(file_crypto->file_handle->fd, (uint8_t *)input_buffer, nbytes);
 
     if (bytes_written != (int)nbytes) {
-        log_error("reading file (%s) failed. tried=%zu, got=%d\n",
+        log_error("writing file (%s) failed. tried=%zu, got=%d\n",
                   file_crypto->file_handle->filepath,
                   nbytes,
                   bytes_written);
@@ -758,75 +776,4 @@ io_file_crypto_finish(struct nexus_file_crypto * file_crypto)
     nexus_free(file_crypto);
 
     return 0;
-}
-
-
-static int
-__sync_on_disk_metadata_buffer(struct metadata_buf * metadata_buf)
-{
-    //TODO
-    return -1;
-}
-
-// synchronizes buffers in memory`
-// precondition: the batch mode musr be switched off
-static int
-__sync_in_memory_metadata_buffer(struct metadata_buf * metadata_buf)
-{
-    //TODO
-    return -1;
-}
-
-static int
-__io_sync_all_buffers(struct sgx_backend * backend)
-{
-    struct metadata_buf * metadata_buf = NULL;
-    struct nexus_hashtable_iter * iter = NULL;
-
-    int ret = -1;
-
-
-    pthread_mutex_lock(&backend->buf_manager->batch_mutex);
-    iter = nexus_htable_create_iter(backend->buf_manager->buffers_table);
-
-    if (!iter->entry) {
-        ret = 0;
-        goto out;
-    }
-
-
-    do {
-        metadata_buf = (struct metadata_buf *)nexus_htable_get_iter_value(iter);
-
-        if (metadata_buf->is_dirty == false) {
-            continue;
-        }
-
-        if (metadata_buf->handle_flags & NEXUS_IO_FNODE) {
-            ret = __sync_on_disk_metadata_buffer(metadata_buf);
-        } else {
-            ret = __sync_in_memory_metadata_buffer(metadata_buf);
-        }
-
-        if (ret != 0) {
-            log_error("could not flush metadata file\n");
-            goto out;
-        }
-    } while(nexus_htable_iter_advance(iter));
-
-
-    ret = 0;
-out:
-    nexus_htable_free_iter(iter);
-
-    pthread_mutex_unlock(&backend->buf_manager->batch_mutex);
-
-    return ret;
-}
-
-
-int
-io_sync_all_buffers(struct sgx_backend * backend)
-{
-    return __io_sync_all_buffers(backend);
 }

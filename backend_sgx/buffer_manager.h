@@ -25,9 +25,9 @@ struct metadata_buf {
 
     struct nexus_file_handle    * file_handle;  // file handle to the datastore
 
-    struct nexus_file_handle    * batch_file;   // used in batch mode
 
     size_t                        data_size;
+
 
     bool                          is_dirty;     // if it is unflushed
 
@@ -41,11 +41,6 @@ struct buffer_manager {
     struct nexus_hashtable      * buffers_table;
 
     size_t                        table_size;
-
-    pthread_mutex_t               batch_mutex;
-    bool                          batch_mode;
-
-    struct nexus_datastore      * batch_datastore;
 };
 
 struct buffer_manager *
@@ -82,10 +77,3 @@ buffer_manager_del(struct buffer_manager * buffer_manager, struct nexus_uuid * u
 
 void
 __free_metadata_buf(struct metadata_buf * buf);
-
-
-int
-buffer_manager_enable_batch_mode(struct sgx_backend * backend);
-
-int
-buffer_manager_disable_batch_mode(struct sgx_backend * backend);
