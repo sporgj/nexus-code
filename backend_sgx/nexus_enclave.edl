@@ -281,7 +281,8 @@ enclave {
         (
             [in]         struct nexus_uuid   * metadata_uuid,
             [user_check] uint8_t             * buffer,
-                         size_t                size,
+                         size_t                metadata_size,
+                         size_t                data_size,
             [out]        size_t              * timestamp,
             [user_check] struct nexus_volume * volume
         );

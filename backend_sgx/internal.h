@@ -26,6 +26,7 @@
 #include "key_buffer.h"
 #include "io.h"
 #include "exports.h"
+#include "commander.h"
 
 #include "hashtree_manager.h"
 
@@ -48,6 +49,7 @@ struct sgx_backend {
 
     size_t                        mmap_len;
 
+    bool                          fsync_mode;   // flush the buffer explicitly
 
     struct nexus_volume         * volume;
 

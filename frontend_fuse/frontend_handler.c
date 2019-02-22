@@ -549,10 +549,21 @@ nexus_fuse_store(struct my_file * file_ptr)
     struct list_head         * chunk_iter  = NULL;
 
 
-    if (!file_ptr->is_dirty) {
+    pthread_mutex_lock(&inode->lock);
+
+    if (!inode->is_dirty || inode->is_deleted) {
+        file_set_clean(file_ptr);
+        inode_set_clean(inode);
+        pthread_mutex_unlock(&inode->lock);
         return 0;
     }
 
+
+    if (inode->openers > 1) {
+        file_set_clean(file_ptr);
+        pthread_mutex_unlock(&inode->lock);
+        return 0;
+    }
 
     file_crypto = nexus_fs_file_encrypt_start(nexus_fuse_volume, file_ptr->filepath, inode->filesize);
 
@@ -603,6 +614,8 @@ nexus_fuse_store(struct my_file * file_ptr)
 
     inode_set_clean(inode);
 
+    pthread_mutex_unlock(&inode->lock);
+
     file_set_clean(file_ptr);
 
     return 0;
@@ -611,6 +624,8 @@ out_err:
     if (file_crypto) {
         nexus_fs_file_crypto_finish(nexus_fuse_volume, file_crypto);
     }
+
+    pthread_mutex_unlock(&inode->lock);
 
     return -1;
 }

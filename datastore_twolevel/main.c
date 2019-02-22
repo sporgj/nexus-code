@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
+
+#include <time.h>
 #include <utime.h>
 #include <limits.h>
 
@@ -101,27 +103,18 @@ __get_full_path(struct twolevel_datastore * datastore, struct nexus_uuid * uuid)
     return __generic_full_path(datastore, uuid, false);
 }
 
-static void *
-twolevel_create(nexus_json_obj_t cfg)
+
+struct twolevel_datastore *
+twolevel_datastore_create(const char * root_path)
 {
     struct twolevel_datastore * datastore = NULL;
-
-    char * root_path = NULL;
-    int    ret       = 0;
-
-    ret = nexus_json_get_string(cfg, "root_path", &root_path);
-
-    if (ret == -1) {
-        log_error("Invalid FLAT datastore config. Missing root_path\n");
-        return NULL;
-    }
 
     if (strlen(root_path) >= PATH_MAX) {
         log_error("Root path is too long\n");
         return NULL;
     }
 
-    ret = mkdir(root_path, 0770);
+    int ret = mkdir(root_path, 0770);
 
     if (ret == -1) {
         if (errno == EEXIST) {
@@ -135,20 +128,25 @@ twolevel_create(nexus_json_obj_t cfg)
 
     datastore = nexus_malloc(sizeof(struct twolevel_datastore));
 
-    if (datastore == NULL) {
-        log_error("Could not allocate datastore state\n");
-        goto err;
-    }
-
     datastore->root_path = strndup(root_path, PATH_MAX);
 
     return datastore;
+}
 
-err:
+static void *
+twolevel_create(nexus_json_obj_t cfg)
+{
+    char * root_path = NULL;
+    int    ret       = 0;
 
-    rmdir(root_path);
+    ret = nexus_json_get_string(cfg, "root_path", &root_path);
 
-    return NULL;
+    if (ret == -1) {
+        log_error("Invalid FLAT datastore config. Missing root_path\n");
+        return NULL;
+    }
+
+    return twolevel_datastore_create(root_path);
 }
 
 static int
@@ -334,10 +332,10 @@ twolevel_fwrite(struct nexus_file_handle * file_handle,
     return 0;
 }
 
-void
+int
 twolevel_fclose(struct nexus_file_handle * file_handle, void * priv_data)
 {
-    nexus_file_handle_close(file_handle);
+    return nexus_file_handle_close(file_handle);
 }
 
 int

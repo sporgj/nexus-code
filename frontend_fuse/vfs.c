@@ -198,14 +198,18 @@ vfs_cache_dentry(struct my_dentry  * parent,
     return _vfs_cache_dentry(parent, name, &lookup_info);
 }
 
-void
+struct my_inode *
 vfs_forget_dentry(struct my_dentry * parent_dentry, char * name)
 {
-    struct my_dentry * child = dentry_lookup(parent_dentry, name);
+    struct my_dentry * child_dentry = dentry_lookup(parent_dentry, name);
+    struct my_inode  * child_inode = NULL;
 
-    if (child) {
-        dentry_invalidate(child);
+    if (child_dentry) {
+        child_inode = inode_get(child_dentry->inode);
+        dentry_invalidate(child_dentry);
     }
+
+    return child_inode;
 }
 
 void

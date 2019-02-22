@@ -89,7 +89,7 @@ nexus_datastore_fwrite(struct nexus_datastore   * datastore,
                        uint8_t                  * buf,
                        size_t                     size);
 
-void
+int
 nexus_datastore_fclose(struct nexus_datastore   * datastore,
                        struct nexus_file_handle * file_handle);
 
@@ -154,6 +154,11 @@ nexus_datastore_rename_uuid(struct nexus_datastore   * datastore,
                             struct nexus_uuid        * to_uuid,
                             char                     * to_path);
 
+int
+nexus_datastore_copy_uuid(struct nexus_datastore * src_datastore,
+                          struct nexus_datastore * dst_datastore,
+                          struct nexus_uuid      * uuid,
+                          bool                     force_copy);
 
 
 int nexus_datastores_init();
@@ -279,7 +284,7 @@ struct nexus_datastore_impl {
     /**
      * Closes the file
      */
-    void (*fclose)(struct nexus_file_handle * file_handle, void * priv_data);
+    int (*fclose)(struct nexus_file_handle * file_handle, void * priv_data);
 
 
 

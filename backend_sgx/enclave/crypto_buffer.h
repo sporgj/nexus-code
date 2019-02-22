@@ -68,8 +68,5 @@ nexus_crypto_buf_get(struct nexus_crypto_buf * buf, size_t * buffer_size, struct
 int
 nexus_crypto_buf_put(struct nexus_crypto_buf * buf, struct nexus_mac * mac);
 
-/**
- * Opens a metadata file, and rewrites it with a UUID
- */
-int
-nexus_crypto_buf_rename(struct nexus_uuid * from_uuid, struct nexus_uuid * to_uuid);
+void
+nexus_crypto_buf_set_datasize(struct nexus_crypto_buf * buf, size_t data_size);

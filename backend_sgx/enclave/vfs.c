@@ -195,7 +195,7 @@ __vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool 
         return nexus_metadata_reload(metadata, flags);
     }
 
-    if (flags & NEXUS_FWRITE) {
+    if (nexus_io_in_lock_mode(flags)) {
         return nexus_metadata_lock(metadata, flags);
     }
 

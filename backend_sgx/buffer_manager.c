@@ -1,19 +1,10 @@
 #include "internal.h"
 
 #include <time.h>
+#include <pthread.h>
 
 #include <nexus_hashtable.h>
-
-
-struct buffer_manager {
-    struct nexus_hashtable * buffers_table;
-
-    size_t                   table_size;
-
-    // TODO it may be helpful to have the total size occupied by the buffers
-};
-
-
+#include <nexus_file_handle.h>
 
 static int
 uuid_equal_func(uintptr_t key1, uintptr_t key2)
@@ -28,13 +19,6 @@ uuid_hash_func(uintptr_t key)
 }
 
 
-static void
-free_buf(struct metadata_buf * buf)
-{
-    nexus_free(buf->addr);
-    nexus_free(buf);
-}
-
 struct buffer_manager *
 buffer_manager_init()
 {
@@ -47,6 +31,7 @@ buffer_manager_init()
     if (buf_manager->buffers_table == NULL) {
         nexus_free(buf_manager);
         log_error("nexus_create_htable FAILED\n");
+        // TODO free batch_datastore
         return NULL;
     }
 
@@ -64,7 +49,7 @@ buffer_manager_destroy(struct buffer_manager * buf_manager)
         do {
             metadata_buf = (struct metadata_buf *)nexus_htable_get_iter_value(iter);
 
-            free_buf(metadata_buf);
+            __free_metadata_buf(metadata_buf);
         } while(nexus_htable_iter_advance(iter));
     }
 
@@ -72,6 +57,7 @@ buffer_manager_destroy(struct buffer_manager * buf_manager)
 
     // only frees the table
     nexus_free_htable(buf_manager->buffers_table, 0, 0);
+
     nexus_free(buf_manager);
 }
 
@@ -86,7 +72,7 @@ buffer_manager_add(struct buffer_manager * buf_manager, struct metadata_buf * bu
     old_buf = (struct metadata_buf *)nexus_htable_remove(buf_manager->buffers_table, key, 0);
 
     if (old_buf) {
-        free_buf(old_buf);
+        __free_metadata_buf(old_buf);
 
         buf_manager->table_size -= 1;
     }
@@ -115,5 +101,5 @@ buffer_manager_del(struct buffer_manager * buf_manager, struct nexus_uuid * uuid
         return;
     }
 
-    free_buf(buf);
+    __free_metadata_buf(buf);
 }

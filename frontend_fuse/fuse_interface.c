@@ -331,11 +331,10 @@ nxs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
     struct my_dentry    * dentry  = vfs_get_dentry(ino, &inode);
     struct nexus_dirent * entries = NULL;
 
-    size_t real_offset    = off; // FIXME: this MIGHT only works for off=0
     size_t result_count   = 0;
     size_t directory_size = 0;
 
-    off_t next_offset = real_offset;
+    off_t next_offset     = dir_ptr->readdir_offset;
 
     char * readdir_buffer = NULL;
     char * readdir_ptr    = NULL;
@@ -349,17 +348,12 @@ nxs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
     }
 
 
-    if (dir_ptr->readdir_offset >= dir_ptr->file_count) {
+    entries = nexus_fuse_readdir(dentry, dir_ptr->readdir_offset, &result_count, &directory_size);
+
+    if (entries == NULL || dir_ptr->readdir_offset >= directory_size) {
         inode_put(inode);
         fuse_reply_err(req, 0);
         return;
-    }
-
-    entries = nexus_fuse_readdir(dentry, real_offset, &result_count, &directory_size);
-
-    if (entries == NULL) {
-        code = EINVAL;
-        goto out_err;
     }
 
 
@@ -402,7 +396,6 @@ nxs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 
     code = 0;
 
-out_err:
     inode_put(inode);
 exit:
     if (code) {
@@ -588,32 +581,40 @@ nxs_fuse_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info * fi)
 }
 
 static void
-nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent, const char * name)
+nxs_fuse_remove(fuse_req_t req, fuse_ino_t parent_ino, const char * name)
 {
-    fuse_ino_t ino;
+    struct my_inode   * parent_inode  = NULL;
+    struct my_inode   * child_inode   = NULL;
 
-    struct my_inode   * inode  = NULL;
+    struct my_dentry  * parent_dentry = vfs_get_dentry(parent_ino, &parent_inode);
 
-    struct my_dentry  * dentry = vfs_get_dentry(parent, &inode);
+    fuse_ino_t child_ino;
 
-    if (dentry == NULL) {
-        log_error("could not find inode (%zu)\n", parent);
+
+    if (parent_dentry == NULL) {
+        log_error("could not find inode (%zu)\n", parent_ino);
         fuse_reply_err(req, ENOENT);
         return;
     }
 
-    if (nexus_fuse_remove(dentry, (char *)name, &ino)) {
-        inode_put(inode);
-        log_error("nexus_fuse_remove (%s/) -> (%s) FAILED\n", dentry->name, name);
+    if (nexus_fuse_remove(parent_dentry, (char *)name, &child_ino)) {
+        inode_put(parent_inode);
+        log_error("nexus_fuse_remove (%s/) -> (%s) FAILED\n", parent_dentry->name, name);
         fuse_reply_err(req, EAGAIN);
         return;
     }
 
-    vfs_forget_dentry(dentry, (char *)name);
+    child_inode = vfs_forget_dentry(parent_dentry, (char *)name);
+
+    if (child_inode && child_inode->attrs.stat_info.link_count <= 1) {
+        // XXX:
+        child_inode->is_deleted = true;
+        inode_put(child_inode);
+    }
+
+    inode_put(parent_inode);
 
     fuse_reply_err(req, 0);
-
-    inode_put(inode);
 }
 
 

@@ -175,11 +175,5 @@ sgx_backend_fs_truncate(struct nexus_volume * volume,
         return -1;
     }
 
-    // FIXME: this is VERY VERY BAD, this must come in as an OCALL.
-    if (io_buffer_truncate(&stat->uuid, filesize, sgx_backend)) {
-        log_error("io_buffer_truncate() FAILED\n");
-        return -1;
-    }
-
     return 0;
 }
