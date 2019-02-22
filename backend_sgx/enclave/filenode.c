@@ -364,7 +364,7 @@ filenode_store(struct nexus_uuid     * uuid,
 
         nexus_crypto_buf_set_datasize(crypto_buffer, filenode->filesize);
 
-        ret = nexus_crypto_buf_put(crypto_buffer, mac);
+        ret = nexus_crypto_buf_put(crypto_buffer, &filenode->mac);
         if (ret != 0) {
             log_error("nexus_crypto_buf_put FAILED\n");
             goto out;
