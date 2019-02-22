@@ -53,24 +53,33 @@ def human_size(num: int) -> str:
 def run_test(filesize, rounds, has_dropbox):
     for i in range(rounds):
         time_lapse = time.monotonic()
+        sync_time = 0
 
         filename = "testfile-%d-%d" % (i, random.randint(1, 1e9))
 
         with open(filename, "wb") as f:
             f.write(os.urandom(filesize))
 
-        if has_dropbox and poll_dropbox_status() != DROPBOX_STATUS_OK:
-            print(":( timeout on checking sync")
+        if has_dropbox:
+            status, sync_time = poll_dropbox_status()
+            if status != DROPBOX_STATUS_OK:
+                print(":( timeout on checking sync")
 
         time_lapse = time.monotonic() - time_lapse
+        io_time = time_lapse - sync_time
 
-        print("%-10s %-10f" % (human_size(filesize), time_lapse))
+        if has_dropbox:
+            print("%-10s %-10f %-10f %-10f" %
+                  (human_size(filesize), io_time, sync_time, time_lapse))
+        else:
+            print("%-10s %-10f" % (human_size(filesize), time_lapse))
 
         os.remove(filename)
 
         # this ensures that the script pauses until the file removal is complete
         if has_dropbox:
-            if poll_dropbox_status() != DROPBOX_STATUS_OK:
+            status, _ = poll_dropbox_status()
+            if status != DROPBOX_STATUS_OK:
                 print(":| we are going to pause (10s) for the sync")
                 time.sleep(10)
 
@@ -104,7 +113,10 @@ def command_line_runner():
 
     filesizes_int_array = [filesize_str_to_int(fz) for fz in filesizes_string_array]
 
-    print("%-10s %-10s" % ("filesize", "time_lapse(s)"))
+    if args_dropbox:
+        print("%-10s %-10s %-10s %-10s" % ("filesize", "io_time", "sync_time", "elapsed(s)"))
+    else:
+        print("%-10s %-10s" % ("filesize", "time_lapse(s)"))
 
     for fz in filesizes_int_array:
         run_test(fz, args_rounds, args_dropbox)

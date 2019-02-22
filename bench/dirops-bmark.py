@@ -14,33 +14,37 @@ import dropbox_watcher
 
 
 def create_files(filelist, has_dropbox):
-    create_time = 0
+    sync_time = 0
+    t1 = time.monotonic()
 
     for fpath in filelist:
-        t1 = time.monotonic()
         Path(fpath).touch()
 
-        if has_dropbox:
-            dropbox_watcher.poll_dropbox_status()
+    if has_dropbox:
+        status, sync_time = dropbox_watcher.poll_dropbox_status()
+        if status != dropbox_watcher.DROPBOX_STATUS_OK:
+            print("ERROR:, dropbox status error on create")
 
-        create_time += time.monotonic() - t1
+    create_time = time.monotonic() - t1
 
-    return create_time
+    return (create_time, sync_time)
 
 
 def remove_files(filelist, has_dropbox):
-    remove_time = 0
+    sync_time = 0
+    t1 = time.monotonic()
 
     for fpath in filelist:
-        t1 = time.monotonic()
         os.remove(fpath)
 
-        if has_dropbox:
-            dropbox_watcher.poll_dropbox_status()
+    if has_dropbox:
+        status, sync_time = dropbox_watcher.poll_dropbox_status()
+        if status != dropbox_watcher.DROPBOX_STATUS_OK:
+            print("ERROR:, dropbox status error on create")
 
-        remove_time += time.monotonic() - t1
+    remove_time = time.monotonic() - t1
 
-    return remove_time
+    return (remove_time, sync_time)
 
 
 def run(filecount, rounds, randomize, has_dropbox):
@@ -48,7 +52,11 @@ def run(filecount, rounds, randomize, has_dropbox):
     testdir = 'test.' + str(os.getpid())
     os.mkdir(testdir)
 
-    print("%-8s %-10s %-10s %-10s" % ("count", "create(s)", "delete(s)", "lapse(s)"))
+    if has_dropbox:
+        print("%-8s %-10s %-10s %-10s %-10s" %
+               ("count", "create(s)", "delete(s)", "sync(s)", "elapsed(s)"))
+    else:
+        print("%-8s %-10s %-10s %-10s" % ("count", "create(s)", "delete(s)", "elapsed(s)"))
 
     for i in range(rounds):
         # generate the list of all files
@@ -57,21 +65,28 @@ def run(filecount, rounds, randomize, has_dropbox):
         time_lapse = time.monotonic()
 
         # create the files
-        create = create_files(filelist, has_dropbox)
+        (create_total, create_sync) = create_files(filelist, has_dropbox)
 
         if randomize:
             random.shuffle(filelist)
 
         # remove the files
-        remove = remove_files(filelist, has_dropbox)
-
-        if has_dropbox:
-            dropbox_watcher.poll_dropbox_status()
+        (remove_total, remove_sync) = remove_files(filelist, has_dropbox)
 
         time_lapse = time.monotonic() - time_lapse
+        time_sync = create_sync + remove_sync
 
         del(filelist)
-        print("%-8d %-10f %-10f %-10f" % (filecount, create, remove, time_lapse))
+
+        create_time = create_total - create_sync
+        remove_time = remove_total - remove_sync
+
+        if has_dropbox:
+            print("%-8d %-10f %-10f %-10f %-10f" %
+                  (filecount, create_time, remove_time, time_sync, time_lapse))
+        else:
+            print("%-8d %-10f %-10f %-10f" %
+                  (filecount, create_time, remove_time, time_lapse))
 
     os.rmdir(testdir)
 

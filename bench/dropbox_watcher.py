@@ -11,7 +11,7 @@ DROPBOX_STATUS_TIMEOUT = -1
 
 
 # how often to query the socket
-CHECK_INTERVAL_SECONDS = 0.0001
+CHECK_INTERVAL_SECONDS = 0.01
 
 # the amount of time before the first "Syncing"
 CHECK_TIMEOUT_SECONDS = 10
@@ -67,7 +67,6 @@ def poll_dropbox_status(timeout_secs=CHECK_TIMEOUT_SECONDS, elapsed_time={}):
         if data.find("Up to date") != -1:
             if sync_time > 0:
                 last_time = time.monotonic()
-                # print("\nYAY!!! time = {:.6f}s".format(time.monotonic() - sync_time))
                 break
         elif data.find("Syncing") != -1 and sync_time == 0:
             sync_time = time.monotonic()
@@ -78,10 +77,10 @@ def poll_dropbox_status(timeout_secs=CHECK_TIMEOUT_SECONDS, elapsed_time={}):
 
         if sync_time == 0 and (time.monotonic() - first_time) > timeout_secs:
             last_time = time.monotonic()
-            elapsed_time['time'] = last_time - first_time
+            elapsed_time = last_time - first_time
             sock.close()
-            return DROPBOX_STATUS_TIMEOUT
+            return (DROPBOX_STATUS_TIMEOUT, elapsed_time)
 
     sock.close()
-    elapsed_time['time'] = last_time - first_time
-    return DROPBOX_STATUS_OK
+    elapsed_time = last_time - first_time
+    return (DROPBOX_STATUS_OK, elapsed_time)
