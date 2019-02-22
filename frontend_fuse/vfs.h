@@ -157,8 +157,8 @@ vfs_cache_dentry(struct my_dentry  * parent,
 struct my_dentry *
 _vfs_cache_dentry(struct my_dentry * parent, char * name, struct nexus_fs_lookup * lookup_info);
 
-void
-vfs_forget_dentry(struct my_dentry * parent, char * name);
+struct my_inode *
+vfs_forget_dentry(struct my_dentry * parent_dentry, char * name);
 
 
 struct my_inode *
@@ -191,6 +191,7 @@ inode_is_file(struct my_inode * inode);
 
 bool
 inode_is_dir(struct my_inode * inode);
+
 
 struct my_inode *
 inode_get(struct my_inode * inode);

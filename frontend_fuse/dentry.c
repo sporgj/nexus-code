@@ -35,7 +35,7 @@ dentry_put(struct my_dentry * dentry)
     dentry->refcount -= 1;
 
     if (dentry->refcount == 0) {
-        dentry_invalidate(dentry);
+        dentry_delete_and_free(dentry);
     }
 }
 
@@ -135,6 +135,10 @@ dentry_invalidate(struct my_dentry * dentry)
     if (dentry->parent) {
         dentry_put(dentry->parent);
         list_del(&dentry->siblings);
+    }
+
+    if (dentry->refcount <= 1) {
+        dentry_delete_and_free(dentry);
     }
 }
 
