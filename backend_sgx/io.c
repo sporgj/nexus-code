@@ -276,9 +276,11 @@ __flush_metadata_file(struct metadata_buf * metadata_buf)
     return 0;
 }
 
-
 static struct metadata_buf *
-__io_buffer_read(struct nexus_uuid * uuid, struct stat * stat_buf, struct sgx_backend * sgx_backend)
+__io_buffer_read(struct nexus_uuid  * uuid,
+                 nexus_io_flags_t     flags,
+                 struct stat        * stat_buf,
+                 struct sgx_backend * sgx_backend)
 {
     struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
@@ -306,7 +308,7 @@ read_datastore:
 
     // try getting the file handle from a previously locked file
     if (__metadata_buf_get_handle(metadata_buf) == NULL) {
-        if (__open_metadata_file(metadata_buf, NEXUS_FREAD) == NULL) {
+        if (__open_metadata_file(metadata_buf, flags) == NULL) {
             log_error("__open_metadata_file() FAILED\n");
             goto out_err;
         }
@@ -343,10 +345,13 @@ out_err:
 }
 
 static inline struct metadata_buf *
-io_buffer_read(struct nexus_uuid * uuid, struct stat * stat_buf, struct sgx_backend * sgx_backend)
+io_buffer_read(struct nexus_uuid  * uuid,
+               nexus_io_flags_t     flags,
+               struct stat        * stat_buf,
+               struct sgx_backend * sgx_backend)
 {
     // TODO add BPF
-    struct metadata_buf * metadata_buf = __io_buffer_read(uuid, stat_buf, sgx_backend);
+    struct metadata_buf * metadata_buf = __io_buffer_read(uuid, flags, stat_buf, sgx_backend);
     return metadata_buf;
 }
 
@@ -380,7 +385,7 @@ __io_buffer_get(struct nexus_uuid   * uuid,
 
     // if reading, let's check if the metadata buffer
     if (flags & NEXUS_FREAD) {
-        metadata_buf = io_buffer_read(uuid, &stat_buf, sgx_backend);
+        metadata_buf = io_buffer_read(uuid, flags, &stat_buf, sgx_backend);
         if (metadata_buf == NULL) {
             log_error("io_buffer_read() FAILED\n");
             return NULL;
@@ -458,11 +463,6 @@ __store_filenode(struct metadata_buf * metadata_buf, struct __filenode_info * fi
         return -1;
     }
 
-    if (__flush_metadata_file(metadata_buf)) {
-        log_error("flushing metadata_buf FAILED\n");
-        return -1;
-    }
-
     return 0;
 }
 
@@ -475,12 +475,27 @@ __io_buffer_filenode_put(struct metadata_buf * metadata_buf,
 {
     struct __filenode_info filenode_info   = { .filedata_size = data_size };
 
-    if (__store_filenode(metadata_buf, &filenode_info)) {
+    uint8_t * tmp_buffer = metadata_buf->addr;
+    size_t    tmp_buflen = metadata_buf->size;
+
+    int ret = -1;
+
+
+    // temporarily set the metadata_buf's address
+    metadata_buf->addr = buffer;
+    metadata_buf->size = metadata_size;
+
+    ret = __store_filenode(metadata_buf, &filenode_info);
+
+    if (ret) {
         log_error("__store_filenode() FAILED\n");
-        return -1;
     }
 
-    return 0;
+    // restore
+    metadata_buf->addr = tmp_buffer;
+    metadata_buf->size = tmp_buflen;
+
+    return ret;
 }
 
 
@@ -506,16 +521,14 @@ __io_buffer_put(struct nexus_uuid   * uuid,
             log_error("__io_buffer_filenode_put() FAILED\n");
             goto out_err;
         }
-
-        goto flush_metadata;
+    } else {
+        // we are writing a regular metadata file (e.g. dirnode)
+        if (__write_metadata_file(metadata_buf, buffer, metadata_size)) {
+            log_error("__write_metadata_file() FAILED\n");
+            goto out_err;
+        }
     }
 
-    if (__write_metadata_file(metadata_buf, buffer, metadata_size)) {
-        log_error("__write_metadata_file() FAILED\n");
-        goto out_err;
-    }
-
-flush_metadata:
     if (__flush_metadata_file(metadata_buf)) {
         log_error("__flush_metadata_file() FAILED\n");
         goto out_err;
