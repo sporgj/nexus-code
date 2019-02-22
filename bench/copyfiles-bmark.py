@@ -27,19 +27,21 @@ def __random_string():
 
 def __run_round(src_dir, dst_dir):
     global global_is_dropbox
-    sync_time = {}
+    sync_time = 0
     time_lapse = time.monotonic()
 
     shutil.copytree(src_dir, dst_dir)
 
     if global_is_dropbox:
-        if poll_dropbox_status(elapsed_time=sync_time) != DROPBOX_STATUS_OK:
+        status, sync_time = poll_dropbox_status()
+        if status != DROPBOX_STATUS_OK:
             print(":( timeout on checking sync")
 
     time_lapse = time.monotonic() - time_lapse
+    copy_time = time_lapse - sync_time
 
     if global_is_dropbox:
-        print("%-16f %-16f" % (time_lapse - sync_time['time'], time_lapse))
+        print("%-16f %-16f %-16f" % (copy_time, sync_time, time_lapse))
     else:
         print("%-16f" % (time_lapse))
 
@@ -47,7 +49,8 @@ def __run_round(src_dir, dst_dir):
 
     # this ensures that the script pauses until the file removal is complete
     if global_is_dropbox:
-        if poll_dropbox_status() != DROPBOX_STATUS_OK:
+        status, sync_time = poll_dropbox_status()
+        if status != DROPBOX_STATUS_OK:
             print(":| we are going to pause (10s) for the sync")
             time.sleep(10)
 
@@ -87,9 +90,9 @@ def command_line_runner():
     print("copyfiles: {} -> {}".format(src_dir, dst_dir))
 
     if global_is_dropbox:
-        print("%-16s %-16s" % ("local_time(s)", "total_time(s)"))
+        print("%-16s %-16s %-16s" % ("local_time", "sync_time", "total_time"))
     else:
-        print("%-16s" % ("total time(s)"))
+        print("%-16s" % ("total_time(s)"))
 
     __run_test(src_dir, dst_dir)
 
