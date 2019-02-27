@@ -210,6 +210,9 @@ nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, b
     if (ret == 0) {
         // TODO make this into a function
         metadata->flags = flags;
+
+        // make our metadata object frontmost
+        nexus_lru_get(metadata_cache, &metadata->uuid);
     }
 
     return ret;
