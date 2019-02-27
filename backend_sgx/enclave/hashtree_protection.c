@@ -110,7 +110,7 @@ hashtree_update(struct nexus_metadata * metadata)
 
     do {
         if (parent_dentry->metadata == NULL) {
-            log_error("dentry does not have a metadata object to update");
+            log_error("parent dentry (%s) does not have a metadata object\n", parent_dentry->name);
             return -1;
         }
 
