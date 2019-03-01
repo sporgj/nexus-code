@@ -54,6 +54,11 @@ main(int argc, char * argv[])
         goto out;
     }
 
+    if (commander_init()) {
+        log_error("could not start commander interface\n");
+        goto out;
+    }
+
     printf("Starting nexus-fuse at [%s] (pid=%d)...\n", mount_path, (int) getpid());
 
     argv[1] = argv[0];
@@ -64,6 +69,8 @@ out:
     vfs_deinit();
 
     // TODO handle nexus_deinit properly
+
+    commander_destroy();
 
     nexus_free(volume_path);
     nexus_free(mount_path);
