@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <nexus_datastore.h>
 #include <nexus_backend.h>
 #include <nexus_key.h>
 #include <nexus_log.h>
@@ -12,6 +13,7 @@
 #include <nexus_volume.h>
 #include <nexus_user_data.h>
 #include <nexus_heap.h>
+#include <nexus_list.h>
 
 #include <nexus_probes.h>
 
@@ -51,6 +53,15 @@ struct sgx_backend {
     struct nexus_volume         * volume;
 
     char                        * enclave_path;
+
+    pthread_mutex_t               batch_mutex;
+    bool                          batch_mode;
+    time_t                        batch_start_time;
+    time_t                        batch_finish_time;
+    struct nexus_datastore      * batch_datastore;
+    char                        * batch_dirpath;
+
+    struct nexus_list             batch_deleted_uuids;
 };
 
 

@@ -12,26 +12,29 @@
 struct metadata_buf {
     struct nexus_uuid             uuid;
 
-    uint8_t                     * addr;
-
-    size_t                        size;
-
-    time_t                        timestamp; // last time it was read on disk
-
-
-    nexus_io_flags_t              handle_flags;
+    uint8_t                     * buffer_addr;
+    size_t                        buffer_size;
+    time_t                        buffer_time; // last time buffer was updated
 
     pthread_mutex_t               file_mutex;
 
-    struct nexus_file_handle    * file_handle;  // file handle to the datastore
+    nexus_io_flags_t              io_flags;
 
+    time_t                        sync_time;
+    time_t                        flush_time; // last time we flush to disk
+
+    struct nexus_file_handle    * file_handle;  // file handle to the datastore
+    struct nexus_file_handle    * batch_handle;
+
+    bool                          batch_file_exists;
+
+    bool                          batch_mode_created;  // if created in batch mode
+    bool                          batch_mode_modified;  // if modified in batch mode
 
     size_t                        data_size;
 
-
     bool                          is_dirty;     // if it is unflushed
-
-    time_t                        last_write;
+    bool                          is_syncing;
 
     struct sgx_backend          * backend;
 };

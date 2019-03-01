@@ -24,7 +24,7 @@ buffer_manager_init()
 {
     struct buffer_manager * buf_manager = nexus_malloc(sizeof(struct buffer_manager));
 
-    buf_manager->buffers_table = nexus_create_htable(128,
+    buf_manager->buffers_table = nexus_create_htable(511,
                                                      uuid_hash_func,
                                                      uuid_equal_func);
 

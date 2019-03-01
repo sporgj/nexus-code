@@ -42,11 +42,73 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
         nexus_free(sgx_backend->enclave_path);
     }
 
+    if (sgx_backend->batch_dirpath) {
+        nexus_free(sgx_backend->batch_dirpath);
+    }
+
+    nexus_list_destroy(&sgx_backend->batch_deleted_uuids);
+
+    // TODO delete the batch datastore's contents
+
     nexus_free(sgx_backend);
 
     return 0;
 }
 
+
+static int
+initialize_batch_datastore(struct sgx_backend * backend)
+{
+    char template[] = "/tmp/batch.XXXXXX";
+
+    backend->batch_dirpath = mkdtemp(template);
+    if (backend->batch_dirpath == NULL) {
+        log_error("mkdtemp() FAILED\n");
+        return -1;
+    }
+
+    backend->batch_dirpath = strndup(backend->batch_dirpath, PATH_MAX);
+
+    nexus_printf("batch_datastore init:: %s\n", backend->batch_dirpath);
+
+    nexus_json_obj_t config_json = nexus_json_new_obj("data_store");
+
+    if (config_json == NEXUS_JSON_INVALID_OBJ) {
+        log_error("nexus_json_new_obj() FAILED\n");
+        return -1;
+    }
+
+    if (nexus_json_add_string(config_json, "name", "TWOLEVEL")) {
+        log_error("nexus_json_set_string FAILED\n");
+        goto out_err;
+    }
+
+    if (nexus_json_add_string(config_json, "root_path", backend->batch_dirpath)) {
+        log_error("nexus_json_set_string FAILED\n");
+        goto out_err;
+    }
+
+    backend->batch_datastore = nexus_datastore_create("TWOLEVEL", config_json);
+    if (backend->batch_datastore == NULL) {
+        log_error("nexus_datastore_create() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_json_free(config_json);
+
+    return 0;
+
+out_err:
+    nexus_json_free(config_json);
+
+    return -1;
+}
+
+static void
+nexus_uuid_deallocator(void * element)
+{
+    nexus_free(element);
+}
 
 /**
  * Initializes the backend runtime
@@ -55,6 +117,9 @@ static void *
 sgx_backend_init(nexus_json_obj_t backend_cfg)
 {
     struct sgx_backend * sgx_backend = nexus_malloc(sizeof(struct sgx_backend));
+
+    nexus_list_init(&sgx_backend->batch_deleted_uuids);
+    nexus_list_set_deallocator(&sgx_backend->batch_deleted_uuids, nexus_uuid_deallocator);
 
     if (nexus_json_get_string(backend_cfg, "enclave_path", &sgx_backend->enclave_path)) {
         if (nexus_config.enclave_path) {
@@ -76,6 +141,11 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
         }
 
         nexus_printf("backend_sgx: fsync_mode=%s\n", (sgx_backend->fsync_mode ? "TRUE" : "FALSE"));
+    }
+
+    if (initialize_batch_datastore(sgx_backend)) {
+        log_error("initialize_local_datastore() FAILED\n");
+        goto out_err;
     }
 
     // create the buffer_table
@@ -157,3 +227,76 @@ static struct nexus_backend_impl sgx_backend_impl = {
 
 
 nexus_register_backend(sgx_backend_impl);
+
+
+// batch mode stuff
+
+int
+sgx_backend_batch_mode_start(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = volume->private_data;
+
+    pthread_mutex_lock(&backend->batch_mutex);
+
+    if (backend->batch_mode == true) {
+        pthread_mutex_unlock(&backend->batch_mutex);
+        return 0;
+    }
+
+    backend->batch_mode = true;
+    backend->batch_start_time = time(NULL);
+    pthread_mutex_unlock(&backend->batch_mutex);
+
+    return 0;
+}
+
+int
+sgx_backend_batch_mode_commit(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = volume->private_data;
+
+    int ret = -1;
+
+    pthread_mutex_lock(&backend->batch_mutex);
+
+    if (backend->batch_mode == false) {
+        pthread_mutex_unlock(&backend->batch_mutex);
+        return 0;
+    }
+
+    ret = io_buffer_sync_buffers(backend);
+    if (ret) {
+        log_error("io_buffer_sync_buffers() FAILED\n");
+    }
+
+    pthread_mutex_unlock(&backend->batch_mutex);
+
+    return ret;
+}
+
+int
+sgx_backend_batch_mode_finish(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = volume->private_data;
+    int ret = -1;
+
+    pthread_mutex_lock(&backend->batch_mutex);
+
+    if (backend->batch_mode == false) {
+        pthread_mutex_unlock(&backend->batch_mutex);
+        return 0;
+    }
+
+    ret = io_buffer_sync_buffers(backend);
+    if (ret) {
+        log_error("io_buffer_sync_buffers() FAILED\n");
+    }
+
+    backend->batch_mode = false;
+    backend->batch_finish_time = time(NULL);
+
+    pthread_mutex_unlock(&backend->batch_mutex);
+
+    return 0;
+}
+

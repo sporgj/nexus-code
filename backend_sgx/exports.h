@@ -18,3 +18,16 @@ sgx_backend_export_rootkey(char                * destination_path,
  */
 int
 sgx_backend_import_rootkey(char * rk_exchange_path);
+
+
+// batch mode commands
+
+int
+sgx_backend_batch_mode_start(struct nexus_volume * volume);
+
+/** commits dirty buffers in batch mode */
+int
+sgx_backend_batch_mode_commit(struct nexus_volume * volume);
+
+int
+sgx_backend_batch_mode_finish(struct nexus_volume * volume);
