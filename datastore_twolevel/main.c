@@ -615,6 +615,76 @@ err_out:
     return ret;
 }
 
+
+static int
+twolevel_copy_uuid(struct nexus_datastore * src_datastore,
+                   struct nexus_uuid      * uuid,
+                   bool                     force_copy,
+                   void                   * priv_data)
+{
+    struct twolevel_datastore * dst_2lvl_datastore = priv_data;
+    struct twolevel_datastore * src_2lvl_datastore = NULL;
+
+    char * dst_filepath = NULL;
+    char * src_filepath = NULL;
+
+
+    if (strncmp("TWOLEVEL", src_datastore->impl->name, 100) != 0) {
+        log_error("Only TWOLEVEL to TWOLEVEL copy is allowed at this time\n");
+        return -1;
+    }
+
+    src_2lvl_datastore = src_datastore->priv_data;
+
+    dst_filepath = __make_full_path(dst_2lvl_datastore, uuid);
+    src_filepath = __get_full_path(src_2lvl_datastore, uuid);
+    if (dst_filepath == NULL || src_filepath == NULL) {
+        log_error("src_filepath or dst_filepath could not be derived");
+        goto out_err;
+    }
+
+    // check which file is newer
+    if (force_copy == false) {
+        struct stat dst_stat;
+        struct stat src_stat;
+
+        // if the source file can't be found, the copy operation will fail anyway
+        if (stat(src_filepath, &src_stat) == -1) {
+            log_error("could not stat src_file (%s)\n", src_filepath);
+            goto out_err;
+        }
+
+        // if the dst file is older, let's skip the check
+        int ret = stat(dst_filepath, &dst_stat);
+
+        if ((ret == 0) && (difftime(dst_stat.st_mtime, src_stat.st_mtime) > 0)) {
+            goto out_success;
+        }
+    }
+
+    if (nexus_copy_file(src_filepath, dst_filepath)) {
+        log_error("nexus_copy_file FAILED\n");
+        goto out_err;
+    }
+
+out_success:
+    nexus_free(dst_filepath);
+    nexus_free(src_filepath);
+
+    return 0;
+
+out_err:
+    if (dst_filepath) {
+        nexus_free(dst_filepath);
+    }
+
+    if (src_filepath) {
+        nexus_free(src_filepath);
+    }
+
+    return -1;
+}
+
 static int
 twolevel_getattr(struct nexus_uuid * uuid, struct nexus_fs_attr * attrs, void * priv_data)
 {
@@ -754,6 +824,8 @@ static struct nexus_datastore_impl twolevel_datastore = {
     .new_uuid      = twolevel_new_uuid,
     .touch_uuid    = twolevel_touch_uuid,
     .del_uuid      = twolevel_del_uuid,
+
+    .copy_uuid     = twolevel_copy_uuid,
 
     .fopen         = twolevel_fopen,
     .fread         = twolevel_fread,

@@ -10,6 +10,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <execinfo.h>
+#include <unistd.h>
+
+#include <sys/wait.h>
+#include <sys/types.h>
 
 #include <nexus_util.h>
 #include <nexus_log.h>
@@ -90,6 +94,39 @@ nexus_splitpath(const char * filepath, char ** dirpath, char ** filename)
         *dirpath = strndup(filepath, (int)(fname - filepath));
     }
 }
+
+
+int
+nexus_copy_file(const char * src_filepath, const char * dst_filepath)
+{
+    int status = 0;
+
+    if (src_filepath == NULL || dst_filepath == NULL) {
+        log_error("incorrect arguments\n");
+        return -1;
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("failure");
+        return -1;
+    }
+
+    if (pid == 0) {
+        execl("/bin/cp", "-p", src_filepath, dst_filepath, (char *)0);
+        perror("exec() FAILURE\n");
+        _exit(1);
+    } else {
+        if (waitpid(pid, &status, 0) < 0) {
+            perror("waitpid()");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 
 // https://gist.github.com/ccbrown/9722406
 void
