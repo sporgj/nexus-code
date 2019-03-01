@@ -26,7 +26,6 @@
 #include "key_buffer.h"
 #include "io.h"
 #include "exports.h"
-#include "commander.h"
 
 #include "hashtree_manager.h"
 
