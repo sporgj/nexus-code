@@ -49,7 +49,7 @@ def __run_round(src_dir, dst_dir):
 
     # this ensures that the script pauses until the file removal is complete
     if global_is_dropbox:
-        status, sync_time = poll_dropbox_status()
+        status, _ = poll_dropbox_status()
         if status != DROPBOX_STATUS_OK:
             print(":| we are going to pause (10s) for the sync")
             time.sleep(10)
