@@ -248,21 +248,6 @@ out:
     return ret;
 }
 
-inline static int
-__nxs_fs_filldir(struct nexus_metadata * metadata,
-                 struct nexus_uuid     * uuid,
-                 const char           ** name_ptr,
-                 size_t                * name_len)
-{
-    nexus_dirent_type_t type;
-
-    if (dirnode_find_by_uuid(metadata->dirnode, uuid, &type, name_ptr, name_len)) {
-        return -1;
-    }
-
-    return 0;
-}
-
 int
 ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat * nexus_stat_out)
 {
@@ -315,43 +300,6 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
         nexus_vfs_put(metadata);
     }
 
-    sgx_spin_unlock(&vfs_ops_lock);
-
-    return ret;
-}
-
-int
-ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char filename_out[NEXUS_NAME_MAX])
-{
-    struct nexus_metadata * metadata = NULL;
-
-    const char * name_ptr = NULL;
-    size_t name_len;
-
-    int ret = -1;
-
-
-    sgx_spin_lock(&vfs_ops_lock);
-
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
-
-    if (metadata == NULL) {
-        log_error("could not get metadata\n");
-        sgx_spin_unlock(&vfs_ops_lock);
-        return -1;
-    }
-
-    ret = __nxs_fs_filldir(metadata, uuid, &name_ptr, &name_len);
-    if (ret != 0) {
-        goto out;
-    }
-
-    // copy out the filename
-    strncpy(filename_out, name_ptr, NEXUS_NAME_MAX);
-
-    ret = 0;
-out:
-    nexus_vfs_put(metadata);
     sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
