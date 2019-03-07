@@ -260,7 +260,7 @@ __export_link_count(struct nexus_uuid * uuid, struct nexus_stat * stat_out)
     }
 
     if (hardlink_table_contains_uuid(hardlink_table, uuid)) {
-        stat_out->link_count = hardlink_table_get_uuid(hardlink_table, uuid);
+        hardlink_table_get_uuid(hardlink_table, uuid, &stat_out->link_count);
     } else {
         stat_out->link_count = 0;
     }
