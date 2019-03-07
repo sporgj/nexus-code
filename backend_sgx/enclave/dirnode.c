@@ -8,7 +8,6 @@
 struct __dirnode_hdr {
     struct nexus_uuid   my_uuid;
     struct nexus_uuid   root_uuid;
-    struct nexus_uuid   parent_uuid;
 
     uint32_t            symlink_count;
     uint32_t            symlink_buflen;
@@ -104,7 +103,6 @@ __parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t 
         return NULL;
     }
 
-    nexus_uuid_copy(&header->parent_uuid, &dirnode->parent_uuid);
     nexus_uuid_copy(&header->root_uuid, &dirnode->root_uuid);
     nexus_uuid_copy(&header->my_uuid, &dirnode->my_uuid);
 
@@ -222,15 +220,6 @@ out_err:
     list_iterator_free(iter);
 
     return ret;
-}
-
-
-void
-dirnode_set_parent(struct nexus_dirnode * dirnode, struct nexus_uuid * parent_uuid)
-{
-    nexus_uuid_copy(parent_uuid, &dirnode->parent_uuid);
-
-    __dirnode_set_dirty(dirnode);
 }
 
 static struct nexus_dirnode *
@@ -351,7 +340,6 @@ __serialize_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer)
 
     nexus_uuid_copy(&dirnode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&dirnode->root_uuid, &header->root_uuid);
-    nexus_uuid_copy(&dirnode->parent_uuid, &header->parent_uuid);
 
     header->symlink_count    = dirnode->symlink_count;
     header->symlink_buflen   = dirnode->symlink_buflen;
@@ -565,10 +553,7 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
 }
 
 int
-dirnode_store(struct nexus_uuid    * uuid,
-              struct nexus_dirnode * dirnode,
-              uint32_t               version,
-              struct nexus_mac     * mac)
+dirnode_store(struct nexus_dirnode * dirnode, uint32_t version, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -583,7 +568,7 @@ dirnode_store(struct nexus_uuid    * uuid,
 
     bucket0_size  = __get_bucket0_size(dirnode);
 
-    crypto_buffer = nexus_crypto_buf_new(bucket0_size, version, uuid);
+    crypto_buffer = nexus_crypto_buf_new(bucket0_size, version, &dirnode->my_uuid);
 
     if (crypto_buffer == NULL) {
         return -1;

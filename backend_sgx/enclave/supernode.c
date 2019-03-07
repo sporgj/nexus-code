@@ -6,6 +6,8 @@ struct __supernode_hdr {
 
     struct nexus_uuid usertable_uuid;
     struct nexus_mac  usertable_mac;
+
+    struct nexus_uuid hardlink_table_uuid;
 } __attribute__((packed));
 
 
@@ -41,6 +43,8 @@ __parse_supernode_header(struct nexus_supernode * supernode, uint8_t * buffer, s
 
     nexus_uuid_copy(&header->usertable_uuid, &supernode->usertable_uuid);
     nexus_mac_copy(&header->usertable_mac, &supernode->usertable_mac);
+
+    nexus_uuid_copy(&header->hardlink_table_uuid, &supernode->hardlink_table_uuid);
 
     return buffer + sizeof(struct __supernode_hdr);
 }
@@ -79,7 +83,7 @@ supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flag
     buffer = __parse_supernode_header(supernode, buffer, buflen);
 
     if (buffer == NULL) {
-        log_error("__parse_supernode FAILED\n");
+        log_error("__parse_supernode_header FAILED\n");
         goto err;
     }
 
@@ -89,7 +93,7 @@ supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flag
         struct nexus_mac usertable_mac;
 
         supernode->usertable = nexus_usertable_load(&supernode->usertable_uuid,
-                                                    NEXUS_FREAD,
+                                                    mode,
                                                     &usertable_mac);
 
         if (supernode->usertable == NULL) {
@@ -123,7 +127,7 @@ supernode_load(struct nexus_uuid * uuid, nexus_io_flags_t mode)
     crypto_buffer = nexus_crypto_buf_create(uuid, mode);
 
     if (crypto_buffer == NULL) {
-        log_error("metadata_read FAILED\n");
+        log_error("nexus_crypto_buf_create FAILED\n");
         return NULL;
     }
 
@@ -144,10 +148,13 @@ supernode_create(char * user_pubkey)
 {
     struct nexus_supernode * supernode = NULL;
 
+    struct hardlink_table * hardlink_table = NULL;
+
     supernode = nexus_malloc(sizeof(struct nexus_supernode));
 
     nexus_uuid_gen(&supernode->my_uuid);
     nexus_uuid_gen(&supernode->root_uuid);
+    nexus_uuid_gen(&supernode->hardlink_table_uuid);
 
     supernode->usertable = nexus_usertable_create(user_pubkey);
     if (supernode->usertable == NULL) {
@@ -176,6 +183,8 @@ __serialize_supernode_header(struct nexus_supernode * supernode, uint8_t * buffe
 
     nexus_uuid_copy(&supernode->usertable_uuid, &header->usertable_uuid);
     nexus_mac_copy(&supernode->usertable_mac, &header->usertable_mac);
+
+    nexus_uuid_copy(&supernode->hardlink_table_uuid, &header->hardlink_table_uuid);
 
     return (buffer + sizeof(struct __supernode_hdr));
 }

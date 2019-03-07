@@ -82,22 +82,6 @@ nexus_fs_stat(struct nexus_volume  * volume,
 }
 
 int
-nexus_fs_filldir(struct nexus_volume  * volume,
-                 char                 * dirpath,
-                 char                 * nexus_name,
-                 char                ** plain_name)
-{
-    struct nexus_backend * backend = volume->backend;
-
-    if (backend->impl->fs_filldir == NULL) {
-	log_error("fs_filldir NOT Implemented for %s backend\n", backend->impl->name);
-	return -1;
-    }
-
-    return backend->impl->fs_filldir(volume, dirpath, nexus_name, plain_name, backend->priv_data);
-}
-
-int
 nexus_fs_readdir(struct nexus_volume  * volume,
                  char                 * dirpath,
                  struct nexus_dirent  * dirent_buffer_array,

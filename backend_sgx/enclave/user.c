@@ -201,7 +201,7 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
     crypto_buffer = nexus_crypto_buf_create(uuid, flags);
 
     if (crypto_buffer == NULL) {
-        log_error("buffer_layer_read_datastore FAILED\n");
+        log_error("nexus_crypto_buf_create FAILED\n");
         return NULL;
     }
 
@@ -309,7 +309,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
     }
 
     if (__serialize_usertable(usertable, output_buffer)) {
-        log_error("dirnode_serialize() FAILED\n");
+        log_error("__serialize_usertable() FAILED\n");
         goto out_err;
     }
 

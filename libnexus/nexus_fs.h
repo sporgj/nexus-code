@@ -151,12 +151,6 @@ nexus_fs_stat(struct nexus_volume  * volume,
               struct nexus_stat    * nexus_stat);
 
 int
-nexus_fs_filldir(struct nexus_volume  * volume,
-                 char                 * dirpath,
-                 char                 * nexus_name,
-                 char                ** plain_name);
-
-int
 nexus_fs_readdir(struct nexus_volume  * volume,
                  char                 * dirpath,
                  struct nexus_dirent  * dirent_buffer_array,
