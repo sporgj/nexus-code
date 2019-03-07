@@ -248,6 +248,28 @@ out:
     return ret;
 }
 
+
+static int
+__export_link_count(struct nexus_uuid * uuid, struct nexus_stat * stat_out)
+{
+    struct hardlink_table * hardlink_table = nexus_vfs_acquire_hardlink_table(NEXUS_FREAD);
+
+    if (hardlink_table == NULL) {
+        log_error("WARN: nexus_vfs_acquire_hardlink_table() FAILED\n");
+        return -1;
+    }
+
+    if (hardlink_table_contains_uuid(hardlink_table, uuid)) {
+        stat_out->link_count = hardlink_table_get_uuid(hardlink_table, uuid);
+    } else {
+        stat_out->link_count = 0;
+    }
+
+    nexus_vfs_release_hardlink_table();
+
+    return 0;
+}
+
 int
 ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat * nexus_stat_out)
 {
@@ -275,6 +297,10 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
 
         if (walker.remaining_path) {
             ret = dirnode_export_link_stat(dirnode, walker.remaining_path, nexus_stat_out);
+
+            if (ret == 0 && nexus_stat_out->link_type == NEXUS_REG) {
+                __export_link_count(&dirnode->my_uuid, nexus_stat_out);
+            }
         } else {
             // it is the root directory
             dirnode_export_stat(dirnode, nexus_stat_out);
@@ -295,6 +321,8 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
             dirnode_export_stat(metadata->dirnode, nexus_stat_out);
         } else {
             filenode_export_stat(metadata->filenode, nexus_stat_out);
+
+            __export_link_count(&metadata->uuid, nexus_stat_out);
         }
 
         nexus_vfs_put(metadata);

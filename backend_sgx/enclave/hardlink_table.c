@@ -325,3 +325,19 @@ hardlink_table_contains_uuid(struct hardlink_table * hardlink_table, struct nexu
 
     return true;
 }
+
+int
+hardlink_table_get_uuid(struct hardlink_table * hardlink_table,
+                        struct nexus_uuid     * uuid,
+                        size_t                * link_count)
+{
+    struct __hardlink_table_entry * entry = __get_entry(hardlink_table, uuid);
+
+    if (entry == NULL) {
+        return -1;
+    }
+
+    *link_count = entry->link_count;
+
+    return 0;
+}
