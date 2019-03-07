@@ -46,6 +46,8 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         }
     }
 
+    global_supernode = supernode;
+
     // root dirnode
     {
         ret = -1;
@@ -71,10 +73,33 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         }
     }
 
+    {
+        struct nexus_metadata * hardlink_table_metadata = NULL;
+
+        hardlink_table_metadata
+            = nexus_metadata_create(&supernode->hardlink_table_uuid, NEXUS_HARDLINK_TABLE);
+
+        if (hardlink_table_metadata == NULL) {
+            log_error("nexus_metadata_create() NULL\n");
+            ret = -1;
+            nexus_metadata_free(hardlink_table_metadata);
+            goto out;
+        }
+
+        ret = nexus_metadata_store(hardlink_table_metadata);
+
+        if (ret != 0) {
+            nexus_metadata_free(hardlink_table_metadata);
+            log_error("nexus_metadata_store() FAILED\n");
+            goto out;
+        }
+    }
+
     nexus_uuid_copy(&supernode->my_uuid, supernode_uuid_out);
 
     ret = 0;
 out:
+    // TODO handle unlock of metadata
     if (supernode) {
         supernode_free(supernode);
     }
@@ -82,6 +107,8 @@ out:
     if (root_dirnode) {
         dirnode_free(root_dirnode);
     }
+
+    global_supernode = NULL;
 
     return ret;
 }

@@ -21,6 +21,8 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     struct nexus_dirnode   * dirnode   = NULL;
     struct nexus_filenode  * filenode  = NULL;
 
+    struct hardlink_table  * hardlink_table  = NULL;
+
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
         if (metadata->supernode) {
@@ -46,6 +48,13 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
         filenode = object;
         filenode->metadata = metadata;
         break;
+    case NEXUS_HARDLINK_TABLE:
+        if (metadata->hardlink_table) {
+            hardlink_table_free(metadata->hardlink_table);
+        }
+
+        hardlink_table = object;
+        hardlink_table->metadata = metadata;
     }
 
     metadata->object = object;
@@ -89,12 +98,9 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
 }
 
 struct nexus_metadata *
-nexus_metadata_create(struct nexus_uuid * uuid, nexus_dirent_type_t dirent_type)
+nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_type)
 {
     void * object = NULL;
-
-    nexus_metadata_type_t metadata_type;
-
 
     /* we will first lock the file in the buffer layer */
     if (buffer_layer_lock(uuid, NEXUS_FCREATE)) {
@@ -102,8 +108,6 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_dirent_type_t dirent_type)
         return NULL;
     }
 
-
-    metadata_type = (dirent_type == NEXUS_DIR) ? NEXUS_DIRNODE : NEXUS_FILENODE;
 
     switch (metadata_type) {
     case NEXUS_DIRNODE:
@@ -115,6 +119,9 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_dirent_type_t dirent_type)
     case NEXUS_SUPERNODE:
         log_error("cannot create supernode from nexus_metadata_create()\n");
         return NULL;
+    case NEXUS_HARDLINK_TABLE:
+        object = hardlink_table_create(&global_supernode->root_uuid, uuid);
+        break;
     }
 
     return nexus_metadata_from_object(uuid, object, metadata_type, NEXUS_FCREATE, 0);
@@ -187,8 +194,8 @@ __read_object(struct nexus_uuid     * uuid,
         case NEXUS_FILENODE:
             object = filenode_create(&global_supernode->root_uuid, uuid);
             break;
-        case NEXUS_SUPERNODE:
-            log_error("supernode cannot be version 0\n");
+        default:
+            log_error("metadata cannot be version 0\n");
             break;
         }
     } else {
@@ -201,6 +208,9 @@ __read_object(struct nexus_uuid     * uuid,
             break;
         case NEXUS_SUPERNODE:
             object = supernode_from_crypto_buf(crypto_buf, flags);
+            break;
+        default:
+            object = hardlink_table_from_crypto_buf(crypto_buf, flags);
             break;
         }
     }
@@ -275,6 +285,9 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     case NEXUS_FILENODE:
         ret = filenode_store(&metadata->uuid, metadata->filenode, metadata->version, NULL);
         break;
+    case NEXUS_HARDLINK_TABLE:
+        ret = hardlink_table_store(metadata->hardlink_table, metadata->version, NULL);
+        break;
     }
 
     if (ret == 0) {
@@ -319,10 +332,6 @@ nexus_metadata_put(struct nexus_metadata * metadata)
 int
 nexus_metadata_lock(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 {
-    if (metadata->is_locked) {
-        return 0;
-    }
-
     if (metadata->type == NEXUS_FILENODE) {
         flags |= NEXUS_IO_FNODE;
     }

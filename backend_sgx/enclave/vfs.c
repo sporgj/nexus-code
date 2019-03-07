@@ -14,6 +14,9 @@ static sgx_spinlock_t         mcache_lock                = SGX_SPINLOCK_INITIALI
 static sgx_spinlock_t         traversal_lock             = SGX_SPINLOCK_INITIALIZER;
 
 
+static struct nexus_metadata  * hardlink_table_metadata  = NULL;
+
+
 void
 __lru_shrinker(uintptr_t element, uintptr_t key)
 {
@@ -89,7 +92,7 @@ struct nexus_metadata *
 dentry_get_metadata(struct nexus_dentry * dentry, nexus_io_flags_t flags, bool revalidate)
 {
     if (revalidate && dentry_revalidate(dentry, flags)) {
-        log_error("could revalidate dentry\n");
+        log_error("could revalidate dentry (%s)\n", dentry->name);
         return NULL;
     }
 
@@ -203,17 +206,14 @@ __vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool 
 int
 nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
 {
-    int ret = __vfs_revalidate(metadata, flags, has_changed);
-
-    if (ret == 0) {
-        // TODO make this into a function
-        metadata->flags = flags;
-
+    if (__vfs_revalidate(metadata, flags, has_changed) == 0) {
         // make our metadata object frontmost
         nexus_lru_get(metadata_cache, &metadata->uuid);
+
+        return 0;
     }
 
-    return ret;
+    return -1;
 }
 
 struct nexus_supernode *
@@ -236,6 +236,48 @@ nexus_vfs_release_supernode()
     if (global_supernode_metadata->is_locked) {
         nexus_metadata_unlock(global_supernode_metadata);
     }
+}
+
+
+struct hardlink_table *
+nexus_vfs_acquire_hardlink_table(nexus_io_flags_t flags)
+{
+    struct nexus_uuid * uuid = &global_supernode->hardlink_table_uuid;
+
+    bool has_changed;
+
+    int ret = -1;
+
+
+    if (hardlink_table_metadata == NULL) {
+        hardlink_table_metadata = nexus_metadata_load(uuid, NEXUS_HARDLINK_TABLE, flags);
+
+        if (hardlink_table_metadata == NULL) {
+            log_error("nexus_metadata_load() FAILED\n");
+            return NULL;
+        }
+
+        return hardlink_table_metadata->hardlink_table;
+    }
+
+    if (__vfs_revalidate(hardlink_table_metadata, flags, &has_changed)) {
+        log_error("__vfs_revalidate() FAILED\n");
+        return NULL;
+    }
+
+    return hardlink_table_metadata->hardlink_table;
+}
+
+int
+nexus_vfs_flush_hardlink_table()
+{
+    return nexus_metadata_store(hardlink_table_metadata);
+}
+
+void
+nexus_vfs_release_hardlink_table()
+{
+    nexus_metadata_unlock(hardlink_table_metadata);
 }
 
 

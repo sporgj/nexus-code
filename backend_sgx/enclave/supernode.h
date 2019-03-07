@@ -29,6 +29,8 @@ struct nexus_supernode {
     struct nexus_uuid          usertable_uuid;
     struct nexus_mac           usertable_mac;
 
+    struct nexus_uuid          hardlink_table_uuid;
+
     struct nexus_mac           mac;
 
     struct nexus_metadata    * metadata;

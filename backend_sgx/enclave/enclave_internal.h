@@ -39,6 +39,7 @@
 #include "bucket.h"
 #include "filenode.h"
 #include "file_crypto.h"
+#include "hardlink_table.h"
 
 #include <nexus_volume.h>
 #include <nexus_fs.h>
