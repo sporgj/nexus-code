@@ -63,7 +63,6 @@ struct dir_entry {
 struct nexus_dirnode {
     struct nexus_uuid       my_uuid;
     struct nexus_uuid       root_uuid;
-    struct nexus_uuid       parent_uuid;
 
     size_t                  symlink_count;
     size_t                  symlink_buflen;
@@ -109,9 +108,6 @@ struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid);
 
 void
-dirnode_set_parent(struct nexus_dirnode * dirnode, struct nexus_uuid * parent_uuid);
-
-void
 __dirnode_index_direntry(struct nexus_dirnode * dirnode, struct dir_entry * dir_entry);
 
 void
@@ -128,25 +124,8 @@ dirnode_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
 struct nexus_dirnode *
 dirnode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf, nexus_io_flags_t flags);
 
-/**
- * Writes dirnode to datastore
- *
- * FIXME
- * In some cases, the uuid from which a dirnode was read from is not equals to its
- * dirnode->my_uuid. This is usually the result of a rename operation (which does not
- * rewrite the dirnode of the moved directory). Explicitly specifying the uuid (stored
- * by the vfs) is a temporary solution.
- *
- * @param uuid: to write to.
- * @param dirnode
- * @param mac
- * @return 0 on success
- */
 int
-dirnode_store(struct   nexus_uuid    * uuid,
-              struct   nexus_dirnode * dirnode,
-              uint32_t                 version,
-              struct   nexus_mac     * mac);
+dirnode_store(struct nexus_dirnode * dirnode, uint32_t version, struct nexus_mac * mac);
 
 int
 dirnode_compare(struct nexus_dirnode * src_dirnode, struct nexus_dirnode * dst_dirnode);

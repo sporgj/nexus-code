@@ -280,10 +280,10 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         ret = supernode_store(metadata->supernode, metadata->version, NULL);
         break;
     case NEXUS_DIRNODE:
-        ret = dirnode_store(&metadata->uuid, metadata->dirnode, metadata->version, NULL);
+        ret = dirnode_store(metadata->dirnode, metadata->version, NULL);
         break;
     case NEXUS_FILENODE:
-        ret = filenode_store(&metadata->uuid, metadata->filenode, metadata->version, NULL);
+        ret = filenode_store(metadata->filenode, metadata->version, NULL);
         break;
     case NEXUS_HARDLINK_TABLE:
         ret = hardlink_table_store(metadata->hardlink_table, metadata->version, NULL);
@@ -364,21 +364,4 @@ nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
     }
 
     return 0;
-}
-
-void
-nexus_metadata_set_parent_uuid(struct nexus_metadata * metadata, struct nexus_uuid * parent_uuid)
-{
-    struct nexus_dirnode   * dirnode   = NULL;
-    struct nexus_filenode  * filenode  = NULL;
-
-    if (metadata->type == NEXUS_DIRNODE) {
-        dirnode = (struct nexus_dirnode *)metadata->object;
-
-        dirnode_set_parent(dirnode, parent_uuid);
-    } else if (metadata->type == NEXUS_FILENODE) {
-        filenode = (struct nexus_dirnode *)metadata->object;
-
-        filenode_set_parent(filenode, parent_uuid);
-    }
 }
