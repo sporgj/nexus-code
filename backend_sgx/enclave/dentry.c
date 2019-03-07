@@ -174,6 +174,11 @@ dentry_invalidate(struct nexus_dentry * dentry)
 void
 dentry_delete(struct nexus_dentry * dentry)
 {
+    // we don't touch the root dentry
+    if (dentry == global_root_dentry) {
+        return;
+    }
+
     if (dentry && dentry->flags & DENTRY_DELETED) {
         return;
     }
@@ -188,11 +193,6 @@ dentry_delete(struct nexus_dentry * dentry)
     dentry->flags = DENTRY_DELETED;
 
     d_iput(dentry);
-
-    // we don't touch the root dentry
-    if (dentry == global_root_dentry) {
-        return;
-    }
 
     // if it's only one reference (files and empty directories), remove it
     if (dentry->d_count <= 1) {

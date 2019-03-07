@@ -73,37 +73,29 @@ out:
 static int
 __remove_filenode(struct nexus_uuid * uuid, bool * should_remove)
 {
-    // if we are dealing with files, check hardlink count
-    struct nexus_metadata * metadata = nexus_vfs_load(uuid, NEXUS_FILENODE, NEXUS_FRDWR);
+    struct hardlink_table * hardlink_table = nexus_vfs_acquire_hardlink_table(NEXUS_FRDWR);
 
-    if (metadata == NULL) {
-        log_error("could not find filenode\n");
+    if (hardlink_table == NULL) {
+        log_error("nexus_vfs_acquire_hardlink_table() FAILED\n");
         return -1;
     }
 
-    filenode_decr_linkcount(metadata->filenode);
-
-    // if there are existing links, just update the filenode
-    if (filenode_get_linkcount(metadata->filenode) > 0) {
-        if (nexus_metadata_store(metadata)) {
-            log_error("could not store filenode metadata after increment\n");
-            return -1;
-        }
-
-        nexus_vfs_put(metadata);
-
-        *should_remove = false;
-    } else {
-        // we are going to make the metadata clean to make sure it doesn't get written to disk
-        // and we can just remove the uuid from the vfs
-        __metadata_set_clean(metadata);
-        nexus_vfs_put(metadata);
+    if (!hardlink_table_contains_uuid(hardlink_table, uuid)) {
+        nexus_vfs_release_hardlink_table();
         nexus_vfs_delete(uuid);
-
         *should_remove = true;
+        return 0;
     }
 
-    return 0;
+    if (hardlink_table_decr_uuid(hardlink_table, uuid) == 0) {
+        *should_remove = true;
+        nexus_vfs_delete(uuid);
+        return nexus_vfs_flush_hardlink_table();
+    }
+
+    *should_remove = false;
+
+    return nexus_vfs_flush_hardlink_table();
 }
 
 inline static int
@@ -256,21 +248,6 @@ out:
     return ret;
 }
 
-inline static int
-__nxs_fs_filldir(struct nexus_metadata * metadata,
-                 struct nexus_uuid     * uuid,
-                 const char           ** name_ptr,
-                 size_t                * name_len)
-{
-    nexus_dirent_type_t type;
-
-    if (dirnode_find_by_uuid(metadata->dirnode, uuid, &type, name_ptr, name_len)) {
-        return -1;
-    }
-
-    return 0;
-}
-
 int
 ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat * nexus_stat_out)
 {
@@ -323,43 +300,6 @@ ecall_fs_stat(char * path_IN, nexus_stat_flags_t stat_flags, struct nexus_stat *
         nexus_vfs_put(metadata);
     }
 
-    sgx_spin_unlock(&vfs_ops_lock);
-
-    return ret;
-}
-
-int
-ecall_fs_filldir(char * dirpath_IN, struct nexus_uuid * uuid, char filename_out[NEXUS_NAME_MAX])
-{
-    struct nexus_metadata * metadata = NULL;
-
-    const char * name_ptr = NULL;
-    size_t name_len;
-
-    int ret = -1;
-
-
-    sgx_spin_lock(&vfs_ops_lock);
-
-    metadata = nexus_vfs_get(dirpath_IN, NEXUS_FREAD);
-
-    if (metadata == NULL) {
-        log_error("could not get metadata\n");
-        sgx_spin_unlock(&vfs_ops_lock);
-        return -1;
-    }
-
-    ret = __nxs_fs_filldir(metadata, uuid, &name_ptr, &name_len);
-    if (ret != 0) {
-        goto out;
-    }
-
-    // copy out the filename
-    strncpy(filename_out, name_ptr, NEXUS_NAME_MAX);
-
-    ret = 0;
-out:
-    nexus_vfs_put(metadata);
     sgx_spin_unlock(&vfs_ops_lock);
 
     return ret;
@@ -563,18 +503,20 @@ __nxs_fs_hardlink(struct nexus_dirnode * link_dirnode,
         return -1;
     }
 
-
     {
-        struct nexus_metadata * metadata = nexus_vfs_load(file_uuid, NEXUS_FILENODE, NEXUS_FRDWR);
+        struct hardlink_table * hardlink_table = nexus_vfs_acquire_hardlink_table(NEXUS_FRDWR);
 
-        filenode_incr_linkcount(metadata->filenode);
-
-        if (nexus_metadata_store(metadata)) {
-            log_error("could not store filenode metadata after increment\n");
+        if (hardlink_table == NULL) {
+            log_error("nexus_vfs_acquire_hardlink_table() FAILED\n");
             return -1;
         }
 
-        nexus_vfs_put(metadata);
+        hardlink_table_incr_uuid(hardlink_table, file_uuid);
+
+        if (nexus_vfs_flush_hardlink_table()) {
+            log_error("nexus_vfs_flush_hardlink_table() FAILED\n");
+            return -1;
+        }
     }
 
     // add entry to src_dirnode

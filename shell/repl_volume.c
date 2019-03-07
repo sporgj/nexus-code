@@ -415,6 +415,14 @@ handle_fs_hardlink(int argc, char ** argv)
     link_filepath = strndup(argv[0], NEXUS_PATH_MAX);
     target_filepath = strndup(argv[1], NEXUS_PATH_MAX);
 
+    if (__fs_stat(mounted_volume, target_filepath, NEXUS_STAT_FILE)) {
+        nexus_free(link_filepath);
+        nexus_free(target_filepath);
+
+        log_error("__fs_stat FAILED\n");
+        return -1;
+    }
+
     ret = __fs_hardlink(mounted_volume, link_filepath, target_filepath);
 
     nexus_free(link_filepath);

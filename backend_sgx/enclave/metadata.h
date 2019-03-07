@@ -15,7 +15,8 @@ struct nexus_dentry;
 typedef enum {
     NEXUS_SUPERNODE,
     NEXUS_DIRNODE,
-    NEXUS_FILENODE
+    NEXUS_FILENODE,
+    NEXUS_HARDLINK_TABLE,
 } nexus_metadata_type_t;
 
 
@@ -43,6 +44,9 @@ struct nexus_metadata {
         struct nexus_supernode   * supernode;
         struct nexus_dirnode     * dirnode;
         struct nexus_filenode    * filenode;
+
+        struct hardlink_table    * hardlink_table;
+
         void                     * object;
     };
 
@@ -80,7 +84,7 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
                            uint32_t                version);
 
 struct nexus_metadata *
-nexus_metadata_create(struct nexus_uuid * uuid, nexus_dirent_type_t dirent_type);
+nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_type);
 
 /**
  * Increments the refcount of the metadata object

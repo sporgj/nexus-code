@@ -57,6 +57,9 @@ nexus_vfs_put(struct nexus_metadata * metadata);
 int
 nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed);
 
+int
+__vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed);
+
 
 struct nexus_supernode *
 nexus_vfs_acquire_supernode(nexus_io_flags_t flags);
@@ -64,6 +67,16 @@ nexus_vfs_acquire_supernode(nexus_io_flags_t flags);
 
 void
 nexus_vfs_release_supernode();
+
+
+struct hardlink_table *
+nexus_vfs_acquire_hardlink_table(nexus_io_flags_t flags);
+
+int
+nexus_vfs_flush_hardlink_table();
+
+void
+nexus_vfs_release_hardlink_table();
 
 /**
  * Loads a metadata object from the buffer layer

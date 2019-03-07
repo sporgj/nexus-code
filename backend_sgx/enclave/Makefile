@@ -101,6 +101,7 @@ objs := nexus_enclave_t.o \
 	key_buffer.o \
 	raw_buffer.o \
 	user.o \
+	hardlink_table.o \
 	acl.o \
 	dentry.o \
 	vfs.o \
