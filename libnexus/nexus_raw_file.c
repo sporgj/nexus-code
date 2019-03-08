@@ -14,6 +14,7 @@
 #include <ftw.h>
 
 #include <linux/limits.h>
+#include <sys/wait.h>
 
 #include <nexus_raw_file.h>
 #include <nexus_util.h>
@@ -166,5 +167,37 @@ nexus_delete_path(char * path)
     ret = nftw(path, delete_fn, 20, FTW_DEPTH);
 
     return ret;
+}
+
+
+int
+nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath)
+{
+    int status = 0;
+
+    if (src_filepath == NULL || dst_filepath == NULL) {
+        log_error("incorrect arguments\n");
+        return -1;
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("failure");
+        return -1;
+    }
+
+    if (pid == 0) {
+        execlp("cp", "cp", "-p", src_filepath, dst_filepath, NULL);
+        perror("exec() FAILURE\n");
+        _exit(1);
+    }
+
+    if (waitpid(pid, &status, 0) < 0) {
+        perror("waitpid()");
+        return -1;
+    }
+
+    return status;
 }
 

@@ -662,8 +662,8 @@ twolevel_copy_uuid(struct nexus_datastore * src_datastore,
         }
     }
 
-    if (nexus_copy_file(src_filepath, dst_filepath)) {
-        log_error("nexus_copy_file FAILED\n");
+    if (nexus_copy_raw_file(src_filepath, dst_filepath)) {
+        log_error("nexus_copy_raw_file FAILED\n");
         goto out_err;
     }
 

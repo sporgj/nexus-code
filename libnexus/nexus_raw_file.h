@@ -52,3 +52,7 @@ nexus_delete_raw_file(char * path);
  */
 int
 nexus_delete_path(char * path);
+
+
+int
+nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath);

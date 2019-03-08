@@ -278,7 +278,6 @@ int
 sgx_backend_batch_mode_finish(struct nexus_volume * volume)
 {
     struct sgx_backend * backend = volume->private_data;
-    int ret = -1;
 
     pthread_mutex_lock(&backend->batch_mutex);
 
@@ -287,9 +286,10 @@ sgx_backend_batch_mode_finish(struct nexus_volume * volume)
         return 0;
     }
 
-    ret = io_buffer_sync_buffers(backend);
-    if (ret) {
+    if (io_buffer_sync_buffers(backend)) {
         log_error("io_buffer_sync_buffers() FAILED\n");
+        pthread_mutex_unlock(&backend->batch_mutex);
+        return -1;
     }
 
     backend->batch_mode = false;
@@ -308,4 +308,10 @@ sgx_backend_stat_uuid(struct nexus_volume  * volume,
 {
     // TODO check that the volume's backend is actually SGX
     return io_backend_stat_uuid(volume, uuid, attrs);
+}
+
+struct nexus_datastore *
+sgx_backend_get_datastore(struct nexus_volume * volume, struct nexus_uuid * uuid)
+{
+    return io_backend_get_datastore(volume, uuid, NULL);
 }

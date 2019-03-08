@@ -96,6 +96,9 @@ io_backend_stat_uuid(struct nexus_volume  * volume,
                      struct nexus_uuid    * uuid,
                      struct nexus_fs_attr * attrs);
 
+struct nexus_datastore *
+io_backend_get_datastore(struct nexus_volume * volume, struct nexus_uuid * uuid, struct metadata_buf ** buf);
+
 // ------------------------
 //  file crypto operations
 // ------------------------

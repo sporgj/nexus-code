@@ -38,3 +38,7 @@ int
 sgx_backend_stat_uuid(struct nexus_volume  * volume,
                       struct nexus_uuid    * uuid,
                       struct nexus_fs_attr * attrs);
+
+
+struct nexus_datastore *
+sgx_backend_get_datastore(struct nexus_volume * volume, struct nexus_uuid * uuid);

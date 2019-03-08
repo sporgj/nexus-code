@@ -26,6 +26,8 @@ struct metadata_buf {
     struct nexus_file_handle    * file_handle;  // file handle to the datastore
     struct nexus_file_handle    * batch_handle;
 
+    bool                          sync_file_exists;
+
     bool                          batch_file_exists;
 
     bool                          batch_mode_created;  // if created in batch mode

@@ -243,6 +243,8 @@ __copy_metadata_file_to_batch_directory(struct metadata_buf * metadata_buf, bool
 
     metadata_buf->batch_file_exists = true;
 
+    metadata_buf->sync_file_exists = true;
+
     return 0;
 }
 
@@ -261,10 +263,12 @@ __open_metadata_file(struct metadata_buf * metadata_buf, nexus_io_flags_t flags)
         return __acquire_metadata_buf(metadata_buf);
     }
 
-    if ((metadata_buf->backend->batch_mode) && !(metadata_buf->is_syncing)) {
-        if (__copy_metadata_file_to_batch_directory(metadata_buf, true)) {
-            log_error("__copy_metadata_file_to_batch_directory() FAILED\n");
-            return NULL;
+    if ((metadata_buf->backend->batch_mode) && !(flags & NEXUS_FCREATE)) {
+        if (!(metadata_buf->is_syncing) && !(metadata_buf->batch_mode_created)) {
+            if (__copy_metadata_file_to_batch_directory(metadata_buf, true)) {
+                log_error("__copy_metadata_file_to_batch_directory() FAILED\n");
+                return NULL;
+            }
         }
     }
 
@@ -282,6 +286,13 @@ __open_metadata_file(struct metadata_buf * metadata_buf, nexus_io_flags_t flags)
     }
 
     metadata_buf->io_flags = flags;
+
+    if ((datastore == metadata_buf->backend->batch_datastore) && (flags & NEXUS_FCREATE)) {
+        metadata_buf->batch_mode_created  = true;
+        metadata_buf->batch_file_exists   = true;
+    } else if (datastore == metadata_buf->backend->volume->metadata_store) {
+        metadata_buf->sync_file_exists = true;
+    }
 
     return __acquire_metadata_buf(metadata_buf);
 }
@@ -450,6 +461,7 @@ __io_buffer_get(struct nexus_uuid   * uuid,
                 size_t              * p_timestamp,
                 struct nexus_volume * volume)
 {
+    struct nexus_datastore   * datastore    = NULL;
     struct sgx_backend       * sgx_backend  = (struct sgx_backend *)volume->private_data;
 
     struct metadata_buf      * metadata_buf = NULL;
@@ -457,7 +469,9 @@ __io_buffer_get(struct nexus_uuid   * uuid,
     struct stat stat_buf;
 
 
-    if (nexus_datastore_stat_uuid(volume->metadata_store, uuid, NULL, &stat_buf)) {
+    datastore = io_backend_get_datastore(volume, uuid, &metadata_buf);
+
+    if (nexus_datastore_stat_uuid(datastore, uuid, NULL, &stat_buf)) {
         log_error("could not stat metadata file\n");
         return NULL;
     }
@@ -466,7 +480,7 @@ __io_buffer_get(struct nexus_uuid   * uuid,
     if (flags & (NEXUS_FWRITE | NEXUS_IO_FCRYPTO)) {
         metadata_buf = io_buffer_lock(uuid, flags, volume);
         if (metadata_buf == NULL) {
-            log_error("__io_buffer_lock() FAILED\n");
+            log_error("io_buffer_lock() FAILED\n");
             return NULL;
         }
     }
@@ -707,13 +721,12 @@ __io_buffer_unlock(struct nexus_uuid * uuid, struct nexus_volume * volume)
 
     struct metadata_buf * metadata_buf = buffer_manager_find(sgx_backend->buf_manager, uuid);
 
-    if (metadata_buf && metadata_buf->file_handle) {
-        __release_metadata_buf(metadata_buf);
-
-        return metadata_buf;
+    if (metadata_buf &&  __release_metadata_buf(metadata_buf)) {
+        log_error("__release_metadata_buf FAILED\n");
+        return NULL;
     }
 
-    return NULL;
+    return metadata_buf;
 }
 
 struct metadata_buf *
@@ -746,7 +759,6 @@ __io_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
         metadata_buf = __alloc_metadata_buf(metadata_uuid, backend);
 
         metadata_buf->batch_mode_created  = true;
-        metadata_buf->batch_mode_modified = true;
         metadata_buf->batch_file_exists   = true;
         metadata_buf->flush_time          = time(NULL);
 
@@ -777,7 +789,7 @@ __io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
     struct nexus_datastore * datastore    = __get_backend_datastore(volume);
     struct metadata_buf    * metadata_buf = buffer_manager_find(backend->buf_manager, metadata_uuid);
 
-    if (metadata_buf && metadata_buf->batch_mode_created == false) {
+    if (metadata_buf && metadata_buf->sync_file_exists) {
         struct nexus_uuid * uuid = nexus_uuid_clone(metadata_uuid);
         nexus_list_append(&backend->batch_deleted_uuids, uuid);
     }
@@ -805,33 +817,50 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
     return result;
 }
 
-int
-io_backend_stat_uuid(struct nexus_volume  * volume,
-                     struct nexus_uuid    * uuid,
-                     struct nexus_fs_attr * attrs)
+struct nexus_datastore *
+io_backend_get_datastore(struct nexus_volume * volume, struct nexus_uuid * uuid, struct metadata_buf ** buf)
 {
     struct sgx_backend * backend = volume->private_data;
 
     struct metadata_buf * metadata_buf = NULL;
 
     if (!backend->batch_mode) {
-        return nexus_datastore_getattr(volume->metadata_store, uuid, attrs);
+        return volume->metadata_store;
     }
 
     metadata_buf = buffer_manager_find(backend->buf_manager, uuid);
 
-    if (metadata_buf == NULL || metadata_buf->batch_file_exists == false) {
-        // that means the file was never "batched", just return it from source
-        return nexus_datastore_getattr(volume->metadata_store, uuid, attrs);
+    if (buf) {
+        *buf = metadata_buf;
     }
 
-    if (nexus_datastore_getattr(backend->batch_datastore, uuid, attrs)) {
-        log_error("could not get_attr() from batch_datastore\n");
+    if (metadata_buf == NULL || metadata_buf->batch_file_exists == false) {
+        return volume->metadata_store;
+    }
+
+    return backend->batch_datastore;
+}
+
+int
+io_backend_stat_uuid(struct nexus_volume  * volume,
+                     struct nexus_uuid    * uuid,
+                     struct nexus_fs_attr * attrs)
+{
+    struct metadata_buf    * metadata_buf = NULL;
+
+    struct nexus_datastore * datastore = io_backend_get_datastore(volume, uuid, &metadata_buf);
+
+    if (datastore == NULL) {
+        log_error("io_backend_get_datastore() FAILED\n");
         return -1;
     }
 
-    // if the metadata is dirty, let's just update the modified time
-    if (metadata_buf->is_dirty) {
+    if (nexus_datastore_getattr(datastore, uuid, attrs)) {
+        log_error("nexus_datastore_getattr() FAILED\n");
+        return -1;
+    }
+
+    if (metadata_buf && metadata_buf->is_dirty) {
         attrs->posix_stat.st_mtime = metadata_buf->buffer_time;
     }
 
@@ -889,7 +918,13 @@ __sync_on_disk_metadata(struct metadata_buf * metadata_buf)
 static int
 __sync_in_memory_metadata(struct metadata_buf * metadata_buf)
 {
-    if (__open_metadata_file(metadata_buf, NEXUS_FWRITE) == NULL) {
+    nexus_io_flags_t flags = NEXUS_FWRITE;
+
+    if (metadata_buf->batch_mode_created) {
+        flags |= NEXUS_FCREATE;
+    }
+
+    if (__open_metadata_file(metadata_buf, flags) == NULL) {
         log_error("openning metadata file failed\n");
         return -1;
     }
@@ -971,12 +1006,15 @@ __io_buffer_sync_buffers(struct sgx_backend * backend)
             ret = __sync_on_disk_metadata(metadata_buf);
         }
 
+        metadata_buf->is_syncing = false;
+
+        metadata_buf->batch_mode_created = false;
+        metadata_buf->batch_file_exists = false;
+
         if (ret != 0) {
             log_error("could not flush metadata file\n");
             goto out;
         }
-
-        metadata_buf->is_syncing = false;
     } while (nexus_htable_iter_advance(iter));
 
 
