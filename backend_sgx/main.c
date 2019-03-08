@@ -300,3 +300,12 @@ sgx_backend_batch_mode_finish(struct nexus_volume * volume)
     return 0;
 }
 
+
+int
+sgx_backend_stat_uuid(struct nexus_volume  * volume,
+                      struct nexus_uuid    * uuid,
+                      struct nexus_fs_attr * attrs)
+{
+    // TODO check that the volume's backend is actually SGX
+    return io_backend_stat_uuid(volume, uuid, attrs);
+}

@@ -2,6 +2,8 @@
 
 #include <nexus_file_handle.h>
 
+#include "../backend_sgx/exports.h"
+
 
 static uint8_t __file_crypto_buffer__[NEXUS_CHUNK_SIZE] __attribute__ ((__aligned__(4096)));
 
@@ -101,22 +103,18 @@ __datastore_getattr(struct my_dentry *     dentry,
                     struct nexus_uuid *    uuid,
                     struct nexus_fs_attr * attrs)
 {
-    int ret = -1;
-
-    // stat the datastores
     switch (dentry->type) {
     case NEXUS_DIR:
     case NEXUS_REG:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
-        break;
+        return sgx_backend_stat_uuid(nexus_fuse_volume, uuid, attrs);
     case NEXUS_LNK:
         // we will just return stat information about its parent
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store,
-                                      &dentry->parent->inode->attrs.stat_info.uuid,
-                                      attrs);
+        uuid = &dentry->parent->inode->attrs.stat_info.uuid;
+
+        return sgx_backend_stat_uuid(nexus_fuse_volume, uuid, attrs);
     }
 
-    return ret;
+    return -1;
 }
 
 int

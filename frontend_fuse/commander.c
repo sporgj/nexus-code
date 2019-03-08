@@ -16,7 +16,8 @@
 #include "nexus_fuse.h"
 
 
-#define DEFAULT_SOCKET_FILEPATH "/tmp/nxs-socks-XXXXXX"
+#define DEFAULT_SOCKET_DIRPATH  "/tmp/nexus-sockets"
+#define DEFAULT_SOCKET_FILEPATH "/tmp/nexus-sockets/XXXXXX"
 
 #define DEFAULT_SOCKET_BUFSIZE  1024
 
@@ -147,9 +148,9 @@ __help()
 }
 
 static struct sock_command cmds[]
-    = { { "enable_batching", __enable_batching, "enables batch mode" },
-        { "disable_batching", __disable_batching, "disables batch mode" },
-        { "flush_batches", __flush_batching, "flushes batched buffers" },
+    = { { "batch_on", __enable_batching, "enables batch mode" },
+        { "batch_off", __disable_batching, "disables batch mode" },
+        { "flush_buffers", __flush_batching, "flushes batched buffers" },
         { "help", __help, "help menu" },
         { NULL, NULL, NULL }};
 
@@ -207,6 +208,13 @@ __launch_commander_thread()
 int
 commander_init()
 {
+    if (mkdir(DEFAULT_SOCKET_DIRPATH, 0770) == -1) {
+        if (errno != EEXIST) {
+            log_error("could not create directory: %s\n", DEFAULT_SOCKET_DIRPATH);
+            return -1;
+        }
+    }
+
     if (__create_socket(DEFAULT_SOCKET_FILEPATH)) {
         log_error("__create_socket() FAILED\n");
         return -1;

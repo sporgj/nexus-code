@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <nexus_volume.h>
 
 int
 sgx_backend_export_rootkey(char                * destination_path,
@@ -31,3 +32,9 @@ sgx_backend_batch_mode_commit(struct nexus_volume * volume);
 
 int
 sgx_backend_batch_mode_finish(struct nexus_volume * volume);
+
+
+int
+sgx_backend_stat_uuid(struct nexus_volume  * volume,
+                      struct nexus_uuid    * uuid,
+                      struct nexus_fs_attr * attrs);

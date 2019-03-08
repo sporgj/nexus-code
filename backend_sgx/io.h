@@ -91,6 +91,10 @@ io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend
 int
 io_buffer_sync_buffers(struct sgx_backend * backend);
 
+int
+io_backend_stat_uuid(struct nexus_volume  * volume,
+                     struct nexus_uuid    * uuid,
+                     struct nexus_fs_attr * attrs);
 
 // ------------------------
 //  file crypto operations

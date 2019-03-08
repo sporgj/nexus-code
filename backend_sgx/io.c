@@ -806,18 +806,49 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
 }
 
 int
-__io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
+io_backend_stat_uuid(struct nexus_volume  * volume,
+                     struct nexus_uuid    * uuid,
+                     struct nexus_fs_attr * attrs)
 {
-    struct nexus_datastore * datastore = __get_backend_datastore(volume);
+    struct sgx_backend * backend = volume->private_data;
 
-    struct stat stat_buf;
+    struct metadata_buf * metadata_buf = NULL;
 
-    if (nexus_datastore_stat_uuid(datastore, uuid, NULL, &stat_buf)) {
-        log_error("nexus_datastore_stat_uuid() FAILED\n");
+    if (!backend->batch_mode) {
+        return nexus_datastore_getattr(volume->metadata_store, uuid, attrs);
+    }
+
+    metadata_buf = buffer_manager_find(backend->buf_manager, uuid);
+
+    if (metadata_buf == NULL || metadata_buf->batch_file_exists == false) {
+        // that means the file was never "batched", just return it from source
+        return nexus_datastore_getattr(volume->metadata_store, uuid, attrs);
+    }
+
+    if (nexus_datastore_getattr(backend->batch_datastore, uuid, attrs)) {
+        log_error("could not get_attr() from batch_datastore\n");
         return -1;
     }
 
-    *timestamp = stat_buf.st_mtime;
+    // if the metadata is dirty, let's just update the modified time
+    if (metadata_buf->is_dirty) {
+        attrs->posix_stat.st_mtime = metadata_buf->buffer_time;
+    }
+
+    return 0;
+}
+
+static int
+__io_buffer_stattime(struct nexus_uuid * uuid, size_t * timestamp, struct nexus_volume * volume)
+{
+    struct nexus_fs_attr attrs;
+
+    if (io_backend_stat_uuid(volume, uuid, &attrs)) {
+        log_error("io_backend_stat_uuid() FAILED\n");
+        return -1;
+    }
+
+    *timestamp = attrs.posix_stat.st_mtime;
 
     return 0;
 }
