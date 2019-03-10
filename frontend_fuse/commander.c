@@ -30,6 +30,8 @@ struct sock_command {
 
 struct thread_info {
     size_t                commands_received;
+
+    int                   client_fd;
 } socket_thread_info;
 
 
@@ -53,7 +55,7 @@ __create_socket(const char * fullpath)
     int len = -1;
     int temp_fd = -1;
 
-    socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (socket_fd < 0) {
         perror("__create_socket:");
         return -1;
@@ -81,6 +83,11 @@ __create_socket(const char * fullpath)
     if (bind(socket_fd, (struct sockaddr *)&socket_uds, len) < 0) {
         log_error("binding socket to file (%s) FAILED\n", socket_fpath);
         perror("bind");
+        goto out_err;
+    }
+
+    if (listen(socket_fd, 10)) {
+        perror("listen");
         goto out_err;
     }
 
@@ -154,16 +161,51 @@ static struct sock_command cmds[]
         { "help", __help, "help menu" },
         { NULL, NULL, NULL }};
 
+
+static int
+__respond(const char * str)
+{
+    int len    = strnlen(str, 1024);
+    int nbytes = -1;
+
+    nbytes = send(socket_thread_info.client_fd, str, len, 0);
+
+    if (nbytes == 0) {
+        return -1;
+    }
+
+    if (nbytes != len) {
+        log_error("responding command FAILED. tried=%d, got=%d\n", len, nbytes);
+        return -1;
+    }
+
+    return 0;
+}
+
 static void *
 __commander_loop()
 {
     int n = -1;
+    int ret = 1;
 
     bool found;
 
+    static const char * unknown_cmd = "UNKNOWN COMMAND\n";
+    static const char * success_cmd = "OK\n";
+
+    nexus_printf("Commander waiting: %s\n", socket_fpath);
+    int client_fd = accept(socket_fd, NULL, NULL);
+
+    if (client_fd < 0) {
+        perror("accept");
+        pthread_exit(NULL);
+    }
+
+    socket_thread_info.client_fd = client_fd;
+
 loop:
     found = false;
-    n = recv(socket_fd, socket_buf, sizeof(socket_buf), 0);
+    n = recv(socket_thread_info.client_fd, socket_buf, sizeof(socket_buf), 0);
 
     if (n < 0) {
         log_error("recv failed\n");
@@ -171,18 +213,26 @@ loop:
         goto out;
     }
 
+    if (n == 0) {
+        goto out;
+    }
+
     for (size_t i = 0; cmds[i].name; i++) {
         if (strncmp(cmds[i].name, (char *)socket_buf, strnlen(cmds[i].name, 1024)) == 0) {
             // TODO handle return value
-            cmds[i].handler();
+            ret = cmds[i].handler();
             found = true;
             break;
         }
     }
 
+    (void)ret;
+
     if (found == false) {
-        nexus_printf("UNKNOWN COMMAND: %s\n", (char *)socket_buf);
+        __respond(unknown_cmd);
         fflush(stdout);
+    } else {
+        __respond(success_cmd);
     }
 
     goto loop;
@@ -191,18 +241,23 @@ out:
     pthread_exit(NULL);
 }
 
-static int
+static void *
 __launch_commander_thread()
 {
+accept_conn:
     memset(&socket_thread_info, 0, sizeof(struct thread_info));
 
     if (pthread_create(&socket_thread, NULL, __commander_loop, &socket_thread_info)) {
         log_error("pthread_create FAILED\n");
         perror("pthread_create");
-        return -1;
+        return NULL;
     }
 
-    return 0;
+    pthread_join(socket_thread, NULL);
+
+    close(socket_thread_info.client_fd);
+
+    goto accept_conn;
 }
 
 int
@@ -220,12 +275,14 @@ commander_init()
         return -1;
     }
 
-    if (__launch_commander_thread()) {
-        log_error("__launch_commander_thread FAILED\n");
-        return -1;
-    }
+    {
+        pthread_t thread = 0;
 
-    nexus_printf("Launched commander: %s\n", socket_fpath);
+        if (pthread_create(&thread, NULL, __launch_commander_thread, NULL)) {
+            perror("pthread_create");
+            return -1;
+        }
+    }
 
     return 0;
 }

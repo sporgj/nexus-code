@@ -634,6 +634,10 @@ __io_buffer_put(struct nexus_uuid   * uuid,
     }
 
 flush_metadata:
+    if (sgx_backend->batch_mode) {
+        metadata_buf->batch_mode_modified = true;
+    }
+
     if (__flush_metadata_file(metadata_buf)) {
         log_error("__flush_metadata_file() FAILED\n");
         goto out_err;
@@ -789,7 +793,7 @@ __io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
     struct nexus_datastore * datastore    = __get_backend_datastore(volume);
     struct metadata_buf    * metadata_buf = buffer_manager_find(backend->buf_manager, metadata_uuid);
 
-    if (metadata_buf && metadata_buf->sync_file_exists) {
+    if (metadata_buf && backend->batch_mode && metadata_buf->sync_file_exists) {
         struct nexus_uuid * uuid = nexus_uuid_clone(metadata_uuid);
         nexus_list_append(&backend->batch_deleted_uuids, uuid);
     }
@@ -975,6 +979,11 @@ __io_buffer_sync_buffers(struct sgx_backend * backend)
     struct metadata_buf * metadata_buf = NULL;
     struct nexus_hashtable_iter * iter = NULL;
 
+    int flush_count = 0;
+    double flush_time = 0;
+
+    struct timespec t1, t2;
+
     int ret = -1;
 
 
@@ -989,12 +998,14 @@ __io_buffer_sync_buffers(struct sgx_backend * backend)
     }
 
 
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
     do {
         ret = 0;
 
         metadata_buf = (struct metadata_buf *)nexus_htable_get_iter_value(iter);
 
-        if (!(metadata_buf->is_dirty) && (backend->batch_start_time > metadata_buf->flush_time)) {
+        if (!metadata_buf->batch_mode_modified) {
             continue;
         }
 
@@ -1010,11 +1021,14 @@ __io_buffer_sync_buffers(struct sgx_backend * backend)
 
         metadata_buf->batch_mode_created = false;
         metadata_buf->batch_file_exists = false;
+        metadata_buf->batch_mode_modified = false;
 
         if (ret != 0) {
             log_error("could not flush metadata file\n");
             goto out;
         }
+
+        flush_count += 1;
     } while (nexus_htable_iter_advance(iter));
 
 
@@ -1025,6 +1039,11 @@ __io_buffer_sync_buffers(struct sgx_backend * backend)
 
     ret = 0;
 out:
+    clock_gettime(CLOCK_MONOTONIC, &t2);
+    flush_time = (((t2.tv_sec - t1.tv_sec) * 1e9) + (t2.tv_nsec - t1.tv_nsec)) / 1e9;
+
+    nexus_printf("io_sync_buffers: time=%.6fs count=%d\n", flush_time, flush_count);
+
     nexus_htable_free_iter(iter);
 
     return ret;

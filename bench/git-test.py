@@ -5,8 +5,11 @@ import subprocess
 import time
 from dropbox_watcher import poll_dropbox_status, DROPBOX_STATUS_OK, DROPBOX_STATUS_TIMEOUT
 
+from nexus_commander import enable_batchmode, disable_batchmode
+
 global_rounds = 1
 global_is_dropbox = False
+global_commander_path = None
 
 base_url = 'git@bonino.cs.pitt.edu'
 global_repos = ['redis.git', 'julia.git', 'node.git']
@@ -14,6 +17,7 @@ global_repos = ['redis.git', 'julia.git', 'node.git']
 
 def __clone_repository(url, folder):
     global global_is_dropbox
+    global global_commander_path
 
     sync_time = 0
     clone_time = 0
@@ -23,7 +27,13 @@ def __clone_repository(url, folder):
     rm_cmd = ['rm', '-rf', folder]
 
     try:
+        if global_commander_path:
+            enable_batchmode(global_commander_path)
+
         ret = subprocess.check_output(git_cmd)
+
+        if global_commander_path:
+            disable_batchmode(global_commander_path)
 
         if global_is_dropbox:
             status, sync_time = poll_dropbox_status()
@@ -68,6 +78,7 @@ def __get_parser():
 
     parser = argparse.ArgumentParser(description="Clone (redis, julia, node) from bonino")
     parser.add_argument('repo', nargs='*', default=global_repos, help='which repos to clone')
+    parser.add_argument('-c', "--commander", type=str, dest="commander_path", help="path to commander socket")
     parser.add_argument("-r", "--rounds", dest="rounds", default=1, type=int,
                         help="Number of rounds")
     parser.add_argument("-d", "--dropbox", dest="dropbox", action="store_true",
@@ -79,12 +90,14 @@ def __get_parser():
 def command_line_runner():
     global global_rounds
     global global_is_dropbox
+    global global_commander_path
 
     parser = __get_parser()
     args = vars(parser.parse_args())
 
     global_rounds = args['rounds']
     global_is_dropbox = args['dropbox']
+    global_commander_path = args.get('commander_path', None)
 
     for repo in args['repo']:
         if not repo in global_repos:
