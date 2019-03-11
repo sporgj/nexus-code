@@ -313,10 +313,10 @@ __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac)
         ret = supernode_store(metadata->supernode, metadata->version, mac);
         break;
     case NEXUS_DIRNODE:
-        ret = dirnode_store(metadata->dirnode, metadata->version, NULL);
+        ret = dirnode_store(metadata->dirnode, metadata->version, mac);
         break;
     case NEXUS_FILENODE:
-        ret = filenode_store(metadata->filenode, metadata->version, NULL);
+        ret = filenode_store(metadata->filenode, metadata->version, mac);
         break;
     case NEXUS_HARDLINK_TABLE:
         ret = hardlink_table_store(metadata->hardlink_table, metadata->version, NULL);
@@ -413,4 +413,14 @@ __nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
     }
 
     return 0;
+}
+
+int
+nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
+{
+     if (__nexus_metadata_verify_uuids(dentry)) {
+         return -1;
+     }
+
+     return hashtree_verify(dentry);
 }
