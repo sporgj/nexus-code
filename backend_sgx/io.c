@@ -389,10 +389,6 @@ __io_buffer_read(struct nexus_uuid  * uuid,
         goto early_exit;
     }
 
-    if (sgx_backend->batch_mode && metadata_buf->buffer_addr) {
-        goto early_exit;
-    }
-
     if (difftime(metadata_buf->buffer_time, stat_buf->st_mtime) >= 0) {
         // then the metadata_buf contains up-to-date information
         goto early_exit;
@@ -485,7 +481,6 @@ __io_buffer_get(struct nexus_uuid   * uuid,
         }
     }
 
-    // if reading, let's check if the metadata buffer
     if (flags & NEXUS_FREAD) {
         metadata_buf = io_buffer_read(uuid, flags, &stat_buf, sgx_backend);
         if (metadata_buf == NULL) {
@@ -763,6 +758,7 @@ __io_buffer_new(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume)
         metadata_buf = __alloc_metadata_buf(metadata_uuid, backend);
 
         metadata_buf->batch_mode_created  = true;
+        metadata_buf->batch_mode_modified = true;
         metadata_buf->batch_file_exists   = true;
         metadata_buf->flush_time          = time(NULL);
 
