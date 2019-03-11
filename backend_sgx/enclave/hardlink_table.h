@@ -33,6 +33,14 @@ hardlink_table_contains_uuid(struct hardlink_table * hardlink_table, struct nexu
 int
 hardlink_table_incr_uuid(struct hardlink_table * hardlink_table, struct nexus_uuid * uuid);
 
+/**
+ * Returns the number of links belonging to uuid
+ * @return -1 if uuid not found
+ */
+int
+hardlink_table_get_uuid(struct hardlink_table * hardlink_table,
+                        struct nexus_uuid     * uuid,
+                        size_t                * link_count);
 
 /**
  * Decrements the number of links on the uuid

@@ -65,7 +65,7 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
             goto out;
         }
 
-        ret = dirnode_store(&root_dirnode->my_uuid, root_dirnode, 0, NULL);
+        ret = dirnode_store(root_dirnode, 0, NULL);
 
         if (ret != 0) {
             log_error("dirnode_store FAILED\n");

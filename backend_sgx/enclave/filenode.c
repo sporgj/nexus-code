@@ -3,11 +3,9 @@
 struct __filenode_hdr {
     struct nexus_uuid         my_uuid;
     struct nexus_uuid         root_uuid;
-    struct nexus_uuid         parent_uuid;
 
     uint64_t                  encrypted_length;     // how much of the file is "encrypted
 
-    uint8_t                   link_count;
     uint32_t                  nchunks;
 
     uint8_t                   log2chunksize;
@@ -87,14 +85,6 @@ filenode_set_chunksize(struct nexus_filenode * filenode, size_t log2chunksize)
     filenode->chunksize     = 1 << log2chunksize;
 }
 
-void
-filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid)
-{
-    nexus_uuid_copy(parent_uuid, &filenode->parent_uuid);
-
-    __filenode_set_dirty(filenode);
-}
-
 static void
 filenode_init(struct nexus_filenode * filenode, size_t log2chunksize)
 {
@@ -108,8 +98,6 @@ struct nexus_filenode *
 filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
     struct nexus_filenode * filenode = nexus_malloc(sizeof(struct nexus_filenode));
-
-    filenode->link_count = 1;
 
     nexus_uuid_copy(root_uuid, &filenode->root_uuid);
     nexus_uuid_copy(my_uuid, &filenode->my_uuid);
@@ -151,11 +139,8 @@ __parse_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer, size
     filenode->filesize = header->filesize;
     filenode->encrypted_length = header->encrypted_length;
 
-    filenode->link_count = header->link_count;
-
     nexus_uuid_copy(&header->my_uuid, &filenode->my_uuid);
     nexus_uuid_copy(&header->root_uuid, &filenode->root_uuid);
-    nexus_uuid_copy(&header->parent_uuid, &filenode->parent_uuid);
 
     filenode_init(filenode, header->log2chunksize);
 
@@ -279,13 +264,10 @@ __serialize_filenode_header(struct nexus_filenode * filenode, uint8_t * buffer)
     header->log2chunksize = filenode->log2chunksize;
     header->filesize      = filenode->filesize;
 
-    header->link_count    = filenode->link_count;
-
     header->encrypted_length = filenode->encrypted_length;
 
     nexus_uuid_copy(&filenode->my_uuid, &header->my_uuid);
     nexus_uuid_copy(&filenode->root_uuid, &header->root_uuid);
-    nexus_uuid_copy(&filenode->parent_uuid, &header->parent_uuid);
 
     memcpy(buffer, header, sizeof(struct __filenode_hdr));
 
@@ -323,10 +305,7 @@ filenode_serialize(struct nexus_filenode * filenode, size_t bytes_left, uint8_t 
 }
 
 int
-filenode_store(struct nexus_uuid     * uuid,
-               struct nexus_filenode * filenode,
-               uint32_t                version,
-               struct nexus_mac      * mac)
+filenode_store(struct nexus_filenode * filenode, uint32_t version, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer     = NULL;
 
@@ -337,7 +316,7 @@ filenode_store(struct nexus_uuid     * uuid,
 
     serialized_buflen = __get_filenode_size(filenode);
 
-    crypto_buffer     = nexus_crypto_buf_new(serialized_buflen, version, uuid);
+    crypto_buffer     = nexus_crypto_buf_new(serialized_buflen, version, &filenode->my_uuid);
 
     if (!crypto_buffer) {
         goto out;
@@ -470,38 +449,11 @@ filenode_update_encrypted_pos(struct nexus_filenode * filenode, size_t encrypted
     }
 }
 
-
-void
-filenode_incr_linkcount(struct nexus_filenode * filenode)
-{
-#define MAX_LINKS   (UINT8_MAX)
-
-    assert(filenode->link_count != MAX_LINKS);     // TODO handle overflow
-    filenode->link_count += 1;
-    __filenode_set_dirty(filenode);
-}
-
-void
-filenode_decr_linkcount(struct nexus_filenode * filenode)
-{
-    if (filenode->link_count > 0) {
-        filenode->link_count -= 1;
-        __filenode_set_dirty(filenode);
-    }
-}
-
-size_t
-filenode_get_linkcount(struct nexus_filenode * filenode)
-{
-    return filenode->link_count;
-}
-
 void
 filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out)
 {
     stat_out->type = NEXUS_REG;
     stat_out->filesize = filenode->filesize;
-    stat_out->link_count = filenode->link_count;
     nexus_uuid_copy(&filenode->my_uuid, &stat_out->uuid);
 }
 

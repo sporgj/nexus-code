@@ -19,7 +19,6 @@ struct nexus_metadata;
 struct nexus_filenode {
     struct nexus_uuid          my_uuid;
     struct nexus_uuid          root_uuid;
-    struct nexus_uuid          parent_uuid;
 
     uint32_t                   chunksize;
     uint32_t                   log2chunksize;
@@ -27,9 +26,6 @@ struct nexus_filenode {
     size_t                     encrypted_length;
 
     struct nexus_mac           mac;
-
-
-    size_t                     link_count;
 
     uint32_t                   nchunks;
     uint64_t                   filesize;
@@ -44,9 +40,6 @@ struct nexus_filenode {
 
 void
 filenode_export_stat(struct nexus_filenode * filenode, struct nexus_stat * stat_out);
-
-void
-filenode_set_parent(struct nexus_filenode * filenode, struct nexus_uuid * parent_uuid);
 
 /**
  * Creates a new filenode with a given root_uuid
@@ -69,10 +62,7 @@ struct nexus_filenode *
 filenode_from_crypto_buf(struct nexus_crypto_buf * crypto_buf, nexus_io_flags_t flags);
 
 int
-filenode_store(struct nexus_uuid     * uuid,
-               struct nexus_filenode * filenode,
-               uint32_t                version,
-               struct nexus_mac      * mac);
+filenode_store(struct nexus_filenode * filenode, uint32_t version, struct nexus_mac * mac);
 
 /**
  * Frees an allocated filenode
