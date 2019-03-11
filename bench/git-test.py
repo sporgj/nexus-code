@@ -40,12 +40,12 @@ def __clone_repository(url, folder):
             if status != DROPBOX_STATUS_OK:
                 print(":( timeout on checking sync")
 
+        time_lapse = time.monotonic() - time_lapse
+
         subprocess.call(rm_cmd)
     except subprocess.CalledProcessError as e:
         subprocess.call(rm_cmd)
-        pass
 
-    time_lapse = time.monotonic() - time_lapse
     clone_time = time_lapse - sync_time
 
     if global_is_dropbox:
