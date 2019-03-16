@@ -81,6 +81,13 @@ nexus_trusted_objs := \
 trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 
+nexus_abac_objs := \
+	attribute_table.o \
+	attribute_store.o
+
+abac_objs := $(foreach o,$(nexus_abac_objs),abac/$(o))
+
+
 nexus_ecall_objs := \
 	instance.o \
 	dirs.o \
@@ -94,6 +101,7 @@ ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))
 objs := nexus_enclave_t.o \
 	$(gcmsiv_objs) \
 	$(trusted_objs) \
+	$(abac_objs) \
 	$(ecall_objs) \
 	buffer_layer.o \
 	data_buffer.o \
