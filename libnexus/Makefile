@@ -30,9 +30,8 @@ objs :=	nexus_main.o \
 	nexus_file_handle.o \
 	nexus_json.o \
 	nexus_heap.o \
-	nexus_ringbuf.o \
 	nexus_mac.o \
-	xxhash.o
+	nexus_ringbuf.o
 
 
 
