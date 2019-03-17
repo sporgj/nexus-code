@@ -1,8 +1,8 @@
 ######## SGX SDK Settings ########
-SGX_SDK   ?= /home/pranut/Downloads/linux-sgx/linux/installer/bin/sgxsdk
+SGX_SDK   ?= /opt/intel/sgxsdk
 
 # Can be either 'HW' or 'SIM'
-SGX_MODE  := SIM
+SGX_MODE  := HW
 
 
 DEBUG := 1
