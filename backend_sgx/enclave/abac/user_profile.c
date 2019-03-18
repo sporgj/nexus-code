@@ -2,9 +2,10 @@
 
 
 struct __user_profile_hdr {
-    size_t                          attribute_count;
+    struct nexus_uuid      my_uuid;
+    struct nexus_uuid      root_uuid;
 
-    mac_and_version_t               attribute_store_macversion;
+    __mac_and_version_bytes_t  attribute_store_macversion_bytes;
 } __attribute__((packed));
 
 
@@ -43,7 +44,57 @@ user_profile_destroy(struct user_profile * user_profile)
 
 
 
-/// -- load/store
+/// --[[ load/store
+
+struct user_profile *
+user_profile_from_buffer(uint8_t * buffer, size_t buflen)
+{
+    struct user_profile * user_profile = nexus_malloc(sizeof(struct user_profile));
+
+    if (buflen < sizeof(struct __user_profile_hdr)) {
+        log_error("user_profile buffer is too small\n");
+        return NULL;
+    }
+
+    // parse the header
+    {
+        struct __user_profile_hdr * header = (struct __user_profile_hdr *)buffer;
+
+        nexus_uuid_copy(&header->root_uuid, &user_profile->root_uuid);
+        nexus_uuid_copy(&header->my_uuid, &user_profile->my_uuid);
+
+        __mac_and_version_from_buf(&user_profile->attribute_store_macversion,
+                                   &header->attribute_store_macversion_bytes);
+    }
+
+    buffer += sizeof(struct __user_profile_hdr);
+    buflen -= sizeof(struct __user_profile_hdr);
+
+    user_profile->attribute_table = attribute_table_from_buffer(buffer, buflen);
+
+    if (user_profile->attribute_table == NULL) {
+        log_error("attribute_table_from_buffer() FAILED\n");
+        nexus_free(user_profile);
+        return NULL;
+    }
+
+    return user_profile;
+}
+
+struct user_profile *
+user_profile_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
+{
+    size_t    buflen = 0;
+    uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+
+    if (buffer == NULL) {
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return NULL;
+    }
+
+    return user_profile_from_buffer(buffer, buflen);
+}
+
 
 static size_t
 __get_user_profile_size(struct user_profile * user_profile)
@@ -51,13 +102,73 @@ __get_user_profile_size(struct user_profile * user_profile)
     return (sizeof(struct __user_profile_hdr) + attribute_table_get_size(user_profile->
 }
 
-int
-user_profile_store(struct user_profile * user_profile)
+static int
+__user_profile_serialize(struct user_profile * user_profile, struct nexus_crypto_buf * crypto_buffer)
 {
-    struct nexus_crypto_buf * crypto_buffer     = NULL;
+    size_t    buflen = 0;
+    uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen);
+
+    if (buffer == NULL) {
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return -1;
+    }
+
+    // write the header
+    {
+         struct __user_profile_hdr * header = (struct __user_profile_hdr *)buffer;
+
+         nexus_uuid_copy(&user_profile->my_uuid, &header->my_uuid);
+         nexus_uuid_copy(&user_profile->root_uuid, &header->root_uuid);
+         nexus_macversion_copy(&user_profile->mac_version, &header->mac_version);
+    }
+
+    buffer += sizeof(struct __user_profile_hdr);
+    buflen -= sizeof(struct __user_profile_hdr);
+
+    // write the attribute table
+    if (attribute_table_store(user_profile->attribute_table, buffer, buflen)) {
+        log_error("attribute_table_store() FAILED\n");
+        return -1;
+    }
+
+    return 0;
 }
 
-//// load/store
+int
+user_profile_store(struct user_profile * user_profile, uint32_t version, struct nexus_mac * mac)
+{
+    struct nexus_crypto_buf * crypto_buffer = NULL;
+
+    size_t serialized_buflen = __get_user_profile_size(user_profile);
+
+
+    // update the mac version
+    if (abac_global_export_macversion(&user_profile->attribute_store_macversion)) {
+        log_error("could not export mac version\n");
+        return -1;
+    }
+
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &user_profile->my_uuid);
+
+    if (crypto_buffer == NULL) {
+        log_error("nexus_crypto_buf_new() FAILED\n");
+        return -1;
+    }
+
+    if (__user_profile_serialize(user_profile, crypto_buffer)) {
+        log_error("__user_profile_serialize() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+
+out_err:
+    nexus_crypto_buf_free(crypto_buf);
+
+    return -1;
+}
+
+/// load/store ]]--
 
 
 int

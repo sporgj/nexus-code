@@ -32,6 +32,9 @@ user_profile_create(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid);
 void
 user_profile_destroy(struct user_profile * user_profile);
 
+struct user_profile *
+user_profile_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
+
 
 int
 user_profile_grant_attribute(struct user_profile * user_profile, char * name, char * value);

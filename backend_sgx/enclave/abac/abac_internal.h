@@ -42,3 +42,6 @@ typedef enum {
 /// returns the attribute store
 struct attribute_store *
 abac_global_attribute_store();
+
+int
+abac_global_export_macversion(struct mac_and_version_t * macversion);
