@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "abac_types.h"
+#include "abac_internal.h"
 
 
 struct attribute_table {
@@ -27,6 +27,12 @@ struct attribute_entry {
 
 struct attribute_table *
 attribute_table_from_buffer(uint8_t * buffer, size_t buflen);
+
+struct attribute_table *
+attribute_table_create();
+
+void
+attribute_table_free(struct attribute_table * attribute_table);
 
 
 size_t

@@ -113,6 +113,16 @@ attribute_table_init(struct attribute_table * attribute_table)
     hashmap_init(&attribute_table->attribute_map, (hashmap_cmp_fn)__attribute_htable_cmp, NULL, 0);
 }
 
+struct attribute_table *
+attribute_table_create()
+{
+    struct attribute_table * attribute_table = nexus_malloc(sizeof(struct attribute_table));
+
+    attribute_table_init(attribute_table);
+
+    return attribute_table;
+}
+
 void
 attribute_table_free(struct attribute_table * attribute_table)
 {

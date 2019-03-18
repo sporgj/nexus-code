@@ -36,3 +36,9 @@ typedef enum {
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
         (type *)( (char *)__mptr - offsetof(type,member) );})
 #endif
+
+
+
+/// returns the attribute store
+struct attribute_store *
+abac_global_attribute_store();

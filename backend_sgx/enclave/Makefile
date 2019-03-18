@@ -82,6 +82,8 @@ trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 
 nexus_abac_objs := \
+	runtime.o \
+	user_profile.o \
 	attribute_table.o \
 	attribute_store.o
 

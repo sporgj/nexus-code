@@ -10,6 +10,9 @@
 
 
 struct user_profile {
+    struct nexus_uuid               my_uuid;
+    struct nexus_uuid               root_uuid;
+
     size_t                          attribute_count;
 
     mac_and_version_t               attribute_store_macversion;
