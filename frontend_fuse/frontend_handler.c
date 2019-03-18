@@ -112,7 +112,7 @@ __datastore_getattr(struct my_dentry *     dentry,
     case NEXUS_LNK:
         // we will just return stat information about its parent
         ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store,
-                                      &dentry->parent->inode->attrs.stat_info.uuid,
+                                      &dentry->parent->inode->uuid,
                                       attrs);
     }
 
