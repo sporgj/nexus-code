@@ -50,7 +50,7 @@ __nexus_mac_from_buf(struct nexus_mac * mac, uint8_t * buf);
 
 
 void
-mac_and_version_copy(struct mac_and_version * src_macversion, struct mac_and_version * dst_macversion);
+mac_and_version_copy(struct mac_and_version * src_macver, struct mac_and_version * dst_macver);
 
 void
 __mac_and_version_to_buf(struct mac_and_version * macversion, uint8_t * buf);

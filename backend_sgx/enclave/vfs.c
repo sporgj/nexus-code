@@ -184,29 +184,9 @@ nexus_vfs_put(struct nexus_metadata * metadata)
 }
 
 int
-__vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
-{
-    if (metadata->is_invalid) {
-        return nexus_metadata_reload(metadata, flags);
-    }
-
-    buffer_layer_revalidate(&metadata->uuid, has_changed);
-
-    if (*has_changed) {
-        return nexus_metadata_reload(metadata, flags);
-    }
-
-    if (nexus_io_in_lock_mode(flags)) {
-        return nexus_metadata_lock(metadata, flags);
-    }
-
-    return 0;
-}
-
-int
 nexus_vfs_revalidate(struct nexus_metadata * metadata, nexus_io_flags_t flags, bool * has_changed)
 {
-    if (__vfs_revalidate(metadata, flags, has_changed) == 0) {
+    if (nexus_metadata_revalidate(metadata, flags, has_changed) == 0) {
         // make our metadata object frontmost
         nexus_lru_get(metadata_cache, &metadata->uuid);
 
@@ -260,8 +240,8 @@ nexus_vfs_acquire_hardlink_table(nexus_io_flags_t flags)
         return hardlink_table_metadata->hardlink_table;
     }
 
-    if (__vfs_revalidate(hardlink_table_metadata, flags, &has_changed)) {
-        log_error("__vfs_revalidate() FAILED\n");
+    if (nexus_metadata_revalidate(hardlink_table_metadata, flags, &has_changed)) {
+        log_error("nexus_metadata_revalidate() FAILED\n");
         return NULL;
     }
 

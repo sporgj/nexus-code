@@ -23,6 +23,9 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
 
     struct hardlink_table  * hardlink_table  = NULL;
 
+    struct attribute_store * attribute_store = NULL;
+    struct user_profile    * user_profile    = NULL;
+
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
         if (metadata->supernode) {
@@ -55,6 +58,23 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
 
         hardlink_table = object;
         hardlink_table->metadata = metadata;
+        break;
+    case NEXUS_ATTRIBUTE_STORE:
+        if (metadata->attribute_store) {
+            attribute_store_free(metadata->attribute_store);
+        }
+
+        attribute_store = object;
+        attribute_store->metadata = metadata;
+        break;
+    case NEXUS_USER_PROFILE:
+        if (metadata->user_profile) {
+            user_profile_free(metadata->user_profile);
+        }
+
+        user_profile = object;
+        user_profile->metadata = metadata;
+        break;
     }
 
     metadata->object = object;
@@ -194,6 +214,12 @@ __read_object(struct nexus_uuid     * uuid,
         case NEXUS_FILENODE:
             object = filenode_create(&global_supernode->root_uuid, uuid);
             break;
+        case NEXUS_ATTRIBUTE_STORE:
+            object = attribute_store_create(&global_supernode->root_uuid, uuid);
+            break;
+        case NEXUS_USER_PROFILE:
+            object = user_profile_create(&global_supernode->root_uuid, uuid);
+            break;
         default:
             log_error("metadata cannot be version 0\n");
             break;
@@ -209,8 +235,14 @@ __read_object(struct nexus_uuid     * uuid,
         case NEXUS_SUPERNODE:
             object = supernode_from_crypto_buf(crypto_buf, flags);
             break;
-        default:
+        case NEXUS_HARDLINK_TABLE:
             object = hardlink_table_from_crypto_buf(crypto_buf, flags);
+            break;
+        case NEXUS_ATTRIBUTE_STORE:
+            object = attribute_store_from_crypto_buf(crypto_buf);
+            break;
+        case NEXUS_USER_PROFILE:
+            object = user_profile_from_crypto_buf(crypto_buf);
             break;
         }
     }
@@ -218,6 +250,28 @@ __read_object(struct nexus_uuid     * uuid,
     nexus_crypto_buf_free(crypto_buf);
 
     return object;
+}
+
+int
+nexus_metadata_revalidate(struct nexus_metadata * metadata,
+                          nexus_io_flags_t        flags,
+                          bool                  * has_changed)
+{
+    if (metadata->is_invalid) {
+        return nexus_metadata_reload(metadata, flags);
+    }
+
+    buffer_layer_revalidate(&metadata->uuid, has_changed);
+
+    if (*has_changed) {
+        return nexus_metadata_reload(metadata, flags);
+    }
+
+    if (nexus_io_in_lock_mode(flags)) {
+        return nexus_metadata_lock(metadata, flags);
+    }
+
+    return 0;
 }
 
 int

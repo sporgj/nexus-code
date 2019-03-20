@@ -7,7 +7,9 @@
 
 #include "dirnode.h"
 #include "filenode.h"
+#include "supernode.h"
 
+#include "abac/nexus_abac.h"
 
 struct nexus_dentry;
 
@@ -17,6 +19,9 @@ typedef enum {
     NEXUS_DIRNODE,
     NEXUS_FILENODE,
     NEXUS_HARDLINK_TABLE,
+
+    NEXUS_ATTRIBUTE_STORE,
+    NEXUS_USER_PROFILE,
 } nexus_metadata_type_t;
 
 
@@ -43,6 +48,9 @@ struct nexus_metadata {
         struct nexus_filenode    * filenode;
 
         struct hardlink_table    * hardlink_table;
+
+        struct attribute_store   * attribute_store;
+        struct user_profile      * user_profile;
 
         void                     * object;
     };
@@ -101,6 +109,11 @@ nexus_metadata_put(struct nexus_metadata * metadata);
  */
 void
 nexus_metadata_free(struct nexus_metadata * metadata);
+
+int
+nexus_metadata_revalidate(struct nexus_metadata * metadata,
+                          nexus_io_flags_t        flags,
+                          bool                  * has_changed);
 
 /**
  * Reloads the metadata from the datastore (usually called after revalidation)

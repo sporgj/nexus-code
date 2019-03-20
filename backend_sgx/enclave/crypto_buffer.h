@@ -4,7 +4,9 @@
 
 #include "sgx_backend_common.h"
 
-#include "nexus_mac.h"
+#include <nexus_key.h>
+
+#include <mbedtls/sha256.h>
 
 
 #define CRYPTOBUF_INVALID_VERSION (UINT32_MAX)

@@ -15,6 +15,7 @@
 #include <nexus_hash.h>
 
 #include "user.h"
+#include "abac/nexus_abac.h"
 
 #include "sgx_backend_common.h"
 
@@ -30,6 +31,8 @@ struct nexus_supernode {
     struct nexus_mac           usertable_mac;
 
     struct nexus_uuid          hardlink_table_uuid;
+
+    struct abac_superinfo      abac_superinfo;
 
     struct nexus_mac           mac;
 

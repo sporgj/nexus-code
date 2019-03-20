@@ -94,7 +94,7 @@ __del_attribute(struct attribute_store * attribute_store, struct attribute_term 
 
 // -- creating/destroying
 struct attribute_store *
-attribute_store_create(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid)
+attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
 {
     struct attribute_store * attribute_store = nexus_malloc(sizeof(struct attribute_store));
 
@@ -107,7 +107,7 @@ attribute_store_create(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid)
 }
 
 void
-attribute_store_destroy(struct attribute_store * attr_store)
+attribute_store_free(struct attribute_store * attr_store)
 {
     struct list_head * curr = NULL;
     struct list_head * next = NULL;
@@ -153,34 +153,17 @@ attribute_store_from_buffer(uint8_t * buffer, size_t buflen)
 }
 
 struct attribute_store *
-attribute_store_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
+attribute_store_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
 {
-    struct attribute_store * attribute_store = NULL;
-
-    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, flags);
-
-    uint8_t * buffer = NULL;
     size_t    buflen = 0;
+    uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
 
-    if (crypto_buffer == NULL) {
-        log_error("nexus_crypto_buf_create FAILED\n");
+    if (buffer == NULL) {
+        log_error("nexus_crypto_buf_get() FAILED\n");
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
-    if (buffer == NULL) {
-        goto err;
-    }
-
-    attribute_store = attribute_store_from_buffer(buffer, buflen);
-
-    nexus_crypto_buf_free(crypto_buffer);
-
-    return attribute_store;
-err:
-    nexus_crypto_buf_free(crypto_buffer);
-
-    return NULL;
+    return attribute_store_from_buffer(buffer, buflen);
 }
 
 static int
@@ -318,3 +301,9 @@ attribute_store_find_name(struct attribute_store * attr_store, char * name)
     return __find_attribute_term_by_name(attr_store, name);
 }
 
+void
+attribute_store_export_macversion(struct attribute_store * attr_store,
+                                  struct mac_and_version * macversion)
+{
+    nexus_mac_copy(&attr_store->mac, &macversion->mac);
+}

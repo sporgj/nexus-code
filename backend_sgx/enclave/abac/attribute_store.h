@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "abac_types.h"
 #include "abac_internal.h"
 
 struct attribute_store {
@@ -21,26 +22,11 @@ struct attribute_store {
 };
 
 
-typedef enum {
-    USER_ATTRIBUTE_TYPE,
-    OBJECT_ATTRIBUTE_TYPE
-} attribute_type_t;
-
-
-struct attribute_term {
-    struct list_head         list_entry;
-    attribute_type_t         type;
-    char                     name[ATTRIBUTE_NAME_MAX];
-    struct nexus_uuid        uuid;
-};
-
-
-
 struct attribute_store *
-attribute_store_create(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid);
+attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid);
 
 void
-attribute_store_destroy(struct attribute_store * attr_store);
+attribute_store_free(struct attribute_store * attr_store);
 
 
 const struct attribute_term *
@@ -49,6 +35,9 @@ attribute_store_find_uuid(struct attribute_store * attr_store, struct nexus_uuid
 const struct attribute_term *
 attribute_store_find_name(struct attribute_store * attr_store, char * name);
 
+void
+attribute_store_export_macversion(struct attribute_store * attr_store,
+                                  struct mac_and_version * macversion);
 
 int
 attribute_store_add(struct attribute_store * attr_store, char * name, attribute_type_t type);

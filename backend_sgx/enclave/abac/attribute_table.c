@@ -72,7 +72,7 @@ __get_attr_entry(struct attribute_table * attribute_table, struct nexus_uuid * u
 }
 
 int
-attribute_table_put(struct attribute_table * attribute_table, struct nexus_uuid * uuid, char * value)
+attribute_table_add(struct attribute_table * attribute_table, struct nexus_uuid * uuid, char * value)
 {
     struct attribute_entry * entry = __get_attr_entry(attribute_table, uuid);
 
