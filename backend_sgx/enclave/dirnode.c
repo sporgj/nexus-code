@@ -1303,44 +1303,16 @@ dirnode_rename(struct nexus_dirnode * src_dirnode,
     return 0;
 }
 
-// since UUIDs are not necessarily unique (e.g. hardlinks within the same directory),
-// the hashtable uuid will only contain a maximum of 1 link per uuid. If this UUID gets deleted
-// (e.g. deleting the hardlink), the hash lookup will fail
-//
-// This function allows one to iterate the whole list of dir_entries to upon failed hash lookup
-struct dir_entry *
-__find_by_uuid_with_fallback(struct nexus_dirnode * dirnode, struct nexus_uuid * uuid)
-{
-    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
-
-    if (direntry) {
-        return direntry;
-    }
-
-
-    struct list_head * curr = NULL;
-
-    list_for_each(curr, &dirnode->dirents_list) {
-        direntry = __dir_entry_from_dirents_list(curr);
-
-        if (nexus_uuid_compare(&direntry->dir_rec.link_uuid, uuid) == 0) {
-            return direntry;
-        }
-    }
-
-    return NULL;
-}
-
 int
 dirnode_hashtree_update(struct nexus_dirnode * dirnode,
-                        struct nexus_uuid    * uuid,
+                        char                 * name,
                         struct nexus_mac     * mac,
                         uint32_t               version)
 {
-    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
+    struct dir_entry * direntry = __find_by_name(dirnode, name);
 
     if (direntry == NULL) {
-        log_error("direntry_update could not find uuid\n");
+        log_error("hashtree_update: could not find '%s'\n", name);
         return -1;
     }
 
@@ -1355,13 +1327,14 @@ dirnode_hashtree_update(struct nexus_dirnode * dirnode,
 
 int
 dirnode_hashtree_fetch(struct nexus_dirnode * dirnode,
-                       struct nexus_uuid    * uuid,
+                       char                 * name,
                        struct nexus_mac     * mac,
                        uint32_t             * version)
 {
-    struct dir_entry * direntry = __find_by_uuid(dirnode, uuid);
+    struct dir_entry * direntry = __find_by_name(dirnode, name);
 
     if (direntry == NULL) {
+        log_error("hashtree_update: could not find '%s'\n", name);
         return -1;
     }
 

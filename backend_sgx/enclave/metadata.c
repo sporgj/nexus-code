@@ -303,11 +303,6 @@ __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac)
 {
     int ret = -1;
 
-    if (!metadata->is_dirty && !(metadata->flags & NEXUS_FCREATE)) {
-        return 0;
-    }
-
-
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
         ret = supernode_store(metadata->supernode, metadata->version, mac);
@@ -344,6 +339,11 @@ __nexus_metadata_store(struct nexus_metadata * metadata, struct nexus_mac * mac)
 int
 nexus_metadata_store(struct nexus_metadata * metadata)
 {
+    if (!metadata->is_dirty && !(metadata->flags & NEXUS_FCREATE)) {
+        return 0;
+    }
+
+
     // first save it as a normal metadata
     if (__nexus_metadata_store(metadata, NULL)) {
         return -1;

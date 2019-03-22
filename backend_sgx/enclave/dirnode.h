@@ -27,11 +27,11 @@ struct __dir_rec {
 
     struct nexus_uuid   link_uuid;
 
-    uint16_t            name_len;
-
     struct nexus_mac    link_mac;
 
     uint32_t            link_version;
+
+    uint16_t            name_len;
 
     char                name[NEXUS_NAME_MAX]; // XXX: waste of space...
 } __attribute__((packed));
@@ -243,12 +243,12 @@ __dirnode_clobber_dir_entry(struct nexus_dirnode * dirnode, struct dir_entry * d
 
 int
 dirnode_hashtree_update(struct nexus_dirnode * dirnode,
-                        struct nexus_uuid    * uuid,
+                        char                 * name,
                         struct nexus_mac     * mac,
                         uint32_t               version);
 
 int
 dirnode_hashtree_fetch(struct nexus_dirnode * dirnode,
-                       struct nexus_uuid    * uuid,
+                       char                 * name,
                        struct nexus_mac     * mac,
                        uint32_t             * version);

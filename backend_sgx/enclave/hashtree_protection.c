@@ -27,7 +27,7 @@ __fetch_hashtree_root()
     }
 
     return 0;
-}
+ 0
 
 static int
 __store_hashtree_root()
@@ -84,16 +84,12 @@ hashtree_update(struct nexus_metadata * metadata)
     struct nexus_dentry * child_dentry  = NULL;
 
     struct nexus_mac    child_mac;
-    struct nexus_uuid * child_uuid = NULL;
 
 
 
     if (metadata->is_root_dirnode) {
         return __update_hashtree_root(metadata);
     }
-
-    // as of now, we assume hardlink files will be in the same directory as the parent.
-    // this will SURELY change in the next update
 
     child_dentry = metadata_get_dentry(metadata);
 
@@ -106,18 +102,16 @@ hashtree_update(struct nexus_metadata * metadata)
 
     nexus_metadata_get_mac(metadata, &child_mac);
 
-    child_uuid = &child_dentry->metadata->uuid;
-
     do {
         if (parent_dentry->metadata == NULL) {
             log_error("parent dentry (%s) does not have a metadata object\n", parent_dentry->name);
             return -1;
         }
 
-
-        struct nexus_dirnode * parent_dirnode = parent_dentry->metadata->dirnode;
-
-        if (dirnode_hashtree_update(parent_dirnode, child_uuid, &child_mac, metadata->version)) {
+        if (dirnode_hashtree_update(parent_dentry->metadata->dirnode,
+                                    child_dentry->name,
+                                    &child_mac,
+                                    child_dentry->metadata->version)) {
             log_error("could not update direntry\n");
             return -1;
         }
@@ -129,9 +123,8 @@ hashtree_update(struct nexus_metadata * metadata)
 
 
         child_dentry = parent_dentry;
-        child_uuid = &child_dentry->metadata->uuid;
         parent_dentry = parent_dentry->parent;
-    } while(child_dentry != global_root_dentry);
+    } while(parent_dentry);
 
 
     return __update_hashtree_root(global_root_dentry->metadata);
@@ -177,7 +170,7 @@ hashtree_verify(struct nexus_dentry * dentry)
     nexus_metadata_get_mac(metadata, &metadata_mac);
 
     // otherwise, just check with the parent dirnode
-    if (dirnode_hashtree_fetch(parent_dirnode, &metadata->uuid, &link_mac, &link_version)) {
+    if (dirnode_hashtree_fetch(parent_dirnode, dentry->name, &link_mac, &link_version)) {
         log_error("dirnode_hashtree_fetch FAILED\n");
         return -1;
     }

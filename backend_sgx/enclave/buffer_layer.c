@@ -195,6 +195,7 @@ buffer_layer_dealloc(struct nexus_uuid * uuid)
     nexus_heap_free(global_heap, meta_buf->tmp_buffer);
 
     meta_buf->tmp_buffer = NULL;
+    meta_buf->tmp_buflen = 0;
 
     sgx_spin_unlock(&meta_buf->write_lock);
 

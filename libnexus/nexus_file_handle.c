@@ -158,6 +158,7 @@ nexus_file_handle_write(struct nexus_file_handle * file_handle, uint8_t * buf, s
                   file_handle->filepath,
                   (int)size,
                   nbytes);
+        perror("file_handle_write:");
         return -1;
     }
 
