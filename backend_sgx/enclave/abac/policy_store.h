@@ -9,30 +9,18 @@ struct policy_store {
     struct nexus_list       rules_list;
 };
 
-struct policy_rule {
-    perm_type_t             perm_type;
-};
+
+struct policy_store *
+policy_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid);
+
+void
+policy_store_destroy(struct policy_store * policy_store);
 
 
-typedef enum {
-    POLICY_ATOM_USER;
-    POLICY_ATOM_OBJECT;
-} atom_type_t;
 
-typedef enum {
-    PREDICATE_ATTR;   // system attribute
-    PREDICATE_FUNC;   // system function
-} pred_type_t;
+/// adds a policy to the store and returns the created policy rule
+struct policy_rule *
+policy_store_add_policy(struct policy_store * policy_store, char * policy_string);
 
-
-struct policy_atom {
-    atom_type_t             atom_type;
-    pred_type_t             pred_type;
-
-    union {
-        struct nexus_uuid   attr_uuid;
-        char                sys_func[SYSTEM_FUNC_MAX_LENGTH];
-    };
-
-    list_head               components;
-};
+void
+policy_store_delete_policy(struct nexus_uuid * rule_uuid);

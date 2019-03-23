@@ -44,3 +44,38 @@ struct attribute_term {
 };
 
 
+typedef enum {
+    POLICY_ATOM_USER;
+    POLICY_ATOM_OBJECT;
+} atom_type_t;
+
+typedef enum {
+    PREDICATE_ATTR;   // system attribute
+    PREDICATE_FUNC;   // system function
+} pred_type_t;
+
+
+struct policy_atom {
+    atom_type_t             atom_type;
+    pred_type_t             pred_type;
+
+    struct nexus_uuid       attr_uuid; // 0s when not an attribute
+    char                    predicate[SYSTEM_FUNC_MAX_LENGTH];
+
+    size_t                  arity;
+
+    struct nexus_list       args; // list of strings
+};
+
+
+/// comprises of a permission (head), and a list of atoms
+struct policy_rule {
+    perm_type_t             perm_type;
+
+    size_t                  atom_count;
+
+    struct nexus_uuid       rule_uuid;
+
+    struct nexus_list       atoms;
+};
+

@@ -64,6 +64,18 @@ abac_acquire_attribute_store(nexus_io_flags_t flags)
 }
 
 int
+abac_flush_attribute_store()
+{
+    return nexus_metadata_store(attribute_store_metadata);
+}
+
+void
+abac_release_attribute_store()
+{
+    nexus_metadata_unlock(attribute_store_metadata);
+}
+
+int
 abac_runtime_mount()
 {
     if (abac_acquire_attribute_store(NEXUS_FREAD)) {

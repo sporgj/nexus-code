@@ -8,6 +8,8 @@ struct __supernode_hdr {
     struct nexus_mac  usertable_mac;
 
     struct nexus_uuid hardlink_table_uuid;
+
+    struct abac_superinfo abac_superinfo;
 } __attribute__((packed));
 
 
@@ -45,6 +47,8 @@ __parse_supernode_header(struct nexus_supernode * supernode, uint8_t * buffer, s
     nexus_mac_copy(&header->usertable_mac, &supernode->usertable_mac);
 
     nexus_uuid_copy(&header->hardlink_table_uuid, &supernode->hardlink_table_uuid);
+
+    memcpy(&supernode->abac_superinfo, &header->abac_superinfo, sizeof(struct abac_superinfo));
 
     return buffer + sizeof(struct __supernode_hdr);
 }
@@ -185,6 +189,8 @@ __serialize_supernode_header(struct nexus_supernode * supernode, uint8_t * buffe
     nexus_mac_copy(&supernode->usertable_mac, &header->usertable_mac);
 
     nexus_uuid_copy(&supernode->hardlink_table_uuid, &header->hardlink_table_uuid);
+
+    memcpy(&header->abac_superinfo, &supernode->abac_superinfo, sizeof(struct abac_superinfo));
 
     return (buffer + sizeof(struct __supernode_hdr));
 }

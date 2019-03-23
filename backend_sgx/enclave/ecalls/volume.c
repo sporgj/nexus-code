@@ -95,6 +95,12 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         }
     }
 
+    if (abac_runtime_create(&supernode->abac_superinfo)) {
+        ret = -1;
+        log_error("abac_runtime_create() FAILED\n");
+        goto out;
+    }
+
     nexus_uuid_copy(&supernode->my_uuid, supernode_uuid_out);
 
     ret = 0;
@@ -311,6 +317,13 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
         if (ret != 0) {
             nexus_vfs_deinit();
             log_error("could not verify the user's public key\n");
+            goto out;
+        }
+
+        ret = abac_runtime_mount();
+        if (ret != 0) {
+            nexus_vfs_deinit();
+            log_error("abac_runtime_mount() FAILED\n");
             goto out;
         }
     }
