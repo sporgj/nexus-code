@@ -78,7 +78,7 @@ abac_release_attribute_store()
 int
 abac_runtime_mount()
 {
-    if (abac_acquire_attribute_store(NEXUS_FREAD)) {
+    if (abac_acquire_attribute_store(NEXUS_FREAD) == NULL) {
         log_error("could not load attribute store\n");
         return -1;
     }

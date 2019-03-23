@@ -11,39 +11,16 @@ static struct nonce_challenge authentication_nonce;
 static int
 nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
 {
-    struct nexus_supernode * supernode    = NULL;
+    struct nexus_supernode * supernode    = supernode_create(user_pubkey);
 
     struct nexus_dirnode   * root_dirnode = NULL;
 
     int ret = -1;
 
-    // creates the supernode & its accompanying usertable
-    {
-        ret = -1;
 
-        supernode = supernode_create(user_pubkey);
-        if (!supernode) {
-            log_error("supernode_create FAILED\n");
-            goto out;
-        }
-
-        // create the supernode file on disk
-        if (buffer_layer_lock(&supernode->my_uuid, NEXUS_FCREATE)) {
-            log_error("could not create supernode file\n");
-            goto out;
-        }
-
-        if (buffer_layer_lock(&supernode->usertable->my_uuid, NEXUS_FCREATE)) {
-            log_error("could not create usertable file\n");
-            goto out;
-        }
-
-        ret = supernode_store(supernode, 0, NULL);
-
-        if (ret) {
-            log_error("storing the supernode FAILED\n");
-            goto out;
-        }
+    if (supernode == NULL) {
+        log_error("supernode_create FAILED\n");
+        return -1;
     }
 
     global_supernode = supernode;
@@ -56,9 +33,6 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         if (root_dirnode == NULL) {
             goto out;
         }
-
-        // make the dirnode's uuid the root uuid
-        nexus_uuid_copy(&root_dirnode->root_uuid, &root_dirnode->my_uuid);
 
         if (buffer_layer_lock(&root_dirnode->my_uuid, NEXUS_FCREATE)) {
             log_error("could not create root dirnode file\n");
@@ -99,6 +73,27 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         ret = -1;
         log_error("abac_runtime_create() FAILED\n");
         goto out;
+    }
+
+    // creates the supernode & its accompanying usertable
+    {
+        // create the supernode file on disk
+        if (buffer_layer_lock(&supernode->my_uuid, NEXUS_FCREATE)) {
+            log_error("could not create supernode file\n");
+            goto out;
+        }
+
+        if (buffer_layer_lock(&supernode->usertable->my_uuid, NEXUS_FCREATE)) {
+            log_error("could not create usertable file\n");
+            goto out;
+        }
+
+        ret = supernode_store(supernode, 0, NULL);
+
+        if (ret) {
+            log_error("storing the supernode FAILED\n");
+            goto out;
+        }
     }
 
     nexus_uuid_copy(&supernode->my_uuid, supernode_uuid_out);

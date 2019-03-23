@@ -44,17 +44,6 @@ struct attribute_term {
 };
 
 
-typedef enum {
-    POLICY_ATOM_USER;
-    POLICY_ATOM_OBJECT;
-} atom_type_t;
-
-typedef enum {
-    PREDICATE_ATTR;   // system attribute
-    PREDICATE_FUNC;   // system function
-} pred_type_t;
-
-
 struct policy_atom {
     atom_type_t             atom_type;
     pred_type_t             pred_type;

@@ -136,12 +136,18 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_t
     case NEXUS_FILENODE:
         object = filenode_create(&global_supernode->root_uuid, uuid);
         break;
-    case NEXUS_SUPERNODE:
-        log_error("cannot create supernode from nexus_metadata_create()\n");
-        return NULL;
     case NEXUS_HARDLINK_TABLE:
         object = hardlink_table_create(&global_supernode->root_uuid, uuid);
         break;
+    case NEXUS_ATTRIBUTE_STORE:
+        object = attribute_store_create(&global_supernode->root_uuid, uuid);
+        break;
+    case NEXUS_USER_PROFILE:
+        object = user_profile_create(&global_supernode->root_uuid, uuid);
+        break;
+    default:
+        log_error("cannot create object from nexus_metadata_create()\n");
+        return NULL;
     }
 
     return nexus_metadata_from_object(uuid, object, metadata_type, NEXUS_FCREATE, 0);
@@ -342,6 +348,15 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     case NEXUS_HARDLINK_TABLE:
         ret = hardlink_table_store(metadata->hardlink_table, metadata->version, NULL);
         break;
+    case NEXUS_ATTRIBUTE_STORE:
+        ret = attribute_store_store(metadata->attribute_store, metadata->version, NULL);
+        break;
+    case NEXUS_USER_PROFILE:
+        ret = user_profile_store(metadata->user_profile, metadata->version, NULL);
+        break;
+    default:
+        log_error("metadata->type UNKNOWN\n");
+        return -1;
     }
 
     if (ret == 0) {
