@@ -258,3 +258,57 @@ attribute_table_store(struct attribute_table * attribute_table, uint8_t * buffer
     return 0;
 }
 
+int
+UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
+                          struct attribute_store    * attribute_store,
+                          struct nxs_attribute_pair * attribute_pair_array,
+                          size_t                      attribute_pair_capacity,
+                          size_t                      offset,
+                          size_t                    * result_count,
+                          size_t                    * total_count)
+{
+    struct hashmap_iter iter;
+
+    struct nxs_attribute_pair * output_pair_ptr = attribute_pair_array;
+
+    struct attribute_term * tmp_attribute_term = NULL;
+
+    size_t copied = 0;
+
+
+    hashmap_iter_init(&attribute_table->attribute_map, &iter);
+
+    do {
+        struct attribute_entry * attr_entry = hashmap_iter_next(&iter);
+
+        if (offset) {
+            offset -= 1;
+            continue;
+        }
+
+        if (attr_entry == NULL) {
+            break;
+        }
+
+        // copy out the attribute pair
+        tmp_attribute_term = attribute_store_find_uuid(attribute_store, &attr_entry->attr_uuid);
+
+        if (tmp_attribute_term) {
+            // then copy its name into the pair
+            strncpy(&output_pair_ptr->val_str, tmp_attribute_term->name, NXS_ATTRIBUTE_NAME_MAX);
+        } else {
+            // XXX: temporaray
+            strncpy(&output_pair_ptr->val_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
+        }
+
+        strncpy(&output_pair_ptr->val_str, attr_entry->attr_val, NXS_ATTRIBUTE_VALUE_MAX);
+
+        copied += 1;
+        output_pair_ptr += 1;
+    } while (1);
+
+    *result_count = copied;
+    *total_count = attribute_table->count;
+
+    return 0;
+}

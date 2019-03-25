@@ -47,3 +47,14 @@ attribute_table_add(struct attribute_table * attribute_table, struct nexus_uuid 
 
 int
 attribute_table_del(struct attribute_table * attribute_table, struct nexus_uuid * uuid);
+
+
+// writes all the attribute pairs stored in the table
+int
+UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
+                          struct attribute_store    * attribute_store,
+                          struct nxs_attribute_pair * attribute_pair_array,
+                          size_t                      attribute_pair_capacity,
+                          size_t                      offset,
+                          size_t                    * result_count,
+                          size_t                    * total_count);

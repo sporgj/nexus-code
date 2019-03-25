@@ -18,6 +18,8 @@
 
 #include "handler.h"
 
+#include "../backend_sgx/exports.h"
+
 #define MY_ARGV_SIZE 30
 
 static int    my_argc               = 0;
@@ -487,6 +489,138 @@ handle_fs_truncate(int argc, char ** argv)
     return ret;
 }
 
+
+// abac
+
+static int
+handle_abac_attribute_add(int argc, char ** argv)
+{
+    char * attribute_name = NULL;
+    char * attribute_type = NULL;
+
+    int ret = -1;
+
+    if (argc < 2) {
+        usage("abac_attribute_add");
+        return -1;
+    }
+
+
+    attribute_name = strndup(argv[0], 32);
+    attribute_type = strndup(argv[1], 256);
+
+    ret = sgx_backend_abac_attribute_add(attribute_name, attribute_type, mounted_volume);
+
+    nexus_free(attribute_name);
+    nexus_free(attribute_type);
+
+    return ret;
+}
+
+static int
+handle_abac_attribute_del(int argc, char ** argv)
+{
+    char * attribute_name = NULL;
+
+    int ret = -1;
+
+    if (argc < 1) {
+        usage("abac_attribute_del");
+        return -1;
+    }
+
+
+    attribute_name = strndup(argv[0], 32);
+
+    ret = sgx_backend_abac_attribute_del(attribute_name, mounted_volume);
+
+    nexus_free(attribute_name);
+
+    return ret;
+}
+
+static int
+handle_abac_attribute_ls(int argc, char ** argv)
+{
+    return sgx_backend_abac_attribute_ls(mounted_volume);
+}
+
+
+static int
+handle_abac_user_attribute_grant(int argc, char ** argv)
+{
+    char * username = NULL;
+    char * attribute_name = NULL;
+    char * attribute_value = NULL;
+
+    int ret = -1;
+
+    if (argc < 3) {
+        usage("abac_user_attribute_grant");
+        return -1;
+    }
+
+
+    username = strndup(argv[0], 32);
+    attribute_name = strndup(argv[0], 32);
+    attribute_value = strndup(argv[1], 256);
+
+    ret = sgx_backend_abac_user_attribute_grant(username, attribute_name, attribute_value, mounted_volume);
+
+    nexus_free(username);
+    nexus_free(attribute_name);
+    nexus_free(attribute_value);
+
+    return ret;
+}
+
+static int
+handle_abac_user_attribute_revoke(int argc, char ** argv)
+{
+    char * username = NULL;
+    char * attribute_name = NULL;
+
+    int ret = -1;
+
+    if (argc < 2) {
+        usage("abac_user_attribute_revoke");
+        return -1;
+    }
+
+
+    username = strndup(argv[0], 32);
+    attribute_name = strndup(argv[0], 32);
+
+    ret = sgx_backend_abac_user_attribute_revoke(username, attribute_name, mounted_volume);
+
+    nexus_free(username);
+    nexus_free(attribute_name);
+
+    return ret;
+}
+
+static int
+handle_abac_user_attribute_ls(int argc, char ** argv)
+{
+    char * username = NULL;
+
+    int ret = -1;
+
+    if (argc < 1) {
+        usage("abac_user_attribute_ls");
+        return -1;
+    }
+
+
+    username = strndup(argv[0], 32);
+
+    ret = sgx_backend_abac_user_attribute_ls(username, mounted_volume);
+
+    nexus_free(username);
+
+    return ret;
+}
+
 /////////
 
 static int
@@ -600,6 +734,14 @@ static struct _cmd cmds[]
         { "fs_hardlink", handle_fs_hardlink, "Hardlink file", "<link_fpath> <target_fpath>" },
         { "fs_rename", handle_fs_rename, "Rename file", "<from_path> <to_path>" },
         { "fs_truncate", handle_fs_truncate, "Truncate file", "<file_path>" },
+
+        { "abac_attribute_add", handle_abac_attribute_add, "Creates a volume attribute", "<name> <type>" },
+        { "abac_attribute_del", handle_abac_attribute_del, "Deletes a volume attribute", "<name>" },
+        { "abac_attribute_ls", handle_abac_attribute_ls, "Lists all volume attributes", "" },
+
+        { "abac_user_attribute_add", handle_abac_user_attribute_grant, "Grants a user attribute", "<name> <value>" },
+        { "abac_user_attribute_del", handle_abac_user_attribute_revoke, "Revokes a user attribute", "<name>" },
+        { "abac_user_attribute_ls", handle_abac_user_attribute_ls, "List a user's attributes", "" },
 
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };

@@ -18,3 +18,32 @@ sgx_backend_export_rootkey(char                * destination_path,
  */
 int
 sgx_backend_import_rootkey(char * rk_exchange_path);
+
+
+
+// abac management stuff
+
+int
+sgx_backend_abac_attribute_add(char                * attribute_name,
+                               char                * attribute_type,
+                               struct nexus_volume * volume);
+
+int
+sgx_backend_abac_attribute_del(char * attribute_name, struct nexus_volume * volume);
+
+int
+sgx_backend_abac_attribute_ls(struct nexus_volume * volume);
+
+int
+sgx_backend_abac_user_attribute_grant(char                * username,
+                                      char                * attribute_name,
+                                      char                * attribute_val,
+                                      struct nexus_volume * volume);
+
+int
+sgx_backend_abac_user_attribute_revoke(char                * username,
+                                       char                * attribute_name,
+                                       struct nexus_volume * volume);
+
+int
+sgx_backend_abac_user_attribute_ls(char * username, struct nexus_volume * volume);

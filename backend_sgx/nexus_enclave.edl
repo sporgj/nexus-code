@@ -4,6 +4,8 @@ enclave {
     include "sgx_trts.h"
     include "sgx_backend_common.h"
 
+    from "nexus_abac.edl" import *;
+
     trusted {
 
         /**

@@ -47,3 +47,11 @@ user_profile_grant_attribute(struct user_profile * user_profile, char * name, ch
 
 int
 user_profile_revoke_attribute(struct user_profile * user_profile, char * name);
+
+int
+UNSAFE_user_profile_attribute_ls(struct user_profile       * user_profile,
+                                 struct nxs_attribute_pair * attribute_pair_array,
+                                 size_t                      attribute_pair_capacity,
+                                 size_t                      offset,
+                                 size_t                    * result_count,
+                                 size_t                    * total_count);

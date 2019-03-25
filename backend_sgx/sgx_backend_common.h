@@ -31,6 +31,9 @@
 #define NEXUS_CHUNK_SIZE_LOG    20
 #define NEXUS_CHUNK_SIZE        (1 << NEXUS_CHUNK_SIZE_LOG)
 
+#define NXS_ATTRIBUTE_NAME_MAX      32
+#define NXS_ATTRIBUTE_VALUE_MAX     32
+
 
 struct nonce_challenge {
     uint8_t bytes[NONCE_SIZE];
@@ -62,4 +65,16 @@ struct nxs_user_buffer {
     char    name[NEXUS_MAX_NAMELEN];
 
     uint8_t pubkey_hash[NEXUS_PUBKEY_HASHLEN];
+};
+
+
+struct nxs_attribute_term {
+    char    term_str[NXS_ATTRIBUTE_NAME_MAX];
+    char    type_str[10]; // "user"|"object"
+} __attribute__((packed));
+
+
+struct nxs_attribute_pair {
+    char    term_str[NXS_ATTRIBUTE_NAME_MAX];
+    char    val_str[NXS_ATTRIBUTE_VALUE_MAX];
 };

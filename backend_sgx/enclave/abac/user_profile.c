@@ -24,7 +24,7 @@ __user_profile_set_dirty(struct user_profile * user_profile)
 /// --[[ create/destroy
 
 struct user_profile *
-user_profile_create(struct nexus_uuid * uuid, struct nexus_uuid * root_uuid)
+user_profile_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
 {
     struct user_profile * user_profile = nexus_malloc(sizeof(struct user_profile));
 
@@ -214,7 +214,7 @@ user_profile_grant_attribute(struct user_profile * user_profile, char * name, ch
 {
     struct attribute_term * attribute_term = NULL;
 
-    struct attribute_store * attribute_store = abac_global_attribute_store();
+    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
 
     if (attribute_store == NULL) {
         log_error("could not get global attribute store\n");
@@ -243,7 +243,7 @@ user_profile_revoke_attribute(struct user_profile * user_profile, char * name)
 {
     struct attribute_term * attribute_term = NULL;
 
-    struct attribute_store * attribute_store = abac_global_attribute_store();
+    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
 
     if (attribute_store == NULL) {
         log_error("could not get global attribute store\n");
@@ -265,4 +265,28 @@ user_profile_revoke_attribute(struct user_profile * user_profile, char * name)
     __user_profile_set_dirty(user_profile);
 
     return 0;
+}
+
+int
+UNSAFE_user_profile_attribute_ls(struct user_profile       * user_profile,
+                                 struct nxs_attribute_pair * attribute_pair_array,
+                                 size_t                      attribute_pair_capacity,
+                                 size_t                      offset,
+                                 size_t                    * result_count,
+                                 size_t                    * total_count)
+{
+    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+
+    if (attribute_store == NULL) {
+        log_error("could not get attribute_store\n");
+        return -1;
+    }
+
+    return UNSAFE_attribute_table_ls(attribute_store,
+                                     user_profile->attribute_table,
+                                     attribute_pair_array,
+                                     attribute_pair_capacity,
+                                     offset,
+                                     result_count,
+                                     total_count);
 }

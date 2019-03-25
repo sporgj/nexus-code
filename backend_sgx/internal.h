@@ -54,6 +54,14 @@ struct sgx_backend {
 };
 
 
+static inline struct sgx_backend *
+__sgx_backend_from_volume(struct nexus_volume * volume)
+{
+    // TODO check backend->impl matches "SGX"
+    return (struct sgx_backend *)volume->private_data;
+}
+
+
 // main.c
 
 int

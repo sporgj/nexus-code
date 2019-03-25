@@ -57,6 +57,7 @@ objs := nexus_enclave_u.o \
 	dir_ops.o \
 	file_ops.o \
 	user_ops.o \
+	abac_ops.o \
 	instance_ops.o \
 	buffer_manager.o \
 	io.o \
@@ -65,7 +66,7 @@ objs := nexus_enclave_u.o \
 	ocalls.o
 
 
-edl_src := nexus_enclave.edl
+edl_src := nexus_enclave.edl nexus_abac.edl
 
 build = \
         @if [ -z "$V" ]; then \
@@ -90,7 +91,7 @@ all: $(static_lib)
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@)
 
 nexus_enclave_u.c: $(edl_src)
-	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --untrusted --untrusted-dir ./ $(edl_src)
+	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include --untrusted --untrusted-dir ./ nexus_enclave.edl
 
 .PHONY: libnexus_probes
 libnexus_probes:

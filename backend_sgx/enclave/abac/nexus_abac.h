@@ -28,3 +28,19 @@ abac_runtime_destroy();
  */
 int
 abac_runtime_create();
+
+
+
+// get/put for user profiles
+
+struct user_profile *
+abac_get_user_profile(char * username, nexus_io_flags_t flags);
+
+int
+abac_put_user_profile(struct user_profile * user_profile);
+
+int
+abac_create_user_profile(struct nexus_uuid * user_uuid);
+
+int
+abac_del_user_profile(struct nexus_uuid * user_uuid);

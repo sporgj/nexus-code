@@ -1,0 +1,75 @@
+enclave {
+
+    trusted {
+
+        // attribute mgmt.
+
+        /** Creates an attribute inside the attribute_store */
+        public int ecall_abac_attribute_add
+        (
+            [in, string] char * attribute_name_IN,
+            [in, string] char * attriubte_type_IN
+        );
+
+        /** Deletes an attribute from the volume */
+        public int ecall_abac_attribute_del
+        (
+            [in, string] char   * attribute_name_IN
+        );
+
+        /** Lists the attributes defined in the volume */
+        public int ecall_abac_attribute_ls
+        (
+            [user_check] struct nxs_attribute_term * attribute_array_out,
+                         size_t                      attribute_array_capacity,
+                         size_t                      offset,
+            [user_check] size_t                    * total_count_out,
+            [user_check] size_t                    * result_count_out
+        );
+
+
+        // user/object attribute management
+
+        public int ecall_abac_user_attribute_grant
+        (
+            [in, string] char * username_IN,
+            [in, string] char * attribute_name_IN,
+            [in, string] char * attribute_value_IN
+        );
+
+        public int ecall_abac_user_attribute_revoke
+        (
+            [in, string] char * username_IN,
+            [in, string] char * attribute_name_IN
+        );
+
+        public int ecall_abac_user_attribute_ls
+        (
+            [in, string] char                      * username,
+            [user_check] struct nxs_attribute_pair * attribute_pair_out,
+                         size_t                      attribute_pair_capacity,
+                         size_t                      offset,
+            [user_check] size_t                    * total_count_out,
+            [user_check] size_t                    * result_count_out
+        );
+
+        public int ecall_abac_object_attribute_grant
+        (
+            [in, string] char * path,
+            [in, string] char * attribute_name,
+            [in, string] char * attribute_value
+        );
+
+        public int ecall_abac_object_attribute_revoke
+        (
+            [in, string] char * path,
+            [in, string] char * attribute_name
+        );
+
+        public int ecall_abac_object_attribute_ls
+        (
+            [in, string] char * path
+        );
+
+    };
+};

@@ -5,6 +5,8 @@ struct __user {
 
     nexus_uid_t        user_id;
 
+    struct nexus_uuid  user_uuid;
+
     pubkey_hash_t      pubkey_hash;
 
     char               name[NEXUS_MAX_NAMELEN]; // XXX  future 0 byte array impl...
@@ -115,6 +117,8 @@ __read_user_from_buf(uint8_t * buf)
 
     nexus_hash_copy(&user_buf->pubkey_hash, &user->pubkey_hash);
 
+    nexus_uuid_copy(&user_buf->user_uuid, &user->user_uuid);
+
     user->name = strndup(user_buf->name, NEXUS_MAX_NAMELEN);
 
     return user;
@@ -131,6 +135,8 @@ __write_user_to_buf(struct nexus_user * user, uint8_t * buf)
     user_buf->user_id = user->user_id;
 
     nexus_hash_copy(&user->pubkey_hash, &user_buf->pubkey_hash);
+
+    nexus_uuid_copy(&user->user_uuid, &user_buf->user_uuid);
 
     strncpy(user_buf->name, user->name, NEXUS_MAX_NAMELEN);
 
@@ -291,6 +297,11 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
     size_t                    buffer_size   = nexus_usertable_buflen(usertable);
 
 
+    if (buffer_layer_lock(&usertable->my_uuid, NEXUS_FRDWR)) {
+        log_error("could not lock usertable metadata\n");
+        return -1;
+    }
+
 
     crypto_buffer = nexus_crypto_buf_new(buffer_size, usertable->version, &usertable->my_uuid);
 
@@ -380,6 +391,27 @@ __usertable_find_pubkey_hash(struct nexus_usertable * usertable, pubkey_hash_t *
     return NULL;
 }
 
+static struct nexus_list_iterator *
+__usertable_find_uuid(struct nexus_usertable * usertable, struct nexus_uuid * uuid)
+{
+    struct nexus_list_iterator * iter = NULL;
+
+    iter = list_iterator_new(&usertable->userlist);
+
+    while (list_iterator_is_valid(iter)) {
+        struct nexus_user * user = list_iterator_get(iter);
+
+        if (nexus_uuid_compare(&user->user_uuid, uuid) == 0) {
+            return iter;
+        }
+
+        list_iterator_next(iter);
+    }
+
+    list_iterator_free(iter);
+    return NULL;
+}
+
 struct nexus_user *
 nexus_usertable_find_name(struct nexus_usertable * usertable, char * name)
 {
@@ -440,8 +472,37 @@ nexus_usertable_find_pubkey(struct nexus_usertable * usertable, char * pubkey_st
     return nexus_usertable_find_pubkey_hash(usertable, &pubkey_hash);
 }
 
+struct nexus_user *
+nexus_usertable_find_uuid(struct nexus_usertable * usertable, struct nexus_uuid * uuid)
+{
+    struct nexus_list_iterator * iter = __usertable_find_uuid(usertable, uuid);
+
+    struct nexus_user * user = NULL;
+
+    if (iter == NULL) {
+        return NULL;
+    }
+
+    user = list_iterator_get(iter);
+
+    list_iterator_free(iter);
+
+    return user;
+}
+
+
 int
 nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str)
+{
+    if (__nexus_usertable_add(usertable, name, pubkey_str) == NULL) {
+        return -1;
+    }
+
+    return 0;
+}
+
+struct nexus_user *
+__nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str)
 {
     struct nexus_user * new_user = NULL;
 
@@ -460,7 +521,7 @@ nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubk
 
         if (existing_user != NULL) {
             log_error("user '%s' already in database\n", name);
-            return -1;
+            return NULL;
         }
 
 
@@ -468,7 +529,7 @@ nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubk
 
         if (existing_user != NULL) {
             log_error("user already with specified public key already in database\n");
-            return -1;
+            return NULL;
         }
     }
 
@@ -480,23 +541,31 @@ nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubk
     new_user->user_id = usertable->auto_increment;
     new_user->name = strndup(name, NEXUS_MAX_NAMELEN);
 
+    nexus_uuid_gen(&new_user->user_uuid);
+
     nexus_hash_copy(&pubkey_hash, &new_user->pubkey_hash);
 
     nexus_list_append(userlist, new_user);
 
     __usertable_set_dirty(usertable);
 
-    return 0;
+    return new_user;
 }
 
 int
-nexus_usertable_remove_username(struct nexus_usertable * usertable, char * username)
+nexus_usertable_remove_username(struct nexus_usertable * usertable,
+                                char                   * username,
+                                struct nexus_uuid      * uuid)
 {
     struct nexus_list_iterator * iter = __usertable_find_name(usertable, username);
 
     if (iter == NULL) {
         return -1;
     }
+
+    struct nexus_user * user = list_iterator_get(iter);
+
+    nexus_uuid_copy(&user->user_uuid, uuid);
 
     list_iterator_del(iter);
     list_iterator_free(iter);
@@ -509,7 +578,9 @@ nexus_usertable_remove_username(struct nexus_usertable * usertable, char * usern
 }
 
 int
-nexus_usertable_remove_pubkey(struct nexus_usertable * usertable, char * pubkey_str)
+nexus_usertable_remove_pubkey(struct nexus_usertable * usertable,
+                              char                   * pubkey_str,
+                              struct nexus_uuid      * uuid)
 {
     pubkey_hash_t                pubkey_hash;
 
@@ -525,6 +596,10 @@ nexus_usertable_remove_pubkey(struct nexus_usertable * usertable, char * pubkey_
     if (iter == NULL) {
         return -1;
     }
+
+    struct nexus_user * user = list_iterator_get(iter);
+
+    nexus_uuid_copy(&user->user_uuid, uuid);
 
     list_iterator_del(iter);
     list_iterator_free(iter);

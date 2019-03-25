@@ -30,6 +30,8 @@ struct nexus_user {
 
     nexus_uid_t               user_id;
 
+    struct nexus_uuid         user_uuid;
+
     pubkey_hash_t             pubkey_hash;
 };
 
@@ -107,8 +109,15 @@ nexus_usertable_find_pubkey(struct nexus_usertable * usertable, char * pubkey_st
 int
 nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str);
 
-int
-nexus_usertable_remove_username(struct nexus_usertable * usertable, char * username);
+struct nexus_user *
+__nexus_usertable_add(struct nexus_usertable * usertable, char * name, char * pubkey_str);
 
 int
-nexus_usertable_remove_pubkey(struct nexus_usertable * usertable, char * pubkey_str);
+nexus_usertable_remove_username(struct nexus_usertable * usertable,
+                                char                   * username,
+                                struct nexus_uuid      * uuid);
+
+int
+nexus_usertable_remove_pubkey(struct nexus_usertable * usertable,
+                              char                   * pubkey_str,
+                              struct nexus_uuid      * uuid);

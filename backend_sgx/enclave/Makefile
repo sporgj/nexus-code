@@ -95,6 +95,7 @@ nexus_ecall_objs := \
 	dirs.o \
 	files.o \
 	users.o \
+	abac.o \
 	volume.o
 
 ecall_objs := $(foreach o,$(nexus_ecall_objs),ecalls/$(o))
@@ -149,8 +150,8 @@ all: nexus_enclave.signed.so
 %.o: %.c
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDE) -c $<  -o $@)
 
-nexus_enclave_t.c: $(edl_src)
-	$(EDGER8ER) --search-path $(SGX_SDK_DIR)/include\
+nexus_enclave_t.c: $(edl_src) ../nexus_abac.edl
+	$(EDGER8ER) --search-path ../ --search-path $(SGX_SDK_DIR)/include\
 		--trusted --trusted-dir . $(edl_src)
 
 

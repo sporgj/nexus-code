@@ -139,7 +139,7 @@ attribute_store_from_buffer(uint8_t * buffer, size_t buflen)
         log_error("buffer is too small\n");
     }
 
-    attribute_store = attribute_store_create(&header->my_uuid, &header->root_uuid);
+    attribute_store = attribute_store_create(&header->root_uuid, &header->my_uuid);
 
     // now parse the entries
     in_entry = (struct __attr_store_entry *)(buffer + sizeof(struct __attr_store_hdr));
@@ -306,4 +306,45 @@ attribute_store_export_macversion(struct attribute_store * attr_store,
                                   struct mac_and_version * macversion)
 {
     nexus_mac_copy(&attr_store->mac, &macversion->mac);
+}
+
+int
+UNSAFE_attribute_store_export_terms(struct attribute_store    * attr_store,
+                                    struct nxs_attribute_term * attribute_term_array_out,
+                                    size_t                      attribute_term_array_capacity,
+                                    size_t                      offset,
+                                    size_t                    * total_count_out,
+                                    size_t                    * result_count_out)
+{
+    struct list_head * curr = NULL;
+
+    struct nxs_attribute_term * out_attribute_term = attribute_term_array_out;
+
+    size_t copied = 0;
+
+
+    list_for_each(curr, &attr_store->list_attribute_terms)
+    {
+        if (offset) {
+            offset -= 1;
+            continue;
+        }
+
+        struct attribute_term * term = __attribute_term_from_list_entry(curr);
+
+        strncpy(out_attribute_term->term_str, term->name, ATTRIBUTE_NAME_MAX);
+        attribute_type_to_str(term->type, out_attribute_term->type_str, sizeof(out_attribute_term->type_str));
+
+        out_attribute_term += 1;
+        copied += 1;
+
+        if (copied == attribute_term_array_capacity) {
+            break;
+        }
+    }
+
+    *result_count_out = copied;
+    *total_count_out = attr_store->count;
+
+    return 0;
 }
