@@ -83,11 +83,6 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
             goto out;
         }
 
-        if (buffer_layer_lock(&supernode->usertable->my_uuid, NEXUS_FCREATE)) {
-            log_error("could not create usertable file\n");
-            goto out;
-        }
-
         ret = supernode_store(supernode, 0, NULL);
 
         if (ret) {

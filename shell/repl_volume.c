@@ -562,8 +562,8 @@ handle_abac_user_attribute_grant(int argc, char ** argv)
 
 
     username = strndup(argv[0], 32);
-    attribute_name = strndup(argv[0], 32);
-    attribute_value = strndup(argv[1], 256);
+    attribute_name = strndup(argv[1], 32);
+    attribute_value = strndup(argv[2], 256);
 
     ret = sgx_backend_abac_user_attribute_grant(username, attribute_name, attribute_value, mounted_volume);
 
@@ -589,7 +589,7 @@ handle_abac_user_attribute_revoke(int argc, char ** argv)
 
 
     username = strndup(argv[0], 32);
-    attribute_name = strndup(argv[0], 32);
+    attribute_name = strndup(argv[1], 32);
 
     ret = sgx_backend_abac_user_attribute_revoke(username, attribute_name, mounted_volume);
 

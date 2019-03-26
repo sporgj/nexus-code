@@ -1,5 +1,6 @@
 #include "abac_internal.h"
 
+#include "../vfs.h"
 #include "../metadata.h"
 
 static struct nexus_metadata * attribute_store_metadata = NULL;
@@ -12,8 +13,17 @@ static struct abac_superinfo   global_abac_superinfo;
 int
 abac_global_export_macversion(struct mac_and_version * macversion)
 {
-    // TODO
-    return -1;
+    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+
+    if (attribute_store == NULL) {
+        log_error("could not get attribute store\n");
+        return -1;
+    }
+
+    nexus_metadata_export_mac(attribute_store->metadata, &macversion->mac);
+    macversion->version = attribute_store->metadata->version;
+
+    return 0;
 }
 
 
@@ -161,7 +171,8 @@ attribute_type_to_str(attribute_type_t attribute_type, char * buffer_out, size_t
 struct user_profile *
 abac_get_user_profile(char * username, nexus_io_flags_t flags)
 {
-    struct nexus_profile   * rst_profile = NULL;
+    struct nexus_metadata  * user_profile_metadata = NULL;
+
     struct nexus_user      * rst_user    = NULL;
     struct nexus_usertable * usertable   = abac_global_get_usertable(NEXUS_FREAD);
 
@@ -178,37 +189,26 @@ abac_get_user_profile(char * username, nexus_io_flags_t flags)
     }
 
     // now load the user profile using the uuid
-    {
-        struct nexus_metadata  * rst_profile_metadata = NULL;
+    user_profile_metadata = nexus_metadata_load(&rst_user->user_uuid, NEXUS_USER_PROFILE, flags);
 
-        rst_profile_metadata = nexus_metadata_load(&rst_user->user_uuid, NEXUS_USER_PROFILE, flags);
-
-        if (rst_profile_metadata == NULL) {
-            log_error("could not load user profile metadata\n");
-            goto err;
-        }
-
-        rst_profile = rst_profile_metadata->user_profile;
+    if (user_profile_metadata == NULL) {
+        log_error("could not load user profile metadata\n");
+        goto err;
     }
 
     abac_global_put_usertable(usertable);
 
-    return rst_profile;
+    return user_profile_metadata->user_profile;
 err:
     abac_global_put_usertable(usertable);
 
-    return -1;
+    return NULL;
 }
 
 int
 abac_put_user_profile(struct user_profile * user_profile)
 {
-    if (user_profile != global_supernode->usertable) {
-        log_error("user_profile passed is not volume's user table\n");
-        return -1;
-    }
-
-    if (nexus_metadata_store(user_profile)) {
+    if (nexus_metadata_store(user_profile->metadata)) {
         log_error("nexus_metadata_store() FAILED\n");
         return -1;
     }
@@ -225,22 +225,21 @@ abac_create_user_profile(struct nexus_uuid * user_uuid)
 {
     struct nexus_metadata * tmp_metadata = NULL;
 
-    tmp_metadata = nexus_metadata_create(user_uuid, NEXUS_ATTRIBUTE_STORE);
+    tmp_metadata = nexus_metadata_create(user_uuid, NEXUS_USER_PROFILE);
     if (tmp_metadata == NULL) {
         log_error("nexus_metadata_create() FAILED\n");
         goto out_err;
     }
 
     if (nexus_metadata_store(tmp_metadata)) {
-        nexus_metadata_free(tmp_metadata);
         log_error("nexus_metadata_store() FAILED\n");
         goto out_err;
     }
 
     nexus_metadata_free(tmp_metadata);
-
     return 0;
 out_err:
+    nexus_metadata_free(tmp_metadata);
     return -1;
 }
 

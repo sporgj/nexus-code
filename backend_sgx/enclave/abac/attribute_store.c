@@ -93,6 +93,7 @@ __del_attribute(struct attribute_store * attribute_store, struct attribute_term 
 
 
 // -- creating/destroying
+
 struct attribute_store *
 attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
 {
@@ -155,15 +156,27 @@ attribute_store_from_buffer(uint8_t * buffer, size_t buflen)
 struct attribute_store *
 attribute_store_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
 {
+    struct attribute_store * attribute_store = NULL;
+    struct nexus_mac mac;
+
     size_t    buflen = 0;
-    uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
+    uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &mac);
 
     if (buffer == NULL) {
         log_error("nexus_crypto_buf_get() FAILED\n");
         return NULL;
     }
 
-    return attribute_store_from_buffer(buffer, buflen);
+    attribute_store = attribute_store_from_buffer(buffer, buflen);
+
+    if (attribute_store == NULL) {
+        log_error("attribute_store_from_buffer FAILED\n");
+        return NULL;
+    }
+
+    nexus_mac_copy(&mac, &attribute_store->mac);
+
+    return attribute_store;
 }
 
 static int

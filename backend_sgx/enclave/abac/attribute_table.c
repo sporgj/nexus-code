@@ -24,7 +24,14 @@ __put_attr_entry(struct attribute_table * attribute_table,
                  char *                   value,
                  size_t                   len)
 {
-    struct attribute_entry * new_entry = nexus_malloc(sizeof(struct attribute_entry));
+    struct attribute_entry * new_entry = NULL;
+
+    if (len > ATTRIBUTE_VALUE_SIZE) {
+        log_error("attribute value is too large (got=%zu, max=%zu)\n", len, ATTRIBUTE_VALUE_SIZE);
+        return -1;
+    }
+
+    new_entry = nexus_malloc(sizeof(struct attribute_entry));
 
     memcpy(new_entry->attr_val, value, len);
     new_entry->attr_val_len = len;
@@ -72,7 +79,9 @@ __get_attr_entry(struct attribute_table * attribute_table, struct nexus_uuid * u
 }
 
 int
-attribute_table_add(struct attribute_table * attribute_table, struct nexus_uuid * uuid, char * value)
+attribute_table_add(struct attribute_table * attribute_table,
+                    struct nexus_uuid      * uuid,
+                    char                   * value)
 {
     struct attribute_entry * entry = __get_attr_entry(attribute_table, uuid);
 
@@ -184,20 +193,13 @@ attribute_table_from_buffer(uint8_t * buffer, size_t buflen)
 
     buffer = __parse_attribute_table_hdr(attribute_table, buffer);
 
-    buffer += sizeof(struct __attr_table_hdr);
-
     if (__parse_attribute_table_body(attribute_table, buffer)) {
         log_error("__parse_attribute_table_body FAILED\n");
-        goto err;
+        attribute_table_free(attribute_table);
+        return NULL;
     }
 
     return attribute_table;
-err:
-    if (attribute_table) {
-        nexus_free(attribute_table);
-    }
-
-    return NULL;
 }
 
 size_t
@@ -207,6 +209,8 @@ attribute_table_get_size(struct attribute_table * attribute_table)
            + (attribute_table->count * sizeof(struct __attr_table_entry));
 }
 
+
+/// serializes the attribute table's header into the buffer and returns the buffer shifted
 uint8_t *
 __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t * buffer)
 {
@@ -295,10 +299,10 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
 
         if (tmp_attribute_term) {
             // then copy its name into the pair
-            strncpy(&output_pair_ptr->val_str, tmp_attribute_term->name, NXS_ATTRIBUTE_NAME_MAX);
+            strncpy(&output_pair_ptr->term_str, tmp_attribute_term->name, NXS_ATTRIBUTE_NAME_MAX);
         } else {
             // XXX: temporaray
-            strncpy(&output_pair_ptr->val_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
+            strncpy(&output_pair_ptr->term_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
         }
 
         strncpy(&output_pair_ptr->val_str, attr_entry->attr_val, NXS_ATTRIBUTE_VALUE_MAX);

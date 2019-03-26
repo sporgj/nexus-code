@@ -237,6 +237,8 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
 
     usertable->version = nexus_crypto_buf_version(crypto_buffer);
 
+    usertable->on_disk = true;
+
     return usertable;
 }
 
@@ -296,8 +298,9 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 
     size_t                    buffer_size   = nexus_usertable_buflen(usertable);
 
+    nexus_io_flags_t flags = (usertable->on_disk ? NEXUS_FRDWR : NEXUS_FCREATE);
 
-    if (buffer_layer_lock(&usertable->my_uuid, NEXUS_FRDWR)) {
+    if (buffer_layer_lock(&usertable->my_uuid, flags)) {
         log_error("could not lock usertable metadata\n");
         return -1;
     }
@@ -330,6 +333,7 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
     }
 
     usertable->version += 1;
+    usertable->on_disk = true;
 
     __usertable_set_clean(usertable);
 

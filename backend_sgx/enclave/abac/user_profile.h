@@ -33,9 +33,6 @@ void
 user_profile_free(struct user_profile * user_profile);
 
 struct user_profile *
-user_profile_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
-
-struct user_profile *
 user_profile_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer);
 
 int

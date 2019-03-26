@@ -71,6 +71,9 @@ __metadata_set_dirty(struct nexus_metadata * metadata);
 struct nexus_dentry *
 metadata_get_dentry(struct nexus_metadata * metadata);
 
+int
+nexus_metadata_export_mac(struct nexus_metadata * metadata, struct nexus_mac * mac);
+
 /**
  * Creates a new metadata
  * @param uuid

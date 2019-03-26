@@ -101,7 +101,9 @@ err:
 }
 
 int
-ecall_abac_user_attribute_grant(char * username_IN, char * attribute_name_IN, char * attribute_value_IN)
+ecall_abac_user_attribute_grant(char * username_IN,
+                                char * attribute_name_IN,
+                                char * attribute_value_IN)
 {
     struct user_profile * user_profile = abac_get_user_profile(username_IN, NEXUS_FRDWR);
 
@@ -174,6 +176,8 @@ ecall_abac_user_attribute_ls(char                      * username_IN,
     }
 
     abac_put_user_profile(user_profile);
+
+    return 0;
 err:
     abac_put_user_profile(user_profile);
 

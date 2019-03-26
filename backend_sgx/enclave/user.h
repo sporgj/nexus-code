@@ -43,6 +43,7 @@ struct nexus_usertable {
     uint64_t          total_size;
 
     bool              is_dirty;
+    bool              on_disk;
 
     struct nexus_uuid my_uuid;
 

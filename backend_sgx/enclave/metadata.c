@@ -117,6 +117,19 @@ nexus_metadata_from_object(struct nexus_uuid     * uuid,
     return metadata;
 }
 
+int
+nexus_metadata_export_mac(struct nexus_metadata * metadata, struct nexus_mac * mac)
+{
+    switch (metadata->type) {
+    case NEXUS_ATTRIBUTE_STORE:
+        nexus_mac_copy(&metadata->attribute_store->mac, mac);
+        return 0;
+    }
+
+    log_error("metadata cannot export mac\n");
+    return -1;
+}
+
 struct nexus_metadata *
 nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_type)
 {

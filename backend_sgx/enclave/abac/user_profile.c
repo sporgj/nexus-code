@@ -7,7 +7,7 @@ struct __user_profile_hdr {
     struct nexus_uuid      my_uuid;
     struct nexus_uuid      root_uuid;
 
-    struct mac_and_version attribute_store_macversion_bytes;
+    __mac_and_version_bytes_t attribute_store_macversion_bytes;
 } __attribute__((packed));
 
 
@@ -101,26 +101,6 @@ user_profile_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
     return user_profile_from_buffer(buffer, buflen);
 }
 
-struct user_profile *
-user_profile_load(struct nexus_uuid * uuid, nexus_io_flags_t flags)
-{
-    struct user_profile * user_profile = NULL;
-
-    struct nexus_crypto_buf * crypto_buffer = nexus_crypto_buf_create(uuid, flags);
-
-    if (crypto_buffer == NULL) {
-        log_error("nexus_crypto_buf_create() FAILED\n");
-        return NULL;
-    }
-
-    user_profile = user_profile_from_crypto_buf(crypto_buffer);
-
-    nexus_crypto_buf_free(crypto_buffer);
-
-    return user_profile;
-}
-
-
 static size_t
 __get_user_profile_size(struct user_profile * user_profile)
 {
@@ -130,8 +110,7 @@ __get_user_profile_size(struct user_profile * user_profile)
 
 static int
 __user_profile_serialize(struct user_profile     * user_profile,
-                         struct nexus_crypto_buf * crypto_buffer,
-                         struct nexus_mac        * mac)
+                         struct nexus_crypto_buf * crypto_buffer)
 {
     size_t    buflen = 0;
     uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, NULL);
@@ -165,10 +144,6 @@ __user_profile_serialize(struct user_profile     * user_profile,
         return -1;
     }
 
-    if (mac) {
-        nexus_mac_copy(&user_profile->mac, mac);
-    }
-
     return 0;
 }
 
@@ -193,10 +168,16 @@ user_profile_store(struct user_profile * user_profile, uint32_t version, struct 
         return -1;
     }
 
-    if (__user_profile_serialize(user_profile, crypto_buffer, mac)) {
+    if (__user_profile_serialize(user_profile, crypto_buffer)) {
         log_error("__user_profile_serialize() FAILED\n");
-        return -1;
+        goto out_err;
     }
+
+    if (mac) {
+        nexus_mac_copy(&user_profile->mac, mac);
+    }
+
+    nexus_crypto_buf_free(crypto_buffer);
 
     return 0;
 
@@ -225,6 +206,11 @@ user_profile_grant_attribute(struct user_profile * user_profile, char * name, ch
 
     if (attribute_term == NULL) {
         log_error("could not find attribute (%s) in store\n", name);
+        return -1;
+    }
+
+    if (attribute_term->type != USER_ATTRIBUTE_TYPE) {
+        log_error("attribute type for (%s) is not user\n", attribute_term->name);
         return -1;
     }
 
@@ -282,8 +268,8 @@ UNSAFE_user_profile_attribute_ls(struct user_profile       * user_profile,
         return -1;
     }
 
-    return UNSAFE_attribute_table_ls(attribute_store,
-                                     user_profile->attribute_table,
+    return UNSAFE_attribute_table_ls(user_profile->attribute_table,
+                                     attribute_store,
                                      attribute_pair_array,
                                      attribute_pair_capacity,
                                      offset,
