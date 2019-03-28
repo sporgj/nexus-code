@@ -75,6 +75,7 @@ __put_attribute(struct attribute_store * attribute_store,
 
     nexus_uuid_copy(uuid, &term->uuid);
     strncpy(term->name, name, ATTRIBUTE_NAME_MAX);
+    term->type = type;
 
     list_add_tail(&term->list_entry, &attribute_store->list_attribute_terms);
     attribute_store->count += 1;

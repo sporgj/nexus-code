@@ -22,17 +22,17 @@ typedef enum {
 } perm_type_t;
 
 typedef enum {
-    POLICY_ATOM_USER,
+    POLICY_ATOM_USER = 0x01,
     POLICY_ATOM_OBJECT,
 } atom_type_t;
 
 typedef enum {
-    PREDICATE_ATTR,   // system attribute
+    PREDICATE_ATTR = 0x01,   // system attribute
     PREDICATE_FUNC,   // system function
 } pred_type_t;
 
 typedef enum {
-    USER_ATTRIBUTE_TYPE,
+    USER_ATTRIBUTE_TYPE = 0x01,
     OBJECT_ATTRIBUTE_TYPE
 } attribute_type_t;
 

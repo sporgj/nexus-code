@@ -55,20 +55,25 @@ enclave {
 
         public int ecall_abac_object_attribute_grant
         (
-            [in, string] char * path,
-            [in, string] char * attribute_name,
-            [in, string] char * attribute_value
+            [in, string] char * path_IN,
+            [in, string] char * attribute_name_IN,
+            [in, string] char * attribute_value_IN
         );
 
         public int ecall_abac_object_attribute_revoke
         (
-            [in, string] char * path,
-            [in, string] char * attribute_name
+            [in, string] char * path_IN,
+            [in, string] char * attribute_name_IN
         );
 
         public int ecall_abac_object_attribute_ls
         (
-            [in, string] char * path
+            [in, string] char                      * path_IN,
+            [user_check] struct nxs_attribute_pair * attribute_pair_out,
+                         size_t                      attribute_pair_capacity,
+                         size_t                      offset,
+            [user_check] size_t                    * total_count_out,
+            [user_check] size_t                    * result_count_out
         );
 
     };

@@ -12,9 +12,11 @@
 #include <nexus_list.h>
 #include <nexus_mac.h>
 
+#include "abac/attribute_table.h"
+
 
 struct nexus_metadata;
-
+struct attribute_table;
 
 struct nexus_filenode {
     struct nexus_uuid          my_uuid;
@@ -31,6 +33,8 @@ struct nexus_filenode {
     nexus_io_flags_t           flags;
 
     struct nexus_list          chunk_list;
+
+    struct attribute_table   * attribute_table;
 
     struct nexus_metadata    * metadata;
 };

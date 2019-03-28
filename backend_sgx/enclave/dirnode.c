@@ -49,6 +49,7 @@ __get_bucket0_size(struct nexus_dirnode * dirnode)
            + dirnode->symlink_buflen
            + nexus_acl_size(&dirnode->dir_acl)
            + (sizeof(struct __bucket_rec) * dirnode->bucket_count)
+           + attribute_table_get_size(dirnode->attribute_table)
            + bucket0->size_bytes;
 }
 
@@ -263,13 +264,18 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen, nexus_io_flags_t flags)
         goto out_err;
     }
 
+    size_t bytes_left        = buflen - (int)(input_ptr - buffer);
+    dirnode->attribute_table = attribute_table_from_buffer(input_ptr, bytes_left);
+    if (dirnode->attribute_table == NULL) {
+        log_error("could not load attribute_table\n");
+        goto out_err;
+    }
 
     /* load the dirnode buckets */
     if (__load_bucket0(dirnode, input_ptr)) {
         log_error("could not load dirnode buckets\n");
         goto out_err;
     }
-
 
     if (__load_other_buckets(dirnode, flags)) {
         log_error("could not load dirnode buckets\n");
@@ -498,7 +504,7 @@ __delete_empty_dirnode_buckets(struct nexus_dirnode * dirnode)
 
 
 static int
-dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
+dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t buflen)
 {
     struct __bucket_rec * bucket_records = NULL;
 
@@ -537,6 +543,14 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer)
         return -1;
     }
 
+
+    size_t bytes_left = buflen - (output_ptr - buffer);
+    if (attribute_table_store(dirnode->attribute_table, output_ptr, bytes_left)) {
+        log_error("attribute_table_store() FAILED\n");
+        return -1;
+    }
+
+    output_ptr += attribute_table_get_size(dirnode->attribute_table);
 
     if (__store_bucket0(dirnode, output_ptr)) {
         log_error("could not store bucket0\n");
@@ -589,7 +603,7 @@ dirnode_store(struct nexus_dirnode * dirnode, uint32_t version, struct nexus_mac
         }
 
 
-        ret = dirnode_serialize(dirnode, output_buffer);
+        ret = dirnode_serialize(dirnode, output_buffer, buffer_size);
 
         if (ret != 0) {
             log_error("dirnode_serialize() FAILED\n");
@@ -778,6 +792,13 @@ struct nexus_dirnode *
 dirnode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
     struct nexus_dirnode * dirnode = nexus_malloc(sizeof(struct nexus_dirnode));
+
+    dirnode->attribute_table = attribute_table_create();
+    if (dirnode->attribute_table == NULL) {
+        log_error("attribute_table_create() FAILED\n");
+        nexus_free(dirnode);
+        return NULL;
+    }
 
     nexus_uuid_copy(root_uuid, &dirnode->root_uuid);
     nexus_uuid_copy(my_uuid, &dirnode->my_uuid);

@@ -75,7 +75,8 @@ __filenode_set_clean(struct nexus_filenode * filenode)
 static size_t
 __get_filenode_size(struct nexus_filenode * filenode)
 {
-    return sizeof(struct __filenode_hdr) + (filenode->nchunks * nexus_crypto_ctx_bufsize());
+    return sizeof(struct __filenode_hdr) + (filenode->nchunks * nexus_crypto_ctx_bufsize())
+           + attribute_table_get_size(filenode->attribute_table);
 }
 
 static void
@@ -98,6 +99,13 @@ struct nexus_filenode *
 filenode_create(struct nexus_uuid * root_uuid, struct nexus_uuid * my_uuid)
 {
     struct nexus_filenode * filenode = nexus_malloc(sizeof(struct nexus_filenode));
+
+    filenode->attribute_table = attribute_table_create();
+    if (filenode->attribute_table == NULL) {
+        nexus_free(filenode);
+        log_error("attribute_table_create() FAILED\n");
+        return NULL;
+    }
 
     nexus_uuid_copy(root_uuid, &filenode->root_uuid);
     nexus_uuid_copy(my_uuid, &filenode->my_uuid);
@@ -181,6 +189,14 @@ filenode_from_buffer(uint8_t * buffer, size_t bytes_left)
 
         bytes_left -= size;
         input_ptr  += size;
+    }
+
+
+    // now parse the attribute table
+    filenode->attribute_table = attribute_table_from_buffer(input_ptr, bytes_left);
+    if (filenode->attribute_table == NULL) {
+        log_error("attribute_table_from_buffer() FAILED\n");
+        goto out_err;
     }
 
     return filenode;
@@ -297,6 +313,11 @@ filenode_serialize(struct nexus_filenode * filenode, size_t bytes_left, uint8_t 
         bytes_left -= size;
     }
 
+    if (attribute_table_store(filenode->attribute_table, output_ptr, bytes_left)) {
+        log_error("attribute_table_store FAILED\n");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -360,8 +381,13 @@ out:
 void
 filenode_free(struct nexus_filenode * filenode)
 {
+    if (filenode->attribute_table) {
+        attribute_table_free(filenode->attribute_table);
+    }
+
     nexus_list_destroy(&filenode->chunk_list);
     memset(filenode, 0, sizeof(struct nexus_filenode));
+
     nexus_free(filenode);
 }
 

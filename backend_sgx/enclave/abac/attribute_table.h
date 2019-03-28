@@ -7,6 +7,7 @@
 #pragma once
 
 #include "abac_internal.h"
+#include "abac_types.h"
 
 
 struct attribute_table {

@@ -16,7 +16,10 @@
 
 #include "libnexus_trusted/hashmap.h"
 
+#include "abac/attribute_table.h"
+
 struct nexus_metadata;
+struct attribute_table;
 
 
 /* directory entry buffer on disk */
@@ -85,6 +88,8 @@ struct nexus_dirnode {
     struct hashmap          fileuuid_hashmap;
 
     struct nexus_list       bucket_list;
+
+    struct attribute_table * attribute_table;
 
     struct nexus_metadata * metadata;
 };

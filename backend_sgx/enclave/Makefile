@@ -181,7 +181,7 @@ cscope:
 
 .PHONY: clean
 clean:
-	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o
+	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o abac/*.o
 
 .PHONY: distclean
 distclean: clean

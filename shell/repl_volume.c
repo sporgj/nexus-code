@@ -547,25 +547,24 @@ handle_abac_attribute_ls(int argc, char ** argv)
 
 
 static int
-handle_abac_user_attribute_grant(int argc, char ** argv)
+handle_abac_user_grant(int argc, char ** argv)
 {
-    char * username = NULL;
-    char * attribute_name = NULL;
+    char * username        = NULL;
+    char * attribute_name  = NULL;
     char * attribute_value = NULL;
 
     int ret = -1;
 
     if (argc < 3) {
-        usage("abac_user_attribute_grant");
+        usage("abac_user_grant");
         return -1;
     }
 
-
-    username = strndup(argv[0], 32);
-    attribute_name = strndup(argv[1], 32);
+    username        = strndup(argv[0], 32);
+    attribute_name  = strndup(argv[1], 32);
     attribute_value = strndup(argv[2], 256);
 
-    ret = sgx_backend_abac_user_attribute_grant(username, attribute_name, attribute_value, mounted_volume);
+    ret = sgx_backend_abac_user_grant(username, attribute_name, attribute_value, mounted_volume);
 
     nexus_free(username);
     nexus_free(attribute_name);
@@ -575,23 +574,22 @@ handle_abac_user_attribute_grant(int argc, char ** argv)
 }
 
 static int
-handle_abac_user_attribute_revoke(int argc, char ** argv)
+handle_abac_user_revoke(int argc, char ** argv)
 {
-    char * username = NULL;
+    char * username       = NULL;
     char * attribute_name = NULL;
 
     int ret = -1;
 
     if (argc < 2) {
-        usage("abac_user_attribute_revoke");
+        usage("abac_user_revoke");
         return -1;
     }
 
-
-    username = strndup(argv[0], 32);
+    username       = strndup(argv[0], 32);
     attribute_name = strndup(argv[1], 32);
 
-    ret = sgx_backend_abac_user_attribute_revoke(username, attribute_name, mounted_volume);
+    ret = sgx_backend_abac_user_revoke(username, attribute_name, mounted_volume);
 
     nexus_free(username);
     nexus_free(attribute_name);
@@ -600,23 +598,95 @@ handle_abac_user_attribute_revoke(int argc, char ** argv)
 }
 
 static int
-handle_abac_user_attribute_ls(int argc, char ** argv)
+handle_abac_user_ls(int argc, char ** argv)
 {
     char * username = NULL;
 
     int ret = -1;
 
     if (argc < 1) {
-        usage("abac_user_attribute_ls");
+        usage("abac_user_ls");
         return -1;
     }
 
 
     username = strndup(argv[0], 32);
 
-    ret = sgx_backend_abac_user_attribute_ls(username, mounted_volume);
+    ret = sgx_backend_abac_user_ls(username, mounted_volume);
 
     nexus_free(username);
+
+    return ret;
+}
+
+static int
+handle_abac_object_grant(int argc, char ** argv)
+{
+    char * path            = NULL;
+    char * attribute_name  = NULL;
+    char * attribute_value = NULL;
+
+    int ret = -1;
+
+    if (argc < 3) {
+        usage("abac_object_grant");
+        return -1;
+    }
+
+    path            = strndup(argv[0], 32);
+    attribute_name  = strndup(argv[1], 32);
+    attribute_value = strndup(argv[2], 256);
+
+    ret = sgx_backend_abac_object_grant(path, attribute_name, attribute_value, mounted_volume);
+
+    nexus_free(path);
+    nexus_free(attribute_name);
+    nexus_free(attribute_value);
+
+    return ret;
+}
+
+static int
+handle_abac_object_revoke(int argc, char ** argv)
+{
+    char * path           = NULL;
+    char * attribute_name = NULL;
+
+    int ret = -1;
+
+    if (argc < 2) {
+        usage("abac_object_revoke");
+        return -1;
+    }
+
+    path           = strndup(argv[0], 32);
+    attribute_name = strndup(argv[1], 32);
+
+    ret = sgx_backend_abac_object_revoke(path, attribute_name, mounted_volume);
+
+    nexus_free(path);
+    nexus_free(attribute_name);
+
+    return ret;
+}
+
+static int
+handle_abac_object_ls(int argc, char ** argv)
+{
+    char * path = NULL;
+
+    int ret = -1;
+
+    if (argc < 1) {
+        usage("abac_object_ls");
+        return -1;
+    }
+
+    path = strndup(argv[0], 32);
+
+    ret = sgx_backend_abac_object_ls(path, mounted_volume);
+
+    nexus_free(path);
 
     return ret;
 }
@@ -713,7 +783,6 @@ help(int argc, char ** argv)
     return 0;
 }
 
-
 static struct _cmd cmds[]
     = { { "user_list", handle_user_list, "List users in a volume", "" },
         { "user_add", handle_user_add, "Add user to the volume", "<username> <pubkey_file>" },
@@ -723,7 +792,10 @@ static struct _cmd cmds[]
         { "user_findkey", handle_user_findkey, "Find user by pubkey", "<pubkey_file>" },
 
         { "fs_create", handle_fs_create, "Creates a new file", "<filepath>" },
-        { "fs_remove", handle_fs_remove, "Deletes a new file", "<filepath>" },  // FIXME: change to "fs_delete"
+        { "fs_remove",
+          handle_fs_remove,
+          "Deletes a new file",
+          "<filepath>" }, // FIXME: change to "fs_delete"
         { "fs_mkdir", handle_fs_mkdir, "Creates a new directory", "<dirpath>" },
         { "fs_ls", handle_fs_ls, "Lists directory content", "<dirpath>" },
         { "fs_fstat", handle_fs_fstat, "Get file attributes", "<path>" },
@@ -735,13 +807,32 @@ static struct _cmd cmds[]
         { "fs_rename", handle_fs_rename, "Rename file", "<from_path> <to_path>" },
         { "fs_truncate", handle_fs_truncate, "Truncate file", "<file_path>" },
 
-        { "abac_attribute_add", handle_abac_attribute_add, "Creates a volume attribute", "<name> <type>" },
+        { "abac_attribute_add",
+          handle_abac_attribute_add,
+          "Creates a volume attribute",
+          "<name> <type>" },
         { "abac_attribute_del", handle_abac_attribute_del, "Deletes a volume attribute", "<name>" },
         { "abac_attribute_ls", handle_abac_attribute_ls, "Lists all volume attributes", "" },
 
-        { "abac_user_attribute_add", handle_abac_user_attribute_grant, "Grants a user attribute", "<name> <value>" },
-        { "abac_user_attribute_del", handle_abac_user_attribute_revoke, "Revokes a user attribute", "<name>" },
-        { "abac_user_attribute_ls", handle_abac_user_attribute_ls, "List a user's attributes", "" },
+        { "abac_user_grant",
+          handle_abac_user_grant,
+          "Grants a user attribute",
+          "<username> <attribute> <value>" },
+        { "abac_user_revoke",
+          handle_abac_user_revoke,
+          "Revokes a user attribute",
+          "<username> <attribute>" },
+        { "abac_user_attribute_ls", handle_abac_user_ls, "List a user's attributes", "<username>" },
+
+        { "abac_object_grant",
+          handle_abac_object_grant,
+          "Grants an object attribute to file/directory",
+          "<path> <attribute> <value>" },
+        { "abac_object_revoke",
+          handle_abac_object_revoke,
+          "Revokes an object attribute from file/directory",
+          "<path> <attribute>" },
+        { "abac_object_ls", handle_abac_object_ls, "List an object's attributes", "<path>" },
 
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };

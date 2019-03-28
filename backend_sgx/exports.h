@@ -35,15 +35,29 @@ int
 sgx_backend_abac_attribute_ls(struct nexus_volume * volume);
 
 int
-sgx_backend_abac_user_attribute_grant(char                * username,
-                                      char                * attribute_name,
-                                      char                * attribute_val,
-                                      struct nexus_volume * volume);
+sgx_backend_abac_user_grant(char                * username,
+                            char                * attribute_name,
+                            char                * attribute_val,
+                            struct nexus_volume * volume);
 
 int
-sgx_backend_abac_user_attribute_revoke(char                * username,
-                                       char                * attribute_name,
-                                       struct nexus_volume * volume);
+sgx_backend_abac_user_revoke(char                * username,
+                             char                * attribute_name,
+                             struct nexus_volume * volume);
 
 int
-sgx_backend_abac_user_attribute_ls(char * username, struct nexus_volume * volume);
+sgx_backend_abac_user_ls(char * username, struct nexus_volume * volume);
+
+int
+sgx_backend_abac_object_grant(char                * path,
+                              char                * attribute_name,
+                              char                * attribute_val,
+                              struct nexus_volume * volume);
+
+int
+sgx_backend_abac_object_revoke(char                * path,
+                               char                * attribute_name,
+                               struct nexus_volume * volume);
+
+int
+sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume);
