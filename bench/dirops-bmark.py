@@ -12,40 +12,27 @@ from pathlib import Path;
 import dropbox_watcher
 
 
+def sync_time(has_dropbox):
+    if not has_dropbox:
+        return 0
 
-def create_files(filelist, has_dropbox):
-    sync_time = 0
+    status, sync_time = dropbox_watcher.poll_dropbox_status()
+    if status != dropbox_watcher.DROPBOX_STATUS_OK:
+        print("ERROR:, dropbox status error on create")
+
+    return sync_time
+
+def create_files(filelist):
     t1 = time.monotonic()
-
     for fpath in filelist:
         Path(fpath).touch()
+    return time.monotonic() - t1
 
-    if has_dropbox:
-        status, sync_time = dropbox_watcher.poll_dropbox_status()
-        if status != dropbox_watcher.DROPBOX_STATUS_OK:
-            print("ERROR:, dropbox status error on create")
-
-    create_time = time.monotonic() - t1
-
-    return (create_time, sync_time)
-
-
-def remove_files(filelist, has_dropbox):
-    sync_time = 0
+def remove_files(filelist):
     t1 = time.monotonic()
-
     for fpath in filelist:
         os.remove(fpath)
-
-    if has_dropbox:
-        status, sync_time = dropbox_watcher.poll_dropbox_status()
-        if status != dropbox_watcher.DROPBOX_STATUS_OK:
-            print("ERROR:, dropbox status error on create")
-
-    remove_time = time.monotonic() - t1
-
-    return (remove_time, sync_time)
-
+    return time.monotonic() - t1
 
 def run(filecount, rounds, randomize, has_dropbox):
     # Create the home directory
@@ -65,21 +52,20 @@ def run(filecount, rounds, randomize, has_dropbox):
         time_lapse = time.monotonic()
 
         # create the files
-        (create_total, create_sync) = create_files(filelist, has_dropbox)
+        create_time = create_files(filelist)
+        create_sync = sync_time(has_dropbox)
 
         if randomize:
             random.shuffle(filelist)
 
         # remove the files
-        (remove_total, remove_sync) = remove_files(filelist, has_dropbox)
+        remove_time = remove_files(filelist)
+        remove_sync = sync_time(has_dropbox)
 
         time_lapse = time.monotonic() - time_lapse
         time_sync = create_sync + remove_sync
 
         del(filelist)
-
-        create_time = create_total - create_sync
-        remove_time = remove_total - remove_sync
 
         if has_dropbox:
             print("%-8d %-10f %-10f %-10f %-10f" %
