@@ -27,8 +27,8 @@ typedef enum {
 } atom_type_t;
 
 typedef enum {
-    PREDICATE_ATTR = 0x01,   // system attribute
-    PREDICATE_FUNC,   // system function
+    PREDICATE_ATTR = 0x01,      // system attribute
+    PREDICATE_FUNC,             // system function
 } pred_type_t;
 
 typedef enum {
