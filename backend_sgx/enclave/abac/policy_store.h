@@ -3,6 +3,7 @@
 
 struct policy_store {
     struct nexus_uuid       my_uuid;
+    struct nexus_uuid       root_uuid;
 
     uint32_t                rules_count;
 

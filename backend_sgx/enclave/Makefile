@@ -75,6 +75,7 @@ nexus_trusted_objs := \
 	nexus_uuid.o \
 	nexus_heap.o \
 	nexus_ringbuf.o \
+	nexus_str.o \
 	tweetnacl.o \
 	hashmap.o
 
@@ -84,6 +85,7 @@ trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 nexus_abac_objs := \
 	runtime.o \
 	user_profile.o \
+	policy_store.o \
 	attribute_table.o \
 	attribute_store.o
 

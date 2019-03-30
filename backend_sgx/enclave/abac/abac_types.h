@@ -53,7 +53,9 @@ struct policy_atom {
 
     size_t                  arity;
 
-    struct nexus_list       args; // list of strings
+    size_t                  args_bufsize;
+
+    struct nexus_list       args_list; // list of strings
 };
 
 
