@@ -55,4 +55,4 @@ nexus_delete_path(char * path);
 
 
 int
-nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath);
+nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath, struct stat * src_stat);

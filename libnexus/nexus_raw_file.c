@@ -170,15 +170,11 @@ nexus_delete_path(char * path)
 }
 
 
-int
-nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath)
+#if 0
+static int
+__copy_file_using_bash(const char * src_filepath, const char * dst_filepath)
 {
     int status = 0;
-
-    if (src_filepath == NULL || dst_filepath == NULL) {
-        log_error("incorrect arguments\n");
-        return -1;
-    }
 
     pid_t pid = fork();
 
@@ -199,5 +195,97 @@ nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath)
     }
 
     return status;
+}
+#endif
+
+static int
+__copy_file_using_libc(const char * src_filepath, const char * dst_filepath, struct stat * src_stat)
+{
+    static int tmp_buflen = 4096;
+    uint8_t *  tmp_buffer = NULL;
+
+    struct stat tmp_stat;
+
+    int src_fd = -1;
+    int dst_fd = -1;
+
+
+    src_fd = open(src_filepath, O_RDONLY);
+    if (src_fd == -1) {
+        log_error("could not open source file (%s)\n", src_filepath);
+        return -1;
+    }
+
+    if (src_stat == NULL) {
+        src_stat = &tmp_stat;
+
+        if (fstat(src_fd, src_stat)) {
+            log_error("could not stat (%s)\n", src_filepath);
+            close(src_fd);
+            return -1;
+        }
+    }
+
+    dst_fd = open(dst_filepath, O_CREAT | O_WRONLY | O_TRUNC, src_stat->st_mode);
+    if (dst_fd == -1) {
+        close(src_fd);
+        nexus_free(tmp_buffer);
+        log_error("could not open destination file (%s)\n", dst_filepath);
+        return -1;
+    }
+
+
+    tmp_buffer = nexus_malloc(tmp_buflen);
+
+    while (1) {
+        ssize_t read_bytes = read(src_fd, tmp_buffer, tmp_buflen);
+
+        if (read_bytes == 0) {
+            break;
+        }
+
+        if (read_bytes == -1) {
+            log_error("error reading file (%s)\n", src_filepath);
+            perror("__copy_file:");
+            goto out_err;
+        }
+
+        ssize_t write_bytes = write(dst_fd, tmp_buffer, read_bytes);
+        if (write_bytes != read_bytes) {
+            log_error("wrting bytes failed. tried=%zd, got=%zd\n", read_bytes, write_bytes);
+            goto out_err;
+        }
+    }
+
+    nexus_free(tmp_buffer);
+
+    close(src_fd);
+
+    if (close(dst_fd)) {
+        log_error("file (%s) closed with error\n", dst_filepath);
+        return -1;
+    }
+
+    return 0;
+out_err:
+    if (tmp_buffer) {
+        nexus_free(tmp_buffer);
+    }
+
+    close(src_fd);
+    close(dst_fd);
+
+    return -1;
+}
+
+int
+nexus_copy_raw_file(const char * src_filepath, const char * dst_filepath, struct stat * src_stat)
+{
+    if (src_filepath == NULL || dst_filepath == NULL) {
+        log_error("incorrect arguments\n");
+        return -1;
+    }
+
+    return __copy_file_using_libc(src_filepath, dst_filepath, src_stat);
 }
 
