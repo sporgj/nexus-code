@@ -100,7 +100,7 @@ nexus_write_raw_file(char * path, void * buf, size_t size)
             */
 
     if (ret == -1) {
-	log_error("Failed to write file (%s) (size=%zu)", path, size);
+        log_error("Failed to write file (%s) (size=%zu)", path, size);
     }
 
     fclose(file_ptr);

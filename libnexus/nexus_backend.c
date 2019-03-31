@@ -37,11 +37,11 @@ backend_hash_fn(uintptr_t key)
 
 static int
 backend_eq_fn(uintptr_t key_1,
-	      uintptr_t key_2)
+              uintptr_t key_2)
 {
     char * name_1 = (char *)key_1;
     char * name_2 = (char *)key_2;
-    
+
     return (strcasecmp(name_1, name_2) == 0);
 }
 
@@ -57,35 +57,34 @@ nexus_backend_init()
     int i = 0;
 
     log_debug("Initializing Nexus Backends\n");
-    
+
     backend_table = nexus_create_htable(0, backend_hash_fn, backend_eq_fn);
 
 
     if (backend_table == NULL) {
-	log_error("Could not allocate backend table\n");
-	return -1;
+        log_error("Could not allocate backend table\n");
+        return -1;
     }
-    
+
 
     while (tmp_backend != __stop__nexus_backends) {
-	log_debug("Registering Backend (%s)\n", (*tmp_backend)->name);
+        log_debug("Registering Backend (%s)\n", (*tmp_backend)->name);
 
+        if (nexus_htable_search(backend_table, (uintptr_t)((*tmp_backend)->name))) {
+            log_error("Backend (%s) is already registered\n", (*tmp_backend)->name);
+            return -1;
+        }
 
-	if (nexus_htable_search(backend_table, (uintptr_t)((*tmp_backend)->name))) {
-	    log_error("Backend (%s) is already registered\n", (*tmp_backend)->name);
-	    return -1;
-	}
+        if (nexus_htable_insert(
+                backend_table, (uintptr_t)((*tmp_backend)->name), (uintptr_t)(*tmp_backend))
+            == 0) {
+            log_error("Could not register backend (%s)\n", (*tmp_backend)->name);
+            return -1;
+        }
 
-
-	if (nexus_htable_insert(backend_table, (uintptr_t)((*tmp_backend)->name), (uintptr_t)(*tmp_backend)) == 0) {
-	    log_error("Could not register backend (%s)\n", (*tmp_backend)->name);
-	    return -1;
-	}
-	
-	tmp_backend = &(__start__nexus_backends[++i]);
+        tmp_backend = &(__start__nexus_backends[++i]);
     }
-    
-    
+
     return 0;
 }
 
@@ -94,29 +93,29 @@ nexus_backend_init()
 
 struct nexus_backend *
 nexus_backend_launch(char             * name,
-		     nexus_json_obj_t   backend_cfg)
+                     nexus_json_obj_t   backend_cfg)
 {
     struct nexus_backend      * backend = NULL;
     struct nexus_backend_impl * impl    = NULL;
-   
+
     impl = nexus_htable_search(backend_table, (uintptr_t)name);
 
     if (impl == NULL) {
-	log_error("Could not find backend implementation for (%s)\n", name);
-	return NULL;
+        log_error("Could not find backend implementation for (%s)\n", name);
+        return NULL;
     }
 
     backend = nexus_malloc(sizeof(struct nexus_backend));
 
     log_debug("initializing backend (%s)\n", name);
-    
+
     backend->impl      = impl;
     backend->priv_data = impl->init(backend_cfg);
 
     if (backend->priv_data == NULL) {
-	log_error("backend_init FAILED (%s)\n", name);
-	nexus_free(backend);
-	return NULL;
+        log_error("backend_init FAILED (%s)\n", name);
+        nexus_free(backend);
+        return NULL;
     }
 
     return backend;
@@ -127,7 +126,7 @@ int
 nexus_backend_init_volume(struct nexus_volume * volume)
 {
     struct nexus_backend * backend = volume->backend;
-    
+
     return backend->impl->volume_init(volume, backend->priv_data);
 }
 
