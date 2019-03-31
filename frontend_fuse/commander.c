@@ -16,8 +16,8 @@
 #include "nexus_fuse.h"
 
 
-#define DEFAULT_SOCKET_DIRPATH  "/tmp/nexus-sockets"
-#define DEFAULT_SOCKET_FILEPATH "/tmp/nexus-sockets/XXXXXX"
+#define DEFAULT_SOCKET_DIRPATH  "/tmp/nexus-tmp"
+#define DEFAULT_SOCKET_FILEPATH "/tmp/nexus-tmp/XXXXXX"
 
 #define DEFAULT_SOCKET_BUFSIZE  1024
 
