@@ -19,7 +19,6 @@
 #include <nexus_datastore.h>
 #include <nexus_log.h>
 #include <nexus_raw_file.h>
-#include <nexus_file_handle.h>
 #include <nexus_util.h>
 #include <nexus_types.h>
 
