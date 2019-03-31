@@ -1,8 +1,8 @@
 #include <pthread.h>
 #include <time.h>
 
+#include <nexus_raw_file.h>
 #include <nexus_datastore.h>
-#include <nexus_file_handle.h>
 #include <nexus_hashtable.h>
 
 #include "internal.h"

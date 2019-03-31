@@ -4,7 +4,7 @@
 #include <pthread.h>
 
 #include <nexus_hashtable.h>
-#include <nexus_file_handle.h>
+#include <nexus_raw_file.h>
 
 static int
 uuid_equal_func(uintptr_t key1, uintptr_t key2)
