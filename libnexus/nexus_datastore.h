@@ -333,6 +333,12 @@ struct nexus_datastore_impl {
                        struct nexus_uuid * to_uuid,
                        char              * to_path,
                        void              * priv_data);
+
+
+    int  (*copy_uuid)(struct nexus_datastore * src_datastore,
+                      struct nexus_uuid      * uuid,
+                      bool                     force_copy,
+                      void                   * priv_data);
 };
 
 

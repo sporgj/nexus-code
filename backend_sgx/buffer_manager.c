@@ -4,7 +4,7 @@
 #include <pthread.h>
 
 #include <nexus_hashtable.h>
-#include <nexus_file_handle.h>
+#include <nexus_raw_file.h>
 
 static int
 uuid_equal_func(uintptr_t key1, uintptr_t key2)
@@ -24,7 +24,7 @@ buffer_manager_init()
 {
     struct buffer_manager * buf_manager = nexus_malloc(sizeof(struct buffer_manager));
 
-    buf_manager->buffers_table = nexus_create_htable(128,
+    buf_manager->buffers_table = nexus_create_htable(511,
                                                      uuid_hash_func,
                                                      uuid_equal_func);
 

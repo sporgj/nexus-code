@@ -27,10 +27,10 @@ objs :=	nexus_main.o \
 	nexus_key.o \
 	nexus_uuid.o \
 	nexus_raw_file.o \
-	nexus_file_handle.o \
 	nexus_json.o \
 	nexus_heap.o \
 	nexus_mac.o \
+	nexus_list.o \
 	nexus_ringbuf.o
 
 

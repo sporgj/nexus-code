@@ -27,7 +27,7 @@ __fetch_hashtree_root()
     }
 
     return 0;
- 0
+}
 
 static int
 __store_hashtree_root()
