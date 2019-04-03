@@ -49,7 +49,7 @@ struct policy_rule *
 policy_rule_new(perm_type_t permission);
 
 /// pops all the atoms and resets it as an empty rule
-int
+void
 policy_rule_clear(struct policy_rule * policy_rule);
 
 void
@@ -60,6 +60,15 @@ policy_rule_to_str(struct policy_rule * rule);
 
 int
 policy_rule_push_atom(struct policy_rule * policy_rule, struct policy_atom * atom);
+
+size_t
+policy_rule_buf_size(struct policy_rule * rule);
+
+uint8_t *
+policy_rule_to_buf(struct policy_rule * rule);
+
+uint8_t *
+policy_rule_from_buf(struct policy_rule * rule);
 
 
 

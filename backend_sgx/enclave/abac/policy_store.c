@@ -11,6 +11,14 @@ struct __policy_store_hdr {
 } __attribute__((packed));
 
 
+struct __policy_rule_hdr {
+    perm_type_t             perm_type;
+
+    uint16_t                atom_count;
+
+    struct nexus_uuid       rule_uuid;
+} __attribute__((packed));
+
 struct __policy_atom_buf {
     atom_type_t             atom_type;
     pred_type_t             pred_type;
@@ -80,6 +88,129 @@ policy_store_del(struct nexus_uuid * rule_uuid)
     return -1;
 }
 
+
+
+static void
+__deallocate_policy_atom(void * ptr)
+{
+    struct policy_atom * atom = ptr;
+
+    policy_atom_free(atom);
+}
+
+struct policy_rule *
+policy_rule_new(perm_type_t permission)
+{
+    struct policy_rule * rule = nexus_malloc(sizeof(struct policy_rule));
+
+    rule->perm_type = permission;
+
+    nexus_list_init(&rule->atoms);
+    nexus_uuid_gen(&rule->rule_uuid);
+
+    return rule;
+}
+
+struct policy_rule *
+policy_rule_clear(struct policy_rule * policy_rule)
+{
+    nexus_list_destroy(&rule->atoms);
+    policy_rule->atom_count = 0;
+}
+
+char *
+policy_rule_to_str(struct policy_rule * rule)
+{
+    if (rule->atom_count < 1) {
+        log_error("cannot serialize empty rule\n");
+        return NULL;
+    }
+
+    // TODO
+    return NULL;
+}
+
+int
+policy_rule_push_atom(struct policy_rule * rule, struct policy_atom * atom)
+{
+    nexus_list_append(&rule->atoms, atom);
+    rule->atom_count += 1;
+
+    return 0;
+}
+
+size_t
+policy_rule_buf_size(struct policy_rule * rule)
+{
+    size_t total_size = sizeof(struct __policy_rule_hdr);
+
+    struct nexus_list_iterator * iter = list_iterator_new(&rule->atoms);
+
+    while (1) {
+        struct policy_atom * atom = list_iterator_get(iter);
+
+        if (atom == NULL) {
+            break;
+        }
+
+        total_size += policy_atom_buf_size(atom);
+
+        list_iterator_next(iter);
+    }
+
+    return total_size;
+}
+
+uint8_t *
+policy_rule_to_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen)
+{
+    struct __policy_rule_hdr * header = (struct __policy_rule_hdr *)buffer;
+
+    size_t total_size = policy_rule_buf_size(rule);
+
+
+    if (buflen < total_size) {
+        log_error("serialization buffer is too small. min=%zu, buflen=%zu\n", total_size,
+                buflen);
+        return NULL;
+    }
+
+    // serialize th header
+    {
+        header->perm_type  = rule->perm_type;
+        header->atom_count = rule->atom_count;
+        nexus_uuid_copy(&rule->rule_uuid, &header->rule_uuid);
+    }
+
+    buffer += total_size;
+    buflen -= total_size;
+
+    // serialize the atoms
+    {
+        struct nexus_list_iterator * iter = list_iterator_new(&rule->atoms);
+
+        while (1) {
+            struct policy_atom * atom = list_iterator_get(iter);
+
+            if (atom == NULL) {
+                break;
+            }
+
+            total_size += policy_atom_buf_size(atom);
+
+            list_iterator_next(iter);
+        }
+    }
+
+    return NULL;
+}
+
+uint8_t *
+policy_rule_from_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen)
+{
+    // TODO
+    return NULL;
+}
 
 
 static void
