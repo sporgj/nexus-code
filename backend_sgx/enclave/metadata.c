@@ -24,6 +24,7 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     struct hardlink_table  * hardlink_table  = NULL;
 
     struct attribute_store * attribute_store = NULL;
+    struct policy_store    * policy_store    = NULL;
     struct user_profile    * user_profile    = NULL;
 
     switch (metadata->type) {
@@ -66,6 +67,14 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
 
         attribute_store = object;
         attribute_store->metadata = metadata;
+        break;
+    case NEXUS_POLICY_STORE:
+        if (metadata->policy_store) {
+            policy_store_free(metadata->policy_store);
+        }
+
+        policy_store = object;
+        policy_store->metadata = metadata;
         break;
     case NEXUS_USER_PROFILE:
         if (metadata->user_profile) {
@@ -155,6 +164,9 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_t
     case NEXUS_ATTRIBUTE_STORE:
         object = attribute_store_create(&global_supernode->root_uuid, uuid);
         break;
+    case NEXUS_POLICY_STORE:
+        object = policy_store_create(&global_supernode->root_uuid, uuid);
+        break;
     case NEXUS_USER_PROFILE:
         object = user_profile_create(&global_supernode->root_uuid, uuid);
         break;
@@ -179,6 +191,19 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     case NEXUS_FILENODE:
         filenode_free(metadata->filenode);
         break;
+    case NEXUS_HARDLINK_TABLE:
+        hardlink_table_free(metadata->hardlink_table);
+        break;
+    case NEXUS_ATTRIBUTE_STORE:
+        attribute_store_free(metadata->attribute_store);
+        break;
+    case NEXUS_POLICY_STORE:
+        policy_store_free(metadata->policy_store);
+        break;
+    case NEXUS_USER_PROFILE:
+        user_profile_free(metadata->user_profile);
+        break;
+
     }
 
     if (metadata->dentry_count) {
@@ -236,6 +261,9 @@ __read_object(struct nexus_uuid     * uuid,
         case NEXUS_ATTRIBUTE_STORE:
             object = attribute_store_create(&global_supernode->root_uuid, uuid);
             break;
+        case NEXUS_POLICY_STORE:
+            object = policy_store_create(&global_supernode->root_uuid, uuid);
+            break;
         case NEXUS_USER_PROFILE:
             object = user_profile_create(&global_supernode->root_uuid, uuid);
             break;
@@ -259,6 +287,9 @@ __read_object(struct nexus_uuid     * uuid,
             break;
         case NEXUS_ATTRIBUTE_STORE:
             object = attribute_store_from_crypto_buf(crypto_buf);
+            break;
+        case NEXUS_POLICY_STORE:
+            object = policy_store_from_crypto_buf(crypto_buf);
             break;
         case NEXUS_USER_PROFILE:
             object = user_profile_from_crypto_buf(crypto_buf);
@@ -363,6 +394,9 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         break;
     case NEXUS_ATTRIBUTE_STORE:
         ret = attribute_store_store(metadata->attribute_store, metadata->version, NULL);
+        break;
+    case NEXUS_POLICY_STORE:
+        ret = policy_store_store(metadata->policy_store, metadata->version, NULL);
         break;
     case NEXUS_USER_PROFILE:
         ret = user_profile_store(metadata->user_profile, metadata->version, NULL);

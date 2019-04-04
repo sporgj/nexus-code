@@ -84,7 +84,7 @@ policy_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
 }
 
 void
-policy_store_destroy(struct policy_store * policy_store)
+policy_store_free(struct policy_store * policy_store)
 {
     nexus_list_destroy(&policy_store->rules_list);
     nexus_free(policy_store);
@@ -197,7 +197,7 @@ __policy_store_parse(uint8_t * buffer, size_t buflen)
 
     return policy_store;
 out_err:
-    policy_store_destroy(policy_store);
+    policy_store_free(policy_store);
 
     return NULL;
 }

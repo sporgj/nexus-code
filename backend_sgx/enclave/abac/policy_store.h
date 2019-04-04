@@ -1,3 +1,5 @@
+#pragma once
+
 #include "abac_internal.h"
 
 
