@@ -7,7 +7,14 @@ struct policy_store {
 
     uint32_t                rules_count;
 
+    struct nexus_mac        mac;
+
+    struct mac_and_version  attribute_store_macversion;
+
     struct nexus_list       rules_list;
+
+
+    struct nexus_metadata * metadata;
 };
 
 
@@ -22,17 +29,17 @@ struct policy_store *
 policy_store_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer);
 
 int
-policy_store_store(struct policy_store * policy_store, struct nexus_mac * mac);
+policy_store_store(struct policy_store * policy_store, uint32_t version, struct nexus_mac * mac);
 
 
 
 /// adds a policy to the store and returns the created policy rule
-struct policy_rule *
-policy_store_add(struct policy_store * policy_store, char * policy_string);
+int
+policy_store_add(struct policy_store * policy_store, struct policy_rule * policy_rule);
 
 /// tries to delete a policy, returns -1 on FAILURE
 int
-policy_store_del(struct nexus_uuid * rule_uuid);
+policy_store_del(struct policy_store * policy_store, struct nexus_uuid * rule_uuid);
 
 
 /**
@@ -48,10 +55,6 @@ policy_store_filter_by_action(struct policy_store * policy_store);
 struct policy_rule *
 policy_rule_new(perm_type_t permission);
 
-/// pops all the atoms and resets it as an empty rule
-void
-policy_rule_clear(struct policy_rule * policy_rule);
-
 void
 policy_rule_free(struct policy_rule * rule);
 
@@ -65,14 +68,14 @@ size_t
 policy_rule_buf_size(struct policy_rule * rule);
 
 uint8_t *
-policy_rule_to_buf(struct policy_rule * rule);
+policy_rule_to_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen);
 
-uint8_t *
-policy_rule_from_buf(struct policy_rule * rule);
+struct policy_rule *
+policy_rule_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_dest_ptr);
 
 
 
-/* policy atom management */
+/* policy atom */
 
 struct policy_atom *
 policy_atom_new(atom_type_t atom_type, pred_type_t pred_type);
@@ -82,9 +85,6 @@ policy_atom_free(struct policy_atom * atom);
 
 size_t
 policy_atom_buf_size(struct policy_atom * atom);
-
-struct policy_atom *
-policy_atom_from_str(char * atr);
 
 char *
 policy_atom_to_str(struct policy_atom * atom);
