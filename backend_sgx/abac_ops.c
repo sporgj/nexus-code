@@ -236,3 +236,26 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
 
     return 0;
 }
+
+
+int
+sgx_backend_abac_policy_add(char * policy_string, struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    struct nexus_uuid uuid;
+
+    int ret = -1;
+    int err = -1;
+
+    err = ecall_abac_policy_add(backend->enclave_id, &ret, policy_string, &uuid);
+
+    if (err || ret) {
+        log_error("ecall_abac_policy_add() FAILED\n");
+        return -1;
+    }
+
+    printf("\n");
+
+    return 0;
+}

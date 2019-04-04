@@ -18,12 +18,11 @@
 typedef enum {
     PERM_READ = 0x01,
     PERM_WRITE,
-    PERM_ADMIN,
 } perm_type_t;
 
 typedef enum {
-    POLICY_ATOM_USER = 0x01,
-    POLICY_ATOM_OBJECT,
+    ATOM_TYPE_USER = 0x01,
+    ATOM_TYPE_OBJECT,
 } atom_type_t;
 
 typedef enum {
@@ -69,4 +68,3 @@ struct policy_rule {
 
     struct nexus_list       atoms;
 };
-

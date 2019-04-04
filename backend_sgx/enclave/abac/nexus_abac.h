@@ -3,6 +3,7 @@
 
 #include "attribute_store.h"
 #include "policy_store.h"
+#include "policy_rule.h"
 #include "user_profile.h"
 
 
@@ -45,3 +46,10 @@ abac_create_user_profile(struct nexus_uuid * user_uuid);
 
 int
 abac_del_user_profile(struct nexus_uuid * user_uuid);
+
+
+
+// parser/lexer
+
+struct policy_rule *
+parse_abac_policy(char * policy_string);

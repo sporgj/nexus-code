@@ -76,5 +76,12 @@ enclave {
             [user_check] size_t                    * result_count_out
         );
 
+
+        // policy management
+        public int ecall_abac_policy_add
+        (
+            [in, string] char              * policy_string_IN,
+            [user_check] struct nexus_uuid * uuid_out
+        );
     };
 };

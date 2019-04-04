@@ -61,3 +61,8 @@ sgx_backend_abac_object_revoke(char                * path,
 
 int
 sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume);
+
+
+/// policy management
+int
+sgx_backend_abac_policy_add(char * policy_string, struct nexus_volume * volume);

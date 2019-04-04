@@ -31,7 +31,7 @@ INCLUDE := -I$(SGX_SDK)/include \
 CFLAGS  += -nostdinc -pedantic \
 	-fvisibility=hidden -fpie -fPIC -fstack-protector -mpclmul -maes -mavx -w \
 	-W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
-	-Werror=implicit-function-declaration
+	-Werror=implicit-function-declaration -Wconversion
 
 
 
@@ -84,6 +84,8 @@ trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 nexus_abac_objs := \
 	runtime.o \
+	parser_lexer.o \
+	policy_rule.o \
 	user_profile.o \
 	policy_store.o \
 	attribute_table.o \

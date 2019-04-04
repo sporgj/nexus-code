@@ -423,3 +423,21 @@ out_err:
 
     return -1;
 }
+
+
+int
+ecall_abac_policy_add(char * policy_string_IN, struct nexus_uuid * uuid_out)
+{
+    struct policy_rule * policy_rule = parse_abac_policy(policy_string_IN);
+
+    char * datalog_string = policy_rule_datalog_string(policy_rule);
+
+    if (datalog_string == NULL) {
+        log_error("policy_rule_datalog_string() NULL\n");
+        return -1;
+    }
+
+    ocall_print(datalog_string);
+
+    return 0;
+}
