@@ -39,7 +39,17 @@ void
 abac_release_attribute_store();
 
 
-// returns specific user profile information
+// policy store
+
+struct policy_store *
+abac_acquire_policy_store(nexus_io_flags_t flags);
+
+int
+abac_flush_policy_store();
+
+void
+abac_release_policy_store();
+
 
 // returns the global usertable
 struct nexus_usertable *

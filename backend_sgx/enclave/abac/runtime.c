@@ -4,6 +4,7 @@
 #include "../metadata.h"
 
 static struct nexus_metadata * attribute_store_metadata = NULL;
+static struct nexus_metadata * policy_store_metadata    = NULL;
 
 static struct nexus_metadata * current_user_profile_metadata = NULL;
 
@@ -78,11 +79,55 @@ abac_release_attribute_store()
     nexus_metadata_unlock(attribute_store_metadata);
 }
 
+struct policy_store *
+abac_acquire_policy_store(nexus_io_flags_t flags)
+{
+    struct nexus_uuid * uuid = __policy_store_uuid();
+
+    bool has_changed;
+
+
+    if (policy_store_metadata == NULL) {
+        policy_store_metadata = nexus_metadata_load(uuid, NEXUS_POLICY_STORE, flags);
+
+        if (policy_store_metadata == NULL) {
+            log_error("nexus_metadata_load() FAILED\n");
+            return NULL;
+        }
+
+        return policy_store_metadata->attribute_store;
+    }
+
+    if (nexus_metadata_revalidate(policy_store_metadata, flags, &has_changed)) {
+        log_error("nexus_metadata_revalidate() FAILED\n");
+        return NULL;
+    }
+
+    return policy_store_metadata->policy_store;
+}
+
+int
+abac_flush_policy_store()
+{
+    return nexus_metadata_store(policy_store_metadata);
+}
+
+void
+abac_release_policy_store()
+{
+    nexus_metadata_unlock(policy_store_metadata);
+}
+
 int
 abac_runtime_mount()
 {
     if (abac_acquire_attribute_store(NEXUS_FREAD) == NULL) {
         log_error("could not load attribute store\n");
+        return -1;
+    }
+
+    if (abac_acquire_policy_store(NEXUS_FREAD) == NULL) {
+        log_error("could not load policy store\n");
         return -1;
     }
 
@@ -102,6 +147,21 @@ abac_runtime_create(struct abac_superinfo * dst_abac_superinfo)
     nexus_uuid_gen(attribute_store_uuid);
 
     // TODO write the policy store
+    {
+        tmp_metadata = nexus_metadata_create(attribute_store_uuid, NEXUS_POLICY_STORE);
+        if (tmp_metadata == NULL) {
+            log_error("nexus_metadata_create() FAILED\n");
+            goto out_err;
+        }
+
+        if (nexus_metadata_store(tmp_metadata)) {
+            nexus_metadata_free(tmp_metadata);
+            log_error("nexus_metadata_store() FAILED\n");
+            goto out_err;
+        }
+
+        nexus_metadata_free(tmp_metadata);
+    }
 
     // create the attribute store metadata
     {
