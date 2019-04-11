@@ -3,11 +3,10 @@
 #include "nexus_log.h"
 
 
-struct nexus_string *
-nexus_string_from_str(char * str)
+static struct nexus_string *
+__nexus_string_from_buf(char * str, size_t len)
 {
     struct nexus_string * nexus_str = NULL;
-    size_t                len       = strlen(str);
 
     nexus_str = nexus_malloc(sizeof(struct nexus_string) + len + 1);
 
@@ -15,6 +14,12 @@ nexus_string_from_str(char * str)
     memcpy(&nexus_str->_str, str, len);
 
     return nexus_str;
+}
+
+struct nexus_string *
+nexus_string_from_str(char * str)
+{
+    return __nexus_string_from_buf(str, strlen(str));
 }
 
 void
@@ -57,5 +62,5 @@ nexus_string_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_ptr)
 
     *output_ptr = (buffer + tmp_nexus_str_len);
 
-    return nexus_string_from_str(tmp_nexus_str->_str);
+    return __nexus_string_from_buf(tmp_nexus_str->_str, tmp_nexus_str->_sz);
 }

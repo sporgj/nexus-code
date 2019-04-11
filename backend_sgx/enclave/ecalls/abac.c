@@ -428,16 +428,100 @@ out_err:
 int
 ecall_abac_policy_add(char * policy_string_IN, struct nexus_uuid * uuid_out)
 {
-    struct policy_rule * policy_rule = parse_abac_policy(policy_string_IN);
+    struct policy_store * policy_store = NULL;
+    struct policy_rule  * policy_rule  = parse_abac_policy(policy_string_IN);
 
-    char * datalog_string = policy_rule_datalog_string(policy_rule);
-
-    if (datalog_string == NULL) {
-        log_error("policy_rule_datalog_string() NULL\n");
+    if (policy_rule == NULL) {
+        log_error("could not parse policy rule\n");
         return -1;
     }
 
-    ocall_print(datalog_string);
+    policy_store = abac_acquire_policy_store(NEXUS_FRDWR);
+
+    if (policy_store == NULL) {
+        policy_rule_free(policy_rule);
+        log_error("abac_acquire_policy_store() FAILED\n");
+        return -1;
+    }
+
+    if (policy_store_add(policy_store, policy_rule)) {
+        log_error("policy_store_add() FAILED\n");
+        goto out_err;
+    }
+
+    if (abac_flush_policy_store()) {
+        log_error("abac_flush_policy_store() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_uuid_copy(&policy_rule->rule_uuid, uuid_out);
 
     return 0;
+
+out_err:
+    if (policy_rule) {
+        policy_rule_free(policy_rule);
+    }
+
+    abac_release_policy_store();
+
+    return -1;
+}
+
+int
+ecall_abac_policy_del(struct nexus_uuid * rule_uuid_IN)
+{
+    struct policy_store * policy_store = abac_acquire_policy_store(NEXUS_FRDWR);
+
+    if (policy_store == NULL) {
+        log_error("could not acquire policy store\n");
+        return -1;
+    }
+
+    if (policy_store_del(policy_store, rule_uuid_IN)) {
+        log_error("policy_store_del() FAILED\n");
+        goto out_err;
+    }
+
+    if (abac_flush_policy_store()) {
+        log_error("abac_flush_policy_store() FAILED\n");
+        goto out_err;
+    }
+
+    return 0;
+out_err:
+    abac_release_policy_store();
+
+    return -1;
+}
+
+int
+ecall_abac_policy_ls(struct nxs_policy_rule * rules_buffer_out,
+                     size_t                   rules_buffer_capacity,
+                     size_t                   offset,
+                     size_t                 * total_count_out,
+                     size_t                 * result_count_out)
+{
+    struct policy_store * policy_store = abac_acquire_policy_store(NEXUS_FREAD);
+
+    if (policy_store == NULL) {
+        log_error("could not acquire policy store\n");
+        return -1;
+    }
+
+    if (policy_store_ls(policy_store,
+                        rules_buffer_out,
+                        rules_buffer_capacity,
+                        offset,
+                        total_count_out,
+                        result_count_out)) {
+        log_error("policy_store_ls() FAILED\n");
+        goto out_err;
+    }
+
+    return 0;
+out_err:
+    abac_release_policy_store();
+
+    return -1;
 }

@@ -86,6 +86,8 @@ __put_policy_rule(struct policy_store * policy_store, struct policy_rule * polic
 {
     nexus_list_append(&policy_store->rules_list, policy_rule);
     policy_store->rules_count += 1;
+
+    return 0;
 }
 
 static int
@@ -244,7 +246,7 @@ __policy_store_serialize(struct policy_store     * policy_store,
 
     // write the attribute table
     if (__serialize_rules(policy_store, buffer, buflen)) {
-        log_error("attribute_table_store() FAILED\n");
+        log_error("__serialize_rules() FAILED\n");
         return -1;
     }
 
@@ -320,4 +322,94 @@ policy_store_del(struct policy_store * policy_store, struct nexus_uuid * rule_uu
     __policy_store_set_dirty(policy_store);
 
     return 0;
+}
+
+
+static uint8_t *
+__export_policy_rule(struct policy_rule * policy_rule, uint8_t * buffer, size_t buflen)
+{
+    struct nxs_policy_rule * exported_rule = (struct nxs_policy_rule *)buffer;
+
+    char * policy_string = policy_rule_datalog_string(policy_rule);
+
+    size_t total_len = 0;
+
+    if (policy_string == NULL) {
+        log_error("could not export policy string\n");
+        return NULL;
+    }
+
+    total_len = strnlen(policy_string, NEXUS_POLICY_MAXLEN) + sizeof(struct nxs_policy_rule) + 1;
+
+    if (total_len > buflen) {
+        log_error("export buffer is too small. rule_size=%zu, buflen=%zu\n", total_len, buflen);
+        goto out_err;
+    }
+
+    // perform the export
+    nexus_uuid_copy(&policy_rule->rule_uuid, &exported_rule->rule_uuid);
+    strncpy(&exported_rule->rule_str, policy_string, NEXUS_POLICY_MAXLEN);
+    exported_rule->total_len = total_len;
+
+    nexus_free(policy_string);
+
+    return (buffer + total_len);
+out_err:
+    nexus_free(policy_string);
+
+    return NULL;
+}
+
+int
+policy_store_ls(struct policy_store * policy_store,
+                uint8_t *             output_bufptr,
+                size_t                output_buflen,
+                size_t                offset,
+                size_t *              total_count,
+                size_t *              result_count)
+{
+    struct nexus_list_iterator * iter = list_iterator_new(&policy_store->rules_list);
+
+    uint8_t * next_outptr = NULL;
+
+    size_t count = 0;
+
+    do {
+        if (offset) {
+            offset -= 1;
+            goto skip;
+        }
+
+        struct policy_rule * policy_rule = list_iterator_get(iter);
+
+        if (policy_rule == NULL) {
+            break;
+        }
+
+        // export the policy_rule
+        next_outptr = __export_policy_rule(policy_rule, output_bufptr, output_buflen);
+        if (next_outptr == NULL) {
+            log_error("__export_policy_rule() FAILED\n");
+            goto out_err;
+        }
+
+        output_buflen -= (next_outptr - output_bufptr);
+        output_bufptr = next_outptr;
+
+        count += 1;
+skip:
+        list_iterator_next(iter);
+    } while(list_iterator_is_valid(iter));
+
+
+    *result_count = count;
+    *total_count  = policy_store->rules_count;
+
+    list_iterator_free(iter);
+
+    return 0;
+out_err:
+    list_iterator_free(iter);
+
+    return -1;
 }

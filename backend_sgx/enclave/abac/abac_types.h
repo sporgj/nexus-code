@@ -3,10 +3,12 @@
 #include "../libnexus_trusted/nexus_uuid.h"
 #include "../libnexus_trusted/nexus_list.h"
 
-#define ATTRIBUTE_NAME_MAX      32
-#define ATTRIBUTE_VALUE_SIZE    64
+#define ATTRIBUTE_NAME_MAX      (32)
+#define ATTRIBUTE_VALUE_SIZE    (64)
 
-#define SYSTEM_FUNC_MAX_LENGTH  32
+#define NEXUS_POLICY_MAXLEN     (256)
+
+#define SYSTEM_FUNC_MAX_LENGTH  (32)
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({                      \

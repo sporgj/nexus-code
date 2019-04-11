@@ -156,19 +156,21 @@ policy_atom_to_buf(struct policy_atom * atom, uint8_t * buffer, size_t buflen)
         return NULL;
     }
 
-    atom_buffer->atom_type    = atom->atom_type;
-    atom_buffer->pred_type    = atom->pred_type;
+    // serialize the header
+    {
+        atom_buffer->atom_type    = atom->atom_type;
+        atom_buffer->pred_type    = atom->pred_type;
 
-    atom_buffer->arity        = atom->arity;
-    atom_buffer->args_bufsize = atom->args_bufsize;
+        atom_buffer->arity        = atom->arity;
+        atom_buffer->args_bufsize = atom->args_bufsize;
 
-    nexus_uuid_copy(&atom->attr_uuid, &atom_buffer->attr_uuid);
-    memcpy(atom_buffer->predicate, atom->predicate, SYSTEM_FUNC_MAX_LENGTH);
-
+        nexus_uuid_copy(&atom->attr_uuid, &atom_buffer->attr_uuid);
+        memcpy(atom_buffer->predicate, atom->predicate, SYSTEM_FUNC_MAX_LENGTH);
+    }
 
     // initialize the output_ptr and output_len
-    output_ptr = (buffer + atom_buf_size);
-    output_len = (buflen - atom_buf_size);
+    output_ptr = (buffer + sizeof(struct __policy_atom_buf));
+    output_len = (buflen - sizeof(struct __policy_atom_buf));
 
     {
         struct nexus_list_iterator * iter = list_iterator_new(&atom->args_list);
@@ -184,7 +186,7 @@ policy_atom_to_buf(struct policy_atom * atom, uint8_t * buffer, size_t buflen)
                 return NULL;
             }
 
-            output_len = (uintptr_t)(next_ptr - output_ptr);
+            output_len -= (uintptr_t)(next_ptr - output_ptr);
             output_ptr = next_ptr;
 
             list_iterator_next(iter);
@@ -207,36 +209,51 @@ policy_atom_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_ptr)
 {
     struct __policy_atom_buf * tmp_atom_buf = (struct __policy_atom_buf *)buffer;
 
-    struct policy_atom * new_policy_atom = NULL;
+    struct policy_atom       * new_policy_atom = NULL;
 
-    size_t tmp_atom_buf_total_size = sizeof(struct __policy_atom_buf) + tmp_atom_buf->args_bufsize;
+    size_t total_size = sizeof(struct __policy_atom_buf) + tmp_atom_buf->args_bufsize;
 
-    if (buflen < tmp_atom_buf_total_size) {
+    if (buflen < total_size) {
         log_error("the atom buffer is too small. buflen=%zu, atom_bufsize=%zu\n",
                   buflen,
-                  tmp_atom_buf_total_size);
+                  total_size);
         return NULL;
     }
 
-    // initializes the args_list
-    new_policy_atom = policy_atom_new(tmp_atom_buf->atom_type, tmp_atom_buf->pred_type);
+    new_policy_atom = policy_atom_new();
 
-    nexus_uuid_copy(&tmp_atom_buf->attr_uuid, &new_policy_atom->attr_uuid);
-    memcpy(new_policy_atom->predicate, tmp_atom_buf->predicate, SYSTEM_FUNC_MAX_LENGTH);
+    // parse the header
+    {
+        new_policy_atom->atom_type = tmp_atom_buf->atom_type;
+        new_policy_atom->pred_type = tmp_atom_buf->pred_type;
 
-    new_policy_atom->arity        = tmp_atom_buf->arity;
-    new_policy_atom->args_bufsize = tmp_atom_buf->args_bufsize;
+        new_policy_atom->arity        = tmp_atom_buf->arity;
+        new_policy_atom->args_bufsize = tmp_atom_buf->args_bufsize;
+
+        nexus_uuid_copy(&tmp_atom_buf->attr_uuid, &new_policy_atom->attr_uuid);
+        memcpy(new_policy_atom->predicate, tmp_atom_buf->predicate, SYSTEM_FUNC_MAX_LENGTH);
+    }
+
+    // set the output_ptr to the start of the buffer
+    *output_ptr = tmp_atom_buf->args_buffer;
 
     // parse the args buffer
     {
-        uint8_t             * buffer    = tmp_atom_buf->args_buffer;
+        uint8_t             * next_ptr = tmp_atom_buf->args_buffer;
         struct nexus_string * nexus_str = NULL;
 
         for (size_t i = 0; i < tmp_atom_buf->arity; i++) {
-            nexus_str = nexus_string_from_buf(buffer, buflen, output_ptr);
+            nexus_str = nexus_string_from_buf(next_ptr, buflen, output_ptr);
             nexus_list_append(&new_policy_atom->args_list, nexus_str);
-            buffer = *output_ptr;
+
+            next_ptr = *output_ptr;
         }
+    }
+
+    if (*output_ptr != (buffer + total_size)) {
+        log_error("output_ptr is not at the end of read buffer\n");
+        policy_atom_free(new_policy_atom);
+        return NULL;
     }
 
     return new_policy_atom;
@@ -453,14 +470,12 @@ policy_rule_to_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen)
         nexus_uuid_copy(&rule->rule_uuid, &header->rule_uuid);
     }
 
-    buffer += total_size;
-    buflen -= total_size;
+    buffer += sizeof(struct __policy_rule_hdr);
+    buflen -= sizeof(struct __policy_rule_hdr);
 
     // serialize the atoms
     {
         struct nexus_list_iterator * iter = list_iterator_new(&rule->atoms);
-
-        size_t atom_bufsize = 0;
 
         while (1) {
             struct policy_atom * atom = list_iterator_get(iter);
@@ -477,10 +492,7 @@ policy_rule_to_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen)
                 return NULL;
             }
 
-            atom_bufsize = policy_atom_buf_size(atom);
-
-            buflen -= atom_bufsize;
-            total_size += atom_bufsize;
+            buflen -= policy_atom_buf_size(atom);
 
             list_iterator_next(iter);
         }

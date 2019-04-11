@@ -146,9 +146,9 @@ abac_runtime_create(struct abac_superinfo * dst_abac_superinfo)
     nexus_uuid_gen(policy_store_uuid);
     nexus_uuid_gen(attribute_store_uuid);
 
-    // TODO write the policy store
+    // create the attribute store metadata
     {
-        tmp_metadata = nexus_metadata_create(attribute_store_uuid, NEXUS_POLICY_STORE);
+        tmp_metadata = nexus_metadata_create(attribute_store_uuid, NEXUS_ATTRIBUTE_STORE);
         if (tmp_metadata == NULL) {
             log_error("nexus_metadata_create() FAILED\n");
             goto out_err;
@@ -163,9 +163,9 @@ abac_runtime_create(struct abac_superinfo * dst_abac_superinfo)
         nexus_metadata_free(tmp_metadata);
     }
 
-    // create the attribute store metadata
+    // create the policy store
     {
-        tmp_metadata = nexus_metadata_create(attribute_store_uuid, NEXUS_ATTRIBUTE_STORE);
+        tmp_metadata = nexus_metadata_create(policy_store_uuid, NEXUS_POLICY_STORE);
         if (tmp_metadata == NULL) {
             log_error("nexus_metadata_create() FAILED\n");
             goto out_err;
@@ -196,7 +196,7 @@ attribute_type_from_str(char * attribute_type_str)
 {
     if (strncmp("user", attribute_type_str, 5) == 0) {
         return USER_ATTRIBUTE_TYPE;
-    } else if (strncmp("object", attribute_type_str, 5) == 0) {
+    } else if (strncmp("object", attribute_type_str, 6) == 0) {
         return OBJECT_ATTRIBUTE_TYPE;
     }
 
