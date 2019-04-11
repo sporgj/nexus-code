@@ -99,7 +99,9 @@ sgx_backend_abac_user_revoke(char * username, char * attribute_name, struct nexu
     struct sgx_backend * backend = __sgx_backend_from_volume(volume);
 
     int ret = -1;
-    int err = ecall_abac_user_attribute_revoke(backend->enclave_id, &ret, username, attribute_name);
+    int err = -1;
+
+    err = ecall_abac_user_attribute_revoke(backend->enclave_id, &ret, username, attribute_name);
 
     if (err || ret) {
         log_error("ecall_abac_user_attribute_revoke() FAILED. err=%x, ret=%d\n", err, ret);
@@ -239,23 +241,91 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
 
 
 int
-sgx_backend_abac_policy_add(char * policy_string, struct nexus_volume * volume)
+sgx_backend_abac_policy_add(char                * policy_string,
+                            struct nexus_uuid   * uuid,
+                            struct nexus_volume * volume)
 {
     struct sgx_backend * backend = __sgx_backend_from_volume(volume);
 
-    struct nexus_uuid uuid;
-
     int ret = -1;
-    int err = -1;
-
-    err = ecall_abac_policy_add(backend->enclave_id, &ret, policy_string, &uuid);
+    int err = ecall_abac_policy_add(backend->enclave_id, &ret, policy_string, uuid);
 
     if (err || ret) {
         log_error("ecall_abac_policy_add() FAILED\n");
         return -1;
     }
 
-    printf("\n");
+    return 0;
+}
+
+
+int
+sgx_backend_abac_policy_del(struct nexus_uuid * uuid, struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_policy_del(backend->enclave_id, &ret, uuid);
+
+    if (err || ret) {
+        log_error("ecall_abac_policy_del() FAILED\n");
+        return -1;
+    }
 
     return 0;
+}
+
+
+static void
+__print_policy_buffer(struct nxs_policy_rule * rules_buffer, size_t result_count)
+{
+    for (size_t i = 0; i < result_count; i++) {
+        printf("%s\n", rules_buffer->rule_str);
+
+        rules_buffer
+            = (struct nxs_policy_rule *)(((uint8_t *)rules_buffer) + rules_buffer->total_len);
+    }
+}
+
+int
+sgx_backend_abac_policy_ls(struct nexus_volume * volume)
+{
+    static size_t buf_capacity = 4096;
+
+    struct sgx_backend     * backend      = __sgx_backend_from_volume(volume);
+    struct nxs_policy_rule * rules_buffer = NULL;
+
+    size_t offset       = 0;
+    size_t total_count  = 0;
+    size_t result_count = 0;
+
+
+    rules_buffer = nexus_malloc(buf_capacity);
+
+    do {
+        int ret = -1;
+        int err = ecall_abac_policy_ls(backend->enclave_id,
+                                       &ret,
+                                       rules_buffer,
+                                       buf_capacity,
+                                       offset,
+                                       &total_count,
+                                       &result_count);
+
+        if (err || ret) {
+            log_error("ecall_abac_policy_del() FAILED\n");
+            goto out_err;
+        }
+
+        __print_policy_buffer(rules_buffer, result_count);
+
+        offset += result_count;
+    } while (offset < total_count);
+
+    nexus_free(rules_buffer);
+
+    return 0;
+out_err:
+    nexus_free(rules_buffer);
+    return -1;
 }

@@ -83,5 +83,19 @@ enclave {
             [in, string] char              * policy_string_IN,
             [user_check] struct nexus_uuid * uuid_out
         );
+
+        public int ecall_abac_policy_del
+        (
+            [in] struct nexus_uuid         * rule_uuid_IN
+        );
+
+        public int ecall_abac_policy_ls
+        (
+            [user_check] struct nxs_policy_rule    * rules_buffer_out,
+                         size_t                      rules_buffer_capacity,
+                         size_t                      offset,
+            [user_check] size_t                    * total_count_out,
+            [user_check] size_t                    * result_count_out
+        );
     };
 };

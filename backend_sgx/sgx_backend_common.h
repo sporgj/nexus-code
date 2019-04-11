@@ -78,3 +78,10 @@ struct nxs_attribute_pair {
     char    term_str[NXS_ATTRIBUTE_NAME_MAX];
     char    val_str[NXS_ATTRIBUTE_VALUE_MAX];
 };
+
+
+struct nxs_policy_rule {
+    size_t            total_len;
+    struct nexus_uuid rule_uuid;
+    char              rule_str[0];
+};
