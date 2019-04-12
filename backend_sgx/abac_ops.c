@@ -280,7 +280,12 @@ static void
 __print_policy_buffer(struct nxs_policy_rule * rules_buffer, size_t result_count)
 {
     for (size_t i = 0; i < result_count; i++) {
-        printf("%s\n", rules_buffer->rule_str);
+        char * uuid_str = nexus_uuid_to_hex(&rules_buffer->rule_uuid);
+
+        printf("[%s]\n", uuid_str);
+        printf("%s\n\n", rules_buffer->rule_str);
+
+        nexus_free(uuid_str);
 
         rules_buffer
             = (struct nxs_policy_rule *)(((uint8_t *)rules_buffer) + rules_buffer->total_len);
@@ -313,7 +318,7 @@ sgx_backend_abac_policy_ls(struct nexus_volume * volume)
                                        &result_count);
 
         if (err || ret) {
-            log_error("ecall_abac_policy_del() FAILED\n");
+            log_error("ecall_abac_policy_ls() FAILED\n");
             goto out_err;
         }
 

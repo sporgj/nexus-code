@@ -697,6 +697,34 @@ handle_abac_object_ls(int argc, char ** argv)
 }
 
 static int
+handle_abac_policy_del(int argc, char ** argv)
+{
+    struct nexus_uuid uuid;
+
+    if (argc < 1) {
+        usage("abac_policy_del");
+        return -1;
+    }
+
+    char * policy_uuid_str = strndup(argv[0], 32);
+
+    if (nexus_uuid_from_hex(&uuid, policy_uuid_str)) {
+        log_error("nexus_uuid_from_hex() FAILED\n");
+        return -1;
+    }
+
+    if (sgx_backend_abac_policy_del(&uuid, mounted_volume)) {
+        nexus_free(policy_uuid_str);
+        log_error("sgx_backend_abac_policy_del() FAILED\n");
+        return -1;
+    }
+
+    nexus_free(policy_uuid_str);
+
+    return 0;
+}
+
+static int
 handle_abac_policy_add(int argc, char ** argv)
 {
     struct nexus_uuid uuid;
@@ -751,10 +779,6 @@ split_string_to_my_argv(char * parm_chars)
     my_argc = 0;
 
 
-    for (; (parm_chars[index] == ' ' && index < len); index++) {
-
-    }
-
     my_argv[0] = (parm_chars + index);
 
 
@@ -778,10 +802,10 @@ split_string_to_my_argv(char * parm_chars)
             if (parm_chars[index] == ' ') {
                 parm_chars[index++] = '\0';
 
-                while (parm_chars[index] == ' ') {
+                while (parm_chars[index + 1] == ' ') {
                     index += 1;
                 }
-            } else if (isalpha(parm_chars[index])) {
+            } else if (isprint(parm_chars[index])) {
                 my_argv[pos++] = (parm_chars + index);
 
                 while (parm_chars[index] != ' ') {
@@ -886,6 +910,7 @@ static struct _cmd cmds[]
         { "abac_object_ls", handle_abac_object_ls, "List an object's attributes", "<path>" },
 
         { "abac_policy_add", handle_abac_policy_add, "Add a policy", "'<policy_string>'" },
+        { "abac_policy_del", handle_abac_policy_del, "Delete a policy", "<policy_uuid>" },
         { "abac_policy_ls", handle_abac_policy_ls, "List volume policies", "" },
 
         { "help", help, "Prints usage", "" },
