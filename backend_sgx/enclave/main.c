@@ -12,6 +12,8 @@ struct nexus_heap   * global_heap               = NULL;
 
 nexus_uid_t           global_user_id            = NEXUS_INVALID_USER_ID;
 
+struct nexus_user   * global_user_struct        = NULL;
+
 sgx_spinlock_t        vfs_ops_lock              = SGX_SPINLOCK_INITIALIZER;
 
 
@@ -62,15 +64,14 @@ nexus_enclave_is_current_user_owner()
 int
 nexus_verfiy_pubkey(pubkey_hash_t * user_pubkey_hash)
 {
-    struct nexus_user * user = NULL;
+    global_user_struct
+        = nexus_usertable_find_pubkey_hash(global_supernode->usertable, user_pubkey_hash);
 
-    user = nexus_usertable_find_pubkey_hash(global_supernode->usertable, user_pubkey_hash);
-
-    if (user == NULL) {
+    if (global_user_struct == NULL) {
         return -1;
     }
 
-    global_user_id = user->user_id;
+    global_user_id = global_user_struct->user_id;
 
     return 0;
 }

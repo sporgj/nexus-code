@@ -80,6 +80,8 @@ extern struct nexus_heap           * global_heap;
 
 extern nexus_uid_t                   global_user_id;
 
+extern struct nexus_user           * global_user_struct;
+
 
 extern size_t                        global_chunk_size;
 extern size_t                        global_log2chunk_size;
