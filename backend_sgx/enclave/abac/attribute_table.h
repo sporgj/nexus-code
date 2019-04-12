@@ -49,6 +49,9 @@ attribute_table_add(struct attribute_table * attribute_table, struct nexus_uuid 
 int
 attribute_table_del(struct attribute_table * attribute_table, struct nexus_uuid * uuid);
 
+const char *
+attribute_table_find(struct attribute_table * attribute_table, struct nexus_uuid * uuid);
+
 
 // writes all the attribute pairs stored in the table
 int

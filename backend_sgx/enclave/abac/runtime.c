@@ -333,3 +333,17 @@ abac_global_put_usertable(struct nexus_usertable * usertable)
 
     nexus_vfs_release_supernode();
 }
+
+
+struct nexus_usertable *
+abac_global_get_current_usertable(nexus_io_flags_t flags)
+{
+    // TODO
+    return NULL;
+}
+
+void
+abac_global_put_current_usertable()
+{
+    // TODO
+}

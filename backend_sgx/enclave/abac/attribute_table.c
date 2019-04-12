@@ -78,6 +78,18 @@ __get_attr_entry(struct attribute_table * attribute_table, struct nexus_uuid * u
     return (struct attribute_entry *)hashmap_get(&attribute_table->attribute_map, &tmp_entry, NULL);
 }
 
+const char *
+attribute_table_find(struct attribute_table * attribute_table, struct nexus_uuid * uuid)
+{
+    struct attribute_entry * entry = __get_attr_entry(attribute_table, uuid);
+
+    if (entry == NULL) {
+        return NULL;
+    }
+
+    return entry->attr_val;
+}
+
 int
 attribute_table_add(struct attribute_table * attribute_table,
                     struct nexus_uuid      * uuid,

@@ -413,3 +413,41 @@ out_err:
 
     return -1;
 }
+
+
+struct nexus_list *
+policy_store_select_rules(struct policy_store * policy_store, perm_type_t permission)
+{
+    struct nexus_list          * filtered_list  = NULL;
+    struct nexus_list_iterator * iter_all_rules = NULL;
+
+    size_t count = 0;
+
+    if (policy_store->rules_count == 0) {
+        return NULL;
+    }
+
+
+    filtered_list = nexus_malloc(sizeof(struct nexus_list));
+    nexus_list_init(filtered_list);
+
+    iter_all_rules = list_iterator_new(&policy_store->rules_list);
+
+    do {
+        struct policy_rule * rule = list_iterator_get(iter_all_rules);
+
+        if (rule->perm_type == permission) {
+            nexus_list_append(filtered_list, rule);
+            count += 1;
+        }
+
+        list_iterator_next(iter_all_rules);
+    } while(list_iterator_is_valid(iter_all_rules));
+
+    if (count == 0) {
+        nexus_free(filtered_list);
+        return NULL;
+    }
+
+    return filtered_list;
+}

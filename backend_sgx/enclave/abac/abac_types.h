@@ -8,7 +8,7 @@
 
 #define NEXUS_POLICY_MAXLEN     (256)
 
-#define SYSTEM_FUNC_MAX_LENGTH  (32)
+#define SYSTEM_FUNC_MAX_LENGTH  (ATTRIBUTE_NAME_MAX)
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({                      \
@@ -70,3 +70,10 @@ struct policy_rule {
 
     struct nexus_list       atoms;
 };
+
+
+/// system function are built-in operations on users and objects that return strings
+typedef enum {
+    USER_FUNCTION = 1,
+    OBJECT_FUNCTION
+} sys_func_type_t;
