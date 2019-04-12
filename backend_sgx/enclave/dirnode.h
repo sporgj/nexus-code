@@ -77,8 +77,6 @@ struct nexus_dirnode {
 
     char                  * last_failed_lookup; // TODO could be made into a list
 
-    struct nexus_acl        dir_acl;
-
     struct nexus_list       symlink_list;
 
     // the list of all dir_entries in the dirnode

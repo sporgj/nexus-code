@@ -47,7 +47,6 @@ __get_bucket0_size(struct nexus_dirnode * dirnode)
 
     return sizeof(struct __dirnode_hdr)
            + dirnode->symlink_buflen
-           + nexus_acl_size(&dirnode->dir_acl)
            + (sizeof(struct __bucket_rec) * dirnode->bucket_count)
            + attribute_table_get_size(dirnode->attribute_table)
            + bucket0->size_bytes;
@@ -116,17 +115,6 @@ __parse_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t 
     dirnode->bucket_count     = header->bucket_count;
 
     return buffer + sizeof(struct __dirnode_hdr);
-}
-
-static uint8_t *
-__parse_acls(struct nexus_dirnode * dirnode, uint8_t * input_ptr, size_t bytes_left)
-{
-    if (__nexus_acl_from_buffer(&dirnode->dir_acl, input_ptr, bytes_left)) {
-        log_error("__nexus_acl_from_buffer() FAILED\n");
-        return NULL;
-    }
-
-    return (input_ptr + nexus_acl_size(&dirnode->dir_acl));
 }
 
 static uint8_t *
@@ -241,14 +229,6 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen, nexus_io_flags_t flags)
     dirnode_init(dirnode);
 
     /* parse the main bucket info first */
-    input_ptr = __parse_acls(dirnode, input_ptr, buflen);
-
-    if (input_ptr == NULL) {
-        log_error("could not parse symlinks\n");
-        goto out_err;
-    }
-
-
     input_ptr = __parse_symlinks(dirnode, input_ptr);
 
     if (input_ptr == NULL) {
@@ -356,17 +336,6 @@ __serialize_dirnode_header(struct nexus_dirnode * dirnode, uint8_t * buffer)
     header->bucket_count     = dirnode->bucket_count;
 
     return buffer + sizeof(struct __dirnode_hdr);
-}
-
-static inline uint8_t *
-__serialize_acls(struct nexus_dirnode * dirnode, uint8_t * output_ptr)
-{
-    if (nexus_acl_to_buffer(&dirnode->dir_acl, output_ptr)) {
-        log_error("nexus_acl_to_buffer() FAILED\n");
-        return NULL;
-    }
-
-    return output_ptr + nexus_acl_size(&dirnode->dir_acl);
 }
 
 
@@ -516,14 +485,6 @@ dirnode_serialize(struct nexus_dirnode * dirnode, uint8_t * buffer, size_t bufle
 
     if (output_ptr == NULL) {
         log_error("serializing dirnode header FAILED\n");
-        return -1;
-    }
-
-
-    output_ptr = __serialize_acls(dirnode, output_ptr);
-
-    if (output_ptr == NULL) {
-        log_error("could not serialize acls\n");
         return -1;
     }
 
@@ -783,8 +744,6 @@ dirnode_init(struct nexus_dirnode * dirnode)
     nexus_list_set_deallocator(&dirnode->symlink_list, __free_symlink_entry);
 
     INIT_LIST_HEAD(&dirnode->dirents_list);
-
-    nexus_acl_init(&dirnode->dir_acl);
 }
 
 
@@ -833,9 +792,6 @@ dirnode_free(struct nexus_dirnode * dirnode)
 
     nexus_list_destroy(&dirnode->bucket_list);
 
-    nexus_acl_free(&dirnode->dir_acl);
-
-
     __clear_last_failed_lookup(dirnode);
 
     memset(dirnode, 0, sizeof(struct nexus_dirnode));
@@ -878,11 +834,6 @@ dirnode_add(struct nexus_dirnode * dirnode,
             struct nexus_uuid    * entry_uuid)
 {
     struct dir_entry * new_dir_entry = NULL;
-
-    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_CREATE)) {
-        log_error("not authorized to create files\n");
-        return -1;
-    }
 
     // check for existing entry.
     // XXX: typical filesystems perform a lookup to check if the file exists before
@@ -972,12 +923,6 @@ dirnode_find_by_uuid(struct nexus_dirnode * dirnode,
 
     struct dir_entry * dir_entry = NULL;
 
-    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_LOOKUP)) {
-        log_error("not authorized to lookup files\n");
-        return -1;
-    }
-
-
     dir_entry = __find_by_uuid(dirnode, uuid);
 
     if (dir_entry == NULL) {
@@ -1000,11 +945,6 @@ dirnode_find_by_name(struct nexus_dirnode * dirnode,
                      struct nexus_uuid    * link_uuid)
 {
     struct dir_entry * dir_entry = NULL;
-
-    if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_LOOKUP)) {
-        log_error("not authorized to lookup files\n");
-        return -1;
-    }
 
     dir_entry = __find_by_name(dirnode, filename);
 
@@ -1100,20 +1040,6 @@ dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
 struct dir_entry *
 __dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexus_io_flags_t flags)
 {
-    struct dir_entry * dir_entry = NULL;
-
-    if (flags & NEXUS_FDELETE) {
-        if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_DELETE)) {
-            log_error("not authorized to delete files\n");
-            return NULL;
-        }
-    } else if (flags & NEXUS_FCREATE) {
-        if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_CREATE)) {
-            log_error("not authorized to create files\n");
-            return NULL;
-        }
-    }
-
     return __find_by_name(dirnode, filename);
 }
 
