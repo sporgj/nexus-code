@@ -306,7 +306,7 @@ hex2bin(const uint8_t * in, size_t len, unsigned char * out)
     while (in < end) {
         *(out++) = LOOKUP[*in] << 4 | LOOKUP[*(in + 1)];
 
-        in += 1;
+        in += 2;
     }
 }
 
