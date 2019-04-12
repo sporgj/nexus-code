@@ -268,7 +268,7 @@ access_check(struct nexus_metadata * metadata, perm_type_t permission)
         goto out_exit;
     }
 
-    access_req->user_profile = abac_global_get_current_usertable(NEXUS_FREAD);
+    access_req->user_profile = abac_acquire_current_user_profile(NEXUS_FREAD);
     if (access_req->user_profile == NULL) {
         abac_release_policy_store();
         abac_release_attribute_store();
@@ -291,7 +291,7 @@ access_check(struct nexus_metadata * metadata, perm_type_t permission)
 
     abac_release_policy_store();
     abac_release_attribute_store();
-    abac_global_put_current_usertable();
+    abac_release_current_user_profile();
 
     __free_access_request(access_req);
 
@@ -300,7 +300,7 @@ access_check(struct nexus_metadata * metadata, perm_type_t permission)
 out_err:
     abac_release_policy_store();
     abac_release_attribute_store();
-    abac_global_put_current_usertable();
+    abac_release_current_user_profile();
 
 out_exit:
     __free_access_request(access_req);

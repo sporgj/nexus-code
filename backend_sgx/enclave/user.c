@@ -14,6 +14,7 @@ struct __user {
 
 struct __table_hdr {
     struct nexus_uuid my_uuid;
+    struct nexus_uuid root_uuid;
 
     uint64_t          total_size;
     uint64_t          user_count;
@@ -32,25 +33,19 @@ free_user(void * element)
     nexus_free(user);
 }
 
-void
-__usertable_set_supernode(struct nexus_usertable * usertable, struct nexus_supernode * supernode)
-{
-    usertable->supernode = supernode;
-}
-
 static void
 __usertable_set_clean(struct nexus_usertable * usertable)
 {
-    usertable->is_dirty = false;
+    if (usertable->metadata) {
+        __metadata_set_clean(usertable->metadata);
+    }
 }
 
 static void
 __usertable_set_dirty(struct nexus_usertable * usertable)
 {
-    usertable->is_dirty = true;
-
-    if (usertable->supernode) {
-        __supernode_set_dirty(usertable->supernode);
+    if (usertable->metadata) {
+        __metadata_set_dirty(usertable->metadata);
     }
 }
 
@@ -68,29 +63,26 @@ nexus_usertable_buflen(struct nexus_usertable * usertable)
 }
 
 void
-nexus_usertable_copy_uuid(struct nexus_usertable * usertable, struct nexus_uuid * dest_uuid)
+nexus_usertable_set_owner_pubkey(struct nexus_usertable * usertable, char * user_pubkey)
 {
-    nexus_uuid_copy(&usertable->my_uuid, dest_uuid);
-}
-
-struct nexus_usertable *
-nexus_usertable_create(char * user_pubkey)
-{
-    struct nexus_usertable * usertable = nexus_malloc(sizeof(struct nexus_usertable));
-
-    nexus_uuid_gen(&usertable->my_uuid);
-
-
     // initialize the owner
     usertable->owner.user_id = NEXUS_ROOT_USER;
     nexus_hash_generate(&usertable->owner.pubkey_hash, user_pubkey, strlen(user_pubkey));
+}
 
+
+struct nexus_usertable *
+nexus_usertable_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
+{
+    struct nexus_usertable * usertable = nexus_malloc(sizeof(struct nexus_usertable));
+
+    nexus_uuid_copy(root_uuid, &usertable->root_uuid);
+    nexus_uuid_copy(uuid, &usertable->my_uuid);
 
     init_userlist(usertable);
 
     return usertable;
 }
-
 
 void
 nexus_usertable_free(struct nexus_usertable * usertable)
@@ -160,6 +152,7 @@ __parse_usertable_header(struct nexus_usertable * usertable, uint8_t * buffer, s
     usertable->total_size     = header->total_size;
 
     nexus_uuid_copy(&header->my_uuid, &usertable->my_uuid);
+    nexus_uuid_copy(&header->root_uuid, &usertable->root_uuid);
 
     nexus_hash_copy(&header->pubkey_hash, &usertable->owner.pubkey_hash);
 
@@ -192,6 +185,29 @@ __parse_usertable(struct nexus_usertable * usertable, uint8_t * buffer, size_t b
 }
 
 struct nexus_usertable *
+nexus_usertable_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
+{
+    struct nexus_usertable * usertable = nexus_malloc(sizeof(struct nexus_usertable));
+
+    size_t    buflen = 0;
+    uint8_t * buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, &usertable->mac);
+
+    if (buffer == NULL) {
+        nexus_free(usertable);
+        log_error("nexus_crypto_buf_get() FAILED\n");
+        return NULL;
+    }
+
+    if (__parse_usertable(usertable, buffer, buflen)) {
+        nexus_free(usertable);
+        log_error("parsing header FAILED\n");
+        return NULL;
+    }
+
+    return usertable;
+}
+
+struct nexus_usertable *
 nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_mac * mac)
 {
     struct nexus_usertable  * usertable     = NULL;
@@ -199,7 +215,6 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
     uint8_t * buffer = NULL;
-    size_t    buflen = 0;
 
     int ret = -1;
 
@@ -211,33 +226,9 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
         return NULL;
     }
 
-    buffer = nexus_crypto_buf_get(crypto_buffer, &buflen, mac);
-
-    if (buffer == NULL) {
-        nexus_crypto_buf_free(crypto_buffer);
-
-        log_error("nexus_crypto_buf_get() FAILED\n");
-        return NULL;
-    }
-
-
-    usertable = nexus_malloc(sizeof(struct nexus_usertable));
-
-    ret = __parse_usertable(usertable, buffer, buflen);
+    usertable = nexus_usertable_from_crypto_buf(crypto_buffer);
 
     nexus_crypto_buf_free(crypto_buffer);
-
-    if (ret != 0) {
-        nexus_free(usertable);
-
-        log_error("parsing header FAILED\n");
-
-        return NULL;
-    }
-
-    usertable->version = nexus_crypto_buf_version(crypto_buffer);
-
-    usertable->on_disk = true;
 
     return usertable;
 }
@@ -254,6 +245,7 @@ __serialize_usertable_header(struct nexus_usertable * usertable, uint8_t * buffe
     header->total_size     = usertable->total_size;
 
     nexus_uuid_copy(&usertable->my_uuid, &header->my_uuid);
+    nexus_uuid_copy(&usertable->root_uuid, &header->root_uuid);
 
     nexus_hash_copy(&usertable->owner.pubkey_hash, &header->pubkey_hash);
 
@@ -290,7 +282,7 @@ __serialize_usertable(struct nexus_usertable * usertable, uint8_t * buffer)
 }
 
 int
-nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac)
+nexus_usertable_store(struct nexus_usertable * usertable, uint32_t version, struct nexus_mac * mac)
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -298,15 +290,8 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
 
     size_t                    buffer_size   = nexus_usertable_buflen(usertable);
 
-    nexus_io_flags_t flags = (usertable->on_disk ? NEXUS_FRDWR : NEXUS_FCREATE);
 
-    if (buffer_layer_lock(&usertable->my_uuid, flags)) {
-        log_error("could not lock usertable metadata\n");
-        return -1;
-    }
-
-
-    crypto_buffer = nexus_crypto_buf_new(buffer_size, usertable->version, &usertable->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(buffer_size, version, &usertable->my_uuid);
 
     if (crypto_buffer == NULL) {
         log_error("could not initialize crypto buffer\n");
@@ -327,15 +312,14 @@ nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac
         goto out_err;
     }
 
-    if (nexus_crypto_buf_put(crypto_buffer, mac)) {
+    if (nexus_crypto_buf_put(crypto_buffer, &usertable->mac)) {
         log_error("nexus_crypto_buf_put FAILED\n");
         goto out_err;
     }
 
-    usertable->version += 1;
-    usertable->on_disk = true;
-
-    __usertable_set_clean(usertable);
+    if (mac) {
+        nexus_mac_copy(mac, &usertable->mac);
+    }
 
     nexus_crypto_buf_free(crypto_buffer);
 

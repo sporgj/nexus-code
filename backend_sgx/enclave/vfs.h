@@ -78,6 +78,16 @@ nexus_vfs_flush_hardlink_table();
 void
 nexus_vfs_release_hardlink_table();
 
+
+struct nexus_usertable *
+nexus_vfs_acquire_user_table(nexus_io_flags_t flags);
+
+int
+nexus_vfs_flush_user_table();
+
+void
+nexus_vfs_release_user_table();
+
 /**
  * Loads a metadata object from the buffer layer
  * @param metadata_uuid

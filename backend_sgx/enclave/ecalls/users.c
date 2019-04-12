@@ -10,23 +10,23 @@ UNSAFE_export_user_buffer(struct nexus_user * user, struct nxs_user_buffer * use
 int
 ecall_user_add(char * username_IN, char * user_pubkey_IN)
 {
-    struct nexus_supernode * global_supernode = NULL;
+    struct nexus_usertable * global_usertable = NULL;
 
     struct nexus_user * new_user = NULL;
 
     if (!nexus_enclave_is_current_user_owner()) {
-        log_error("you do not sufficient permissions\n");
+        log_error("you do not have sufficient permissions\n");
         return -1;
     }
 
-    global_supernode = nexus_vfs_acquire_supernode(NEXUS_FRDWR);
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FRDWR);
 
-    if (global_supernode == NULL) {
+    if (global_usertable == NULL) {
         log_error("could not acquire global supernode\n");
         return -1;
     }
 
-    new_user = __nexus_usertable_add(global_supernode->usertable, username_IN, user_pubkey_IN);
+    new_user = __nexus_usertable_add(global_usertable, username_IN, user_pubkey_IN);
     if (new_user == NULL) {
         log_error("could not add public key to the user table\n");
         goto out;
@@ -37,16 +37,16 @@ ecall_user_add(char * username_IN, char * user_pubkey_IN)
         goto out;
     }
 
-    if (nexus_metadata_store(global_supernode_metadata)) {
-        log_error("could not store supernode\n");
+    if (nexus_vfs_flush_user_table()) {
+        log_error("could not store usertable\n");
         goto out;
     }
 
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return 0;
 out:
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return -1;
 }
@@ -54,7 +54,7 @@ out:
 int
 ecall_user_remove_username(char * username_IN)
 {
-    struct nexus_supernode * global_supernode = NULL;
+    struct nexus_usertable * global_usertable = NULL;
 
     struct nexus_uuid user_uuid;
 
@@ -63,20 +63,20 @@ ecall_user_remove_username(char * username_IN)
         return -1;
     }
 
-    global_supernode = nexus_vfs_acquire_supernode(NEXUS_FRDWR);
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FRDWR);
 
-    if (global_supernode == NULL) {
+    if (global_usertable == NULL) {
         log_error("could not acquire global supernode\n");
         return -1;
     }
 
-    if (nexus_usertable_remove_username(global_supernode->usertable, username_IN, &user_uuid)) {
+    if (nexus_usertable_remove_username(global_usertable, username_IN, &user_uuid)) {
         log_error("could not remove username from table\n");
         return -1;
     }
 
-    if (nexus_metadata_store(global_supernode_metadata)) {
-        log_error("could not store supernode\n");
+    if (nexus_vfs_flush_user_table()) {
+        log_error("could not store usertable\n");
         goto err;
     }
 
@@ -85,11 +85,11 @@ ecall_user_remove_username(char * username_IN)
         goto err;
     }
 
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return 0;
 err:
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return -1;
 }
@@ -97,7 +97,7 @@ err:
 int
 ecall_user_remove_pubkey(char * pubkey_str_IN)
 {
-    struct nexus_supernode * global_supernode = NULL;
+    struct nexus_usertable * global_usertable = NULL;
 
     struct nexus_uuid user_uuid;
 
@@ -106,20 +106,20 @@ ecall_user_remove_pubkey(char * pubkey_str_IN)
         return -1;
     }
 
-    global_supernode = nexus_vfs_acquire_supernode(NEXUS_FRDWR);
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FRDWR);
 
-    if (global_supernode == NULL) {
+    if (global_usertable == NULL) {
         log_error("could not acquire global supernode\n");
         return -1;
     }
 
-    if (nexus_usertable_remove_pubkey(global_supernode->usertable, pubkey_str_IN, &user_uuid)) {
+    if (nexus_usertable_remove_pubkey(global_usertable, pubkey_str_IN, &user_uuid)) {
         log_error("could remove pubkey from usertable\n");
         goto err;
     }
 
-    if (nexus_metadata_store(global_supernode_metadata)) {
-        log_error("could not store supernode\n");
+    if (nexus_vfs_flush_user_table()) {
+        log_error("could not store usertable\n");
         goto err;
     }
 
@@ -128,11 +128,11 @@ ecall_user_remove_pubkey(char * pubkey_str_IN)
         goto err;
     }
 
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return 0;
 err:
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return -1;
 }
@@ -141,7 +141,7 @@ err:
 int
 ecall_user_find_username(char * username_IN, struct nxs_user_buffer * user_buffer_out)
 {
-    struct nexus_supernode * global_supernode = NULL;
+    struct nexus_usertable * global_usertable = NULL;
 
     struct nexus_user      * user             = NULL;
 
@@ -152,15 +152,15 @@ ecall_user_find_username(char * username_IN, struct nxs_user_buffer * user_buffe
     }
 
 
-    global_supernode = nexus_vfs_acquire_supernode(NEXUS_FREAD);
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FREAD);
 
-    if (global_supernode == NULL) {
+    if (global_usertable == NULL) {
         log_error("could not acquire global supernode\n");
         return -1;
     }
 
 
-    user = nexus_usertable_find_name(global_supernode->usertable, username_IN);
+    user = nexus_usertable_find_name(global_usertable, username_IN);
 
     if (user == NULL) {
         log_error("find username in usertable\n");
@@ -170,11 +170,11 @@ ecall_user_find_username(char * username_IN, struct nxs_user_buffer * user_buffe
 
     UNSAFE_export_user_buffer(user, user_buffer_out);
 
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return 0;
 err:
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return -1;
 }
@@ -182,7 +182,7 @@ err:
 int
 ecall_user_find_pubkey(char * pubkey_IN, struct nxs_user_buffer * user_buffer_out)
 {
-    struct nexus_supernode * global_supernode = NULL;
+    struct nexus_usertable * global_usertable = NULL;
 
     struct nexus_user      * user             = NULL;
 
@@ -193,15 +193,15 @@ ecall_user_find_pubkey(char * pubkey_IN, struct nxs_user_buffer * user_buffer_ou
     }
 
 
-    global_supernode = nexus_vfs_acquire_supernode(NEXUS_FREAD);
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FREAD);
 
-    if (global_supernode == NULL) {
+    if (global_usertable == NULL) {
         log_error("could not acquire global supernode\n");
         return -1;
     }
 
 
-    user = nexus_usertable_find_pubkey(global_supernode->usertable, pubkey_IN);
+    user = nexus_usertable_find_pubkey(global_usertable, pubkey_IN);
 
     if (user == NULL) {
         log_error("find pubkey in usertable\n");
@@ -211,11 +211,11 @@ ecall_user_find_pubkey(char * pubkey_IN, struct nxs_user_buffer * user_buffer_ou
 
     UNSAFE_export_user_buffer(user, user_buffer_out);
 
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return 0;
 err:
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return -1;
 }
@@ -269,7 +269,7 @@ ecall_user_ls(struct nxs_user_buffer   * user_buffer_array_in,
               size_t                   * total_count_out,
               size_t                   * result_count_out)
 {
-    struct nexus_supernode * global_supernode = NULL;
+    struct nexus_usertable * global_usertable = NULL;
 
     int                      ret              = -1;
 
@@ -280,14 +280,14 @@ ecall_user_ls(struct nxs_user_buffer   * user_buffer_array_in,
     }
 
 
-    global_supernode = nexus_vfs_acquire_supernode(NEXUS_FREAD);
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FREAD);
 
-    if (global_supernode == NULL) {
+    if (global_usertable == NULL) {
         log_error("could not acquire global supernode\n");
         return -1;
     }
 
-    ret = UNSAFE_dump_user_buffer(global_supernode->usertable,
+    ret = UNSAFE_dump_user_buffer(global_usertable,
                                   user_buffer_array_in,
                                   user_buffer_count_IN,
                                   offset_IN,
@@ -300,11 +300,11 @@ ecall_user_ls(struct nxs_user_buffer   * user_buffer_array_in,
     }
 
 
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return 0;
 err:
-    nexus_vfs_release_supernode();
+    nexus_vfs_release_user_table();
 
     return -1;
 }

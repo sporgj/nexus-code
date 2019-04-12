@@ -21,6 +21,8 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     struct nexus_dirnode   * dirnode   = NULL;
     struct nexus_filenode  * filenode  = NULL;
 
+    struct nexus_usertable * user_table      = NULL;
+
     struct hardlink_table  * hardlink_table  = NULL;
 
     struct attribute_store * attribute_store = NULL;
@@ -35,6 +37,14 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
 
         supernode = object;
         supernode->metadata = metadata;
+        break;
+    case NEXUS_USER_TABLE:
+        if (metadata->user_table) {
+            nexus_usertable_free(metadata->user_table);
+        }
+
+        user_table = object;
+        user_table->metadata = metadata;
         break;
     case NEXUS_DIRNODE:
         if (metadata->dirnode) {
@@ -185,6 +195,9 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     case NEXUS_SUPERNODE:
         supernode_free(metadata->supernode);
         break;
+    case NEXUS_USER_TABLE:
+        nexus_usertable_free(metadata->user_table);
+        break;
     case NEXUS_DIRNODE:
         dirnode_free(metadata->dirnode);
         break;
@@ -294,6 +307,9 @@ __read_object(struct nexus_uuid     * uuid,
         case NEXUS_USER_PROFILE:
             object = user_profile_from_crypto_buf(crypto_buf);
             break;
+        case NEXUS_USER_TABLE:
+            object = nexus_usertable_from_crypto_buf(crypto_buf);
+            break;
         }
     }
 
@@ -400,6 +416,9 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         break;
     case NEXUS_USER_PROFILE:
         ret = user_profile_store(metadata->user_profile, metadata->version, NULL);
+        break;
+    case NEXUS_USER_TABLE:
+        ret = nexus_usertable_store(metadata->user_table, metadata->version, NULL);
         break;
     default:
         log_error("metadata->type UNKNOWN\n");

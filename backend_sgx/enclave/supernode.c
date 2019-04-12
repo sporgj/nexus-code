@@ -5,7 +5,6 @@ struct __supernode_hdr {
     struct nexus_uuid root_uuid;
 
     struct nexus_uuid usertable_uuid;
-    struct nexus_mac  usertable_mac;
 
     struct nexus_uuid hardlink_table_uuid;
 
@@ -44,7 +43,6 @@ __parse_supernode_header(struct nexus_supernode * supernode, uint8_t * buffer, s
     nexus_uuid_copy(&header->root_uuid, &supernode->root_uuid);
 
     nexus_uuid_copy(&header->usertable_uuid, &supernode->usertable_uuid);
-    nexus_mac_copy(&header->usertable_mac, &supernode->usertable_mac);
 
     nexus_uuid_copy(&header->hardlink_table_uuid, &supernode->hardlink_table_uuid);
 
@@ -91,28 +89,6 @@ supernode_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer, nexus_io_flag
         goto err;
     }
 
-
-    // get the usertable
-    {
-        struct nexus_mac usertable_mac;
-
-        supernode->usertable = nexus_usertable_load(&supernode->usertable_uuid,
-                                                    mode,
-                                                    &usertable_mac);
-
-        if (supernode->usertable == NULL) {
-            log_error("could not load usertable\n");
-            goto err;
-        }
-
-        if (nexus_mac_compare(&usertable_mac, &supernode->usertable_mac)) {
-            log_error("the version of the usertable does not match\n");
-            goto err;
-        }
-
-        __usertable_set_supernode(supernode->usertable, supernode);
-    }
-
     return supernode;
 err:
     supernode_free(supernode);
@@ -150,27 +126,12 @@ supernode_load(struct nexus_uuid * uuid, nexus_io_flags_t mode)
 struct nexus_supernode *
 supernode_create(char * user_pubkey)
 {
-    struct nexus_supernode * supernode = NULL;
-
-    struct hardlink_table * hardlink_table = NULL;
-
-    supernode = nexus_malloc(sizeof(struct nexus_supernode));
+    struct nexus_supernode * supernode = nexus_malloc(sizeof(struct nexus_supernode));
 
     nexus_uuid_gen(&supernode->my_uuid);
     nexus_uuid_gen(&supernode->root_uuid);
     nexus_uuid_gen(&supernode->hardlink_table_uuid);
-
-    supernode->usertable = nexus_usertable_create(user_pubkey);
-    if (supernode->usertable == NULL) {
-        nexus_free(supernode);
-
-        log_error("loading usertable failed\n");
-        return NULL;
-    }
-
-    nexus_usertable_copy_uuid(supernode->usertable, &supernode->usertable_uuid);
-
-    __usertable_set_supernode(supernode->usertable, supernode);
+    nexus_uuid_gen(&supernode->usertable_uuid);
 
     supernode_init(supernode);
 
@@ -186,7 +147,6 @@ __serialize_supernode_header(struct nexus_supernode * supernode, uint8_t * buffe
     nexus_uuid_copy(&supernode->root_uuid, &header->root_uuid);
 
     nexus_uuid_copy(&supernode->usertable_uuid, &header->usertable_uuid);
-    nexus_mac_copy(&supernode->usertable_mac, &header->usertable_mac);
 
     nexus_uuid_copy(&supernode->hardlink_table_uuid, &header->hardlink_table_uuid);
 
@@ -204,14 +164,6 @@ supernode_store(struct nexus_supernode * supernode, int version, struct nexus_ma
 
     int ret = -1;
 
-
-    // first write out the usertable
-    ret = nexus_usertable_store(supernode->usertable, &supernode->usertable_mac);
-
-    if (ret != 0) {
-        log_error("writing usertable FAILED\n");
-        return -1;
-    }
 
     serialized_buflen = __supernode_buflen(supernode);
 
@@ -262,6 +214,5 @@ out:
 void
 supernode_free(struct nexus_supernode * supernode)
 {
-    nexus_usertable_free(supernode->usertable);
     nexus_free(supernode);
 }

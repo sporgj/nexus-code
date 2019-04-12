@@ -56,7 +56,6 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         if (hardlink_table_metadata == NULL) {
             log_error("nexus_metadata_create() NULL\n");
             ret = -1;
-            nexus_metadata_free(hardlink_table_metadata);
             goto out;
         }
 
@@ -67,6 +66,29 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
             log_error("nexus_metadata_store() FAILED\n");
             goto out;
         }
+    }
+
+    {
+        struct nexus_usertable * usertable = NULL;
+
+        usertable = nexus_usertable_create(&supernode->root_uuid, &supernode->usertable_uuid);
+
+        nexus_usertable_set_owner_pubkey(usertable, user_pubkey);
+
+        if (buffer_layer_lock(&usertable->my_uuid, NEXUS_FCREATE)) {
+            log_error("could not create usertable file\n");
+            goto out;
+        }
+
+        ret = nexus_usertable_store(usertable, 0, NULL);
+
+        if (ret != 0) {
+            nexus_usertable_free(usertable);
+            log_error("nexus_usertable_store FAILED\n");
+            goto out;
+        }
+
+        nexus_usertable_free(usertable);
     }
 
     if (abac_runtime_create(&supernode->abac_superinfo)) {

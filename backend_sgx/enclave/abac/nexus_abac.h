@@ -48,17 +48,6 @@ int
 abac_del_user_profile(struct nexus_uuid * user_uuid);
 
 
-struct nexus_usertable *
-abac_global_get_current_usertable(nexus_io_flags_t flags);
-
-
-struct nexus_usertable *
-abac_global_get_current_usertable(nexus_io_flags_t flags);
-
-void
-abac_global_put_current_usertable();
-
-
 // parser/lexer
 
 struct policy_rule *

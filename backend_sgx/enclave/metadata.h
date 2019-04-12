@@ -20,6 +20,8 @@ typedef enum {
     NEXUS_FILENODE,
     NEXUS_HARDLINK_TABLE,
 
+    NEXUS_USER_TABLE,
+
     NEXUS_ATTRIBUTE_STORE,
     NEXUS_POLICY_STORE,
     NEXUS_USER_PROFILE,
@@ -49,6 +51,8 @@ struct nexus_metadata {
         struct nexus_filenode    * filenode;
 
         struct hardlink_table    * hardlink_table;
+
+        struct nexus_usertable   * user_table;
 
         struct attribute_store   * attribute_store;
         struct policy_store      * policy_store;

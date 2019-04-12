@@ -16,6 +16,8 @@ static sgx_spinlock_t         traversal_lock             = SGX_SPINLOCK_INITIALI
 
 static struct nexus_metadata  * hardlink_table_metadata  = NULL;
 
+static struct nexus_metadata  * user_table_metadata      = NULL;
+
 
 void
 __lru_shrinker(uintptr_t element, uintptr_t key)
@@ -226,8 +228,6 @@ nexus_vfs_acquire_hardlink_table(nexus_io_flags_t flags)
 
     bool has_changed;
 
-    int ret = -1;
-
 
     if (hardlink_table_metadata == NULL) {
         hardlink_table_metadata = nexus_metadata_load(uuid, NEXUS_HARDLINK_TABLE, flags);
@@ -260,6 +260,45 @@ nexus_vfs_release_hardlink_table()
     nexus_metadata_unlock(hardlink_table_metadata);
 }
 
+
+struct nexus_usertable *
+nexus_vfs_acquire_user_table(nexus_io_flags_t flags)
+{
+    struct nexus_uuid * uuid = &global_supernode->usertable_uuid;
+
+    bool has_changed;
+
+
+    if (user_table_metadata == NULL) {
+        user_table_metadata = nexus_metadata_load(uuid, NEXUS_USER_TABLE, flags);
+
+        if (user_table_metadata == NULL) {
+            log_error("nexus_metadata_load() FAILED\n");
+            return NULL;
+        }
+
+        return user_table_metadata->user_table;
+    }
+
+    if (nexus_metadata_revalidate(user_table_metadata, flags, &has_changed)) {
+        log_error("nexus_metadata_revalidate() FAILED\n");
+        return NULL;
+    }
+
+    return user_table_metadata->user_table;
+}
+
+int
+nexus_vfs_flush_user_table()
+{
+    return nexus_metadata_store(user_table_metadata);
+}
+
+void
+nexus_vfs_release_user_table()
+{
+    nexus_metadata_unlock(user_table_metadata);
+}
 
 struct nexus_metadata *
 nexus_vfs_load(struct nexus_uuid * real_uuid, nexus_metadata_type_t type, nexus_io_flags_t flags)

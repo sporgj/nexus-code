@@ -36,30 +36,31 @@ struct nexus_user {
 };
 
 struct nexus_usertable {
-    uint32_t          version;
-
     uint64_t          auto_increment;
     uint64_t          user_count;
     uint64_t          total_size;
 
-    bool              is_dirty;
-    bool              on_disk;
-
     struct nexus_uuid my_uuid;
+    struct nexus_uuid root_uuid;
 
     struct nexus_user owner;
 
     struct nexus_list userlist;
 
-    struct nexus_supernode * supernode;
+    struct nexus_mac  mac;
+
+    struct nexus_metadata * metadata;
 };
 
 
 void
 __usertable_set_supernode(struct nexus_usertable * usertable, struct nexus_supernode * supernode);
 
+void
+nexus_usertable_set_owner_pubkey(struct nexus_usertable * usertable, char * user_pubkey);
+
 struct nexus_usertable *
-nexus_usertable_create(char * user_pubkey);
+nexus_usertable_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid);
 
 void
 nexus_usertable_free(struct nexus_usertable * usertable);
@@ -77,9 +78,11 @@ nexus_usertable_copy_uuid(struct nexus_usertable * usertable, struct nexus_uuid 
 struct nexus_usertable *
 nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct nexus_mac * mac);
 
-int
-nexus_usertable_store(struct nexus_usertable * usertable, struct nexus_mac * mac);
+struct nexus_usertable *
+nexus_usertable_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer);
 
+int
+nexus_usertable_store(struct nexus_usertable * usertable, uint32_t version, struct nexus_mac * mac);
 
 struct nexus_list_iterator *
 __nexus_usertable_get_iterator(struct nexus_usertable * usertable);

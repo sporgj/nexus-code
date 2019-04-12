@@ -64,8 +64,16 @@ nexus_enclave_is_current_user_owner()
 int
 nexus_verfiy_pubkey(pubkey_hash_t * user_pubkey_hash)
 {
-    global_user_struct
-        = nexus_usertable_find_pubkey_hash(global_supernode->usertable, user_pubkey_hash);
+    struct nexus_usertable * global_usertable = nexus_vfs_acquire_user_table(NEXUS_FREAD);
+
+    if (global_usertable == NULL) {
+        log_error("nexus_vfs_acquire_user_table() FAILED\n");
+        return -1;
+    }
+
+    global_user_struct = nexus_usertable_find_pubkey_hash(global_usertable, user_pubkey_hash);
+
+    nexus_vfs_release_user_table();
 
     if (global_user_struct == NULL) {
         return -1;

@@ -234,7 +234,7 @@ abac_get_user_profile(char * username, nexus_io_flags_t flags)
     struct nexus_metadata  * user_profile_metadata = NULL;
 
     struct nexus_user      * rst_user    = NULL;
-    struct nexus_usertable * usertable   = abac_global_get_usertable(NEXUS_FREAD);
+    struct nexus_usertable * usertable   = nexus_vfs_acquire_user_table(NEXUS_FREAD);
 
     if (usertable == NULL) {
         log_error("nexus_global_get_usertable() FAILED\n");
@@ -256,11 +256,11 @@ abac_get_user_profile(char * username, nexus_io_flags_t flags)
         goto err;
     }
 
-    abac_global_put_usertable(usertable);
+    nexus_vfs_release_user_table();
 
     return user_profile_metadata->user_profile;
 err:
-    abac_global_put_usertable(usertable);
+    nexus_vfs_release_user_table();
 
     return NULL;
 }
@@ -310,40 +310,15 @@ abac_del_user_profile(struct nexus_uuid * user_uuid)
 }
 
 
-struct nexus_usertable *
-abac_global_get_usertable(nexus_io_flags_t flags)
-{
-    struct nexus_supernode * global_supernode = nexus_vfs_acquire_supernode(flags);
-
-    if (global_supernode == NULL) {
-        log_error("could not acquire global supernode\n");
-        return NULL;
-    }
-
-    return global_supernode->usertable;
-}
-
-int
-abac_global_put_usertable(struct nexus_usertable * usertable)
-{
-    if (nexus_metadata_store(global_supernode_metadata)) {
-        log_error("nexus_metadata_store() FAILED\n");
-        return -1;
-    }
-
-    nexus_vfs_release_supernode();
-}
-
-
-struct nexus_usertable *
-abac_global_get_current_usertable(nexus_io_flags_t flags)
+struct user_profile *
+abac_acquire_current_user_profile(nexus_io_flags_t flags)
 {
     // TODO
     return NULL;
 }
 
 void
-abac_global_put_current_usertable()
+abac_release_current_user_profile()
 {
     // TODO
 }
