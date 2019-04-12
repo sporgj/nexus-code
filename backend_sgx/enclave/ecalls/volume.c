@@ -340,6 +340,13 @@ ecall_authentication_response(struct nexus_uuid * supernode_bufuuid_in,
         }
     }
 
+    // print who is logged in
+    if (global_user_id == NEXUS_ROOT_USER) {
+        nexus_printf("Enclave: LoggedIn as OWNER\n");
+    } else {
+        nexus_printf("Enclave: LoggedIn as `%s`\n", global_user_struct->name);
+    }
+
     ret = 0;
 out:
     if (signature_raw_buf) {
