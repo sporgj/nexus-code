@@ -284,6 +284,96 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
 {
     memset(&atom->predicate, 0, SYSTEM_FUNC_MAX_LENGTH);
     strncpy(&atom->predicate, predicate_str, SYSTEM_FUNC_MAX_LENGTH);
+
+    if (atom->predicate[0] == '@') {
+        atom->pred_type = PREDICATE_FUNC;
+    } else {
+        atom->pred_type = PREDICATE_ATTR;
+    }
+}
+
+
+// FIXME: this function should have an optional argument that checks for the uuid.
+// this will allow policies to validate their atoms even after an attribute has been aliased.
+static bool
+__validate_abac_attribute(struct policy_atom * atom)
+{
+    const struct attribute_term * term             = NULL;
+    struct attribute_store      * global_attrstore = abac_acquire_attribute_store(NEXUS_FREAD);
+
+    if (global_attrstore == NULL) {
+        log_error("could not acquire attribute_store\n");
+        return false;
+    }
+
+    term = attribute_store_find_name(global_attrstore, atom->predicate);
+
+    if (term == NULL) {
+        log_error("could not find attribute (%s) in store\n", atom->predicate);
+        goto out_err;
+    }
+
+    if (atom->atom_type == ATOM_TYPE_USER) {
+        if (term->type != USER_ATTRIBUTE_TYPE) {
+            log_error("the atom_type is `user`, but attribute_type is NOT\n");
+            goto out_err;
+        }
+    } else if (atom->atom_type == ATOM_TYPE_OBJECT) {
+        if (term->type != OBJECT_ATTRIBUTE_TYPE) {
+            log_error("the atom_type is `object`, but attribute_type is NOT\n");
+            goto out_err;
+        }
+    } else {
+        log_error("unknown atom type\n");
+        goto out_err;
+    }
+
+    nexus_uuid_copy(&term->uuid, &atom->attr_uuid);
+
+    abac_release_attribute_store();
+
+    return true;
+out_err:
+    abac_release_attribute_store();
+
+    return false;
+}
+
+static bool
+__validate_system_function(struct policy_atom * atom)
+{
+    if (atom->atom_type == ATOM_TYPE_OBJECT) {
+        if (!system_function_exists(atom->predicate, OBJECT_FUNCTION)) {
+            log_error("could not find object function (%s)\n", atom->predicate);
+            return false;
+        }
+
+        return true;
+    } else if (atom->atom_type == ATOM_TYPE_USER) {
+        if (!system_function_exists(atom->predicate, USER_FUNCTION)) {
+            log_error("could not find user function (%s)\n", atom->predicate);
+            return false;
+        }
+
+        return true;
+    }
+
+    log_error("unknown atom type, can't validate system_function predicate\n");
+    return false;
+}
+
+bool
+policy_atom_is_valid(struct policy_atom * atom)
+{
+    if (atom->pred_type == PREDICATE_FUNC) {
+        return __validate_system_function(atom);
+    } else if (atom->pred_type == PREDICATE_ATTR) {
+        return __validate_abac_attribute(atom);
+    }
+
+    log_error("unknown atom type\n");
+
+    return false;
 }
 
 // policy atom ]]--

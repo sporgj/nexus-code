@@ -369,6 +369,11 @@ __parse_atom(struct my_parser * parser)
     }
 
 out_success:
+    if (!policy_atom_is_valid(atom)) {
+        log_error("policy_atom_is_valid() FAILED\n");
+        goto out_err;
+    }
+
     if (policy_rule_push_atom(parser->policy_rule, atom)) {
         log_error("policy_rule_push_atom() FAILED\n");
         goto out_err;

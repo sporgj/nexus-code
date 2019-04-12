@@ -1,3 +1,4 @@
+#include "system_functions.h"
 #include "abac_internal.h"
 
 #include "../metadata.h"
@@ -11,8 +12,6 @@ struct __sys_func {
 
     sys_func_type_t type;
 };
-
-
 
 
 char *

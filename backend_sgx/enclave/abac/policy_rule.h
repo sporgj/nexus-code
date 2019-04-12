@@ -51,3 +51,6 @@ policy_atom_push_arg(struct policy_atom * atom, char * str);
 
 void
 policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str);
+
+bool
+policy_atom_is_valid(struct policy_atom * atom);
