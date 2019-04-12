@@ -10,6 +10,7 @@
 #include "policy_rule.h"
 
 typedef enum {
+    TOK_UNKNOWN = 0,
     TOK_LPAREN = 1,
     TOK_RPAREN,
     TOK_EQUALS,
@@ -202,9 +203,9 @@ repeat:
         return __tok(lexer, TOK_RPAREN);
     case ':':
         n = __next_char(lexer);
-        if (n != '=') {
-            log_error("expected `:=` at position %zu\n", lexer->pos - 2);
-            return NULL;
+        if (n != '-') {
+            log_error("expected `:-` at position %zu\n", lexer->pos - 2);
+            return __tok(lexer, TOK_UNKNOWN);
         }
 
         return __tok(lexer, TOK_COLONEQUALS);
@@ -222,7 +223,7 @@ repeat:
 
     __backup(lexer);
 
-    return NULL;
+    return __tok(lexer, TOK_UNKNOWN);
 }
 
 struct my_parser *
@@ -426,7 +427,7 @@ parse_abac_policy(char * policy_string)
 
     if (__parse_rule(parser)) {
         log_error("__parse_rule() FAILED\n");
-        return -1;
+        return NULL;
     }
 
     // the rule returns with the token consumed
