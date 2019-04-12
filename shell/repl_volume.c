@@ -15,6 +15,7 @@
 #include <readline/history.h>
 
 #include <wordexp.h>
+#include <getopt.h>
 
 #include "handler.h"
 
@@ -38,9 +39,13 @@ static struct _cmd {
 // lists the usage of a particular command, NULL to list all
 static void usage(char * handle_cmd);
 
+static void
+__parse_args(int argc, char ** argv);
 
 
 static struct nexus_volume * mounted_volume = NULL;
+
+static int cmd_line_user_key    = 0;
 
 
 char *
@@ -691,6 +696,43 @@ handle_abac_object_ls(int argc, char ** argv)
     return ret;
 }
 
+static int
+handle_abac_policy_add(int argc, char ** argv)
+{
+    struct nexus_uuid uuid;
+
+    if (argc < 1) {
+        usage("abac_policy_add");
+        return -1;
+    }
+
+    char * policy_str = strndup(argv[0], 100);
+
+    nexus_printf("%s\n", policy_str);
+
+    if (sgx_backend_abac_policy_add(policy_str, &uuid, mounted_volume)) {
+        nexus_free(policy_str);
+        log_error("sgx_backend_abac_policy_add() FAILED\n");
+        return -1;
+    }
+
+    nexus_free(policy_str);
+
+    return 0;
+}
+
+static int
+handle_abac_policy_ls(int argc, char ** argv)
+{
+    if (sgx_backend_abac_policy_ls(mounted_volume)) {
+        log_error("sgx_backend_abac_policy_ls() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
 /////////
 
 static int
@@ -714,7 +756,6 @@ split_string_to_my_argv(char * parm_chars)
     }
 
     my_argv[0] = (parm_chars + index);
-    pos        = 1;
 
 
     for (; index < len; index++)
@@ -733,14 +774,24 @@ split_string_to_my_argv(char * parm_chars)
             my_argv[pos++] = (parm_chars + index + 1);
         }
 
-        if (!in_single_quote && !in_double_quote && parm_chars[index] == ' ') {
-            // if the previous element is also spacen, let's skip it
-            if (index > 1 && parm_chars[index - 1] == ' ') {
-                continue;
-            }
+        if (!in_single_quote && !in_double_quote) {
+            if (parm_chars[index] == ' ') {
+                parm_chars[index++] = '\0';
 
-            parm_chars[index] = '\0';
-            my_argv[pos++] = (parm_chars + index + 1);
+                while (parm_chars[index] == ' ') {
+                    index += 1;
+                }
+            } else if (isalpha(parm_chars[index])) {
+                my_argv[pos++] = (parm_chars + index);
+
+                while (parm_chars[index] != ' ') {
+                    index += 1;
+                }
+
+                if (parm_chars[index] == ' ') {
+                    parm_chars[index] = '\0';
+                }
+            }
         }
 
         if (pos == MY_ARGV_SIZE) {
@@ -749,7 +800,7 @@ split_string_to_my_argv(char * parm_chars)
         }
     }
 
-    if (pos == 0 && my_argv[pos] != '\0') {
+    if (pos == 0 && my_argv[0] != '\0') {
         pos = 1;
     }
 
@@ -834,8 +885,12 @@ static struct _cmd cmds[]
           "<path> <attribute>" },
         { "abac_object_ls", handle_abac_object_ls, "List an object's attributes", "<path>" },
 
+        { "abac_policy_add", handle_abac_policy_add, "Add a policy", "'<policy_string>'" },
+        { "abac_policy_ls", handle_abac_policy_ls, "List volume policies", "" },
+
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };
+
 
 int
 repl_volume_main(int argc, char ** argv)
@@ -849,6 +904,8 @@ repl_volume_main(int argc, char ** argv)
     }
 
     volume_path = strndup(argv[1], PATH_MAX);
+
+    __parse_args(argc, argv);
 
     mounted_volume = nexus_mount_volume(volume_path);
 
@@ -890,4 +947,34 @@ repl_volume_main(int argc, char ** argv)
 
         free(line);
     } while (true);
+}
+
+static void
+__parse_args(int argc, char ** argv)
+{
+    int  opt_index = 0;
+    int  used_opts = 0;
+    char c         = 0;
+
+    static struct option long_options[]
+        = { { "user_key", required_argument, &cmd_line_user_key, 1 }, /* 0 */
+            { 0, 0, 0, 0 } };
+
+    while ((c = getopt_long_only(argc, argv, "h", long_options, &opt_index)) != -1) {
+
+        switch (c) {
+        case 0:
+            switch (opt_index) {
+            case 0:
+                nexus_printf("user_key: %s\n", optarg);
+                nexus_config.user_key_path = optarg;
+                used_opts += 2;
+                break;
+
+            default:
+                return;
+            }
+            break;
+        }
+    }
 }
