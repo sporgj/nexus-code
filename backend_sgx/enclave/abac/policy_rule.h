@@ -1,5 +1,7 @@
 #include "abac_types.h"
 
+#include "../libnexus_trusted/rapidstring.h"
+
 
 /* policy rule stuff */
 
@@ -14,6 +16,9 @@ policy_rule_free(struct policy_rule * rule);
 
 char *
 policy_rule_datalog_string(struct policy_rule * rule);
+
+int
+__policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_builder);
 
 int
 policy_rule_push_atom(struct policy_rule * policy_rule, struct policy_atom * atom);

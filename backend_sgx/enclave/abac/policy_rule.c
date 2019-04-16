@@ -442,24 +442,40 @@ policy_rule_datalog_string(struct policy_rule * rule)
     char *      result_string = NULL;
     rapidstring string_builder;
 
-    if (rule->atom_count < 1) {
-        log_error("cannot serialize empty rule\n");
-        return NULL;
-    }
-
     // "10" is arbirtrary, it's my estimate for spacing and commas
     rs_init_w_cap(&string_builder, policy_rule_buf_size(rule) + 10);
 
+    if (__policy_rule_datalog_string(rule, &string_builder)) {
+        rs_free(&string_builder);
+        log_error("__policy_rule_datalog_string() FAILED\n");
+        return NULL;
+    }
+
+    result_string = strndup(rs_data_c(&string_builder), rs_len(&string_builder));
+
+    rs_free(&string_builder);
+
+    return result_string;
+}
+
+int
+__policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_builder)
+{
+    if (rule->atom_count < 1) {
+        log_error("cannot serialize empty rule\n");
+        return -1;
+    }
+
     switch (rule->perm_type) {
     case PERM_READ:
-        rs_cat(&string_builder, "read(U, O)");
+        rs_cat(string_builder, "read(U, O)");
         break;
     case PERM_WRITE:
-        rs_cat(&string_builder, "write(U, O)");
+        rs_cat(string_builder, "write(U, O)");
         break;
     default:
         log_error("invalid policy_rule type\n");
-        return NULL;
+        return -1;
     }
 
     rs_cat(&string_builder, " :- ");
@@ -477,10 +493,10 @@ policy_rule_datalog_string(struct policy_rule * rule)
             }
 
             if (i > 0) {
-                rs_cat(&string_builder, ", ");
+                rs_cat(string_builder, ", ");
             }
 
-            if (__policy_atom_to_str(atom, &string_builder)) {
+            if (__policy_atom_to_str(atom, string_builder)) {
                 list_iterator_free(iter);
                 log_error("could not convert policy atom to string\n");
                 goto out_err;
@@ -493,17 +509,12 @@ policy_rule_datalog_string(struct policy_rule * rule)
         list_iterator_free(iter);
     }
 
-    rs_cat(&string_builder, ".");
+    rs_cat(string_builder, ".");
 
-    result_string = strndup(rs_data_c(&string_builder), rs_len(&string_builder));
-    rs_free(&string_builder);
-
-    return result_string;
+    return 0;
 
 out_err:
-    rs_free(&string_builder);
-
-    return NULL;
+    return -1;
 }
 
 int

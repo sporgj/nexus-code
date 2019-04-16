@@ -244,10 +244,73 @@ out_err:
     return -1;
 }
 
+int
+__datalog_facts(rapidstring * string_builder, struct access_request * access_req)
+{
+    struct hashmap_iter iter;
+
+    hashmap_iter_init(&access_req->facts_hashmap, &iter);
+
+    do {
+        struct fact_entry * fact_entry = hashmap_iter_next(&iter);
+
+        if (fact_entry == NULL) {
+            return 0;
+        }
+
+        rs_cat(string_builder, fact_entry->value);
+    } while (1);
+
+    return 0;
+}
+
+int
+__datalog_queries(rapidstring * string_builder, struct access_request * access_req)
+{
+    struct nexus_list_iterator * iter = list_iterator_new(access_req->rules);
+
+    do {
+        struct policy_rule * rule = list_iterator_get(iter);
+
+        if (__policy_rule_datalog_string(rule, string_builder)) {
+            log_error("could not generate rule datalog\n");
+            list_iterator_free(iter);
+            return -1;
+        }
+
+        list_iterator_next(iter);
+    } while(list_iterator_is_valid(iter));
+
+    list_iterator_free(iter);
+
+    return 0;
+}
+
 static char *
 build_datalog_program(struct access_request * access_req)
 {
-    // TODO
+    char      * datalog_program = NULL;
+
+    rapidstring string_builder;
+
+    rs_init(&string_builder);
+
+    if (__datalog_facts(&string_builder, access_req)) {
+        log_error("__datalog_facts() FAILED\n");
+        goto out_err;
+    }
+
+    if (__datalog_queries(&string_builder, access_req)) {
+        log_error("__datalog_queries() FAILED\n");
+        goto out_err;
+    }
+
+    datalog_program = strndup(rs_data_c(&string_builder), rs_len(&string_builder));
+    rs_free(&string_builder);
+
+    return datalog_program;
+out_err:
+    rs_free(&string_builder);
     return NULL;
 }
 
