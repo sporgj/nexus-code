@@ -57,4 +57,4 @@ parse_abac_policy(char * policy_string);
 // enforcer
 
 bool
-access_check(struct nexus_metadata * metadata, perm_type_t permission);
+nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission);

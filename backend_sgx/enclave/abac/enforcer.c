@@ -1,6 +1,9 @@
 #include "../libnexus_trusted/hashmap.h"
 
 #include "abac_internal.h"
+#include "policy_store.h"
+#include "attribute_store.h"
+#include "system_functions.h"
 
 /// each fact entry points to a specific atom's value. The key is a string
 /// of the predicate, and the value points to its fact as a value.
@@ -249,12 +252,18 @@ build_datalog_program(struct access_request * access_req)
 }
 
 bool
-access_check(struct nexus_metadata * metadata, perm_type_t permission)
+nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission)
 {
-    struct access_request * access_req = __new_access_request(metadata, permission);
+    struct access_request * access_req      = NULL;
 
-    char * datalog_program = NULL;
+    char                  * datalog_program = NULL;
 
+    if (nexus_enclave_is_current_user_owner()) {
+        return true;
+    }
+
+
+    access_req = __new_access_request(metadata, permission);
     access_req->policy_store = abac_acquire_policy_store(NEXUS_FREAD);
     if (access_req->policy_store == NULL) {
         log_error("could not acquire policy_store\n");
@@ -275,12 +284,15 @@ access_check(struct nexus_metadata * metadata, perm_type_t permission)
         goto out_exit;
     }
 
-    access_req->rules = policy_store_select_rules(permission);
+    access_req->rules = policy_store_select_rules(access_req->policy_store, permission);
     if (access_req->rules == NULL) {
-        // no policies will allow this
         goto out_err;
     }
 
+    if (build_facts(access_req)) {
+        log_error("build_facts() FAILED\n");
+        goto out_err;
+    }
 
     datalog_program = build_datalog_program(access_req);
 

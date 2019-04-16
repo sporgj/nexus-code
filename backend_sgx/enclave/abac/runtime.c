@@ -3,10 +3,13 @@
 #include "../vfs.h"
 #include "../metadata.h"
 
+#include "../enclave_internal.h"
+
+
 static struct nexus_metadata * attribute_store_metadata = NULL;
 static struct nexus_metadata * policy_store_metadata    = NULL;
 
-static struct nexus_metadata * current_user_profile_metadata = NULL;
+static struct nexus_metadata * current_userprofile_metadata = NULL;
 
 static struct abac_superinfo   global_abac_superinfo;
 
@@ -313,12 +316,37 @@ abac_del_user_profile(struct nexus_uuid * user_uuid)
 struct user_profile *
 abac_acquire_current_user_profile(nexus_io_flags_t flags)
 {
-    // TODO
+    bool has_changed;
+
+    if (nexus_enclave_is_current_user_owner()) {
+        return NULL;
+    }
+
+    struct nexus_uuid * uuid = &global_user_struct->user_uuid;
+
+    if (current_userprofile_metadata == NULL) {
+        current_userprofile_metadata = nexus_metadata_load(uuid, NEXUS_USER_PROFILE, flags);
+
+        if (current_userprofile_metadata == NULL) {
+            log_error("nexus_metadata_load() FAILED\n");
+            return NULL;
+        }
+
+        return current_userprofile_metadata->user_profile;
+    }
+
+    if (nexus_metadata_revalidate(current_userprofile_metadata, flags, &has_changed)) {
+        log_error("nexus_metadata_revalidate() FAILED\n");
+        return NULL;
+    }
+
+    return current_userprofile_metadata->user_profile;
+
     return NULL;
 }
 
 void
 abac_release_current_user_profile()
 {
-    // TODO
+    nexus_metadata_unlock(current_userprofile_metadata);
 }

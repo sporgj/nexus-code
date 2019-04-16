@@ -46,6 +46,11 @@ ecall_fs_create(char                * dirpath_IN,
         return -1;
     }
 
+    if (!nexus_abac_access_check(metadata, PERM_WRITE)) {
+        log_error("you are not allowed\n");
+        goto out;
+    }
+
     // perform the create operation
     ret = __nxs_fs_create(metadata->dirnode, filename_IN, type_IN, &entry_uuid);
     if (ret != 0) {

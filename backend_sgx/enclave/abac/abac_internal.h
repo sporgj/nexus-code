@@ -57,3 +57,10 @@ abac_global_get_usertable(nexus_io_flags_t flags);
 
 int
 abac_global_put_usertable(struct nexus_usertable * usertable);
+
+
+struct user_profile *
+abac_acquire_current_user_profile(nexus_io_flags_t flags);
+
+void
+abac_release_current_user_profile();

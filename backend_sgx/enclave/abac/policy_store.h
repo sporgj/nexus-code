@@ -48,5 +48,5 @@ policy_store_del(struct policy_store * policy_store, struct nexus_uuid * rule_uu
  * Returns a list of policies matching the given action
  */
 struct nexus_list *
-policy_store_select_policies(struct policy_store * policy_store, perm_type_t permission);
+policy_store_select_rules(struct policy_store * policy_store, perm_type_t permission);
 
