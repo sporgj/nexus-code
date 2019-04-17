@@ -459,14 +459,9 @@ policy_rule_datalog_string(struct policy_rule * rule)
 }
 
 int
-__policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_builder)
+__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder)
 {
-    if (rule->atom_count < 1) {
-        log_error("cannot serialize empty rule\n");
-        return -1;
-    }
-
-    switch (rule->perm_type) {
+    switch (perm_type) {
     case PERM_READ:
         rs_cat(string_builder, "read(U, O)");
         break;
@@ -478,7 +473,24 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
         return -1;
     }
 
-    rs_cat(&string_builder, " :- ");
+    return 0;
+}
+
+int
+__policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_builder)
+{
+    if (rule->atom_count < 1) {
+        log_error("cannot serialize empty rule\n");
+        return -1;
+    }
+
+    if (__permission_type_to_datalog(rule->perm_type, string_builder)) {
+        log_error("__permission_type_to_datalog() FAILED\n");
+        return -1;
+    }
+
+
+    rs_cat(string_builder, " :- ");
 
     {
         struct nexus_list_iterator * iter = list_iterator_new(&rule->atoms);

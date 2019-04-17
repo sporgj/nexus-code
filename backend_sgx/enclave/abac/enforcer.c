@@ -12,6 +12,8 @@ struct fact_entry {
 
     char                    fact[ATTRIBUTE_NAME_MAX];
 
+    atom_type_t             atom_type;
+
     char                  * value;
 };
 
@@ -86,12 +88,13 @@ __free_access_request(struct access_request * access_req)
 }
 
 static void
-__put_fact(struct access_request * access_req, char * predicate, char * value)
+__put_fact(struct access_request * access_req, char * predicate, char * value, atom_type_t atom_type)
 {
     struct fact_entry * new_fact = nexus_malloc(sizeof(struct fact_entry));
 
     strncpy(&new_fact->fact, predicate, ATTRIBUTE_NAME_MAX);
-    new_fact->value = value;
+    new_fact->value     = value;
+    new_fact->atom_type = atom_type;
 
     hashmap_entry_init(new_fact, strhash(new_fact->fact));
 
@@ -156,7 +159,7 @@ __extract_attributes(struct access_request * access_req, struct policy_atom * at
         return 0;
     }
 
-    __put_fact(access_req, atom->predicate, strndup(value, ATTRIBUTE_VALUE_SIZE));
+    __put_fact(access_req, atom->predicate, strndup(value, ATTRIBUTE_VALUE_SIZE), atom->atom_type);
 
     return 0;
 }
@@ -182,7 +185,7 @@ __extract_sysfunction(struct access_request * access_req, struct policy_atom * a
         return -1;
     }
 
-    __put_fact(access_req, atom->predicate, value);
+    __put_fact(access_req, atom->predicate, value, atom->atom_type);
 
     return 0;
 }
@@ -258,7 +261,22 @@ __datalog_facts(rapidstring * string_builder, struct access_request * access_req
             return 0;
         }
 
-        rs_cat(string_builder, fact_entry->value);
+        rs_cat(string_builder, fact_entry->fact);
+        rs_cat(string_builder, "(");
+
+        if (fact_entry->atom_type == ATOM_TYPE_OBJECT) {
+            rs_cat(string_builder, "o");
+        } else {
+            rs_cat(string_builder, "u");
+        }
+
+        if (strnlen(fact_entry->value, ATTRIBUTE_NAME_MAX)) {
+            rs_cat(string_builder, ", \"");
+            rs_cat(string_builder, fact_entry->value);
+            rs_cat(string_builder, "\"");
+        }
+
+        rs_cat(string_builder, ").\n");
     } while (1);
 
     return 0;
@@ -271,6 +289,8 @@ __datalog_queries(rapidstring * string_builder, struct access_request * access_r
 
     do {
         struct policy_rule * rule = list_iterator_get(iter);
+
+        rs_cat(string_builder, "\n");
 
         if (__policy_rule_datalog_string(rule, string_builder)) {
             log_error("could not generate rule datalog\n");
@@ -304,6 +324,15 @@ build_datalog_program(struct access_request * access_req)
         log_error("__datalog_queries() FAILED\n");
         goto out_err;
     }
+
+    rs_cat(&string_builder, "\n");
+
+    if (__permission_type_to_datalog(access_req->permission, &string_builder)) {
+        log_error("__permission_type_to_datalog() FAILED\n");
+        goto out_err;
+    }
+
+    rs_cat(&string_builder, "?\n");
 
     datalog_program = strndup(rs_data_c(&string_builder), rs_len(&string_builder));
     rs_free(&string_builder);
@@ -364,13 +393,15 @@ nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission
         goto out_err;
     }
 
+    nexus_printf("%s\n", datalog_program);
+
     abac_release_policy_store();
     abac_release_attribute_store();
     abac_release_current_user_profile();
 
     __free_access_request(access_req);
 
-    return true;
+    return false;
 
 out_err:
     abac_release_policy_store();

@@ -59,3 +59,7 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str);
 
 bool
 policy_atom_is_valid(struct policy_atom * atom);
+
+
+int
+__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder);

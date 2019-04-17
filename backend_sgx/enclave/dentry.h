@@ -90,5 +90,5 @@ dentry_delete(struct nexus_dentry * dentry);
 void
 dentry_delete_child(struct nexus_dentry * parent_dentry, const char * child);
 
-
-
+char *
+dentry_get_fullpath(struct nexus_dentry * dentry);

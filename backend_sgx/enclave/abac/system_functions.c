@@ -31,7 +31,14 @@ __handle_upkey(void * arg)
 char *
 __handle_opath(void * arg)
 {
-    // TODO
+    struct nexus_metadata * metadata = arg;
+
+    struct nexus_dentry * dentry = metadata_get_dentry(metadata);
+
+    if (dentry) {
+        return dentry_get_fullpath(dentry);
+    }
+
     return NULL;
 }
 

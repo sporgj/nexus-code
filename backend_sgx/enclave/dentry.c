@@ -423,3 +423,11 @@ dentry_lookup(struct path_walker * walker)
 
     return walk_path(walker);
 }
+
+
+// TODO implement function
+char *
+dentry_get_fullpath(struct nexus_dentry * dentry)
+{
+    return strndup(dentry->name, NEXUS_NAME_MAX);
+}
