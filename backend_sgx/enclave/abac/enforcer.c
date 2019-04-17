@@ -109,6 +109,7 @@ __find_fact(struct access_request * access_req, char * predicate)
     struct fact_entry * rst_fact = NULL;
 
     strncpy(&tmp_fact.fact, predicate, ATTRIBUTE_NAME_MAX);
+    hashmap_entry_init(&tmp_fact, strhash(tmp_fact.fact));
 
     return hashmap_get(&access_req->facts_hashmap, &tmp_fact, NULL);
 }
@@ -247,7 +248,7 @@ out_err:
     return -1;
 }
 
-int
+static int
 __datalog_facts(rapidstring * string_builder, struct access_request * access_req)
 {
     struct hashmap_iter iter;
@@ -282,7 +283,7 @@ __datalog_facts(rapidstring * string_builder, struct access_request * access_req
     return 0;
 }
 
-int
+static int
 __datalog_queries(rapidstring * string_builder, struct access_request * access_req)
 {
     struct nexus_list_iterator * iter = list_iterator_new(access_req->rules);
@@ -350,6 +351,8 @@ nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission
 
     char                  * datalog_program = NULL;
 
+    char                  * datalog_answer  = NULL;
+
     if (nexus_enclave_is_current_user_owner()) {
         return true;
     }
@@ -393,7 +396,21 @@ nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission
         goto out_err;
     }
 
-    nexus_printf("%s\n", datalog_program);
+    if (datalog_evaluate(datalog_program, &datalog_answer)) {
+        log_error("datalog_evaluate() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_printf("==================\n");
+    nexus_printf("%s", datalog_program);
+    nexus_printf("------------------\n");
+    nexus_printf("%s\n", datalog_answer);
+    nexus_printf("==================\n\n");
+
+
+    nexus_free(datalog_program);
+    nexus_free(datalog_answer);
+
 
     abac_release_policy_store();
     abac_release_attribute_store();
@@ -408,6 +425,13 @@ out_err:
     abac_release_attribute_store();
     abac_release_current_user_profile();
 
+    if (datalog_program) {
+        nexus_free(datalog_program);
+    }
+
+    if (datalog_answer) {
+        nexus_free(datalog_answer);
+    }
 out_exit:
     __free_access_request(access_req);
 

@@ -64,3 +64,8 @@ abac_acquire_current_user_profile(nexus_io_flags_t flags);
 
 void
 abac_release_current_user_profile();
+
+
+// defined inside datalog-engine/interp.c
+extern int
+datalog_evaluate(char * datalog_buffer_IN, char ** string_ans);
