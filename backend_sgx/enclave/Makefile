@@ -26,6 +26,7 @@ INCLUDE := -I$(SGX_SDK)/include \
 	-I$(LIBGCC_PATH) \
 	-Imbedtls/include \
 	-Ilibnexus_trusted \
+	-I. \
 	-I..
 
 CFLAGS  += -nostdinc -pedantic \
@@ -82,7 +83,18 @@ nexus_trusted_objs := \
 trusted_objs := $(foreach o,$(nexus_trusted_objs),libnexus_trusted/$(o))
 
 
+lua_dir := abac/datalog-engine/lua
+lua_lib := $(lua_dir)/liblua.a
+
+_datalog_engine_objs := \
+	loader.o \
+	interp.o \
+	datalog.o
+
+datalog_engine_objs := $(foreach o,$(_datalog_engine_objs),datalog-engine/$(o))
+
 nexus_abac_objs := \
+	$(datalog_engine_objs) \
 	enforcer.o \
 	system_functions.o \
 	runtime.o \
@@ -167,13 +179,15 @@ $(private_key):
 libmbedcrypto.a:
 	make -C mbedtls/library && cp $(crypto_lib) .
 
-nexus_enclave.so: $(objs) libmbedcrypto.a
+nexus_enclave.so: $(objs) libmbedcrypto.a $(lua_lib)
 	$(call build,LD,$(CC) $^  $(LDFLAGS) -o $@)
 
 nexus_enclave.signed.so: nexus_enclave.so $(private_key)
 	$(call build,SIGN,$(SGX_ENCLAVE_SIGNER) sign -key $(private_key)\
 		-enclave $< -out $@ -config config.xml)
 
+$(lua_lib):
+	make -C $(lua_dir)
 
 define cscope-all-sources
 	( find . $(RCS_FIND_IGNORE) \
@@ -187,6 +201,7 @@ cscope:
 
 .PHONY: clean
 clean:
+	make clean -C abac/datalog-engine/lua
 	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o abac/*.o
 
 .PHONY: distclean
