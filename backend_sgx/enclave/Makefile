@@ -97,6 +97,7 @@ nexus_abac_objs := \
 	$(datalog_engine_objs) \
 	enforcer.o \
 	system_functions.o \
+	boolean_operators.o \
 	runtime.o \
 	parser_lexer.o \
 	policy_rule.o \

@@ -33,6 +33,7 @@ typedef enum {
 typedef enum {
     PREDICATE_ATTR = 0x01,      // system attribute
     PREDICATE_FUNC,             // system function
+    PREDICATE_BOOL,             // boolean operator
 } pred_type_t;
 
 typedef enum {
