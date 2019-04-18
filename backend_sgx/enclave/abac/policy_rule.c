@@ -285,9 +285,16 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
     memset(&atom->predicate, 0, SYSTEM_FUNC_MAX_LENGTH);
     strncpy(&atom->predicate, predicate_str, SYSTEM_FUNC_MAX_LENGTH);
 
-    if (atom->predicate[0] == '@') {
+    switch (atom->predicate[0]) {
+    case '>':
+    case '<':
+    case '=':
+        atom->pred_type = PREDICATE_BOOL;
+        break;
+    case '@':
         atom->pred_type = PREDICATE_FUNC;
-    } else {
+        break;
+    default:
         atom->pred_type = PREDICATE_ATTR;
     }
 }
@@ -296,7 +303,7 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
 // FIXME: this function should have an optional argument that checks for the uuid.
 // this will allow policies to validate their atoms even after an attribute has been aliased.
 static bool
-__validate_abac_attribute(struct policy_atom * atom)
+__validate_abac_attribute_atom(struct policy_atom * atom)
 {
     const struct attribute_term * term             = NULL;
     struct attribute_store      * global_attrstore = abac_acquire_attribute_store(NEXUS_FREAD);
@@ -340,7 +347,7 @@ out_err:
 }
 
 static bool
-__validate_system_function(struct policy_atom * atom)
+__validate_system_function_atom(struct policy_atom * atom)
 {
     if (atom->atom_type == ATOM_TYPE_OBJECT) {
         if (!system_function_exists(atom->predicate, OBJECT_FUNCTION)) {
@@ -362,13 +369,26 @@ __validate_system_function(struct policy_atom * atom)
     return false;
 }
 
+static bool
+__validate_boolean_operator_atom(struct policy_atom * atom)
+{
+    if (atom->arity != 2) {
+        log_error("boolean operator atom must have arity of 2\n");
+        return false;
+    }
+
+    return true;
+}
+
 bool
 policy_atom_is_valid(struct policy_atom * atom)
 {
     if (atom->pred_type == PREDICATE_FUNC) {
-        return __validate_system_function(atom);
+        return __validate_system_function_atom(atom);
     } else if (atom->pred_type == PREDICATE_ATTR) {
-        return __validate_abac_attribute(atom);
+        return __validate_abac_attribute_atom(atom);
+    } else if (atom->pred_type == PREDICATE_BOOL) {
+        return __validate_boolean_operator_atom(atom);
     }
 
     log_error("unknown atom type\n");

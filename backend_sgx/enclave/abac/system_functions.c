@@ -5,7 +5,6 @@
 #include "../dentry.h"
 
 
-/// a system function takes a userprofile/
 struct __sys_func {
     char * name;
     char * (*handler)(void * arg);
