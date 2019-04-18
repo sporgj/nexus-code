@@ -23,8 +23,11 @@ typedef enum {
 } perm_type_t;
 
 typedef enum {
-    ATOM_TYPE_USER = 0x01,
-    ATOM_TYPE_OBJECT,
+    ATOM_TYPE_NONE          = 0x0000,
+    ATOM_TYPE_USER          = 0x0001,
+    ATOM_TYPE_OBJECT        = 0x0002,
+
+    ATOM_TYPE_ALL           = ATOM_TYPE_USER | ATOM_TYPE_OBJECT,
 } atom_type_t;
 
 typedef enum {
@@ -65,6 +68,8 @@ struct policy_rule {
     perm_type_t             perm_type;
 
     size_t                  atom_count;
+
+    atom_type_t             atom_types;
 
     struct nexus_uuid       rule_uuid;
 

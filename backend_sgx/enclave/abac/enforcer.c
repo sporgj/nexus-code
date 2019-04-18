@@ -249,7 +249,7 @@ out_err:
 }
 
 static int
-__datalog_facts(rapidstring * string_builder, struct access_request * access_req)
+__datalog_facts(struct access_request * access_req, rapidstring * string_builder)
 {
     struct hashmap_iter iter;
 
@@ -259,7 +259,7 @@ __datalog_facts(rapidstring * string_builder, struct access_request * access_req
         struct fact_entry * fact_entry = hashmap_iter_next(&iter);
 
         if (fact_entry == NULL) {
-            return 0;
+            goto out;
         }
 
         rs_cat(string_builder, fact_entry->fact);
@@ -280,11 +280,14 @@ __datalog_facts(rapidstring * string_builder, struct access_request * access_req
         rs_cat(string_builder, ").\n");
     } while (1);
 
+out:
+    rs_cat(string_builder, "_dummy(u).\n_dummy(o).\n");
+
     return 0;
 }
 
 static int
-__datalog_queries(rapidstring * string_builder, struct access_request * access_req)
+__datalog_queries(struct access_request * access_req, rapidstring * string_builder)
 {
     struct nexus_list_iterator * iter = list_iterator_new(access_req->rules);
 
@@ -316,12 +319,12 @@ build_datalog_program(struct access_request * access_req)
 
     rs_init(&string_builder);
 
-    if (__datalog_facts(&string_builder, access_req)) {
+    if (__datalog_facts(access_req, &string_builder)) {
         log_error("__datalog_facts() FAILED\n");
         goto out_err;
     }
 
-    if (__datalog_queries(&string_builder, access_req)) {
+    if (__datalog_queries(access_req, &string_builder)) {
         log_error("__datalog_queries() FAILED\n");
         goto out_err;
     }
@@ -396,14 +399,15 @@ nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission
         goto out_err;
     }
 
+    nexus_printf("==================\n");
+    nexus_printf("%s", datalog_program);
+    nexus_printf("------------------\n");
+
     if (datalog_evaluate(datalog_program, &datalog_answer)) {
         log_error("datalog_evaluate() FAILED\n");
         goto out_err;
     }
 
-    nexus_printf("==================\n");
-    nexus_printf("%s", datalog_program);
-    nexus_printf("------------------\n");
     nexus_printf("%s\n", datalog_answer);
     nexus_printf("==================\n\n");
 

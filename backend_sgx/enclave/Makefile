@@ -201,11 +201,11 @@ cscope:
 
 .PHONY: clean
 clean:
-	make clean -C abac/datalog-engine/lua
 	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o abac/*.o
 
 .PHONY: distclean
 distclean: clean
+	make -C abac/datalog-engine/lua clean
 	make -C mbedtls clean
 
 

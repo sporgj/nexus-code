@@ -489,7 +489,6 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
         return -1;
     }
 
-
     rs_cat(string_builder, " :- ");
 
     {
@@ -521,6 +520,16 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
         list_iterator_free(iter);
     }
 
+    if ((rule->atom_types & ATOM_TYPE_ALL) != ATOM_TYPE_ALL) {
+        if ((rule->atom_types & ATOM_TYPE_USER) == 0) {
+            rs_cat(string_builder, ", _dummy(U)");
+        }
+
+        if ((rule->atom_types & ATOM_TYPE_OBJECT) == 0) {
+            rs_cat(string_builder, ", _dummy(O)");
+        }
+    }
+
     rs_cat(string_builder, ".");
 
     return 0;
@@ -534,6 +543,8 @@ policy_rule_push_atom(struct policy_rule * rule, struct policy_atom * atom)
 {
     nexus_list_append(&rule->atoms, atom);
     rule->atom_count += 1;
+
+    rule->atom_types |= atom->atom_type;
 
     return 0;
 }
@@ -646,9 +657,10 @@ policy_rule_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_dest_ptr
     buffer += sizeof(struct __policy_rule_hdr);
     buflen -= sizeof(struct __policy_rule_hdr);
 
+    policy_rule->atom_count = 0;
 
     // parse the atoms
-    for (size_t i = 0; i < policy_rule->atom_count; i++) {
+    for (size_t i = 0; i < header->atom_count; i++) {
         uint8_t * next_ptr = NULL;
 
         struct policy_atom * atom = policy_atom_from_buf(buffer, buflen, &next_ptr);
@@ -661,7 +673,12 @@ policy_rule_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_dest_ptr
         buflen -= (next_ptr - buffer);
         buffer = next_ptr;
 
-        nexus_list_append(&policy_rule->atoms, atom);
+        policy_rule_push_atom(policy_rule, atom);
+    }
+
+    if (policy_rule->atom_count != header->atom_count) {
+        log_error("policy rule atom count is incorrect\n");
+        goto out_err;
     }
 
     *output_dest_ptr = buffer;
