@@ -321,6 +321,7 @@ __datalog_facts(struct access_request * access_req, rapidstring * string_builder
 
     if (attribute_table_export_facts(user_attr_table,
                                      access_req->attribute_store,
+                                     "u",
                                      string_builder,
                                      &user_attributes_skipped)) {
         log_error("could not export user facts\n");
@@ -329,6 +330,7 @@ __datalog_facts(struct access_request * access_req, rapidstring * string_builder
 
     if (attribute_table_export_facts(obj_attr_table,
                                      access_req->attribute_store,
+                                     "o",
                                      string_builder,
                                      &object_attributes_skipped)) {
         log_error("could not export object facts\n");

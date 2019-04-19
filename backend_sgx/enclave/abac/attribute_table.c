@@ -277,6 +277,7 @@ attribute_table_store(struct attribute_table * attribute_table, uint8_t * buffer
 int
 attribute_table_export_facts(struct attribute_table * attribute_table,
                              struct attribute_store * attribute_store,
+                             char                   * first_term,
                              rapidstring            * string_builder,
                              size_t                 * p_skip_count)
 {
@@ -304,8 +305,10 @@ attribute_table_export_facts(struct attribute_table * attribute_table,
         // append the fact to the string_builder
         rs_cat(string_builder, attr_term->name);
         rs_cat_n(string_builder, "(", 1);
+        rs_cat(string_builder, first_term);
+        rs_cat_n(string_builder, ", \"", 3);
         rs_cat(string_builder, attr_entry->attr_val);
-        rs_cat_n(string_builder, ").\n", 3);
+        rs_cat_n(string_builder, "\").\n", 4);
     } while(1);
 
     *p_skip_count = skip_count;

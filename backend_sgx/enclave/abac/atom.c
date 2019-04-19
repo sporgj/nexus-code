@@ -307,14 +307,12 @@ __stringify_regular_atom(struct policy_atom * atom, bool as_rule, rapidstring * 
             goto out_err;
         }
 
-        rs_cat(string_builder, ", \"");
+        rs_cat_n(string_builder, ", ", 2);
 
         if (__atom_argument_to_datalog(atom_arg, as_rule, string_builder)) {
             log_error("__atom_argument_to_datalog() FAILED\n");
             return -1;
         }
-
-        rs_cat(string_builder, "\"");
     }
 
     rs_cat(string_builder, ")");

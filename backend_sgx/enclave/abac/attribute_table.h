@@ -58,6 +58,7 @@ attribute_table_find(struct attribute_table * attribute_table, struct nexus_uuid
 int
 attribute_table_export_facts(struct attribute_table * attribute_table,
                              struct attribute_store * attribute_store,
+                             char                   * first_term,
                              rapidstring            * string_builder,
                              size_t                 * p_skip_count);
 
