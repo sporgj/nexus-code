@@ -4,6 +4,8 @@
 #include "../metadata.h"
 #include "../dentry.h"
 
+#include <libnexus_trusted/rapidstring.h>
+
 
 struct __sys_func {
     char * name;
@@ -147,4 +149,43 @@ system_function_execute(char * function_name, sys_func_type_t type, void * arg)
     }
 
     return sys_function->handler(arg);
+}
+
+int
+system_function_export_facts(void * arg, sys_func_type_t type, rapidstring * string_builder)
+{
+    struct __sys_func * sys_function = system_functions;
+    char * term = NULL;
+    size_t skipped = 0;
+
+    if (type == USER_FUNCTION) {
+        term = "(u, \"";
+    } else if (type == OBJECT_FUNCTION) {
+        term = "(o, \"";
+    } else {
+        log_error("unknown sys_function type\n");
+        return -1;
+    }
+
+    // XXX: optimize
+    for (; sys_function->name != NULL; sys_function++) {
+        if (sys_function->type != type) {
+            continue;
+        }
+
+        char * result = sys_function->handler(arg);
+        if (result == NULL) {
+            skipped += 1;
+            continue;
+        }
+
+        rs_cat(string_builder, sys_function->name);
+        rs_cat_n(string_builder, term, 5);
+        rs_cat(string_builder, result);
+        rs_cat_n(string_builder, "\").\n", 4);
+
+        nexus_free(result);
+    }
+
+    return 0;
 }

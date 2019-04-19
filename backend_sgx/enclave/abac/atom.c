@@ -1,5 +1,6 @@
 #include "abac_internal.h"
 #include "atom.h"
+#include "boolean_operators.h"
 
 #include <libnexus_trusted/nexus_str.h>
 

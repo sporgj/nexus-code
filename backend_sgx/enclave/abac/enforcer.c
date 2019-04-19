@@ -1,5 +1,7 @@
 #include "../libnexus_trusted/hashmap.h"
 
+#include "../enclave_internal.h"
+
 #include "abac_internal.h"
 #include "policy_store.h"
 #include "attribute_store.h"
@@ -334,6 +336,16 @@ __datalog_facts(struct access_request * access_req, rapidstring * string_builder
                                      string_builder,
                                      &object_attributes_skipped)) {
         log_error("could not export object facts\n");
+        return -1;
+    }
+
+    if (system_function_export_facts(global_user_struct, USER_FUNCTION, string_builder)) {
+        log_error("could not export user system function facts\n");
+        return -1;
+    }
+
+    if (system_function_export_facts(access_req->metadata, OBJECT_FUNCTION, string_builder)) {
+        log_error("could not export object system function facts\n");
         return -1;
     }
 
