@@ -7,7 +7,7 @@
 #include <nexus_log.h>
 
 #include "abac_internal.h"
-#include "policy_rule.h"
+#include "rule.h"
 #include "atom.h"
 
 

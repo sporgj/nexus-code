@@ -3,7 +3,7 @@
 
 #include "attribute_store.h"
 #include "policy_store.h"
-#include "policy_rule.h"
+#include "rule.h"
 #include "user_profile.h"
 
 

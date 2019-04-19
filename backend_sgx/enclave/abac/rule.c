@@ -1,5 +1,5 @@
 #include "abac_internal.h"
-#include "policy_rule.h"
+#include "rule.h"
 #include "atom.h"
 
 #include "../libnexus_trusted/nexus_str.h"

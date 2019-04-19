@@ -101,7 +101,7 @@ nexus_abac_objs := \
 	boolean_operators.o \
 	runtime.o \
 	parser_lexer.o \
-	policy_rule.o \
+	rule.o \
 	user_profile.o \
 	policy_store.o \
 	attribute_table.o \
