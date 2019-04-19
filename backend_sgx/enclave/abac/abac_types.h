@@ -83,3 +83,16 @@ typedef enum {
     USER_FUNCTION = 1,
     OBJECT_FUNCTION
 } sys_func_type_t;
+
+
+static atom_type_t
+atom_type_from_char(char c)
+{
+    if (c == 'u') {
+        return ATOM_TYPE_USER;
+    } else if (c == 'o') {
+        return ATOM_TYPE_OBJECT;
+    }
+
+    return ATOM_TYPE_NONE;
+}

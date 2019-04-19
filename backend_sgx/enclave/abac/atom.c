@@ -24,16 +24,6 @@ struct __atom_arg_buf {
 } __attribute__((packed));
 
 
-struct atom_argument {
-    atom_arg_type_t             arg_type;
-
-    union {
-        int                     number;
-        struct nexus_string   * nexus_str;
-    };
-};
-
-
 // --[[ atom_argument
 
 static struct atom_argument *
@@ -208,6 +198,22 @@ __atom_argument_to_datalog(struct atom_argument * atom_arg,
     return 0;
 }
 
+char *
+atom_argument_string_val(const struct atom_argument * atom_arg)
+{
+    if (atom_arg->arg_type == ATOM_ARG_NUMBER) {
+        char * buffer = nexus_malloc(10 + 1);
+
+        snprintf(buffer, 10, "%d", atom_arg->number);
+
+        return buffer;
+    } else if ((atom_arg->arg_type == ATOM_ARG_STRING) || (atom_arg->arg_type == ATOM_ARG_SYMBOL)) {
+        return strndup(atom_arg->nexus_str->_str, atom_arg->nexus_str->_sz);
+    }
+
+    return NULL;
+}
+
 // atom_argument ]]--
 
 
@@ -249,6 +255,15 @@ __stringify_boolean_atom(struct policy_atom * atom, bool as_rule, rapidstring * 
 {
     struct atom_argument * atom_arg = NULL;
     int index = 0;
+    const char * datalog_str = boolean_operator_to_datalog_str(atom->predicate);
+
+    if (datalog_str == NULL) {
+        log_error("boolean_operator_to_datalog_str() returned NULL\n");
+        return -1;
+    }
+
+    rs_cat(string_builder, datalog_str);
+    rs_cat(string_builder, "(");
 
 restart:
     atom_arg = nexus_list_get(&atom->args_list, index);
@@ -264,12 +279,17 @@ restart:
         goto restart;
     }
 
+    rs_cat(string_builder, ")");
+
     return 0;
 }
 
 static int
 __stringify_regular_atom(struct policy_atom * atom, bool as_rule, rapidstring * string_builder)
 {
+    rs_cat(string_builder, atom->predicate);
+    rs_cat(string_builder, "(");
+
     if (atom->atom_type == ATOM_TYPE_USER) {
         rs_cat(string_builder, "U");
     } else if (atom->atom_type == ATOM_TYPE_OBJECT) {
@@ -297,6 +317,8 @@ __stringify_regular_atom(struct policy_atom * atom, bool as_rule, rapidstring * 
         rs_cat(string_builder, "\"");
     }
 
+    rs_cat(string_builder, ")");
+
     return 0;
 out_err:
     return -1;
@@ -305,9 +327,6 @@ out_err:
 int
 __policy_atom_to_str(struct policy_atom * atom, bool as_rule, rapidstring * string_builder)
 {
-    rs_cat(string_builder, atom->predicate);
-    rs_cat(string_builder, "(");
-
     if (atom->pred_type == PREDICATE_ATTR || atom->pred_type == PREDICATE_FUNC) {
         if (__stringify_regular_atom(atom, as_rule, string_builder)) {
             return -1;
@@ -320,8 +339,6 @@ __policy_atom_to_str(struct policy_atom * atom, bool as_rule, rapidstring * stri
         log_error("unknown predicate type\n");
         return -1;
     }
-
-    rs_cat(string_builder, ")");
 
     return 0;
 }
@@ -501,6 +518,11 @@ policy_atom_push_arg(struct policy_atom * atom, char * str, atom_arg_type_t arg_
     return 0;
 }
 
+const struct atom_argument *
+policy_atom_get_arg(struct policy_atom * atom, size_t index)
+{
+    return nexus_list_get(&atom->args_list, index);
+}
 
 void
 policy_atom_set_uuid(struct policy_atom * atom, struct nexus_uuid * uuid)
@@ -528,11 +550,8 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
     }
 }
 
-
-// FIXME: this function should have an optional argument that checks for the uuid.
-// this will allow policies to validate their atoms even after an attribute has been aliased.
 static bool
-__validate_abac_attribute_atom(struct policy_atom * atom)
+__check_attribute(char * attribute_name, atom_type_t atom_type, struct nexus_uuid * uuid_optional)
 {
     const struct attribute_term * term             = NULL;
     struct attribute_store      * global_attrstore = abac_acquire_attribute_store(NEXUS_FREAD);
@@ -542,19 +561,19 @@ __validate_abac_attribute_atom(struct policy_atom * atom)
         return false;
     }
 
-    term = attribute_store_find_name(global_attrstore, atom->predicate);
+    term = attribute_store_find_name(global_attrstore, attribute_name);
 
     if (term == NULL) {
-        log_error("could not find attribute (%s) in store\n", atom->predicate);
+        log_error("could not find attribute (%s) in store\n", attribute_name);
         goto out_err;
     }
 
-    if (atom->atom_type == ATOM_TYPE_USER) {
+    if (atom_type == ATOM_TYPE_USER) {
         if (term->type != USER_ATTRIBUTE_TYPE) {
             log_error("the atom_type is `user`, but attribute_type is NOT\n");
             goto out_err;
         }
-    } else if (atom->atom_type == ATOM_TYPE_OBJECT) {
+    } else if (atom_type == ATOM_TYPE_OBJECT) {
         if (term->type != OBJECT_ATTRIBUTE_TYPE) {
             log_error("the atom_type is `object`, but attribute_type is NOT\n");
             goto out_err;
@@ -564,7 +583,9 @@ __validate_abac_attribute_atom(struct policy_atom * atom)
         goto out_err;
     }
 
-    nexus_uuid_copy(&term->uuid, &atom->attr_uuid);
+    if (uuid_optional) {
+        nexus_uuid_copy(&term->uuid, uuid_optional);
+    }
 
     abac_release_attribute_store();
 
@@ -575,27 +596,41 @@ out_err:
     return false;
 }
 
+// FIXME: this function should have an optional argument that checks for the uuid.
+// this will allow policies to validate their atoms even after an attribute has been aliased.
 static bool
-__validate_system_function_atom(struct policy_atom * atom)
+__validate_abac_attribute_atom(struct policy_atom * atom)
 {
-    if (atom->atom_type == ATOM_TYPE_OBJECT) {
-        if (!system_function_exists(atom->predicate, OBJECT_FUNCTION)) {
-            log_error("could not find object function (%s)\n", atom->predicate);
+    return __check_attribute(atom->predicate, atom->atom_type, &atom->attr_uuid);
+}
+
+static bool
+__check_system_function(char * function_name, atom_type_t atom_type)
+{
+    if (atom_type == ATOM_TYPE_OBJECT) {
+        if (!system_function_exists(function_name, OBJECT_FUNCTION)) {
+            log_error("could not find object function (%s)\n", function_name);
             return false;
         }
 
         return true;
-    } else if (atom->atom_type == ATOM_TYPE_USER) {
-        if (!system_function_exists(atom->predicate, USER_FUNCTION)) {
-            log_error("could not find user function (%s)\n", atom->predicate);
+    } else if (atom_type == ATOM_TYPE_USER) {
+        if (!system_function_exists(function_name, USER_FUNCTION)) {
+            log_error("could not find user function (%s)\n", function_name);
             return false;
         }
 
         return true;
     }
 
-    log_error("unknown atom type, can't validate system_function predicate\n");
+    log_error("unknown atom_type\n");
     return false;
+}
+
+static bool
+__validate_system_function_atom(struct policy_atom * atom)
+{
+    return __check_system_function(atom->predicate, atom->atom_type);
 }
 
 static bool
@@ -604,6 +639,40 @@ __validate_boolean_operator_atom(struct policy_atom * atom)
     if (atom->arity != 2) {
         log_error("boolean operator atom must have arity of 2\n");
         return false;
+    }
+
+    for (int index = 0; index < 2; index++) {
+        struct atom_argument * atom_arg = nexus_list_get(&atom->args_list, index);
+
+        if (atom_arg->arg_type != ATOM_ARG_SYMBOL) {
+            continue;
+        }
+
+        // get the string, and validate the attribute/sys_function
+        char * string_val = atom_arg->nexus_str->_str;
+
+        if (atom_arg->nexus_str->_sz < 2) {
+            log_error("symbol size is too small\n");
+            return false;
+        }
+
+        atom_type_t atom_type = atom_type_from_char(string_val[0]);
+        if (atom_type == ATOM_TYPE_NONE) {
+            log_error("invalid symbole(%s), neither user or object\n", string_val);
+            return false;
+        }
+
+        if (string_val[2] == '@') {
+            if (!__check_system_function(&string_val[2], atom_type)) {
+                log_error("__check_system_function() FAILED\n");
+                return false;
+            }
+        } else {
+            if (!__check_attribute(&string_val[2], atom_type, NULL)) {
+                log_error("__check_attribute() FAILED\n");
+                return false;
+            }
+        }
     }
 
     return true;

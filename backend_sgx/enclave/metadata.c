@@ -500,3 +500,16 @@ nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
 
     return 0;
 }
+
+struct attribute_table *
+metadata_get_attribute_table(struct nexus_metadata * metadata)
+{
+    if (metadata->type == NEXUS_DIRNODE) {
+        return metadata->dirnode->attribute_table;
+    } else if (metadata->type == NEXUS_FILENODE) {
+        return metadata->filenode->attribute_table;
+    } else {
+        log_error("incorrect metadata type\n");
+        return NULL;
+    }
+}

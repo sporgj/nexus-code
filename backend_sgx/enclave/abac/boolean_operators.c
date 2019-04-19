@@ -72,6 +72,18 @@ __find_boolean_operator(char * boolean_str)
     return NULL;
 }
 
+const char *
+boolean_operator_to_datalog_str(char * boolean_str)
+{
+    struct __bool_op * bool_operator = __find_boolean_operator(boolean_str);
+
+    if (bool_operator == NULL) {
+        return NULL;
+    }
+
+    return bool_operator->datalog_str;
+}
+
 bool
 boolean_operator_exists(char * boolean_str)
 {

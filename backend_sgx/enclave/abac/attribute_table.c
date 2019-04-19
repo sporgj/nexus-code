@@ -275,6 +275,45 @@ attribute_table_store(struct attribute_table * attribute_table, uint8_t * buffer
 }
 
 int
+attribute_table_export_facts(struct attribute_table * attribute_table,
+                             struct attribute_store * attribute_store,
+                             rapidstring            * string_builder,
+                             size_t                 * p_skip_count)
+{
+    const struct attribute_term * attr_term;
+
+    struct hashmap_iter iter;
+
+    size_t skip_count = 0;
+
+    hashmap_iter_init(&attribute_table->attribute_map, &iter);
+
+    do {
+        struct attribute_entry * attr_entry = hashmap_iter_next(&iter);
+        if (attr_entry == NULL) {
+            break;
+        }
+
+        attr_term = attribute_store_find_uuid(attribute_store, &attr_entry->attr_uuid);
+        if (attr_term == NULL) {
+            // TODO maybe report here?
+            skip_count += 1;
+            continue;
+        }
+
+        // append the fact to the string_builder
+        rs_cat(string_builder, attr_term->name);
+        rs_cat_n(string_builder, "(", 1);
+        rs_cat(string_builder, attr_entry->attr_val);
+        rs_cat_n(string_builder, ").\n", 3);
+    } while(1);
+
+    *p_skip_count = skip_count;
+
+    return 0;
+}
+
+int
 UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
                           struct attribute_store    * attribute_store,
                           struct nxs_attribute_pair * attribute_pair_array,

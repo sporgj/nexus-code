@@ -9,6 +9,8 @@
 #include "abac_internal.h"
 #include "abac_types.h"
 
+#include <libnexus_trusted/rapidstring.h>
+
 
 struct attribute_table {
     struct nexus_uuid       uuid;
@@ -52,6 +54,12 @@ attribute_table_del(struct attribute_table * attribute_table, struct nexus_uuid 
 const char *
 attribute_table_find(struct attribute_table * attribute_table, struct nexus_uuid * uuid);
 
+/// exports all the attribute pairs as datalog facts
+int
+attribute_table_export_facts(struct attribute_table * attribute_table,
+                             struct attribute_store * attribute_store,
+                             rapidstring            * string_builder,
+                             size_t                 * p_skip_count);
 
 // writes all the attribute pairs stored in the table
 int
