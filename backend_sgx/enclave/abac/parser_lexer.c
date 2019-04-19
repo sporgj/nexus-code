@@ -8,6 +8,7 @@
 
 #include "abac_internal.h"
 #include "policy_rule.h"
+#include "atom.h"
 
 
 #define MAX_ARGUMENT_LEN  (256)
@@ -453,14 +454,19 @@ __parse_regular_atom_type(struct my_parser * parser, struct policy_atom * atom)
     // now get the remaining arguments
     struct my_token * token = __next_token(parser);
     if (token->type == TOK_COMMA) {
-        // get the argument
         token = __next_token(parser);
-        if ((token->type != TOK_STRING) && (token->type != TOK_NUMBER)) {
+        atom_arg_type_t arg_type;
+
+        if (token->type == TOK_STRING) {
+            arg_type = ATOM_ARG_STRING;
+        } else if (token->type == TOK_NUMBER) {
+            arg_type = ATOM_ARG_NUMBER;
+        } else {
             log_error("expected string/number at position=%zu\n", token->pos);
             goto out_err;
         }
 
-        if (policy_atom_push_arg(atom, token->val)) {
+        if (policy_atom_push_arg(atom, token->val, arg_type)) {
             log_error("policy_atom_push_arg() FAILED\n");
             goto out_err;
         }
@@ -480,19 +486,32 @@ static int
 __parse_boolean_atom_type(struct my_parser * parser, struct policy_atom * atom)
 {
     struct my_token * token = __next_token(parser);
-
+    atom_arg_type_t arg_type;
     int args_pushed = 0;
 
 push_arg:
-    if (!(token->type == TOK_DOTNOTATION || token->type == TOK_STRING
-          || token->type == TOK_NUMBER)) {
+    if (token->type == TOK_DOTNOTATION) {
+        arg_type = ATOM_ARG_SYMBOL;
+    } else if (token->type == TOK_STRING) {
+        arg_type = ATOM_ARG_STRING;
+    } else if (token->type == TOK_NUMBER) {
+        arg_type = ATOM_ARG_NUMBER;
+    } else {
         log_error("expected dot var/string/number at position=%zu\n", token->pos);
         return -1;
     }
 
-    if (policy_atom_push_arg(atom, token->val)) {
+    if (policy_atom_push_arg(atom, token->val, arg_type)) {
         log_error("policy_atom_push_arg() FAILED\n");
         return -1;
+    }
+
+    if (token->type == TOK_DOTNOTATION) {
+        if (token->val[0] == 'u') {
+            atom->atom_type |= ATOM_TYPE_USER;
+        } else if (token->val[0] == 'o') {
+            atom->atom_type |= ATOM_TYPE_OBJECT;
+        }
     }
 
     args_pushed += 1;
@@ -516,13 +535,6 @@ __parse_atom(struct my_parser * parser)
 
     struct policy_atom * atom = NULL;
 
-    char * predicate = NULL;
-
-
-    if (token->type != TOK_IDENTIFIER && !token_is_boolean_op(token)) {
-        log_error("expected identifier or boolen op at position=%zu\n", token->pos);
-        return -1;
-    }
 
     // create the policy_atom
     if (token->type == TOK_IDENTIFIER) {

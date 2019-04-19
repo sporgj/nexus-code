@@ -3,7 +3,8 @@
 #include "../libnexus_trusted/rapidstring.h"
 
 
-/* policy rule stuff */
+int
+__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder);
 
 struct policy_rule *
 policy_rule_new(perm_type_t permission);
@@ -31,35 +32,3 @@ policy_rule_to_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen);
 
 struct policy_rule *
 policy_rule_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_dest_ptr);
-
-
-
-/* policy atom */
-
-struct policy_atom *
-policy_atom_new();
-
-struct policy_atom *
-policy_atom_new_from_predicate(char * predicate);
-
-void
-policy_atom_free(struct policy_atom * atom);
-
-size_t
-policy_atom_buf_size(struct policy_atom * atom);
-
-char *
-policy_atom_to_str(struct policy_atom * atom);
-
-int
-policy_atom_push_arg(struct policy_atom * atom, char * str);
-
-void
-policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str);
-
-bool
-policy_atom_is_valid(struct policy_atom * atom);
-
-
-int
-__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder);
