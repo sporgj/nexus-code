@@ -95,6 +95,7 @@ datalog_engine_objs := $(foreach o,$(_datalog_engine_objs),datalog-engine/$(o))
 
 nexus_abac_objs := \
 	$(datalog_engine_objs) \
+	value.o \
 	atom.o \
 	enforcer.o \
 	system_functions.o \
