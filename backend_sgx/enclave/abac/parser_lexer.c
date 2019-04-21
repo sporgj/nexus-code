@@ -9,6 +9,7 @@
 #include "abac_internal.h"
 #include "rule.h"
 #include "atom.h"
+#include "value.h"
 
 
 #define MAX_ARGUMENT_LEN  (256)
@@ -429,6 +430,22 @@ __consume_token(struct my_parser * parser, token_type_t expected_type)
     return 0;
 }
 
+static struct abac_value *
+__abac_value_from_token(struct my_token * token)
+{
+    if (token->type == TOK_DOTNOTATION) {
+        return abac_value_from_str(token->val, true);
+    } else if (token->type == TOK_STRING) {
+        return abac_value_from_str(token->val, false);
+    } else if (token->type == TOK_NUMBER) {
+        int number = atoi(token->val);
+        return abac_value_from_int(number);
+    } else {
+        log_error("expected dot var/string/number at position=%zu\n", token->pos);
+        return NULL;
+    }
+}
+
 static int
 __parse_regular_atom_type(struct my_parser * parser, struct policy_atom * atom)
 {
@@ -455,18 +472,15 @@ __parse_regular_atom_type(struct my_parser * parser, struct policy_atom * atom)
     struct my_token * token = __next_token(parser);
     if (token->type == TOK_COMMA) {
         token = __next_token(parser);
-        atom_arg_type_t arg_type;
+        struct abac_value * abac_value = NULL;
 
-        if (token->type == TOK_STRING) {
-            arg_type = ATOM_ARG_STRING;
-        } else if (token->type == TOK_NUMBER) {
-            arg_type = ATOM_ARG_NUMBER;
-        } else {
+        if ((token->type != TOK_STRING) && (token->type == TOK_NUMBER)) {
             log_error("expected string/number at position=%zu\n", token->pos);
             goto out_err;
         }
 
-        if (policy_atom_push_arg(atom, token->val, arg_type)) {
+        abac_value = __abac_value_from_token(token);
+        if (policy_atom_push_arg(atom, abac_value)) {
             log_error("policy_atom_push_arg() FAILED\n");
             goto out_err;
         }
@@ -486,22 +500,21 @@ static int
 __parse_boolean_atom_type(struct my_parser * parser, struct policy_atom * atom)
 {
     struct my_token * token = __next_token(parser);
-    atom_arg_type_t arg_type;
+
+    struct abac_value * abac_value = NULL;
+
     int args_pushed = 0;
 
 push_arg:
-    if (token->type == TOK_DOTNOTATION) {
-        arg_type = ATOM_ARG_SYMBOL;
-    } else if (token->type == TOK_STRING) {
-        arg_type = ATOM_ARG_STRING;
-    } else if (token->type == TOK_NUMBER) {
-        arg_type = ATOM_ARG_NUMBER;
-    } else {
-        log_error("expected dot var/string/number at position=%zu\n", token->pos);
+    abac_value = __abac_value_from_token(token);
+
+    if (abac_value == NULL) {
+        log_error("could not derive abac value\n");
         return -1;
     }
 
-    if (policy_atom_push_arg(atom, token->val, arg_type)) {
+    if (policy_atom_push_arg(atom, abac_value)) {
+        abac_value_free(abac_value);
         log_error("policy_atom_push_arg() FAILED\n");
         return -1;
     }

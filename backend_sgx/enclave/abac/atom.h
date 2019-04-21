@@ -1,5 +1,7 @@
 #include "abac_types.h"
 
+#include "value.h"
+
 #include "../libnexus_trusted/nexus_str.h"
 #include "../libnexus_trusted/rapidstring.h"
 
@@ -14,10 +16,7 @@ typedef enum {
 struct atom_argument {
     atom_arg_type_t             arg_type;
 
-    union {
-        int                     number;
-        struct nexus_string   * nexus_str;
-    };
+    struct abac_value         * abac_value;
 };
 
 
@@ -43,7 +42,7 @@ struct policy_atom *
 policy_atom_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_ptr);
 
 int
-policy_atom_push_arg(struct policy_atom * atom, char * str, atom_arg_type_t arg_type);
+policy_atom_push_arg(struct policy_atom * atom, struct abac_value * abac_value);
 
 const struct atom_argument *
 policy_atom_get_arg(struct policy_atom * atom, size_t index);

@@ -27,44 +27,11 @@ struct __atom_arg_buf {
 
 // --[[ atom_argument
 
-static struct atom_argument *
-__atom_arg_from_number(int number)
-{
-    struct atom_argument * atom_arg = nexus_malloc(sizeof(struct atom_argument));
-
-    atom_arg->arg_type = ATOM_ARG_NUMBER;
-    atom_arg->number = number;
-
-    return atom_arg;
-}
-
-static struct atom_argument *
-__atom_arg_from_symbol(char * str)
-{
-    struct atom_argument * atom_arg = nexus_malloc(sizeof(struct atom_argument));
-
-    atom_arg->arg_type = ATOM_ARG_SYMBOL;
-    atom_arg->nexus_str = nexus_string_from_str(str);
-
-    return atom_arg;
-}
-
-static struct atom_argument *
-__atom_arg_from_string(char * str)
-{
-    struct atom_argument * atom_arg = nexus_malloc(sizeof(struct atom_argument));
-
-    atom_arg->arg_type = ATOM_ARG_STRING;
-    atom_arg->nexus_str = nexus_string_from_str(str);
-
-    return atom_arg;
-}
-
 static void
 __atom_argument_free(struct atom_argument * atom_arg)
 {
-    if (atom_arg->nexus_str) {
-        nexus_free(atom_arg->nexus_str);
+    if (atom_arg->abac_value) {
+        nexus_free(atom_arg->abac_value);
     }
 
     nexus_free(atom_arg);
@@ -73,16 +40,7 @@ __atom_argument_free(struct atom_argument * atom_arg)
 static size_t
 __atom_argument_buf_size(struct atom_argument * atom_arg)
 {
-    size_t total_size = sizeof(atom_arg_type_t);
-
-    if ((atom_arg->arg_type == ATOM_ARG_STRING) ||
-        (atom_arg->arg_type == ATOM_ARG_SYMBOL)) {
-        return total_size + nexus_string_buf_size(atom_arg->nexus_str);
-    } else if (atom_arg->arg_type == ATOM_ARG_NUMBER) {
-        return total_size + sizeof(atom_arg->number);
-    }
-
-    return 0;
+    return sizeof(atom_arg_type_t) + abac_value_bufsize(atom_arg->abac_value);
 }
 
 static struct atom_argument *
@@ -91,40 +49,23 @@ __atom_argument_from_buffer(uint8_t * buffer, size_t buflen, uint8_t ** output_p
     struct atom_argument  * atom_arg = nexus_malloc(sizeof(struct atom_argument));
     struct __atom_arg_buf * arg_buf  = (struct __atom_arg_buf *)buffer;
 
+    size_t bytes_left = buflen - sizeof(struct __atom_arg_buf);
 
-    atom_arg->arg_type = arg_buf->arg_type;
+    atom_arg->arg_type   = arg_buf->arg_type;
+    atom_arg->abac_value = abac_value_from_buf(&arg_buf->arg_val, bytes_left, output_ptr);
 
-    if ((atom_arg->arg_type == ATOM_ARG_STRING) ||
-        (atom_arg->arg_type == ATOM_ARG_SYMBOL)) {
-        size_t    bytes_left = buflen - sizeof(struct __atom_arg_buf);
-        uint8_t * next_ptr   = buffer + sizeof(struct __atom_arg_buf);
-
-        atom_arg->nexus_str = nexus_string_from_buf(next_ptr, bytes_left, output_ptr);
-        if (atom_arg->nexus_str == NULL) {
-            log_error("nexus_string_from_buf() FAILED\n");
-            goto out_err;
-        }
-    } else if (atom_arg->arg_type == ATOM_ARG_NUMBER) {
-        memcpy(&arg_buf->arg_val, &atom_arg->number, sizeof(int));
-        *output_ptr = arg_buf->arg_val + sizeof(int);
-    } else {
-        log_error("unknown atom_argument type\n");
-        goto out_err;
+    if (atom_arg->abac_value == NULL) {
+        log_error("abac_value_from_buf() FAILED\n");
+        return NULL;
     }
 
-
     return atom_arg;
-out_err:
-    __atom_argument_free(atom_arg);
-
-    return NULL;
 }
 
 static uint8_t *
 __atom_argument_to_buffer(struct atom_argument * atom_arg, uint8_t * buffer, size_t buflen)
 {
     struct __atom_arg_buf * arg_buf    = (struct __atom_arg_buf *)buffer;
-    size_t                  bytes_left = buflen - sizeof(struct __atom_arg_buf);
 
     size_t                  total_size = __atom_argument_buf_size(atom_arg);
 
@@ -135,29 +76,15 @@ __atom_argument_to_buffer(struct atom_argument * atom_arg, uint8_t * buffer, siz
 
     arg_buf->arg_type = atom_arg->arg_type;
 
-    if ((atom_arg->arg_type == ATOM_ARG_STRING) ||
-        (atom_arg->arg_type == ATOM_ARG_SYMBOL)) {
-        uint8_t * next_ptr = nexus_string_to_buf(atom_arg->nexus_str, arg_buf->arg_val, bytes_left);
+    // write the buffer
+    size_t bytes_left = buflen - sizeof(struct __atom_arg_buf);
 
-        if (next_ptr == NULL) {
-            log_error("nexus_string_to_buf() FAILED\n");
-            goto out_err;
-        }
-
-        if (next_ptr != (buffer + total_size)) {
-            log_error("atom argument serialization not at end of buffer\n");
-            goto out_err;
-        }
-    } else if (atom_arg->arg_type == ATOM_ARG_NUMBER) {
-        memcpy(&arg_buf->arg_val, &atom_arg->number, sizeof(int));
-    } else {
-        log_error("unknown atom_argument type\n");
-        goto out_err;
+    if (abac_value_to_buf(atom_arg->abac_value, arg_buf->arg_val, bytes_left) == NULL) {
+        log_error("abac_value_to_buf() FAILED\n");
+        return NULL;
     }
 
     return (buffer + total_size);
-out_err:
-    return NULL;
 }
 
 static int
@@ -165,54 +92,13 @@ __atom_argument_to_datalog(struct atom_argument * atom_arg,
                            bool                   as_rule,
                            rapidstring          * string_builder)
 {
-    if (atom_arg->arg_type == ATOM_ARG_SYMBOL) {
-        // append 'u' or 'o'
-        if (as_rule) {
-            char c = atom_arg->nexus_str->_str[0];
-            if (c == 'u') {
-                rs_cat_n(string_builder, "U", 1);
-            } else if (c == 'o') {
-                rs_cat_n(string_builder, "O", 1);
-            }
-        } else {
-            rs_cat_n(string_builder, atom_arg->nexus_str->_str, 1);
-        }
-
-        // if we have a dot notation, split the argument
-        if (atom_arg->nexus_str->_sz > 2) {
-            rs_cat_n(string_builder, ", ", 2);
-            rs_cat(string_builder, &atom_arg->nexus_str->_str[2]);
-        }
-    } else if (atom_arg->arg_type == ATOM_ARG_STRING) {
-        rs_cat_n(string_builder, "\"", 1);
-        rs_cat(string_builder, atom_arg->nexus_str->_str);
-        rs_cat_n(string_builder, "\"", 1);
-    } else if (atom_arg->arg_type == ATOM_ARG_NUMBER) {
-        char buffer[10] = {0};
-        snprintf(buffer, sizeof(buffer), "%d", atom_arg->number);
-        rs_cat(string_builder, buffer);
-    } else {
-        log_error("unknown atom_argument type\n");
-        return -1;
-    }
-
-    return 0;
+    return abac_value_as_datalog(atom_arg->abac_value, string_builder, as_rule);
 }
 
 char *
 atom_argument_string_val(const struct atom_argument * atom_arg)
 {
-    if (atom_arg->arg_type == ATOM_ARG_NUMBER) {
-        char * buffer = nexus_malloc(10 + 1);
-
-        snprintf(buffer, 10, "%d", atom_arg->number);
-
-        return buffer;
-    } else if ((atom_arg->arg_type == ATOM_ARG_STRING) || (atom_arg->arg_type == ATOM_ARG_SYMBOL)) {
-        return strndup(atom_arg->nexus_str->_str, atom_arg->nexus_str->_sz);
-    }
-
-    return NULL;
+    return abac_value_stringify(atom_arg->abac_value);
 }
 
 // atom_argument ]]--
@@ -488,26 +374,11 @@ out_err:
 }
 
 int
-policy_atom_push_arg(struct policy_atom * atom, char * str, atom_arg_type_t arg_type)
+policy_atom_push_arg(struct policy_atom * atom, struct abac_value * abac_value)
 {
-    struct atom_argument * atom_arg = NULL;
+    struct atom_argument * atom_arg = nexus_malloc(sizeof(struct atom_argument));
 
-    if (arg_type == ATOM_ARG_NUMBER) {
-        int val = atoi(str);
-        atom_arg = __atom_arg_from_number(val);
-    } else if (arg_type == ATOM_ARG_STRING) {
-        atom_arg = __atom_arg_from_string(str);
-    } else if (arg_type == ATOM_ARG_SYMBOL) {
-        atom_arg = __atom_arg_from_symbol(str);
-    } else {
-        log_error("unknown argument type\n");
-        return -1;
-    }
-
-    if (atom_arg == NULL) {
-        log_error("could not create atom_arg\n");
-        return -1;
-    }
+    atom_arg->abac_value = abac_value;
 
     atom->arity        += 1;
     atom->args_bufsize += __atom_argument_buf_size(atom_arg);
@@ -648,9 +519,9 @@ __validate_boolean_operator_atom(struct policy_atom * atom)
         }
 
         // get the string, and validate the attribute/sys_function
-        char * string_val = atom_arg->nexus_str->_str;
+        char * string_val = __abac_value_get_rawptr(atom_arg->abac_value);
 
-        if (atom_arg->nexus_str->_sz < 2) {
+        if (strnlen(string_val, _ABAC_VALUE_MAXLEN) < 2) {
             log_error("symbol size is too small\n");
             return false;
         }
