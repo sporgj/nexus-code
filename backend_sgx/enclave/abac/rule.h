@@ -1,10 +1,11 @@
+#include <stdbool.h>
 #include "abac_types.h"
 
 #include "../libnexus_trusted/rapidstring.h"
 
 
 int
-__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder);
+__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder, bool as_rule);
 
 struct policy_rule *
 policy_rule_new(perm_type_t permission);

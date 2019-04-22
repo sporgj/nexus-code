@@ -109,7 +109,7 @@ __free_access_request(struct access_request * access_req)
     nexus_free(access_req);
 }
 
-static char *
+static struct abac_value *
 __execute_attribute(struct access_request * access_req,
                     char                  * name,
                     atom_type_t             atom_type)
@@ -140,10 +140,10 @@ __execute_attribute(struct access_request * access_req,
         return NULL;
     }
 
-    return strndup(value, NXS_ATTRIBUTE_VALUE_MAX);
+    return abac_value_from_str(value);
 }
 
-static char *
+static struct abac_value *
 __execute_sysfunction(struct access_request * access_req,
                       char                  * function_str,
                       atom_type_t             atom_type)
@@ -159,18 +159,24 @@ __execute_sysfunction(struct access_request * access_req,
     return NULL;
 }
 
-static char *
+static struct abac_value *
 __get_arg_operand(struct access_request * access_req, const struct atom_argument * atom_arg)
 {
-    if (atom_arg->arg_type == ATOM_ARG_STRING || atom_arg->arg_type == ATOM_ARG_NUMBER) {
-        return atom_argument_string_val(atom_arg);
-    } else if (atom_arg->arg_type != ATOM_ARG_SYMBOL) {
+    struct abac_value * abac_value = atom_arg->abac_value;
+
+    switch (abac_value->type) {
+    case ABAC_VALUE_STRING:
+    case ABAC_VALUE_NUMBER:
+        return abac_value_shallow_copy(atom_arg->abac_value);
+    case ABAC_VALUE_IDENTIFIER:
+        goto abac_identifier;
+    default:
         log_error("unknown atom argument type\n");
         return NULL;
     }
 
 
-    // ATOM_ARG_SYMBOL
+abac_identifier:
     {
         char * symbol = atom_argument_string_val(atom_arg);
 
@@ -195,11 +201,11 @@ __get_arg_operand(struct access_request * access_req, const struct atom_argument
 static int
 __extract_booloperator(struct access_request * access_req, struct policy_atom * atom)
 {
-    const struct atom_argument * left_arg = policy_atom_get_arg(atom, 1);
-    const struct atom_argument * right_arg = policy_atom_get_arg(atom, 2);
+    const struct atom_argument * left_arg = policy_atom_get_arg(atom, 0);
+    const struct atom_argument * right_arg = policy_atom_get_arg(atom, 1);
 
-    char * left_operand = __get_arg_operand(access_req, left_arg);
-    char * right_operand = __get_arg_operand(access_req, right_arg);
+    struct abac_value * left_operand = __get_arg_operand(access_req, left_arg);
+    struct abac_value * right_operand = __get_arg_operand(access_req, right_arg);
 
     bool eval_true = false;
 
@@ -225,17 +231,17 @@ __extract_booloperator(struct access_request * access_req, struct policy_atom * 
         __put_fact(access_req, atom_str);
     }
 
-    nexus_free(left_operand);
-    nexus_free(right_operand);
+    abac_value_free(left_operand);
+    abac_value_free(right_operand);
 
     return 0;
 out_err:
     if (left_operand) {
-        nexus_free(left_operand);
+        abac_value_free(left_operand);
     }
 
     if (right_operand) {
-        nexus_free(right_operand);
+        abac_value_free(right_operand);
     }
 
     return -1;
@@ -408,7 +414,7 @@ build_datalog_program(struct access_request * access_req)
 
     rs_cat(&string_builder, "\n");
 
-    if (__permission_type_to_datalog(access_req->permission, &string_builder)) {
+    if (__permission_type_to_datalog(access_req->permission, &string_builder, false)) {
         log_error("__permission_type_to_datalog() FAILED\n");
         goto out_err;
     }

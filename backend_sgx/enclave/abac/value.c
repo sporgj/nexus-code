@@ -36,18 +36,30 @@ __abac_value_from_data(void * data, size_t size, abac_value_type_t value_type)
     return abac_value;
 }
 
+struct abac_value *
+abac_value_shallow_copy(struct abac_value * abac_value)
+{
+    struct abac_value * new_abac_value = NULL;
+
+    new_abac_value = __abac_value_from_data(abac_value->raw_ptr, abac_value->data_sz, abac_value->type);
+
+    new_abac_value->is_shallow_copy = true;
+
+    return new_abac_value;
+}
+
 void
 abac_value_free(struct abac_value * abac_value)
 {
-    if (abac_value->type != ABAC_VALUE_NUMBER) {
+    if (!(abac_value->is_shallow_copy) && (abac_value->type != ABAC_VALUE_NUMBER)) {
         nexus_free(abac_value->raw_ptr);
     }
 
     nexus_free(abac_value);
 }
 
-struct abac_value *
-abac_value_from_str(char * string, bool is_identifier)
+static inline struct abac_value *
+__abac_value_from_str(char * string, bool is_identifier)
 {
     size_t sz = strnlen(string, _ABAC_VALUE_MAXLEN);
 
@@ -57,6 +69,18 @@ abac_value_from_str(char * string, bool is_identifier)
     memcpy(copy, string, sz);
 
     return __abac_value_from_data(copy, sz + 1, type);
+}
+
+struct abac_value *
+abac_value_from_str(char * string)
+{
+    return __abac_value_from_str(string, false);
+}
+
+struct abac_value *
+abac_value_from_str_as_identifier(char * string)
+{
+    return __abac_value_from_str(string, true);
 }
 
 struct abac_value *

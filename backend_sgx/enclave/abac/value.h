@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <libnexus_trusted/rapidstring.h>
 
@@ -15,6 +16,8 @@ typedef enum {
 
 struct abac_value {
     abac_value_type_t type;
+
+    bool              is_shallow_copy;
 
     size_t            data_sz;
 
@@ -36,12 +39,18 @@ __abac_value_get_rawptr(struct abac_value * abac_value);
 struct abac_value *
 __abac_value_from_data(void * data, size_t len, abac_value_type_t value_type);
 
+struct abac_value *
+abac_value_shallow_copy(struct abac_value * abac_value);
+
 void
 abac_value_free(struct abac_value * abac_value);
 
 
 struct abac_value *
-abac_value_from_str(char * string, bool is_identifier);
+abac_value_from_str(char * string);
+
+struct abac_value *
+abac_value_from_str_as_identifier(char * string);
 
 struct abac_value *
 abac_value_from_int(int intval);

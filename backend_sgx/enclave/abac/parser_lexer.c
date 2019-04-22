@@ -434,9 +434,9 @@ static struct abac_value *
 __abac_value_from_token(struct my_token * token)
 {
     if (token->type == TOK_DOTNOTATION) {
-        return abac_value_from_str(token->val, true);
+        return abac_value_from_str_as_identifier(token->val);
     } else if (token->type == TOK_STRING) {
-        return abac_value_from_str(token->val, false);
+        return abac_value_from_str(token->val);
     } else if (token->type == TOK_NUMBER) {
         int number = atoi(token->val);
         return abac_value_from_int(number);

@@ -9,27 +9,27 @@
 
 struct __sys_func {
     char * name;
-    char * (*handler)(void * arg);
+    struct abac_value * (*handler)(void * arg);
 
     sys_func_type_t type;
 };
 
 
-char *
+struct abac_value *
 __handle_uname(void * arg)
 {
     // TODO
     return NULL;
 }
 
-char *
+struct abac_value *
 __handle_upkey(void * arg)
 {
     // TODO
     return NULL;
 }
 
-char *
+struct abac_value *
 __handle_opath(void * arg)
 {
     struct nexus_metadata * metadata = arg;
@@ -37,13 +37,13 @@ __handle_opath(void * arg)
     struct nexus_dentry * dentry = metadata_get_dentry(metadata);
 
     if (dentry) {
-        return dentry_get_fullpath(dentry);
+        return abac_value_from_str(dentry_get_fullpath(dentry));
     }
 
     return NULL;
 }
 
-char *
+struct abac_value *
 __handle_oname(void * arg)
 {
     struct nexus_metadata * metadata = arg;
@@ -51,35 +51,35 @@ __handle_oname(void * arg)
     struct nexus_dentry * dentry = metadata_get_dentry(metadata);
 
     if (dentry) {
-        return strndup(dentry->name, NEXUS_NAME_MAX);
+        return abac_value_from_str(dentry->name);
     }
 
     return NULL;
 }
 
-char *
+struct abac_value *
 __handle_osize(void * arg)
 {
     struct nexus_metadata * metadata = arg;
 
     if (metadata->type == NEXUS_DIRNODE) {
-        return metadata->dirnode->dir_entry_count;
+        return abac_value_from_int(metadata->dirnode->dir_entry_count);
     } else if (metadata->type == NEXUS_FILENODE) {
-        return metadata->filenode->filesize;
+        return abac_value_from_int(metadata->filenode->filesize);
     }
 
     return NULL;
 }
 
-char *
+struct abac_value *
 __handle_otype(void * arg)
 {
     struct nexus_metadata * metadata = arg;
 
     if (metadata->type == NEXUS_DIRNODE) {
-        return strndup("dir", 4);
+        return abac_value_from_str("dir");
     } else if (metadata->type == NEXUS_FILENODE) {
-        return strndup("file", 5);
+        return abac_value_from_str("file");
     }
 
     return NULL;
@@ -128,7 +128,7 @@ system_function_exists(char * function_name, sys_func_type_t type)
     return true;
 }
 
-char *
+struct abac_value *
 system_function_execute(char * function_name, sys_func_type_t type, void * arg)
 {
     struct __sys_func * sys_function = __find_system_function(function_name);
@@ -173,18 +173,21 @@ system_function_export_facts(void * arg, sys_func_type_t type, rapidstring * str
             continue;
         }
 
-        char * result = sys_function->handler(arg);
+        struct abac_value * result = sys_function->handler(arg);
         if (result == NULL) {
             skipped += 1;
             continue;
         }
 
+        char * string_val = abac_value_stringify(result);
+
         rs_cat(string_builder, sys_function->name);
         rs_cat_n(string_builder, term, 5);
-        rs_cat(string_builder, result);
+        rs_cat(string_builder, string_val);
         rs_cat_n(string_builder, "\").\n", 4);
 
-        nexus_free(result);
+        nexus_free(string_val);
+        abac_value_free(result);
     }
 
     return 0;

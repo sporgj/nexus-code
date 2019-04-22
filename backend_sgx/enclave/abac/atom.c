@@ -20,7 +20,6 @@ struct __policy_atom_buf {
 
 
 struct __atom_arg_buf {
-    atom_arg_type_t         arg_type;
     uint8_t                 arg_val[0];
 } __attribute__((packed));
 
@@ -40,7 +39,7 @@ __atom_argument_free(struct atom_argument * atom_arg)
 static size_t
 __atom_argument_buf_size(struct atom_argument * atom_arg)
 {
-    return sizeof(atom_arg_type_t) + abac_value_bufsize(atom_arg->abac_value);
+    return abac_value_bufsize(atom_arg->abac_value);
 }
 
 static struct atom_argument *
@@ -51,7 +50,6 @@ __atom_argument_from_buffer(uint8_t * buffer, size_t buflen, uint8_t ** output_p
 
     size_t bytes_left = buflen - sizeof(struct __atom_arg_buf);
 
-    atom_arg->arg_type   = arg_buf->arg_type;
     atom_arg->abac_value = abac_value_from_buf(&arg_buf->arg_val, bytes_left, output_ptr);
 
     if (atom_arg->abac_value == NULL) {
@@ -73,8 +71,6 @@ __atom_argument_to_buffer(struct atom_argument * atom_arg, uint8_t * buffer, siz
         log_error("the buffer is too small. total_size=%zu, buflen=%zu\n", total_size, buflen);
         return NULL;
     }
-
-    arg_buf->arg_type = atom_arg->arg_type;
 
     // write the buffer
     size_t bytes_left = buflen - sizeof(struct __atom_arg_buf);
@@ -514,7 +510,7 @@ __validate_boolean_operator_atom(struct policy_atom * atom)
     for (int index = 0; index < 2; index++) {
         struct atom_argument * atom_arg = nexus_list_get(&atom->args_list, index);
 
-        if (atom_arg->arg_type != ATOM_ARG_SYMBOL) {
+        if (atom_arg->abac_value->type != ABAC_VALUE_IDENTIFIER) {
             continue;
         }
 

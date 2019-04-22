@@ -6,16 +6,7 @@
 #include "../libnexus_trusted/rapidstring.h"
 
 
-typedef enum {
-    ATOM_ARG_NUMBER    = 0x01,
-    ATOM_ARG_STRING    = 0x02,
-    ATOM_ARG_SYMBOL    = 0x03,
-} atom_arg_type_t;
-
-
 struct atom_argument {
-    atom_arg_type_t             arg_type;
-
     struct abac_value         * abac_value;
 };
 

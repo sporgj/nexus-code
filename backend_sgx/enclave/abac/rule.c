@@ -94,18 +94,24 @@ policy_rule_datalog_string(struct policy_rule * rule)
 }
 
 int
-__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder)
+__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder, bool as_rule)
 {
     switch (perm_type) {
     case PERM_READ:
-        rs_cat(string_builder, "read(U, O)");
+        rs_cat(string_builder, "read");
         break;
     case PERM_WRITE:
-        rs_cat(string_builder, "write(U, O)");
+        rs_cat(string_builder, "write");
         break;
     default:
         log_error("invalid policy_rule type\n");
         return -1;
+    }
+
+    if (as_rule) {
+        rs_cat(string_builder, "(U, O)");
+    } else {
+        rs_cat(string_builder, "(u, o)");
     }
 
     return 0;
@@ -119,7 +125,7 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
         return -1;
     }
 
-    if (__permission_type_to_datalog(rule->perm_type, string_builder)) {
+    if (__permission_type_to_datalog(rule->perm_type, string_builder, true)) {
         log_error("__permission_type_to_datalog() FAILED\n");
         return -1;
     }
