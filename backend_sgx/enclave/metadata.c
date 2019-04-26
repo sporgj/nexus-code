@@ -508,6 +508,8 @@ metadata_get_attribute_table(struct nexus_metadata * metadata)
         return metadata->dirnode->attribute_table;
     } else if (metadata->type == NEXUS_FILENODE) {
         return metadata->filenode->attribute_table;
+    } else if (metadata->type == NEXUS_USER_PROFILE) {
+        return metadata->user_profile->attribute_table;
     } else {
         log_error("incorrect metadata type\n");
         return NULL;
