@@ -289,3 +289,18 @@ nexus_base64_encode(uint8_t * src_buf, uint32_t src_len)
     return base64_str;
 
 }
+
+char *
+nexus_hex_encode(uint8_t * src_buf, uint32_t src_len)
+{
+    size_t base16_len = (src_len * 2) + 1;
+    char * base16_str = nexus_malloc(base16_len); // XXX: returns a zeroed buffer
+
+    for (size_t i = 0; i < src_len; i++) {
+        snprintf(&base16_str[(i << 1)], (base16_len - i), "%02x", src_buf[i]);
+    }
+
+    return base16_str;
+}
+
+

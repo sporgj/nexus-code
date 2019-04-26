@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "nexus_encode.h"
+
 #include "../enclave_internal.h"
 
 int
@@ -135,4 +137,10 @@ uint32_t
 nexus_uuid_hash(struct nexus_uuid * uuid)
 {
     return fnv_32_buf(uuid, sizeof(struct nexus_uuid), 0);
+}
+
+char *
+nexus_uuid_to_hex(struct nexus_uuid * uuid)
+{
+    return nexus_hex_encode((uint8_t *)uuid, sizeof(struct nexus_uuid));
 }

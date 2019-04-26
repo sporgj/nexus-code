@@ -50,6 +50,9 @@ bool nexus_uuid_is_valid(struct nexus_uuid * uuid);
 uint32_t
 nexus_uuid_hash(struct nexus_uuid * uuid);
 
+char *
+nexus_uuid_to_hex(struct nexus_uuid * uuid);
+
 
 // used for hashtable key
 

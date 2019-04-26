@@ -25,3 +25,6 @@ nexus_base64_decode(char      * alt_str,
 char *
 nexus_base64_encode(uint8_t   * src_buf,
 		    uint32_t    src_len);
+
+char *
+nexus_hex_encode(uint8_t * src_buf, uint32_t src_len);
