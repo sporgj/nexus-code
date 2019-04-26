@@ -62,6 +62,14 @@ attribute_table_export_facts(struct attribute_table * attribute_table,
                              rapidstring            * string_builder,
                              size_t                 * p_skip_count);
 
+int
+attribute_table_export_to_datalog_db(struct attribute_table * attribute_table,
+                                     struct attribute_store * attribute_store,
+                                     struct nexus_uuid      * object_uuid,
+                                     rapidstring            * string_builder,
+                                     size_t                 * p_skip_count);
+
+
 // writes all the attribute pairs stored in the table
 int
 UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,

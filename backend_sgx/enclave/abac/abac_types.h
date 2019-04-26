@@ -48,6 +48,11 @@ struct attribute_term {
     struct nexus_uuid        uuid;
 };
 
+struct name_value_pair {
+    char name[ATTRIBUTE_NAME_MAX];
+    char * value;
+};
+
 
 struct policy_atom {
     atom_type_t             atom_type;
@@ -95,4 +100,17 @@ atom_type_from_char(char c)
     }
 
     return ATOM_TYPE_NONE;
+}
+
+static char *
+perm_type_to_string(perm_type_t perm_type)
+{
+    switch (perm_type) {
+    case PERM_READ:
+        return strndup("read", 5);
+    case PERM_WRITE:
+        return strndup("write", 6);
+    }
+
+    return NULL;
 }

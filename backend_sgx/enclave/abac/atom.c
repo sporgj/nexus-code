@@ -560,3 +560,118 @@ policy_atom_is_valid(struct policy_atom * atom)
     return false;
 }
 
+int
+policy_atom_add_to_engine(struct policy_atom * atom, dl_db_t db)
+{
+    struct nexus_list_iterator * iter = NULL;
+
+
+    if (atom->pred_type == PREDICATE_BOOL) {
+        log_error("boolean atoms are not supported\n");
+        return -1;
+    }
+
+    if (dl_pushliteral(db)) {
+        log_error("dl_pushliteral() for atom FAILED\n");
+        return -1;
+    }
+
+    // push the predicate
+    if (dl_pushstring(db, atom->predicate)) {
+        log_error("dl_pushstring('%s')\n", atom->predicate);
+        return -1;
+    }
+
+    if (dl_addpred(db)) {
+        log_error("dl_addpred() of atom's predicate FAILED\n");
+        return -1;
+    }
+
+    // push "u|o"
+    {
+        const char * user_or_object_term = NULL;
+
+        switch (atom->atom_type) {
+        case ATOM_TYPE_OBJECT:
+            user_or_object_term = "O";
+            break;
+        case ATOM_TYPE_USER:
+            user_or_object_term = "U";
+            break;
+        default:
+            log_error("unknown atom type\n");
+            return -1;
+        }
+
+        if (dl_pushstring(db, user_or_object_term)) {
+            log_error("dl_pushstring() user_or_object_term\n");
+            return -1;
+        }
+
+        if (dl_addvar(db)) {
+            log_error("dl_addvar() FAILED\n");
+            return -1;
+        }
+    }
+
+    // push the nuumber of string argument
+    iter = list_iterator_new(&atom->args_list);
+
+    {
+        const struct atom_argument * atom_arg = list_iterator_get(iter);
+
+        if (atom_arg == NULL) {
+            log_error("iteratorr returned NULL\n");
+            goto out_err;
+        }
+
+        char * string_val = atom_argument_string_val(atom_arg);
+
+        if (string_val == NULL) {
+            log_error("atom_argument_string_val() FAILED\n");
+            goto out_err;
+        }
+
+        if (dl_pushstring(db, string_val)) {
+            log_error("dl_pushstring(`%s`) FAILED\n", string_val);
+            nexus_free(string_val);
+            goto out_err;
+        }
+
+        nexus_free(string_val);
+
+        switch (atom_arg->abac_value->type) {
+        case ABAC_VALUE_IDENTIFIER:
+            if (dl_addvar(db)) {
+                log_error("could not add atom's variable\n");
+                goto out_err;
+            }
+            break;
+        case ABAC_VALUE_STRING:
+        case ABAC_VALUE_NUMBER:
+            if (dl_addconst(db)) {
+                log_error("could not add atom's constant\n");
+                goto out_err;
+            }
+            break;
+        default:
+            log_error("abac value unknown\n");
+            goto out_err;
+        }
+
+        list_iterator_next(iter);
+    } while (list_iterator_is_valid(iter));
+
+    if (dl_makeliteral(db)) {
+        log_error("dl_makeliteral() FAILED\n");
+        goto out_err;
+    }
+
+    list_iterator_free(iter);
+    return 0;
+
+out_err:
+    list_iterator_free(iter);
+    return -1;
+}
+

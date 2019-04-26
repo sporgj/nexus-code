@@ -31,14 +31,14 @@ abac_global_export_macversion(struct mac_and_version * macversion)
 }
 
 
-static inline struct nexus_uuid *
-__attribute_store_uuid()
+struct nexus_uuid *
+abac_attribute_store_uuid()
 {
     return &global_supernode->abac_superinfo.attribute_store_uuid;
 }
 
-static inline struct nexus_uuid *
-__policy_store_uuid()
+struct nexus_uuid *
+abac_policy_store_uuid()
 {
     return &global_supernode->abac_superinfo.policy_store_uuid;
 }
@@ -46,7 +46,7 @@ __policy_store_uuid()
 struct attribute_store *
 abac_acquire_attribute_store(nexus_io_flags_t flags)
 {
-    struct nexus_uuid * uuid = __attribute_store_uuid();
+    struct nexus_uuid * uuid = abac_attribute_store_uuid();
 
     bool has_changed;
 
@@ -85,7 +85,7 @@ abac_release_attribute_store()
 struct policy_store *
 abac_acquire_policy_store(nexus_io_flags_t flags)
 {
-    struct nexus_uuid * uuid = __policy_store_uuid();
+    struct nexus_uuid * uuid = abac_policy_store_uuid();
 
     bool has_changed;
 
@@ -131,6 +131,11 @@ abac_runtime_mount()
 
     if (abac_acquire_policy_store(NEXUS_FREAD) == NULL) {
         log_error("could not load policy store\n");
+        return -1;
+    }
+
+    if (bouncer_init()) {
+        log_error("bouncer_init() FAILED\n");
         return -1;
     }
 

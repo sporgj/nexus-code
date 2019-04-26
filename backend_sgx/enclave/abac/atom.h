@@ -5,6 +5,8 @@
 #include "../libnexus_trusted/nexus_str.h"
 #include "../libnexus_trusted/rapidstring.h"
 
+#include "./datalog-engine/datalog.h"
+
 
 struct atom_argument {
     struct abac_value         * abac_value;
@@ -51,3 +53,6 @@ __policy_atom_to_str(struct policy_atom * atom, bool as_rule, rapidstring * stri
 // converts what ever type stored in the argument to a string value
 char *
 atom_argument_string_val(const struct atom_argument * atom_arg);
+
+int
+policy_atom_add_to_engine(struct policy_atom * atom, dl_db_t db);

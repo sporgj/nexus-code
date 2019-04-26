@@ -4,6 +4,8 @@
 #include "../metadata.h"
 #include "../dentry.h"
 
+#include "../enclave_internal.h"
+
 #include <libnexus_trusted/rapidstring.h>
 
 
@@ -15,11 +17,16 @@ struct __sys_func {
 };
 
 
+const char *
+sys_func_get_name(struct __sys_func * sys_func)
+{
+    return sys_func->name;
+}
+
 struct abac_value *
 __handle_uname(void * arg)
 {
-    // TODO
-    return NULL;
+    return abac_value_from_str(global_user_struct->name);
 }
 
 struct abac_value *
@@ -191,4 +198,41 @@ system_function_export_facts(void * arg, sys_func_type_t type, rapidstring * str
     }
 
     return 0;
+}
+
+
+struct nexus_list *
+system_function_export_sysfuncs(sys_func_type_t type)
+{
+    struct nexus_list * result_list  = nexus_malloc(sizeof(struct nexus_list));
+    struct __sys_func * sys_function = system_functions;
+
+    nexus_list_init(result_list);
+
+    for (; sys_function->name != NULL; sys_function++) {
+        if (sys_function->type != type) {
+            continue;
+        }
+
+        nexus_list_append(result_list, sys_function);
+    }
+
+    return result_list;
+}
+
+// TODO optimize this. double allocation/copy with abac_value
+char *
+system_function_run(struct __sys_func * sys_func, void * arg)
+{
+    struct abac_value * abac_value = sys_func->handler(arg);
+
+    if (abac_value == NULL) {
+        return NULL;
+    }
+
+    char * string_val = abac_value_stringify(abac_value);
+
+    abac_value_free(abac_value);
+
+    return string_val;
 }

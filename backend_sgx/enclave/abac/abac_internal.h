@@ -17,6 +17,12 @@ extern struct nexus_metadata  * global_supernode_metadata;
 int
 abac_global_export_macversion(struct mac_and_version * macversion);
 
+struct nexus_uuid *
+abac_attribute_store_uuid();
+
+struct nexus_uuid *
+abac_policy_store_uuid();
+
 
 // utils for converting attribute_type
 int

@@ -31,6 +31,14 @@ abac_runtime_destroy();
 int
 abac_runtime_create();
 
+int
+bouncer_init();
+
+void
+bouncer_destroy();
+
+bool
+bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type);
 
 
 // get/put for user profiles

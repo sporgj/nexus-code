@@ -3,6 +3,8 @@
 
 #include "../libnexus_trusted/rapidstring.h"
 
+#include "./datalog-engine/datalog.h"
+
 
 int
 __permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder, bool as_rule);
@@ -33,3 +35,6 @@ policy_rule_to_buf(struct policy_rule * rule, uint8_t * buffer, size_t buflen);
 
 struct policy_rule *
 policy_rule_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_dest_ptr);
+
+int
+policy_rule_add_to_engine(struct policy_rule * rule, dl_db_t db);
