@@ -1,4 +1,5 @@
 #include "internal.h"
+#include "engine.h"
 
 #include <libnexus_trusted/nexus_util.h>
 
@@ -95,4 +96,108 @@ datalog_evaluate(char * datalog_buffer_IN, char ** string_ans)
 err:
     dl_close(database);
     return -1;
+}
+
+dl_db_t
+datalog_engine_create()
+{
+    return dl_open();
+}
+
+void
+datalog_engine_destroy(dl_db_t db)
+{
+    dl_close(db);
+}
+
+static int
+__push_query_to_db(dl_db_t db, char * permission_str, char * user_uuid_str, char * obj_uuid_str)
+{
+    if (dl_pushliteral(db)) {
+        log_error("dl_pushliteral() FAILED\n");
+        goto out_err;
+    }
+
+    // push the predicate
+    {
+        if (dl_pushstring(db, permission_str)) {
+            log_error("dl_pushstring() of `%s` FAILED\n", permission_str);
+            goto out_err;
+        }
+
+        if (dl_addpred(db)) {
+            log_error("dl_addpred() for permission_string failed\n");
+            goto out_err;
+        }
+    }
+
+    // push the first constant (user_uuid)
+    {
+        if (dl_pushstring(db, user_uuid_str)) {
+            log_error("dl_pushstring() of `%s` FAILED\n", user_uuid_str);
+            goto out_err;
+        }
+
+        if (dl_addconst(db)) {
+            log_error("dl_addconst() for user_uuid_str failed\n");
+            goto out_err;
+        }
+    }
+
+    // push the second constant (obj_uuid)
+    {
+        if (dl_pushstring(db, obj_uuid_str)) {
+            log_error("dl_pushstring() of `%s` FAILED\n", obj_uuid_str);
+            goto out_err;
+        }
+
+        if (dl_addconst(db)) {
+            log_error("dl_addconst() for obj_uuid_str failed\n");
+            goto out_err;
+        }
+    }
+
+    // make the literal, and then push the query
+    if (dl_makeliteral(db)) {
+        log_error("dl_makeliteral() FAILED\n");
+        goto out_err;
+    }
+
+    return 0;
+out_err:
+    return -1;
+}
+
+bool
+datalog_engine_is_true(dl_db_t db,
+                       char *  permission_str,
+                       char *  user_uuid_str,
+                       char *  obj_uuid_str)
+{
+    dl_answers_t answers = NULL;
+
+    int mark = dl_mark(db);
+
+    if (__push_query_to_db(db, permission_str, user_uuid_str, obj_uuid_str)) {
+        log_error("__push_query_to_db() FAILED\n");
+        goto out_err;
+    }
+
+    if (dl_ask(db, &answers)) {
+        log_error("could not get answers\n");
+        goto out_err;
+    }
+
+    if (answers == NULL) {
+        return false;
+    }
+
+    // TODO print out answers
+
+    dl_free(answers);
+
+    return true;
+out_err:
+    dl_reset(db, mark);
+    return false;
 }
