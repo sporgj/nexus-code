@@ -46,6 +46,8 @@ ecall_fs_create(char                * dirpath_IN,
         return -1;
     }
 
+    nexus_abac_access_check(metadata, PERM_WRITE);
+
     if (!bouncer_access_check(metadata, PERM_WRITE)) {
         log_error("you are not allowed\n");
         goto out;

@@ -8,6 +8,8 @@
 #include <libnexus_trusted/nexus_uuid.h>
 #include <libnexus_trusted/hashmap.h>
 
+#include "system_functions.h"
+
 #include "value.h"
 
 
@@ -180,6 +182,7 @@ __new_cached_element(struct nexus_uuid * uuid)
     cached_element->uuid_str = nexus_uuid_to_hex(uuid);
 
     hashmap_init(&cached_element->attribute_facts, (hashmap_cmp_fn)__attribute_facts_cmp, NULL, 17);
+    hashmap_init(&cached_element->sysfunc_facts, (hashmap_cmp_fn)__sysfunc_facts_cmp, NULL, 7);
 
     return cached_element;
 }
@@ -385,6 +388,11 @@ __insert_db_fact(dl_db_t      db,
         }
     }
 
+    if (dl_makeliteral(db)) {
+        log_error("dl_makeliteral() FAILED\n");
+        goto out_err;
+    }
+
     // push the head and make a clause
     {
         if (dl_pushhead(db)) {
@@ -460,46 +468,6 @@ out_err:
 }
 
 static int
-__insert_attribute_table(struct abac_request     * abac_req,
-                         struct __cached_element * cached_element,
-                         struct attribute_table  * attribute_table)
-{
-    struct hashmap_iter iter;
-    size_t  skip_count = 0;
-
-    hashmap_iter_init(&attribute_table->attribute_map, &iter);
-
-    // start iterating the attribute table
-    do {
-        const struct attribute_term * attr_term;
-
-        struct attribute_entry      * attr_entry = hashmap_iter_next(&iter);
-
-        if (attr_entry == NULL) {
-            break;
-        }
-
-        attr_term = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
-
-        if (attr_term == NULL) {
-            // TODO maybe report here?
-            skip_count += 1;
-            continue;
-        }
-
-        if (__register_attribute_fact(cached_element,
-                                      &attr_entry->attr_uuid,
-                                      attr_term->name,
-                                      attr_entry->attr_val)) {
-            log_error("could not push attribute pair (%s)\n", attr_term->name);
-            return -1;
-        }
-    } while (1);
-
-    return 0;
-}
-
-static int
 __insert_system_functions(void                    * user_or_object,
                           struct __cached_element * cached_element,
                           struct nexus_list       * sysfacts_list)
@@ -542,7 +510,7 @@ next:
 
 
 static int
-__insert_access_sysfuncs(struct abac_request * abac_req)
+__abac_request_insert_sysfuncs(struct abac_request * abac_req)
 {
     struct nexus_list * usr_sysfacts = NULL;
     struct nexus_list * obj_sysfacts = NULL;
@@ -583,7 +551,45 @@ out_err:
 }
 
 static int
-__insert_access_attributes(struct abac_request * abac_req)
+__insert_attribute_table(struct abac_request     * abac_req,
+                         struct __cached_element * cached_element,
+                         struct attribute_table  * attribute_table)
+{
+    struct hashmap_iter iter;
+
+    hashmap_iter_init(&attribute_table->attribute_map, &iter);
+
+    // start iterating the attribute table
+    do {
+        const struct attribute_term * attr_term;
+
+        struct attribute_entry      * attr_entry = hashmap_iter_next(&iter);
+
+        if (attr_entry == NULL) {
+            break;
+        }
+
+        attr_term = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
+
+        if (attr_term == NULL) {
+            // TODO maybe report here?
+            continue;
+        }
+
+        if (__register_attribute_fact(cached_element,
+                                      &attr_entry->attr_uuid,
+                                      attr_term->name,
+                                      attr_entry->attr_val)) {
+            log_error("could not push attribute pair (%s)\n", attr_term->name);
+            return -1;
+        }
+    } while (1);
+
+    return 0;
+}
+
+static int
+__abac_request_insert_attributes(struct abac_request * abac_req)
 {
     struct attribute_table * user_attr_table = abac_req->user_profile->attribute_table;
 
@@ -608,12 +614,52 @@ out_err:
     return -1;
 }
 
+
 static int
-__insert_access_rules(struct abac_request * abac_req)
+__insert_policy_rule(struct abac_request * abac_req, struct policy_rule * rule)
+{
+    struct __cached_fact * cached_fact = NULL;
+
+    cached_fact = __find_attribute_fact(policy_rules_element, &rule->rule_uuid);
+
+    if (cached_fact == NULL) {
+        cached_fact = __put_attribute_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
+        if (cached_fact == NULL) {
+            log_error("could not cache policy rule\n");
+            goto out_err;
+        }
+    }
+
+    if (cached_fact->is_inserted == false) {
+        if (policy_rule_add_to_engine(rule, my_database)) {
+            log_error("policy_rule_add_to_engine() FAILED\n");
+            goto out_err;
+        }
+
+        int ret = dl_assert(my_database);
+
+        if (ret) {
+            if (ret == -1) {
+                log_error("unsafe rule asserted\n");
+            } else {
+                log_error("could not assert rule\n");
+            }
+
+            goto out_err;
+        }
+
+        cached_fact->is_inserted = true;
+    }
+
+    return 0;
+out_err:
+    return -1;
+}
+
+    static int
+__abac_request_insert_rules(struct abac_request * abac_req)
 {
     struct nexus_list_iterator * iter = NULL;
-
-    struct __cached_fact * cached_fact = NULL;
 
     if (abac_req->policy_store->rules_count == 0) {
         return NULL;
@@ -624,35 +670,10 @@ __insert_access_rules(struct abac_request * abac_req)
     do {
         struct policy_rule * rule = list_iterator_get(iter);
 
-        cached_fact = __find_attribute_fact(policy_rules_element, &rule->rule_uuid);
-
-        if (cached_fact == NULL) {
-            cached_fact = __put_attribute_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
-            if (cached_fact == NULL) {
-                log_error("could not cache policy rule\n");
-                goto out_err;
-            }
-        }
-
-        if (cached_fact->is_inserted == false) {
-            if (policy_rule_add_to_engine(rule, my_database)) {
-                log_error("policy_rule_add_to_engine() FAILED\n");
-                goto out_err;
-            }
-
-            int ret = dl_assert(my_database);
-
-            if (ret) {
-                if (ret == -1) {
-                    log_error("unsafe rule asserted\n");
-                } else {
-                    log_error("could not assert rule\n");
-                }
-
-                goto out_err;
-            }
-
-            cached_fact->is_inserted = true;
+        if (__insert_policy_rule(abac_req, rule)) {
+            list_iterator_free(iter);
+            log_error("__insert_policy_rule() FAILED\n");
+            return -1;
         }
 
         list_iterator_next(iter);
@@ -661,10 +682,6 @@ __insert_access_rules(struct abac_request * abac_req)
     list_iterator_free(iter);
 
     return 0;
-out_err:
-    list_iterator_free(iter);
-
-    return -1;
 }
 
 
@@ -736,14 +753,14 @@ __init_user_attributes()
         return -1;
     }
 
-    if (__insert_access_attributes(abac_req)) {
-        log_error("__insert_access_attributes() FAILED\n");
+    if (__abac_request_insert_attributes(abac_req)) {
+        log_error("__abac_request_insert_attributes() FAILED\n");
         __destroy_abac_request(abac_req);
         return -1;
     }
 
-    if (__insert_access_sysfuncs(abac_req)) {
-        log_error("__insert_access_sysfuncs() FAILED\n");
+    if (__abac_request_insert_sysfuncs(abac_req)) {
+        log_error("__abac_request_insert_sysfuncs() FAILED\n");
         __destroy_abac_request(abac_req);
         return -1;
     }
@@ -754,6 +771,9 @@ __init_user_attributes()
 }
 
 
+/**
+ * Adds a metadata uuid to the object_elements_map map cacche
+ */
 static struct __cached_element *
 __object_element_upsert(struct nexus_uuid * uuid)
 {
@@ -848,21 +868,18 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
 {
     struct abac_request * abac_req = __create_abac_request(metadata, perm_type);
 
-    struct attribute_table * user_attribute_table = NULL;
-    struct attribute_table * object_attribute_table = NULL;
-
     if (abac_req == NULL) {
         log_error("__create_abac_request() FAILED\n");
         return -1;
     }
 
-    if (__insert_access_attributes(abac_req)) {
-        log_error("__insert_access_attributes() FAILED\n");
-        return -1;
+    if (__abac_request_insert_attributes(abac_req)) {
+        log_error("__abac_request_insert_attributes() FAILED\n");
+        goto out_err;
     }
 
-    if (__insert_access_rules(abac_req)) {
-        log_error("__insert_access_rules() FAILED\n");
+    if (__abac_request_insert_rules(abac_req)) {
+        log_error("__abac_request_insert_rules() FAILED\n");
         goto out_err;
     }
 
