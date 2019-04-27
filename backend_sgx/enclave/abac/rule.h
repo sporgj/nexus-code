@@ -37,4 +37,4 @@ struct policy_rule *
 policy_rule_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_dest_ptr);
 
 int
-policy_rule_add_to_engine(struct policy_rule * rule, dl_db_t db);
+policy_rule_to_db(struct policy_rule * rule, dl_db_t db);

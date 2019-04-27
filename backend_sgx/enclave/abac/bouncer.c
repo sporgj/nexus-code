@@ -11,28 +11,8 @@
 #include "system_functions.h"
 
 #include "value.h"
-
-
-struct __cached_fact {
-    struct hashmap_entry hash_entry;
-    struct nexus_uuid    uuid;
-    char                 name[ATTRIBUTE_NAME_MAX];
-    char               * value;
-    struct abac_value  * abac_value;
-    bool                 is_inserted;
-};
-
-
-/// a cached element points to a user_profile/metadata fact
-struct __cached_element {
-    struct nexus_uuid uuid;
-    char *            uuid_str;
-
-    attribute_type_t  attr_type; // denotes whether _isUser/_isObject have been added
-
-    struct hashmap    attribute_facts;
-    struct hashmap    sysfunc_facts;
-};
+#include "fact.h"
+#include "db.h"
 
 
 struct abac_request {
@@ -48,185 +28,16 @@ struct abac_request {
 };
 
 
-static dl_db_t            my_database;
-
-
 static struct nexus_lru        * object_elements_map  = NULL;
 
 static struct __cached_element * user_profile_element = NULL;
 static struct __cached_element * policy_rules_element = NULL;
 
-
-static struct __cached_element *
-__object_element_upsert(struct nexus_uuid * uuid);
-
-
-static int
-__retract_db_fact(dl_db_t      db,
-                  const char * attribute_name,
-                  const char * object_name,
-                  const char * value);
-
-static int
-__assert_db_fact(dl_db_t      db,
-                 const char * attribute_name,
-                 const char * object_name,
-                 const char * value);
-
 static void
 __destroy_abac_request(struct abac_request * abac_req);
 
-
-static struct __cached_fact *
-__new_cached_fact(struct nexus_uuid * uuid, char * name, char * value)
-{
-    struct __cached_fact * new_fact = nexus_malloc(sizeof(struct __cached_fact));
-
-    if (uuid) {
-        nexus_uuid_copy(uuid, &new_fact->uuid);
-    }
-
-    strncpy(&new_fact->name, name, ATTRIBUTE_NAME_MAX);
-    new_fact->value = value;
-
-    return new_fact;
-}
-
-static void
-__free_cached_fact(struct __cached_fact * cached_fact)
-{
-    if (cached_fact->value) {
-        nexus_free(cached_fact->value);
-    }
-
-    if (cached_fact->abac_value) {
-        abac_value_free(cached_fact->abac_value);
-    }
-
-    nexus_free(cached_fact);
-}
-
-static struct __cached_fact *
-__put_attribute_fact(struct __cached_element * cached_element,
-                     struct nexus_uuid       * uuid,
-                     char                    * name,
-                     char                    * value)
-{
-    struct __cached_fact * new_fact = __new_cached_fact(uuid, name, value);
-
-    hashmap_entry_init(new_fact, memhash(&new_fact->uuid, sizeof(struct nexus_uuid)));
-
-    hashmap_add(&cached_element->attribute_facts, &new_fact->hash_entry);
-
-    return new_fact;
-}
-
-static struct __cached_fact *
-__put_sysfunc_fact(struct __cached_element * cached_element, char * name, char * value)
-{
-    struct __cached_fact * new_fact = __new_cached_fact(NULL, name, NULL);
-
-    hashmap_entry_init(new_fact, strhash(new_fact->name));
-
-    hashmap_add(&cached_element->sysfunc_facts, &new_fact->hash_entry);
-
-    return new_fact;
-}
-
-static struct __cached_fact *
-__find_attribute_fact(struct __cached_element * cached_element, struct nexus_uuid * uuid)
-{
-    struct __cached_fact   tmp_fact = {0};
-
-    nexus_uuid_copy(uuid, &tmp_fact.uuid);
-    hashmap_entry_init(&tmp_fact, memhash(&tmp_fact.uuid, sizeof(struct nexus_uuid)));
-
-    return hashmap_get(&cached_element->attribute_facts, &tmp_fact, NULL);
-}
-
-static struct __cached_fact *
-__find_sysfunc_fact(struct __cached_element * cached_element, char * name)
-{
-    struct __cached_fact   tmp_fact = {0};
-
-    strncpy(&tmp_fact.name, name, ATTRIBUTE_NAME_MAX);
-    hashmap_entry_init(&tmp_fact, strhash(tmp_fact.name));
-
-    return hashmap_get(&cached_element->sysfunc_facts, &tmp_fact, NULL);
-}
-
-static int
-__attribute_facts_cmp(const void                 * data,
-                      const struct __cached_fact * entry1,
-                      const struct __cached_fact * entry2,
-                      const void                 * keydata)
-{
-    return nexus_uuid_compare(&entry1->uuid, &entry2->uuid);
-}
-
-static int
-__sysfunc_facts_cmp(const void                 * data,
-                    const struct __cached_fact * entry1,
-                    const struct __cached_fact * entry2,
-                    const void                 * keydata)
-{
-    return strncmp(entry1->name, entry2->name, ATTRIBUTE_NAME_MAX);
-}
-
 static struct __cached_element *
-__new_cached_element(struct nexus_uuid * uuid)
-{
-    struct __cached_element * cached_element = nexus_malloc(sizeof(struct __cached_element));
-
-    nexus_uuid_copy(uuid, &cached_element->uuid);
-    cached_element->uuid_str = nexus_uuid_to_hex(uuid);
-
-    hashmap_init(&cached_element->attribute_facts, (hashmap_cmp_fn)__attribute_facts_cmp, NULL, 17);
-    hashmap_init(&cached_element->sysfunc_facts, (hashmap_cmp_fn)__sysfunc_facts_cmp, NULL, 7);
-
-    return cached_element;
-}
-
-static void
-__delete_element_facts(struct __cached_element * cached_element, struct hashmap * facts_map)
-{
-    struct hashmap_iter iter;
-
-    hashmap_iter_init(facts_map, &iter);
-
-    do {
-        struct __cached_fact * cached_fact = hashmap_iter_next(&iter);
-
-        if (cached_fact == NULL) {
-            break;
-        }
-
-        if (cached_fact->is_inserted) {
-            if (__retract_db_fact(my_database,
-                                  cached_fact->name,
-                                  cached_element->uuid_str,
-                                  cached_fact->value)) {
-                log_error("__retract_db_fact() FAILED\n");
-                continue;
-            }
-        }
-
-        __free_cached_fact(cached_fact);
-    } while (1);
-
-    hashmap_free(facts_map, 0);
-}
-
-static void
-__free_cached_element(struct __cached_element * cached_element)
-{
-    __delete_element_facts(cached_element, &cached_element->sysfunc_facts);
-    __delete_element_facts(cached_element, &cached_element->attribute_facts);
-
-    nexus_free(cached_element->uuid_str);
-    nexus_free(cached_element);
-}
-
+__object_element_upsert(struct nexus_uuid * uuid);
 
 
 
@@ -241,11 +52,8 @@ __register_fact_with_db(struct __cached_element * cached_element,
         }
 
         // retract from datalog engine and update the value
-        if (__retract_db_fact(my_database,
-                              cached_fact->name,
-                              cached_element->uuid_str,
-                              cached_fact->value)) {
-            log_error("__retract_db_fact() FAILED\n");
+        if (db_retract_fact(cached_fact)) {
+            log_error("db_retract_fact() FAILED\n");
             return -1;
         }
 
@@ -254,11 +62,8 @@ __register_fact_with_db(struct __cached_element * cached_element,
         cached_fact->is_inserted = false;
     }
 
-    if (__assert_db_fact(my_database,
-                         cached_fact->name,
-                         cached_element->uuid_str,
-                         cached_fact->value)) {
-        log_error("__assert_db_fact() FAILED\n");
+    if (db_assert_fact(cached_fact)) {
+        log_error("db_retract_fact() FAILED\n");
         return -1;
     }
 
@@ -267,205 +72,8 @@ __register_fact_with_db(struct __cached_element * cached_element,
     return 0;
 }
 
-static int
-__register_attribute_fact(struct __cached_element * cached_element,
-                          struct nexus_uuid       * attr_uuid,
-                          char                    * name,
-                          char                    * value)
-{
-    struct __cached_fact * cached_fact = __find_attribute_fact(cached_element, attr_uuid);
 
-    if (cached_fact == NULL) {
-        cached_fact = __put_attribute_fact(cached_element, attr_uuid, name, value);
-    }
-
-    return __register_fact_with_db(cached_element, cached_fact, value);
-}
-
-static int
-__register_sysfunc_fact(struct __cached_element * cached_element, char * name, char * value)
-{
-    struct __cached_fact * cached_fact = __find_sysfunc_fact(cached_element, name);
-
-    if (cached_fact == NULL) {
-        cached_fact = __put_sysfunc_fact(cached_element, name, value);
-    }
-
-    return __register_fact_with_db(cached_element, cached_fact, value);
-}
-
-static int
-__assert_cached_element_type(struct __cached_element * cached_element, attribute_type_t attr_type)
-{
-    if (attr_type == USER_ATTRIBUTE_TYPE) {
-        if (__assert_db_fact(my_database, "_isUser", cached_element->uuid_str, NULL)) {
-            log_error("could not assert _isUser db_fact\n");
-            return -1;
-        }
-    } else if (attr_type == OBJECT_ATTRIBUTE_TYPE) {
-        if (__assert_db_fact(my_database, "_isObject", cached_element->uuid_str, NULL)) {
-            log_error("could not assert _isObject db_fact\n");
-            return -1;
-        }
-    } else {
-        log_error("unknown attribute type\n");
-        return -1;
-    }
-
-    cached_element->attr_type = attr_type;
-
-    return 0;
-}
-
-static int
-__retract_cached_element_type(struct __cached_element * cached_element)
-{
-    if (cached_element->attr_type == USER_ATTRIBUTE_TYPE) {
-        if (__retract_db_fact(my_database, "_isUser", cached_element->uuid_str, NULL)) {
-            log_error("could not retract _isUser db_fact\n");
-            return -1;
-        }
-    } else if (cached_element->attr_type == OBJECT_ATTRIBUTE_TYPE) {
-        if (__retract_db_fact(my_database, "_isObject", cached_element->uuid_str, NULL)) {
-            log_error("could not retract _isObject db_fact\n");
-            return -1;
-        }
-    }
-
-    cached_element->attr_type = 0;
-
-    return 0;
-}
-
-
-static int
-__insert_db_fact(dl_db_t      db,
-                 const char * attribute_name,
-                 const char * object_name,
-                 const char * value)
-{
-    // goal: name(object_name, value)
-    if (dl_pushliteral(db)) {
-        log_error("dl_pushliteral() for fact FAILED\n");
-        goto out_err;
-    }
-
-    // the name is the predicate
-    {
-        if (dl_pushstring(db, attribute_name)) {
-            log_error("pushing rule predicate(`%s`) failed\n", attribute_name);
-            goto out_err;
-        }
-
-        if (dl_addpred(db)) {
-            log_error("dl_addpred() of atom's predicate FAILED\n");
-            goto out_err;
-        }
-    }
-
-    // add the object name
-    {
-        if (dl_pushstring(db, object_name)) {
-            log_error("could not push string `%s`\n", object_name);
-            goto out_err;
-        }
-
-        if (dl_addconst(db)) {
-            log_error("could not add constant\n");
-            goto out_err;
-        }
-    }
-
-    if (value) {
-        if (dl_pushstring(db, value)) {
-            log_error("could not push string `%s`\n", value);
-            goto out_err;
-        }
-
-        if (dl_addconst(db)) {
-            log_error("could not add constant\n");
-            goto out_err;
-        }
-    }
-
-    if (dl_makeliteral(db)) {
-        log_error("dl_makeliteral() FAILED\n");
-        goto out_err;
-    }
-
-    // push the head and make a clause
-    {
-        if (dl_pushhead(db)) {
-            log_error("dl_pushhead() FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_makeclause(db)) {
-            log_error("dl_makeclause() FAILED on __assert_fact()\n");
-            goto out_err;
-        }
-    }
-
-    return 0;
-out_err:
-    return -1;
-}
-
-static int
-__retract_db_fact(dl_db_t      db,
-                  const char * attribute_name,
-                  const char * object_name,
-                  const char * value)
-{
-    int mark = dl_mark(db);
-
-    if (__insert_db_fact(db, attribute_name, object_name, value)) {
-        log_error("__insert_db_fact() FAILED\n");
-        goto out_err;
-    }
-
-    if (dl_retract(db)) {
-        log_error("dl_retract() FAILED\n");
-        goto out_err;
-    }
-
-    return 0;
-
-out_err:
-    dl_reset(db, mark);
-    return -1;
-}
-
-static int
-__assert_db_fact(dl_db_t      db,
-                 const char * attribute_name,
-                 const char * object_name,
-                 const char * value)
-{
-    int mark = dl_mark(db);
-
-    if (__insert_db_fact(db, attribute_name, object_name, value)) {
-        log_error("__insert_db_fact() FAILED\n");
-        return -1;
-    }
-
-    int ret = dl_assert(db);
-
-    if (ret) {
-        if (ret == -1) {
-            log_error("unsafe fact asserted\n");
-        } else {
-            log_error("dl_assert() reported an error\n");
-        }
-
-        goto out_err;
-    }
-
-    return 0;
-out_err:
-    dl_reset(db, mark);
-    return -1;
-}
+// --[[ system facts
 
 static int
 __insert_system_functions(void                    * user_or_object,
@@ -473,6 +81,8 @@ __insert_system_functions(void                    * user_or_object,
                           struct nexus_list       * sysfacts_list)
 {
     struct nexus_list_iterator * iter = list_iterator_new(sysfacts_list);
+
+    struct __cached_fact * cached_fact = NULL;
 
     while (list_iterator_is_valid(iter)) {
         struct __sys_func * sys_func = list_iterator_get(iter);
@@ -486,16 +96,21 @@ __insert_system_functions(void                    * user_or_object,
         }
 
         // get the cached fact and compare its value
-        struct __cached_fact * cached_fact = __find_sysfunc_fact(cached_element, (char *)name);
+        cached_fact = cached_element_find_name_fact(cached_element, (char *)name);
 
-        if (cached_fact && (strncmp(new_value, cached_fact->value, ATTRIBUTE_VALUE_SIZE) == 0)) {
-            nexus_free(new_value);
-            goto next;
+        if (cached_fact) {
+            // if the value is unchanged, let's skip
+            if ((strncmp(new_value, cached_fact->value, ATTRIBUTE_VALUE_SIZE) == 0)) {
+                nexus_free(new_value);
+                goto next;
+            }
+        } else {
+            cached_fact = cached_element_put_name_fact(cached_element, name, new_value);
         }
 
-        if (__register_sysfunc_fact(cached_element, (char *)name, new_value)) {
+        if (__register_fact_with_db(cached_element, cached_fact, new_value)) {
             list_iterator_free(iter);
-            log_error("__register_sysfunc_fact() FAILED\n");
+            log_error("__register_fact_with_db() FAILED\n");
             return -1;
         }
 
@@ -507,7 +122,6 @@ next:
 
     return 0;
 }
-
 
 static int
 __abac_request_insert_sysfuncs(struct abac_request * abac_req)
@@ -548,6 +162,28 @@ out_err:
     }
 
     return ret;
+}
+
+// --]] system facts
+
+
+// --[[ attributes
+
+static int
+__register_attribute_fact(struct __cached_element * cached_element,
+                          struct nexus_uuid       * attr_uuid,
+                          char                    * name,
+                          char                    * value)
+{
+    struct __cached_fact * cached_fact = NULL;
+
+    cached_fact = cached_element_find_uuid_fact(cached_element, attr_uuid);
+
+    if (cached_fact == NULL) {
+        cached_fact = cached_element_put_uuid_fact(cached_element, attr_uuid, name, value);
+    }
+
+    return __register_fact_with_db(cached_element, cached_fact, value);
 }
 
 static int
@@ -614,37 +250,32 @@ out_err:
     return -1;
 }
 
+// --]] attributes
+
+
+// --[[ rules
 
 static int
 __insert_policy_rule(struct abac_request * abac_req, struct policy_rule * rule)
 {
     struct __cached_fact * cached_fact = NULL;
 
-    cached_fact = __find_attribute_fact(policy_rules_element, &rule->rule_uuid);
+    cached_fact = cached_element_find_uuid_fact(policy_rules_element, &rule->rule_uuid);
 
     if (cached_fact == NULL) {
-        cached_fact = __put_attribute_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
+        cached_fact
+            = cached_element_put_uuid_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
         if (cached_fact == NULL) {
             log_error("could not cache policy rule\n");
             goto out_err;
         }
+
+        cached_fact->is_rule = true;
     }
 
     if (cached_fact->is_inserted == false) {
-        if (policy_rule_add_to_engine(rule, my_database)) {
-            log_error("policy_rule_add_to_engine() FAILED\n");
-            goto out_err;
-        }
-
-        int ret = dl_assert(my_database);
-
-        if (ret) {
-            if (ret == -1) {
-                log_error("unsafe rule asserted\n");
-            } else {
-                log_error("could not assert rule\n");
-            }
-
+        if (db_assert_policy_rule(rule)) {
+            log_error("db_assert_policy_rule() FAILED\n");
             goto out_err;
         }
 
@@ -683,6 +314,8 @@ __abac_request_insert_rules(struct abac_request * abac_req)
 
     return 0;
 }
+
+// --]] rules
 
 
 static struct abac_request *
@@ -748,8 +381,8 @@ __init_user_attributes()
         return -1;
     }
 
-    if (__assert_cached_element_type(user_profile_element, USER_ATTRIBUTE_TYPE)) {
-        log_error("__assert_cached_element_type() FAILED\n");
+    if (db_assert_cached_element_type(user_profile_element, USER_ATTRIBUTE_TYPE)) {
+        log_error("db_assert_cached_element_type() FAILED\n");
         return -1;
     }
 
@@ -770,10 +403,6 @@ __init_user_attributes()
     return 0;
 }
 
-
-/**
- * Adds a metadata uuid to the object_elements_map map cacche
- */
 static struct __cached_element *
 __object_element_upsert(struct nexus_uuid * uuid)
 {
@@ -783,16 +412,16 @@ __object_element_upsert(struct nexus_uuid * uuid)
         return cached_element;
     }
 
-    cached_element = __new_cached_element(uuid);
+    cached_element = cached_element_new(uuid);
 
     if (!nexus_lru_put(object_elements_map, &cached_element->uuid, cached_element)) {
-        __free_cached_element(cached_element);
+        cached_element_free(cached_element);
         log_error("nexus_lru_put() FAILED\n");
         return NULL;
     }
 
-    if (__assert_cached_element_type(cached_element, OBJECT_ATTRIBUTE_TYPE)) {
-        log_error("__assert_cached_element_type() FAILED\n");
+    if (db_assert_cached_element_type(cached_element, OBJECT_ATTRIBUTE_TYPE)) {
+        log_error("db_assert_cached_element_type() FAILED\n");
         return -1;
     }
 
@@ -805,10 +434,10 @@ __object_element_freer(uintptr_t element, uintptr_t key)
     struct __cached_element * cached_element = element;
 
     if (cached_element->attr_type) {
-        __retract_cached_element_type(cached_element);
+        db_retract_cached_element_type(cached_element);
     }
 
-    __free_cached_element(element);
+    cached_element_free(element);
 }
 
 int
@@ -826,9 +455,9 @@ bouncer_init()
         object_elements_map
             = nexus_lru_create(16, __uuid_hasher, __uuid_equals, __object_element_freer);
 
-        policy_rules_element = __new_cached_element(abac_policy_store_uuid());
+        policy_rules_element = cached_element_new(abac_policy_store_uuid());
 
-        user_profile_element = __new_cached_element(&global_user_struct->user_uuid);
+        user_profile_element = cached_element_new(&global_user_struct->user_uuid);
     }
 
     if (__init_user_attributes()) {
@@ -855,11 +484,11 @@ bouncer_destroy()
     }
 
     if (policy_rules_element) {
-        __free_cached_element(policy_rules_element);
+        cached_element_free(policy_rules_element);
     }
 
     if (user_profile_element) {
-        __free_cached_element(user_profile_element);
+        cached_element_free(user_profile_element);
     }
 }
 

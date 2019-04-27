@@ -462,7 +462,7 @@ out_err:
 }
 
 int
-policy_rule_add_to_engine(struct policy_rule * rule, dl_db_t db)
+policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
 {
     struct nexus_list_iterator * iter = NULL;
 
@@ -481,8 +481,8 @@ policy_rule_add_to_engine(struct policy_rule * rule, dl_db_t db)
             break;
         }
 
-        if (policy_atom_add_to_engine(atom, db)) {
-            log_error("policy_atom_add_to_engine() FAILED\n");
+        if (policy_atom_to_db(atom, db)) {
+            log_error("policy_atom_to_db() FAILED\n");
             goto out_err;
         }
 

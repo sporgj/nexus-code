@@ -561,7 +561,7 @@ policy_atom_is_valid(struct policy_atom * atom)
 }
 
 int
-policy_atom_add_to_engine(struct policy_atom * atom, dl_db_t db)
+policy_atom_to_db(struct policy_atom * atom, dl_db_t db)
 {
     struct nexus_list_iterator * iter = NULL;
 
