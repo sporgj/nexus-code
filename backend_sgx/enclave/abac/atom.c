@@ -19,6 +19,11 @@ struct __policy_atom_buf {
 } __attribute__((packed));
 
 
+typedef enum {
+    DATALOG_VAR_TERM = 1,
+    DATALOG_CONST_TERM
+} datalog_term_type_t;
+
 struct __atom_arg_buf {
     uint8_t                 arg_val[0];
 } __attribute__((packed));
@@ -560,118 +565,238 @@ policy_atom_is_valid(struct policy_atom * atom)
     return false;
 }
 
-int
-policy_atom_to_db(struct policy_atom * atom, dl_db_t db)
+
+static const char *
+__atom_type_char_uppercase_str(char atom_type_char)
 {
-    struct nexus_list_iterator * iter = NULL;
+    switch (atom_type_char) {
+    case 'o':
+        return "O";
+    case 'u':
+        return "U";
+    default:
+        log_error("unknown atom type\n");
+        return NULL;
+    }
+}
 
+static const char *
+__atom_type_to_uppercase_str(atom_type_t atom_type)
+{
+    switch (atom_type) {
+    case ATOM_TYPE_OBJECT:
+        return "O";
+    case ATOM_TYPE_USER:
+        return "U";
+    default:
+        log_error("unknown atom type\n");
+        return NULL;
+    }
+}
 
-    if (atom->pred_type == PREDICATE_BOOL) {
-        log_error("boolean atoms are not supported\n");
+static int
+__push_term_to_db(char * term, datalog_term_type_t term_type, dl_db_t db)
+{
+    if (dl_pushstring(db, term)) {
+        log_error("dl_pushstring(`%s`) FAILED\n", term);
         return -1;
     }
 
+    if (term_type == DATALOG_VAR_TERM) {
+        if (dl_addvar(db)) {
+            log_error("dl_addvar() failed\n");
+            return -1;
+        }
+    } else {
+        if (dl_addconst(db)) {
+            log_error("dl_addconst() failed\n");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+__push_literal_to_db(char              * predicate,
+                     char              * first_term_str,
+                     datalog_term_type_t first_term_type,
+                     char              * second_term_str,
+                     datalog_term_type_t second_term_type,
+                     dl_db_t             db)
+{
     if (dl_pushliteral(db)) {
         log_error("dl_pushliteral() for atom FAILED\n");
         return -1;
     }
 
-    // push the predicate
-    if (dl_pushstring(db, atom->predicate)) {
-        log_error("dl_pushstring('%s')\n", atom->predicate);
+    {
+        if (dl_pushstring(db, predicate)) {
+            log_error("dl_pushstring('%s')\n", predicate);
+            return -1;
+        }
+
+        if (dl_addpred(db)) {
+            log_error("dl_addpred() of atom's predicate FAILED\n");
+            return -1;
+        }
+    }
+
+    if (__push_term_to_db(first_term_str, first_term_type, db)) {
+        log_error("__push_term_to_db(`%s`) FAILED\n", first_term_str);
         return -1;
     }
 
-    if (dl_addpred(db)) {
-        log_error("dl_addpred() of atom's predicate FAILED\n");
+    if (second_term_str && __push_term_to_db(second_term_str, second_term_type, db)) {
+        log_error("__push_term_to_db(`%s`) FAILED\n", second_term_str);
         return -1;
     }
-
-    // push "u|o"
-    {
-        const char * user_or_object_term = NULL;
-
-        switch (atom->atom_type) {
-        case ATOM_TYPE_OBJECT:
-            user_or_object_term = "O";
-            break;
-        case ATOM_TYPE_USER:
-            user_or_object_term = "U";
-            break;
-        default:
-            log_error("unknown atom type\n");
-            return -1;
-        }
-
-        if (dl_pushstring(db, user_or_object_term)) {
-            log_error("dl_pushstring() user_or_object_term\n");
-            return -1;
-        }
-
-        if (dl_addvar(db)) {
-            log_error("dl_addvar() FAILED\n");
-            return -1;
-        }
-    }
-
-    // push the nuumber of string argument
-    iter = list_iterator_new(&atom->args_list);
-
-    {
-        const struct atom_argument * atom_arg = list_iterator_get(iter);
-
-        if (atom_arg == NULL) {
-            log_error("iteratorr returned NULL\n");
-            goto out_err;
-        }
-
-        char * string_val = atom_argument_string_val(atom_arg);
-
-        if (string_val == NULL) {
-            log_error("atom_argument_string_val() FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_pushstring(db, string_val)) {
-            log_error("dl_pushstring(`%s`) FAILED\n", string_val);
-            nexus_free(string_val);
-            goto out_err;
-        }
-
-        nexus_free(string_val);
-
-        switch (atom_arg->abac_value->type) {
-        case ABAC_VALUE_IDENTIFIER:
-            if (dl_addvar(db)) {
-                log_error("could not add atom's variable\n");
-                goto out_err;
-            }
-            break;
-        case ABAC_VALUE_STRING:
-        case ABAC_VALUE_NUMBER:
-            if (dl_addconst(db)) {
-                log_error("could not add atom's constant\n");
-                goto out_err;
-            }
-            break;
-        default:
-            log_error("abac value unknown\n");
-            goto out_err;
-        }
-
-        list_iterator_next(iter);
-    } while (list_iterator_is_valid(iter));
 
     if (dl_makeliteral(db)) {
         log_error("dl_makeliteral() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static char *
+__try_push_boolean_fact(struct atom_argument * atom_arg,
+                        size_t               * free_variable_index_ptr,
+                        datalog_term_type_t  * term_type,
+                        dl_db_t                db)
+{
+    if (atom_arg->abac_value->type != ABAC_VALUE_IDENTIFIER) {
+        *term_type = DATALOG_CONST_TERM;
+        return abac_value_stringify(atom_arg->abac_value);
+    }
+
+    char * string_ptr = atom_arg->abac_value->str_val;  // [u|o] + "." + [attribute_name|sys_func]
+
+    char * free_variable_str_dest = nexus_malloc(10);
+
+    const char * atom_type_str = __atom_type_char_uppercase_str(string_ptr[0]);
+
+    if (atom_type_str == NULL) {
+        nexus_free(free_variable_str_dest);
+        log_error("could not get uppercase atom type\n");
+        return NULL;
+    }
+
+    snprintf(free_variable_str_dest, 10, "X%zu", *free_variable_index_ptr);
+
+    if (__push_literal_to_db(&string_ptr[2],
+                             atom_type_str,
+                             DATALOG_VAR_TERM,
+                             free_variable_str_dest,
+                             DATALOG_VAR_TERM,
+                             db)) {
+        log_error("__push_literal_to_db() FAILED\n");
+        nexus_free(free_variable_str_dest);
+        return NULL;
+    }
+
+    *free_variable_index_ptr = *free_variable_index_ptr + 1;
+
+    *term_type = DATALOG_VAR_TERM;
+
+    return free_variable_str_dest;
+}
+
+static int
+__push_boolean_atom_to_db(struct policy_atom * atom, size_t * free_variable_index_ptr, dl_db_t db)
+{
+    datalog_term_type_t first_variable_type;
+    datalog_term_type_t second_variable_type;
+
+    char * first_variable_str
+        = __try_push_boolean_fact(atom, free_variable_index_ptr, &first_variable_type, db);
+
+    char * second_variable_str
+        = __try_push_boolean_fact(atom, free_variable_index_ptr, &second_variable_type, db);
+
+
+    if (first_variable_str == NULL || second_variable_str == NULL) {
+        log_error("__try_push_boolean_argument() FAILED\n");
         goto out_err;
     }
 
-    list_iterator_free(iter);
-    return 0;
+    // now add the boolean operation
+    {
+        const char * predicate = boolean_operator_to_datalog_str(atom->predicate);
 
+        if (predicate == NULL) {
+            log_error("boolean_operator_to_datalog_str() returned NULL\n");
+            return -1;
+        }
+
+        if (__push_literal_to_db(predicate,
+                                 first_variable_str,
+                                 first_variable_type,
+                                 second_variable_str,
+                                 second_variable_type,
+                                 db)) {
+            log_error("__push_literal_to_db() FAILED\n");
+            goto out_err;
+        }
+    }
+
+    return 0;
 out_err:
-    list_iterator_free(iter);
+    if (first_variable_str) {
+        nexus_free(first_variable_str);
+    }
+
+    if (second_variable_str) {
+        nexus_free(second_variable_str);
+    }
+
     return -1;
 }
 
+static int
+__push_normal_atom_to_db(struct policy_atom * atom, dl_db_t db)
+{
+    struct atom_argument * atom_arg = nexus_list_get(&atom->args_list, 0);
+
+    const char * atom_type_str = __atom_type_to_uppercase_str(atom->atom_type);
+
+    char * second_variable_str = NULL;
+
+    if (atom_type_str == NULL) {
+        log_error("could not get uppercase atom type\n");
+        return NULL;
+    }
+
+
+    second_variable_str = atom_argument_string_val(atom_arg);
+
+    if (__push_literal_to_db(atom->predicate,
+                             atom_type_str,
+                             DATALOG_VAR_TERM,
+                             second_variable_str,
+                             DATALOG_CONST_TERM,
+                             db)) {
+        log_error("__push_literal_to_db() FAILED\n");
+        nexus_free(second_variable_str);
+        return -1;
+    }
+
+    nexus_free(second_variable_str);
+
+    return 0;
+}
+
+int
+policy_atom_to_db(struct policy_atom * atom, size_t * free_variable_index_ptr, dl_db_t db)
+{
+    switch (atom->pred_type) {
+    case PREDICATE_ATTR:
+    case PREDICATE_FUNC:
+        return __push_normal_atom_to_db(atom, db);
+    case PREDICATE_BOOL:
+        return __push_boolean_atom_to_db(atom, free_variable_index_ptr, db);
+    }
+
+    return -1;
+}

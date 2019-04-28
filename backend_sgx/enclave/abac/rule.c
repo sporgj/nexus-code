@@ -466,6 +466,8 @@ policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
 {
     struct nexus_list_iterator * iter = NULL;
 
+    size_t free_variable_index = 0;
+
     if (__policy_rule_push_head(rule, db)) {
         log_error("__policy_rule_push_head() FAILED\n");
         return -1;
@@ -481,7 +483,7 @@ policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
             break;
         }
 
-        if (policy_atom_to_db(atom, db)) {
+        if (policy_atom_to_db(atom, &free_variable_index, db)) {
             log_error("policy_atom_to_db() FAILED\n");
             goto out_err;
         }

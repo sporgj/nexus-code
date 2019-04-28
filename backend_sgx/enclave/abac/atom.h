@@ -55,4 +55,4 @@ char *
 atom_argument_string_val(const struct atom_argument * atom_arg);
 
 int
-policy_atom_to_db(struct policy_atom * atom, dl_db_t db);
+policy_atom_to_db(struct policy_atom * atom, size_t * free_variable_index_ptr, dl_db_t db);
