@@ -488,11 +488,6 @@ policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
             goto out_err;
         }
 
-        if (dl_addliteral(db)) {
-            log_error("dl_addliteral() FAILED\n");
-            goto out_err;
-        }
-
         list_iterator_next(iter);
     } while(list_iterator_is_valid(iter));
 

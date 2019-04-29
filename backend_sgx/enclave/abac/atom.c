@@ -657,6 +657,11 @@ __push_literal_to_db(char              * predicate,
         return -1;
     }
 
+    if (dl_addliteral(db)) {
+        log_error("dl_addliteral() FAILED\n");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -709,11 +714,14 @@ __push_boolean_atom_to_db(struct policy_atom * atom, size_t * free_variable_inde
     datalog_term_type_t first_variable_type;
     datalog_term_type_t second_variable_type;
 
+    struct atom_argument * arg1 = policy_atom_get_arg(atom, 0);
+    struct atom_argument * arg2 = policy_atom_get_arg(atom, 1);
+
     char * first_variable_str
-        = __try_push_boolean_fact(atom, free_variable_index_ptr, &first_variable_type, db);
+        = __try_push_boolean_fact(arg1, free_variable_index_ptr, &first_variable_type, db);
 
     char * second_variable_str
-        = __try_push_boolean_fact(atom, free_variable_index_ptr, &second_variable_type, db);
+        = __try_push_boolean_fact(arg2, free_variable_index_ptr, &second_variable_type, db);
 
 
     if (first_variable_str == NULL || second_variable_str == NULL) {
