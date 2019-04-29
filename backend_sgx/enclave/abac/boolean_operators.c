@@ -96,7 +96,7 @@ static struct __bool_op __boolean_operators[] = {
     { "<",  "_lt", __handle_lesser_than },
     { ">=", "_ge", __handle_greater_or_equals },
     { "<=", "_le", __handle_lesser_or_equals },
-    { "==", "_ee", __handle_double_equals },
+    { "==", "=", __handle_double_equals },
     { NULL,  NULL, NULL },
 };
 

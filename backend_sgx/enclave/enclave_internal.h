@@ -96,3 +96,6 @@ extern sgx_spinlock_t                vfs_ops_lock;
  */
 int
 nexus_verfiy_pubkey(struct nexus_hash * user_pubkey_hash);
+
+bool
+nexus_enclave_is_current_user_owner();

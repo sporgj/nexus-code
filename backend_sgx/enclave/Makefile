@@ -168,7 +168,7 @@ private_key := private_key.pem
 EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
 edl_src := ../nexus_enclave.edl
 
-all: nexus_enclave.signed.so bin2c
+all: abac/datalog-engine/dl_lua.h nexus_enclave.signed.so
 
 
 bin2c: ./abac/datalog-engine/bin2c.c
@@ -213,7 +213,7 @@ cscope:
 
 .PHONY: clean
 clean:
-	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o abac/*.o
+	rm -rf *.a *.o *.so nexus_enclave_t.* libnexus_trusted/*.o ecalls/*.o bin2c $(abac_objs)
 
 .PHONY: distclean
 distclean: clean

@@ -127,10 +127,10 @@ __execute_attribute(struct access_request * access_req,
 
     if (atom_type == ATOM_TYPE_OBJECT) {
         attribute_table = metadata_get_attribute_table(access_req->metadata);
-        value           = attribute_table_find(attribute_table, attribute_term->name);
+        value           = attribute_table_find(attribute_table, &attribute_term->uuid);
     } else if (atom_type == ATOM_TYPE_USER) {
         attribute_table = access_req->user_profile->attribute_table;
-        value           = attribute_table_find(attribute_table, attribute_term->name);
+        value           = attribute_table_find(attribute_table, &attribute_term->uuid);
     } else {
         log_error("unknown atom type\n");
         return NULL;
@@ -255,6 +255,7 @@ __process_rule(struct access_request * access_req, struct policy_rule * rule)
     do {
         struct policy_atom * atom = list_iterator_get(iter);
 
+#if 0
         if (atom->pred_type == PREDICATE_BOOL) {
             if (__extract_booloperator(access_req, atom)) {
                 log_error("could not process boolean operator\n");
@@ -262,6 +263,7 @@ __process_rule(struct access_request * access_req, struct policy_rule * rule)
                 return -1;
             }
         }
+#endif
 
         list_iterator_next(iter);
     } while(list_iterator_is_valid(iter));
@@ -486,6 +488,7 @@ nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission
     nexus_printf("%s", datalog_program);
     nexus_printf("------------------\n");
 
+#if 0
     if (datalog_evaluate(datalog_program, &datalog_answer)) {
         log_error("datalog_evaluate() FAILED\n");
         goto out_err;
@@ -493,6 +496,7 @@ nexus_abac_access_check(struct nexus_metadata * metadata, perm_type_t permission
 
     nexus_printf("%s\n", datalog_answer);
     nexus_printf("==================\n\n");
+#endif
 
 
     nexus_free(datalog_program);
