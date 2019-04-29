@@ -168,8 +168,14 @@ private_key := private_key.pem
 EDGER8ER = $(SGX_SDK)/bin/x64/sgx_edger8r
 edl_src := ../nexus_enclave.edl
 
-all: nexus_enclave.signed.so
+all: nexus_enclave.signed.so bin2c
 
+
+bin2c: ./abac/datalog-engine/bin2c.c
+	$(call build,CC,$(CC) $^ -o $@)
+
+abac/datalog-engine/dl_lua.h: abac/datalog-engine/datalog.lua bin2c
+	$(call build,BIN2C,./bin2c -n datalog.lua -o $@ $<)
 
 %.o: %.c
 	$(call build,CC,$(CC) $(CFLAGS) $(INCLUDE) -c $<  -o $@)
