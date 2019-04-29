@@ -756,6 +756,33 @@ do				-- equals primitive
    binary_equals_pred.prim = equals_primitive
 end
 
+do				-- equals primitive
+   local binary_greater_or_equals_pred = make_pred("_gt", 2)
+
+   local function greater_or_equals_primitive(literal, subgoal)
+      local x = literal[1]
+      local y = literal[2]
+      local env = x:unify(y, {})-- Both terms must unify,
+      if env then		-- and at least one of them
+	 x = x:subst(env)	-- must be a constant.
+	 y = y:subst(env)
+      end
+      return x:greater_or_equals_primitive(y, subgoal)
+   end
+
+   function Var:greater_or_equals_primitive(term, subgoal)
+   end
+
+   function Const:greater_or_equals_primitive(term, subgoal)
+      if self ~= term then	-- Both terms are constant and equal.
+	 local literal = {pred = binary_greater_or_equals_pred, self, term}
+	 return fact(subgoal, literal)
+      end
+   end
+
+   binary_greater_or_equals_pred.prim = greater_or_equals_primitive
+end
+
 -- Does a literal unify with an fact known to contain only constant
 -- terms?
 
