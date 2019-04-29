@@ -374,8 +374,13 @@ __destroy_abac_request(struct abac_request * abac_req)
 static int
 __init_user_attributes()
 {
-    struct abac_request * abac_req = __create_abac_request(NULL, PERM_READ);
+    struct abac_request * abac_req = NULL;
 
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
+    abac_req = __create_abac_request(NULL, PERM_READ);
     if (abac_req == NULL) {
         log_error("__create_abac_request() FAILED\n");
         return -1;
