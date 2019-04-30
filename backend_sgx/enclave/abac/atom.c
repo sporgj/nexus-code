@@ -2,6 +2,8 @@
 #include "atom.h"
 #include "boolean_operators.h"
 
+#include "db.h"
+
 #include <libnexus_trusted/nexus_str.h>
 
 
@@ -18,11 +20,6 @@ struct __policy_atom_buf {
     uint8_t                 args_buffer[0];
 } __attribute__((packed));
 
-
-typedef enum {
-    DATALOG_VAR_TERM = 1,
-    DATALOG_CONST_TERM
-} datalog_term_type_t;
 
 struct __atom_arg_buf {
     uint8_t                 arg_val[0];
@@ -595,29 +592,6 @@ __atom_type_to_uppercase_str(atom_type_t atom_type)
 }
 
 static int
-__push_term_to_db(char * term, datalog_term_type_t term_type, dl_db_t db)
-{
-    if (dl_pushstring(db, term)) {
-        log_error("dl_pushstring(`%s`) FAILED\n", term);
-        return -1;
-    }
-
-    if (term_type == DATALOG_VAR_TERM) {
-        if (dl_addvar(db)) {
-            log_error("dl_addvar() failed\n");
-            return -1;
-        }
-    } else {
-        if (dl_addconst(db)) {
-            log_error("dl_addconst() failed\n");
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static int
 __push_literal_to_db(char              * predicate,
                      char              * first_term_str,
                      datalog_term_type_t first_term_type,
@@ -642,12 +616,12 @@ __push_literal_to_db(char              * predicate,
         }
     }
 
-    if (__push_term_to_db(first_term_str, first_term_type, db)) {
+    if (db_push_term(first_term_str, first_term_type, db)) {
         log_error("__push_term_to_db(`%s`) FAILED\n", first_term_str);
         return -1;
     }
 
-    if (second_term_str && __push_term_to_db(second_term_str, second_term_type, db)) {
+    if (second_term_str && db_push_term(second_term_str, second_term_type, db)) {
         log_error("__push_term_to_db(`%s`) FAILED\n", second_term_str);
         return -1;
     }
@@ -690,13 +664,13 @@ __try_push_boolean_fact(struct atom_argument * atom_arg,
 
     snprintf(free_variable_str_dest, 10, "X%zu", *free_variable_index_ptr);
 
-    if (__push_literal_to_db(&string_ptr[2],
-                             atom_type_str,
-                             DATALOG_VAR_TERM,
-                             free_variable_str_dest,
-                             DATALOG_VAR_TERM,
-                             db)) {
-        log_error("__push_literal_to_db() FAILED\n");
+    if (db_push_literal(&string_ptr[2],
+                        atom_type_str,
+                        DATALOG_VAR_TERM,
+                        free_variable_str_dest,
+                        DATALOG_VAR_TERM,
+                        db)) {
+        log_error("db_push_literal() FAILED\n");
         nexus_free(free_variable_str_dest);
         return NULL;
     }
@@ -738,13 +712,13 @@ __push_boolean_atom_to_db(struct policy_atom * atom, size_t * free_variable_inde
             return -1;
         }
 
-        if (__push_literal_to_db(predicate,
-                                 first_variable_str,
-                                 first_variable_type,
-                                 second_variable_str,
-                                 second_variable_type,
-                                 db)) {
-            log_error("__push_literal_to_db() FAILED\n");
+        if (db_push_literal(predicate,
+                            first_variable_str,
+                            first_variable_type,
+                            second_variable_str,
+                            second_variable_type,
+                            db)) {
+            log_error("db_push_literal() FAILED\n");
             goto out_err;
         }
     }
@@ -779,13 +753,13 @@ __push_normal_atom_to_db(struct policy_atom * atom, dl_db_t db)
 
     second_variable_str = atom_argument_string_val(atom_arg);
 
-    if (__push_literal_to_db(atom->predicate,
-                             atom_type_str,
-                             DATALOG_VAR_TERM,
-                             second_variable_str,
-                             DATALOG_CONST_TERM,
-                             db)) {
-        log_error("__push_literal_to_db() FAILED\n");
+    if (db_push_literal(atom->predicate,
+                        atom_type_str,
+                        DATALOG_VAR_TERM,
+                        second_variable_str,
+                        DATALOG_CONST_TERM,
+                        db)) {
+        log_error("db_push_literal() FAILED\n");
         nexus_free(second_variable_str);
         return -1;
     }

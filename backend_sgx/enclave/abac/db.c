@@ -242,3 +242,74 @@ out_err:
     return -1;
 }
 
+int
+db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db)
+{
+    if (dl_pushstring(db, term)) {
+        log_error("dl_pushstring(`%s`) FAILED\n", term);
+        return -1;
+    }
+
+    if (term_type == DATALOG_VAR_TERM) {
+        if (dl_addvar(db)) {
+            log_error("dl_addvar() failed\n");
+            return -1;
+        }
+    } else {
+        if (dl_addconst(db)) {
+            log_error("dl_addconst() failed\n");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int
+db_push_literal(char              * predicate,
+                char              * first_term_str,
+                datalog_term_type_t first_term_type,
+                char              * second_term_str,
+                datalog_term_type_t second_term_type,
+                dl_db_t             db)
+{
+    if (dl_pushliteral(db)) {
+        log_error("dl_pushliteral() for atom FAILED\n");
+        return -1;
+    }
+
+    {
+        if (dl_pushstring(db, predicate)) {
+            log_error("dl_pushstring('%s')\n", predicate);
+            return -1;
+        }
+
+        if (dl_addpred(db)) {
+            log_error("dl_addpred() of atom's predicate FAILED\n");
+            return -1;
+        }
+    }
+
+    if (db_push_term(first_term_str, first_term_type, db)) {
+        log_error("db_push_term(`%s`) FAILED\n", first_term_str);
+        return -1;
+    }
+
+    if (second_term_str && db_push_term(second_term_str, second_term_type, db)) {
+        log_error("db_push_term(`%s`) FAILED\n", second_term_str);
+        return -1;
+    }
+
+    if (dl_makeliteral(db)) {
+        log_error("dl_makeliteral() FAILED\n");
+        return -1;
+    }
+
+    if (dl_addliteral(db)) {
+        log_error("dl_addliteral() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+
+}
