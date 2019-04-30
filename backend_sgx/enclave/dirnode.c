@@ -1079,8 +1079,6 @@ dirnode_get_link(struct nexus_dirnode * dirnode, struct nexus_uuid * entry_uuid)
 struct dir_entry *
 __dirnode_search_and_check(struct nexus_dirnode * dirnode, char * filename, nexus_io_flags_t flags)
 {
-    struct dir_entry * dir_entry = NULL;
-
     if (flags & NEXUS_FDELETE) {
         if (!nexus_acl_is_authorized(&dirnode->dir_acl, NEXUS_PERM_DELETE)) {
             log_error("not authorized to delete files\n");
@@ -1156,7 +1154,7 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
 
     struct nexus_dirent * dirent = dirent_buffer_array;
 
-    int copied = 0;
+    size_t copied = 0;
 
 
     if (dirent_buffer_count < 1) {

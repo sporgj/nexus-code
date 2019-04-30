@@ -26,10 +26,10 @@ struct data_xfer_context {
     struct nexus_metadata * metadata;
 
 
-    struct crypto_context * crypto_context;
+    struct nexus_crypto_ctx * crypto_context;
 
 
-    struct data_buffer    * data_buffer; // the current data buffer
+    struct nexus_data_buf * data_buffer; // the current data buffer
 };
 
 
@@ -179,12 +179,10 @@ file_crypto_seek(int xfer_id, size_t offset)
 int
 __flush_data_buffer(struct data_xfer_context * xfer_context)
 {
-    struct nexus_crypto_ctx * crypto_ctx = xfer_context->crypto_context;
-
     int ret = 0;
 
     if (xfer_context->mode == NEXUS_ENCRYPT) {
-        nexus_data_buf_flush(xfer_context->data_buffer, &crypto_ctx->mac);
+        nexus_data_buf_flush(xfer_context->data_buffer, &xfer_context->crypto_context->mac);
 
         filenode_update_encrypted_pos(xfer_context->filenode, xfer_context->offset);
     } else if (xfer_context->offset < xfer_context->filenode->encrypted_length) {
@@ -197,7 +195,7 @@ __flush_data_buffer(struct data_xfer_context * xfer_context)
 
         nexus_data_buf_flush(xfer_context->data_buffer, &computed_mac);
 
-        if (nexus_mac_compare(&crypto_ctx->mac, &computed_mac)) {
+        if (nexus_mac_compare(&xfer_context->crypto_context->mac, &computed_mac)) {
             log_error("mac comparison FAILED\n");
             ret = -1;
         }

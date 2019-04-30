@@ -246,8 +246,6 @@ nexus_vfs_acquire_hardlink_table(nexus_io_flags_t flags)
 
     bool has_changed;
 
-    int ret = -1;
-
 
     if (hardlink_table_metadata == NULL) {
         hardlink_table_metadata = nexus_metadata_load(uuid, NEXUS_HARDLINK_TABLE, flags);

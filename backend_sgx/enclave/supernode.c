@@ -146,11 +146,7 @@ supernode_load(struct nexus_uuid * uuid, nexus_io_flags_t mode)
 struct nexus_supernode *
 supernode_create(char * user_pubkey)
 {
-    struct nexus_supernode * supernode = NULL;
-
-    struct hardlink_table * hardlink_table = NULL;
-
-    supernode = nexus_malloc(sizeof(struct nexus_supernode));
+    struct nexus_supernode * supernode = nexus_malloc(sizeof(struct nexus_supernode));
 
     nexus_uuid_gen(&supernode->my_uuid);
     nexus_uuid_gen(&supernode->root_uuid);

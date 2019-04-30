@@ -10,8 +10,6 @@
 
 #include "crypto_context.h"
 
-#define crypto_randombytes  randombytes
-
 
 // ---- GCM stuff ----
 #define GCM128_KEY_SIZE (16)
@@ -34,6 +32,8 @@ struct ecdh_secret_key {
 
 typedef struct nexus_hash     pubkey_hash_t;
 
+void
+crypto_randombytes(void * dest, uint64_t l);
 
 int
 crypto_hash_pubkey(char * pubkey, pubkey_hash_t * pubkey_hash);

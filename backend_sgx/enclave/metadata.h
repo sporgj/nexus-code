@@ -135,3 +135,6 @@ nexus_metadata_lock(struct nexus_metadata * metadata, nexus_io_flags_t flags);
  */
 void
 nexus_metadata_unlock(struct nexus_metadata * metadata);
+
+int
+nexus_metadata_verify_uuids(struct nexus_dentry * dentry);

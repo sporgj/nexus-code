@@ -8,6 +8,12 @@
 #include <mbedtls/sha256.h>
 
 
+void
+crypto_randombytes(void * dest, uint64_t l)
+{
+    sgx_read_rand((uint8_t *)dest, l);
+}
+
 int
 crypto_hash_pubkey(char * pubkey_rawstr, pubkey_hash_t * pubkey_hash)
 {
