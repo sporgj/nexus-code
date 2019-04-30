@@ -55,3 +55,11 @@ attribute_store_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
 int
 attribute_store_store(struct attribute_store * attr_store, size_t version, struct nexus_mac * mac);
 
+int
+UNSAFE_attribute_store_export_terms(struct attribute_store    * attr_store,
+                                    struct nxs_attribute_term * attribute_term_array_out,
+                                    size_t                      attribute_term_array_capacity,
+                                    size_t                      offset,
+                                    size_t                    * total_count_out,
+                                    size_t                    * result_count_out);
+

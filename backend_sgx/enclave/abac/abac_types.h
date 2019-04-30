@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include "../libnexus_trusted/nexus_uuid.h"
 #include "../libnexus_trusted/nexus_list.h"
 

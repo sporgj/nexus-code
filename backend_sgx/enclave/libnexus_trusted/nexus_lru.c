@@ -50,7 +50,7 @@ nexus_lru_create(size_t capacity, lru_hasher hasher, lru_comparer comparer, lru_
 
     INIT_LIST_HEAD(&(lru->list));
 
-    lru->htable = nexus_create_htable(capacity, hasher, comparer);
+    lru->htable = nexus_create_htable((uint32_t)capacity, hasher, comparer);
 
     if (lru->htable == NULL) {
         log_error("could not create hashtable\n");

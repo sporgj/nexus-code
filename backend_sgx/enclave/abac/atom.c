@@ -1,6 +1,7 @@
 #include "abac_internal.h"
 #include "atom.h"
 #include "boolean_operators.h"
+#include "system_functions.h"
 
 #include "db.h"
 

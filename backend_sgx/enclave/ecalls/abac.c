@@ -1,5 +1,8 @@
 #include "../enclave_internal.h"
 
+#include "../abac/attribute_store.h"
+#include "../abac/policy_store.h"
+
 
 int
 ecall_abac_attribute_add(char * attribute_name_IN, char * attribute_type_str_IN)
@@ -41,8 +44,6 @@ int
 ecall_abac_attribute_del(char * attribute_name_IN)
 {
     struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FRDWR);
-
-    attribute_type_t attribute_type;
 
     if (attribute_store == NULL) {
         log_error("abac_acquire_attribute_store() FAILED\n");

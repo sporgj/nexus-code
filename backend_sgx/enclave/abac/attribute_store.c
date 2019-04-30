@@ -1,3 +1,5 @@
+#include <ctype.h>
+
 #include "attribute_store.h"
 
 struct __attr_store_hdr {

@@ -50,3 +50,11 @@ policy_store_del(struct policy_store * policy_store, struct nexus_uuid * rule_uu
 struct nexus_list *
 policy_store_select_rules(struct policy_store * policy_store, perm_type_t permission);
 
+
+int
+policy_store_ls(struct policy_store * policy_store,
+                uint8_t             * output_bufptr,
+                size_t                output_buflen,
+                size_t                offset,
+                size_t              * total_count,
+                size_t              * result_count);

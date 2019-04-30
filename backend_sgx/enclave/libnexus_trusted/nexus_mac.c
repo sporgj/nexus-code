@@ -66,7 +66,7 @@ mac_and_version_copy(struct mac_and_version * src_macversion, struct mac_and_ver
 void
 __mac_and_version_to_buf(struct mac_and_version * macversion, uint8_t * buf)
 {
-    __mac_and_version_bytes_t * mac_version_bytes = (struct __mac_and_version_bytes *)buf;
+    __mac_and_version_bytes_t * mac_version_bytes = (__mac_and_version_bytes_t *)buf;
 
     mac_version_bytes->version = macversion->version;
     nexus_mac_to_buf(&macversion->mac, mac_version_bytes->mac_bytes);
@@ -75,7 +75,7 @@ __mac_and_version_to_buf(struct mac_and_version * macversion, uint8_t * buf)
 void
 __mac_and_version_from_buf(struct mac_and_version * macversion, uint8_t * buf)
 {
-    __mac_and_version_bytes_t * mac_version_bytes = (struct __mac_and_version_bytes *)buf;
+    __mac_and_version_bytes_t * mac_version_bytes = (__mac_and_version_bytes_t *)buf;
 
     macversion->version = mac_version_bytes->version;
     __nexus_mac_from_buf(&macversion->mac, mac_version_bytes->mac_bytes);

@@ -6,6 +6,7 @@
 #include "policy_store.h"
 #include "attribute_store.h"
 #include "system_functions.h"
+#include "boolean_operators.h"
 #include "atom.h"
 
 struct computed_fact {

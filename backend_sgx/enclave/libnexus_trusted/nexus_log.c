@@ -32,10 +32,10 @@ nexus_printf(char * fmt, ...)
 	abort();
     }
 
-    log_str = nexus_malloc(size);
+    log_str = nexus_malloc((size_t)size);
 
     va_start(args, fmt);
-    ret = vsnprintf(log_str, size, fmt, args);
+    ret = vsnprintf(log_str, (size_t)size, fmt, args);
     va_end(args);
 
     if (ret == -1) {
