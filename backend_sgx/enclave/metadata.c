@@ -1,5 +1,8 @@
 #include "enclave_internal.h"
 
+#include "dentry.h"
+#include "hardlink_table.h"
+
 
 void
 __metadata_set_clean(struct nexus_metadata * metadata)
@@ -216,7 +219,6 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     case NEXUS_USER_PROFILE:
         user_profile_free(metadata->user_profile);
         break;
-
     }
 
     if (metadata->dentry_count) {

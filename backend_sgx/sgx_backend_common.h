@@ -19,12 +19,12 @@
 #define NEXUS_PUBKEY_HASHLEN      32
 
 
-#ifndef crypto_box_PUBLICKEYBYTES
-#define crypto_box_PUBLICKEYBYTES 32
+#ifndef nx_crypto_box_PUBLICKEYBYTES
+#define nx_crypto_box_PUBLICKEYBYTES 32
 #endif
 
-#ifndef crypto_box_NONCEBYTES
-#define crypto_box_NONCEBYTES 24
+#ifndef nx_crypto_box_NONCEBYTES
+#define nx_crypto_box_NONCEBYTES 24
 #endif
 
 // XXX this is temporary
@@ -42,11 +42,11 @@ struct nonce_challenge {
 
 // used for the instance creation
 struct ecdh_public_key {
-    uint8_t  bytes[crypto_box_PUBLICKEYBYTES];
+    uint8_t  bytes[nx_crypto_box_PUBLICKEYBYTES];
 } __attribute__((packed));
 
 struct ecdh_nonce {
-    uint8_t  bytes[crypto_box_NONCEBYTES];
+    uint8_t  bytes[nx_crypto_box_NONCEBYTES];
 } __attribute__((packed));
 
 

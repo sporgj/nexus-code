@@ -1103,7 +1103,7 @@ UNSAFE_dirnode_readdir(struct nexus_dirnode * dirnode,
 
     struct nexus_dirent * dirent = dirent_buffer_array;
 
-    int copied = 0;
+    size_t copied = 0;
 
 
     if (dirent_buffer_count < 1) {

@@ -1,6 +1,8 @@
 #include "nexus_fuse.h"
 
-#include <nexus_file_handle.h>
+#include <nexus_raw_file.h>
+
+#include "../backend_sgx/exports.h"
 
 
 static uint8_t __file_crypto_buffer__[NEXUS_CHUNK_SIZE] __attribute__ ((__aligned__(4096)));
@@ -101,22 +103,18 @@ __datastore_getattr(struct my_dentry *     dentry,
                     struct nexus_uuid *    uuid,
                     struct nexus_fs_attr * attrs)
 {
-    int ret = -1;
-
-    // stat the datastores
     switch (dentry->type) {
     case NEXUS_DIR:
     case NEXUS_REG:
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store, uuid, attrs);
-        break;
+        return sgx_backend_stat_uuid(nexus_fuse_volume, uuid, attrs);
     case NEXUS_LNK:
         // we will just return stat information about its parent
-        ret = nexus_datastore_getattr(nexus_fuse_volume->metadata_store,
-                                      &dentry->parent->inode->attrs.stat_info.uuid,
-                                      attrs);
+        uuid = &dentry->parent->inode->attrs.stat_info.uuid;
+
+        return sgx_backend_stat_uuid(nexus_fuse_volume, uuid, attrs);
     }
 
-    return ret;
+    return -1;
 }
 
 int
@@ -231,6 +229,8 @@ out:
 int
 nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int flags)
 {
+    struct nexus_datastore * datastore = NULL;
+
     struct nexus_uuid * uuid = &dentry->inode->uuid;
 
     struct nexus_stat * stat_info = &dentry->inode->attrs.stat_info;
@@ -245,6 +245,8 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
         return -1;
     }
 
+    datastore = sgx_backend_get_datastore(nexus_fuse_volume, uuid);
+
     if (flags & FUSE_SET_ATTR_SIZE) {
         if (nexus_fs_truncate(nexus_fuse_volume, path, new_stat->st_size, stat_info)) {
             log_error("could not stat backend (filepath=%s)\n", path);
@@ -252,7 +254,7 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
             return -1;
         }
     } else if (flags & FUSE_SET_ATTR_MODE) {
-        if (nexus_datastore_set_mode(nexus_fuse_volume->metadata_store, uuid, new_stat->st_mode)) {
+        if (nexus_datastore_set_mode(datastore, uuid, new_stat->st_mode)) {
             log_error("nexus_datastore_set_mode() FAILED\n");
             goto out_err;
         }
@@ -262,7 +264,7 @@ nexus_fuse_setattr(struct my_dentry * dentry, struct nexus_fs_attr * attrs, int 
         size_t atime = (flags & FUSE_SET_ATTR_ATIME) ? new_stat->st_atime : 0;
         size_t mtime = (flags & FUSE_SET_ATTR_MTIME) ? new_stat->st_mtime : 0;
 
-        if (nexus_datastore_set_times(nexus_fuse_volume->metadata_store, uuid, atime, mtime)) {
+        if (nexus_datastore_set_times(datastore, uuid, atime, mtime)) {
             log_error("nexus_datastore_set_times() FAILED\n");
             goto out_err;
         }
@@ -315,6 +317,8 @@ nexus_fuse_create(struct my_dentry  * dentry,
 {
     char * parent_dirpath = dentry_get_fullpath(dentry);
 
+    struct nexus_datastore * datastore = NULL;
+
     if (parent_dirpath == NULL) {
         return -1;
     }
@@ -332,7 +336,9 @@ nexus_fuse_create(struct my_dentry  * dentry,
     }
 
     if (type == NEXUS_REG && (mode & NEXUS_POSIX_EXEC_MODE)) {
-        if (nexus_datastore_set_mode(nexus_fuse_volume->metadata_store, &nexus_stat->uuid, mode)) {
+        datastore = sgx_backend_get_datastore(nexus_fuse_volume, &nexus_stat->uuid);
+
+        if (nexus_datastore_set_mode(datastore, &nexus_stat->uuid, mode)) {
             log_error("nexus_datastore_set_mode() FAILED\n");
             nexus_free(parent_dirpath);
             return -1;

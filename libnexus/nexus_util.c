@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <execinfo.h>
+#include <unistd.h>
+
+#include <sys/types.h>
 
 #include <nexus_util.h>
 #include <nexus_log.h>
@@ -90,6 +93,7 @@ nexus_splitpath(const char * filepath, char ** dirpath, char ** filename)
         *dirpath = strndup(filepath, (int)(fname - filepath));
     }
 }
+
 
 // https://gist.github.com/ccbrown/9722406
 void

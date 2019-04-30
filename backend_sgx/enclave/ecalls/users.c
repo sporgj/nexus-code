@@ -230,7 +230,7 @@ UNSAFE_dump_user_buffer(struct nexus_usertable   * usertable,
 {
     struct nexus_list_iterator * iter = NULL;
 
-    int pos = 0;
+    size_t pos = 0;
 
 
     if (offset > usertable->user_count) {

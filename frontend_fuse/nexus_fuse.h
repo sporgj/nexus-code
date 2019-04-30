@@ -17,7 +17,11 @@ int
 start_fuse(int argc, char * argv[], bool foreground, char * mount_path);
 
 
+int
+commander_init();
 
+void
+commander_destroy();
 
 // handlers
 

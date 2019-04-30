@@ -259,7 +259,7 @@ err:
 }
 
 static int
-__seal_rootkey_and_export(char                    * unwrapped_buffer,
+__seal_rootkey_and_export(uint8_t                 * unwrapped_buffer,
                           size_t                    unwrapped_buflen,
                           struct nexus_key_buffer * sealed_volkey_keybuf_out)
 {
@@ -300,10 +300,8 @@ ecall_extract_rootkey(struct ecdh_public_key  * ephemeral_pk_IN,
     int       result_len = 0;
     int       offset     = 0;
 
-    int       sealed_other_rootkey_len = 0;
-
     uint8_t * unwrapped_buffer = NULL;
-    size_t    unwrapped_buflen = NULL;
+    size_t    unwrapped_buflen = 0;
 
     uint8_t * wrapped_secret_copy = NULL;
 

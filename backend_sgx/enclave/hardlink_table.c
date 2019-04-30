@@ -1,5 +1,6 @@
 #include "enclave_internal.h"
 
+#include "./libnexus_trusted/nexus_hashtable.h"
 
 
 struct __hardlink_table_hdr {
@@ -177,7 +178,7 @@ __serialize_hardlink_table(struct hardlink_table * hardlink_table, uint8_t * buf
             break;
         }
 
-        src_entry = nexus_htable_get_iter_value(iter);
+        src_entry = (struct __hardlink_table_entry *)nexus_htable_get_iter_value(iter);
 
         if (src_entry == NULL) {
             break;

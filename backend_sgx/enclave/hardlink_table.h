@@ -24,6 +24,9 @@ struct hardlink_table {
 struct hardlink_table *
 hardlink_table_create(struct nexus_uuid * table_uuid, struct nexus_uuid * root_uuid);
 
+void
+hardlink_table_free(struct hardlink_table * hardlink_table);
+
 bool
 hardlink_table_contains_uuid(struct hardlink_table * hardlink_table, struct nexus_uuid * uuid);
 

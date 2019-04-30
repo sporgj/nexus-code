@@ -20,6 +20,7 @@ exec_objs := \
 	fuse_interface.o \
 	frontend_handler.o \
 	io.o \
+	commander.o \
 	main.o
 
 execs := nexus-fuse

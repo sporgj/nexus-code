@@ -17,12 +17,6 @@ struct nexus_user   * global_user_struct        = NULL;
 sgx_spinlock_t        vfs_ops_lock              = SGX_SPINLOCK_INITIALIZER;
 
 
-void
-randombytes(void * dest, uint64_t l)
-{
-    sgx_read_rand((uint8_t *)dest, l);
-}
-
 int
 ecall_init_enclave(struct nexus_volume  * volume,
                    struct nexus_heap    * heap)

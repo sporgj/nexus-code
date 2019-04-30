@@ -450,6 +450,7 @@ nxs_fuse_create(
 
     if (new_dentry == NULL) {
         log_error("could not create file\n");
+        fuse_reply_err(req, EFAULT);
         return;
     }
 

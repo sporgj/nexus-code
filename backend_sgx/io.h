@@ -87,6 +87,17 @@ io_buffer_del(struct nexus_uuid * metadata_uuid, struct nexus_volume * volume);
 int
 io_buffer_truncate(struct nexus_uuid * uuid, size_t filesize, struct sgx_backend * sgx_backend);
 
+// must hold backend->batch_mutex
+int
+io_buffer_sync_buffers(struct sgx_backend * backend);
+
+int
+io_backend_stat_uuid(struct nexus_volume  * volume,
+                     struct nexus_uuid    * uuid,
+                     struct nexus_fs_attr * attrs);
+
+struct nexus_datastore *
+io_backend_get_datastore(struct nexus_volume * volume, struct nexus_uuid * uuid, struct metadata_buf ** buf);
 
 // ------------------------
 //  file crypto operations

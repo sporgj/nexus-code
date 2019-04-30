@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <nexus_volume.h>
 
 int
 sgx_backend_export_rootkey(char                * destination_path,
@@ -18,7 +19,6 @@ sgx_backend_export_rootkey(char                * destination_path,
  */
 int
 sgx_backend_import_rootkey(char * rk_exchange_path);
-
 
 
 // abac management stuff
@@ -74,3 +74,26 @@ sgx_backend_abac_policy_del(struct nexus_uuid * uuid, struct nexus_volume * volu
 
 int
 sgx_backend_abac_policy_ls(struct nexus_volume * volume);
+
+
+// batch mode commands
+
+int
+sgx_backend_batch_mode_start(struct nexus_volume * volume);
+
+/** commits dirty buffers in batch mode */
+int
+sgx_backend_batch_mode_commit(struct nexus_volume * volume);
+
+int
+sgx_backend_batch_mode_finish(struct nexus_volume * volume);
+
+
+int
+sgx_backend_stat_uuid(struct nexus_volume  * volume,
+                      struct nexus_uuid    * uuid,
+                      struct nexus_fs_attr * attrs);
+
+
+struct nexus_datastore *
+sgx_backend_get_datastore(struct nexus_volume * volume, struct nexus_uuid * uuid);

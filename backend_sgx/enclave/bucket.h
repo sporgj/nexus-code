@@ -107,3 +107,6 @@ __new_dir_entry(struct nexus_uuid * entry_uuid, nexus_dirent_type_t type, char *
 
 void
 __free_dir_entry(struct dir_entry * dir_entry);
+
+void
+__rename_dir_entry(struct dir_entry * dir_entry, char * newname);
