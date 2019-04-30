@@ -409,6 +409,7 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
     case '>':
     case '<':
     case '=':
+    case '!':
         atom->pred_type = PREDICATE_BOOL;
         break;
     case '@':
