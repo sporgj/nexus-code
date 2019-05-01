@@ -403,7 +403,7 @@ void
 policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
 {
     memset(&atom->predicate, 0, SYSTEM_FUNC_MAX_LENGTH);
-    strncpy(&atom->predicate, predicate_str, SYSTEM_FUNC_MAX_LENGTH);
+    strncpy(atom->predicate, predicate_str, SYSTEM_FUNC_MAX_LENGTH);
 
     switch (atom->predicate[0]) {
     case '>':
@@ -705,7 +705,7 @@ __push_normal_atom_to_db(struct policy_atom * atom, dl_db_t db)
 
     if (atom_type_str == NULL) {
         log_error("could not get uppercase atom type\n");
-        return NULL;
+        return -1;
     }
 
 
