@@ -20,7 +20,7 @@ struct abac_request {
     struct attribute_store  * attribute_store;
 
     struct nexus_metadata   * metadata;
-    struct kb_entity * object_entity;
+    struct kb_entity        * object_entity;
 
     struct user_profile     * user_profile;
 
@@ -28,7 +28,7 @@ struct abac_request {
 };
 
 
-static struct nexus_lru        * object_entitys_map  = NULL;
+static struct nexus_lru * object_entitys_map  = NULL;
 
 static struct kb_entity * user_profile_entity = NULL;
 static struct kb_entity * policy_rules_entity = NULL;
@@ -42,9 +42,7 @@ __cache_entity(struct nexus_uuid * uuid);
 
 
 static int
-__register_fact_with_db(struct kb_entity * entity,
-                        struct kb_fact    * cached_fact,
-                        char                    * value)
+__register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact, char * value)
 {
     if (cached_fact->is_inserted) {
         if (strncmp(cached_fact->value, value, ATTRIBUTE_VALUE_SIZE) == 0) {
@@ -77,9 +75,9 @@ __register_fact_with_db(struct kb_entity * entity,
 // --[[ system facts
 
 static int
-__insert_system_functions(void                    * user_or_object,
-                          struct kb_entity * entity,
-                          struct nexus_list       * sysfacts_list)
+__insert_system_functions(void              * user_or_object,
+                          struct kb_entity  * entity,
+                          struct nexus_list * sysfacts_list)
 {
     struct nexus_list_iterator * iter = list_iterator_new(sysfacts_list);
 
@@ -171,10 +169,10 @@ out_err:
 // --[[ attributes
 
 static int
-__register_attribute_fact(struct kb_entity * entity,
-                          struct nexus_uuid       * attr_uuid,
-                          char                    * name,
-                          char                    * value)
+__register_attribute_fact(struct kb_entity  * entity,
+                          struct nexus_uuid * attr_uuid,
+                          char              * name,
+                          char              * value)
 {
     struct kb_fact * cached_fact = NULL;
 
@@ -526,12 +524,15 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
 
     // query the database
     if (db_ask_permission(perm_type, user_profile_entity, abac_req->object_entity)) {
+        nexus_printf(":( NO\n");
         goto out_err;
     }
 
+    nexus_printf(":) YAY!!!\n");
+
     __destroy_abac_request(abac_req);
 
-    return false;
+    return false; // TODO change this when done
 out_err:
     __destroy_abac_request(abac_req);
 
