@@ -756,33 +756,6 @@ do				-- equals primitive
    binary_equals_pred.prim = equals_primitive
 end
 
-do				-- equals primitive
-   local binary_greater_or_equals_pred = make_pred("_gt", 2)
-
-   local function greater_or_equals_primitive(literal, subgoal)
-      local x = literal[1]
-      local y = literal[2]
-      local env = x:unify(y, {})-- Both terms must unify,
-      if env then		-- and at least one of them
-	 x = x:subst(env)	-- must be a constant.
-	 y = y:subst(env)
-      end
-      return x:greater_or_equals_primitive(y, subgoal)
-   end
-
-   function Var:greater_or_equals_primitive(term, subgoal)
-   end
-
-   function Const:greater_or_equals_primitive(term, subgoal)
-      if self ~= term then	-- Both terms are constant and equal.
-	 local literal = {pred = binary_greater_or_equals_pred, self, term}
-	 return fact(subgoal, literal)
-      end
-   end
-
-   binary_greater_or_equals_pred.prim = greater_or_equals_primitive
-end
-
 -- Does a literal unify with an fact known to contain only constant
 -- terms?
 
@@ -840,6 +813,115 @@ local function add_iter_prim(name, arity, iter)
    pred.prim = prim
    return insert(pred)
 end
+
+
+add_iter_prim("_ge", 2, function(literal)
+  return function(s, v)
+    if v then
+      return nil
+    else
+      local x = literal[1]
+      local y = literal[2]
+      if x:is_const() and y:is_const() then
+        local j = tonumber(x.id)
+        local k = tonumber(y.id)
+        if j and k and j >= k then
+          return {j, k}
+        else
+          return nil
+        end
+      else
+        return nil
+      end
+    end
+  end
+end)
+
+add_iter_prim("_gt", 2, function(literal)
+  return function(s, v)
+    if v then
+      return nil
+    else
+      local x = literal[1]
+      local y = literal[2]
+      if x:is_const() and y:is_const() then
+        local j = tonumber(x.id)
+        local k = tonumber(y.id)
+        if j and k and j > k then
+          return {j, k}
+        else
+          return nil
+        end
+      else
+        return nil
+      end
+    end
+  end
+end)
+
+add_iter_prim("_le", 2, function(literal)
+  return function(s, v)
+    if v then
+      return nil
+    else
+      local x = literal[1]
+      local y = literal[2]
+      if x:is_const() and y:is_const() then
+        local j = tonumber(x.id)
+        local k = tonumber(y.id)
+        if j and k and j <= k then
+          return {j, k}
+        else
+          return nil
+        end
+      else
+        return nil
+      end
+    end
+  end
+end)
+
+add_iter_prim("_lt", 2, function(literal)
+  return function(s, v)
+    if v then
+      return nil
+    else
+      local x = literal[1]
+      local y = literal[2]
+      if x:is_const() and y:is_const() then
+        local j = tonumber(x.id)
+        local k = tonumber(y.id)
+        if j and k and j < k then
+          return {j, k}
+        else
+          return nil
+        end
+      else
+        return nil
+      end
+    end
+  end
+end)
+
+add_iter_prim("_ne", 2, function(literal)
+  return function(s, v)
+    if v then
+      return nil
+    else
+      local x = literal[1]
+      local y = literal[2]
+      if x:is_const() and y:is_const() then
+        if x.id == y.id then
+          return nil
+        else
+          return {x.id, y.id}
+        end
+      else
+        return nil
+      end
+    end
+  end
+end)
 
 --[[
 
@@ -931,6 +1013,14 @@ end
 function dl_makeclause(tbl)
    return tbl
 end
+
+function dl_printfacts(tbl)
+  print("FACTS\n")
+  for n,v in pairs(db) do
+    print(n, "\n")
+  end
+end
+
 
 dl_assert = assert
 
