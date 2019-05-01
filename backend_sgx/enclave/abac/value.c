@@ -113,8 +113,13 @@ abac_value_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_ptr)
     abac_value->type    = abac_val_buffer->type;
 
     uint8_t * src_buf   = buffer + sizeof(struct __abac_value_buf);
-    abac_value->raw_ptr = nexus_malloc(abac_val_buffer->size);
-    memcpy(abac_value->raw_ptr, src_buf, abac_value->data_sz);
+
+    if (abac_value->type == ABAC_VALUE_NUMBER) {
+        memcpy(&abac_value->int_val, src_buf, abac_value->data_sz);
+    } else {
+        abac_value->raw_ptr = nexus_malloc(abac_value->data_sz);
+        memcpy(abac_value->raw_ptr, src_buf, abac_value->data_sz);
+    }
 
     *output_ptr = (buffer + minsize);
 
@@ -137,7 +142,12 @@ abac_value_to_buf(struct abac_value * abac_value, uint8_t * buffer, size_t bufle
     abac_val_buffer->type = abac_value->type;
 
     uint8_t * dest_buf = (buffer + sizeof(struct __abac_value_buf));
-    memcpy(dest_buf, abac_value->raw_ptr, abac_value->data_sz);
+
+    if (abac_value->type == ABAC_VALUE_NUMBER) {
+        memcpy(dest_buf, &abac_value->int_val, abac_value->data_sz);
+    } else {
+        memcpy(dest_buf, abac_value->raw_ptr, abac_value->data_sz);
+    }
 
     return (buffer + minsize);
 }
