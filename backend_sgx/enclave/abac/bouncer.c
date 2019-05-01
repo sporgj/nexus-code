@@ -20,7 +20,7 @@ struct abac_request {
     struct attribute_store  * attribute_store;
 
     struct nexus_metadata   * metadata;
-    struct __cached_element * object_element;
+    struct kb_entity * object_element;
 
     struct user_profile     * user_profile;
 
@@ -30,20 +30,20 @@ struct abac_request {
 
 static struct nexus_lru        * object_elements_map  = NULL;
 
-static struct __cached_element * user_profile_element = NULL;
-static struct __cached_element * policy_rules_element = NULL;
+static struct kb_entity * user_profile_element = NULL;
+static struct kb_entity * policy_rules_element = NULL;
 
 static void
 __destroy_abac_request(struct abac_request * abac_req);
 
-static struct __cached_element *
+static struct kb_entity *
 __object_element_upsert(struct nexus_uuid * uuid);
 
 
 
 static int
-__register_fact_with_db(struct __cached_element * cached_element,
-                        struct __cached_fact    * cached_fact,
+__register_fact_with_db(struct kb_entity * entity,
+                        struct kb_fact    * cached_fact,
                         char                    * value)
 {
     if (cached_fact->is_inserted) {
@@ -78,12 +78,12 @@ __register_fact_with_db(struct __cached_element * cached_element,
 
 static int
 __insert_system_functions(void                    * user_or_object,
-                          struct __cached_element * cached_element,
+                          struct kb_entity * entity,
                           struct nexus_list       * sysfacts_list)
 {
     struct nexus_list_iterator * iter = list_iterator_new(sysfacts_list);
 
-    struct __cached_fact * cached_fact = NULL;
+    struct kb_fact * cached_fact = NULL;
 
     while (list_iterator_is_valid(iter)) {
         struct __sys_func * sys_func = list_iterator_get(iter);
@@ -97,7 +97,7 @@ __insert_system_functions(void                    * user_or_object,
         }
 
         // get the cached fact and compare its value
-        cached_fact = cached_element_find_name_fact(cached_element, (char *)name);
+        cached_fact = kb_entity_find_name_fact(entity, (char *)name);
 
         if (cached_fact) {
             // if the value is unchanged, let's skip
@@ -106,10 +106,10 @@ __insert_system_functions(void                    * user_or_object,
                 goto next;
             }
         } else {
-            cached_fact = cached_element_put_name_fact(cached_element, name, new_value);
+            cached_fact = kb_entity_put_name_fact(entity, name, new_value);
         }
 
-        if (__register_fact_with_db(cached_element, cached_fact, new_value)) {
+        if (__register_fact_with_db(entity, cached_fact, new_value)) {
             list_iterator_free(iter);
             log_error("__register_fact_with_db() FAILED\n");
             return -1;
@@ -171,25 +171,25 @@ out_err:
 // --[[ attributes
 
 static int
-__register_attribute_fact(struct __cached_element * cached_element,
+__register_attribute_fact(struct kb_entity * entity,
                           struct nexus_uuid       * attr_uuid,
                           char                    * name,
                           char                    * value)
 {
-    struct __cached_fact * cached_fact = NULL;
+    struct kb_fact * cached_fact = NULL;
 
-    cached_fact = cached_element_find_uuid_fact(cached_element, attr_uuid);
+    cached_fact = kb_entity_find_uuid_fact(entity, attr_uuid);
 
     if (cached_fact == NULL) {
-        cached_fact = cached_element_put_uuid_fact(cached_element, attr_uuid, name, value);
+        cached_fact = kb_entity_put_uuid_fact(entity, attr_uuid, name, value);
     }
 
-    return __register_fact_with_db(cached_element, cached_fact, value);
+    return __register_fact_with_db(entity, cached_fact, value);
 }
 
 static int
 __insert_attribute_table(struct abac_request     * abac_req,
-                         struct __cached_element * cached_element,
+                         struct kb_entity * entity,
                          struct attribute_table  * attribute_table)
 {
     struct hashmap_iter iter;
@@ -213,7 +213,7 @@ __insert_attribute_table(struct abac_request     * abac_req,
             continue;
         }
 
-        if (__register_attribute_fact(cached_element,
+        if (__register_attribute_fact(entity,
                                       &attr_entry->attr_uuid,
                                       attr_term->name,
                                       attr_entry->attr_val)) {
@@ -259,13 +259,13 @@ out_err:
 static int
 __insert_policy_rule(struct abac_request * abac_req, struct policy_rule * rule)
 {
-    struct __cached_fact * cached_fact = NULL;
+    struct kb_fact * cached_fact = NULL;
 
-    cached_fact = cached_element_find_uuid_fact(policy_rules_element, &rule->rule_uuid);
+    cached_fact = kb_entity_find_uuid_fact(policy_rules_element, &rule->rule_uuid);
 
     if (cached_fact == NULL) {
         cached_fact
-            = cached_element_put_uuid_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
+            = kb_entity_put_uuid_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
         if (cached_fact == NULL) {
             log_error("could not cache policy rule\n");
             goto out_err;
@@ -387,8 +387,8 @@ __init_user_attributes()
         return -1;
     }
 
-    if (db_assert_cached_element_type(user_profile_element, USER_ATTRIBUTE_TYPE)) {
-        log_error("db_assert_cached_element_type() FAILED\n");
+    if (db_assert_kb_entity_type(user_profile_element, USER_ATTRIBUTE_TYPE)) {
+        log_error("db_assert_kb_entity_type() FAILED\n");
         return -1;
     }
 
@@ -409,41 +409,41 @@ __init_user_attributes()
     return 0;
 }
 
-static struct __cached_element *
+static struct kb_entity *
 __object_element_upsert(struct nexus_uuid * uuid)
 {
-    struct __cached_element * cached_element = nexus_lru_get(object_elements_map, uuid);
+    struct kb_entity * entity = nexus_lru_get(object_elements_map, uuid);
 
-    if (cached_element) {
-        return cached_element;
+    if (entity) {
+        return entity;
     }
 
-    cached_element = cached_element_new(uuid);
+    entity = kb_entity_new(uuid);
 
-    if (!nexus_lru_put(object_elements_map, &cached_element->uuid, cached_element)) {
-        cached_element_free(cached_element);
+    if (!nexus_lru_put(object_elements_map, &entity->uuid, entity)) {
+        kb_entity_free(entity);
         log_error("nexus_lru_put() FAILED\n");
         return NULL;
     }
 
-    if (db_assert_cached_element_type(cached_element, OBJECT_ATTRIBUTE_TYPE)) {
-        log_error("db_assert_cached_element_type() FAILED\n");
+    if (db_assert_kb_entity_type(entity, OBJECT_ATTRIBUTE_TYPE)) {
+        log_error("db_assert_kb_entity_type() FAILED\n");
         return -1;
     }
 
-    return cached_element;
+    return entity;
 }
 
 static void
 __object_element_freer(uintptr_t element, uintptr_t key)
 {
-    struct __cached_element * cached_element = element;
+    struct kb_entity * entity = element;
 
-    if (cached_element->attr_type) {
-        db_retract_cached_element_type(cached_element);
+    if (entity->attr_type) {
+        db_retract_kb_entity_type(entity);
     }
 
-    cached_element_free(element);
+    kb_entity_free(element);
 }
 
 int
@@ -461,9 +461,9 @@ bouncer_init()
         object_elements_map
             = nexus_lru_create(16, __uuid_hasher, __uuid_equals, __object_element_freer);
 
-        policy_rules_element = cached_element_new(abac_policy_store_uuid());
+        policy_rules_element = kb_entity_new(abac_policy_store_uuid());
 
-        user_profile_element = cached_element_new(&global_user_struct->user_uuid);
+        user_profile_element = kb_entity_new(&global_user_struct->user_uuid);
     }
 
     if (__init_user_attributes()) {
@@ -490,18 +490,24 @@ bouncer_destroy()
     }
 
     if (policy_rules_element) {
-        cached_element_free(policy_rules_element);
+        kb_entity_free(policy_rules_element);
     }
 
     if (user_profile_element) {
-        cached_element_free(user_profile_element);
+        kb_entity_free(user_profile_element);
     }
 }
 
 bool
 bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
 {
-    struct abac_request * abac_req = __create_abac_request(metadata, perm_type);
+    struct abac_request * abac_req = NULL;
+
+    if (nexus_enclave_is_current_user_owner()) {
+        return true;
+    }
+
+    abac_req = __create_abac_request(metadata, perm_type);
 
     if (abac_req == NULL) {
         log_error("__create_abac_request() FAILED\n");

@@ -6,7 +6,7 @@ dl_db_t my_database;
 
 
 int
-__get_cached_element_type(char * dest_buffer, attribute_type_t attr_type)
+__get_kb_entity_type(char * dest_buffer, attribute_type_t attr_type)
 {
     if (attr_type == USER_ATTRIBUTE_TYPE) {
         strncpy(dest_buffer, "_isUser", ATTRIBUTE_NAME_MAX);
@@ -20,45 +20,45 @@ __get_cached_element_type(char * dest_buffer, attribute_type_t attr_type)
 }
 
 int
-db_assert_cached_element_type(struct __cached_element * cached_element, attribute_type_t attr_type)
+db_assert_kb_entity_type(struct kb_entity * entity, attribute_type_t attr_type)
 {
-    struct __cached_fact tmp_fact = { 0 };
+    struct kb_fact tmp_fact = { 0 };
 
-    if (__get_cached_element_type(&tmp_fact.name, attr_type)) {
-        log_error("could not get cached_element type\n");
+    if (__get_kb_entity_type(&tmp_fact.name, attr_type)) {
+        log_error("could not get entity type\n");
         return -1;
     }
 
-    tmp_fact.element = cached_element;
+    tmp_fact.entity = entity;
 
     if (db_assert_fact(&tmp_fact)) {
-        log_error("could not assert `%s` cached_element type\n", tmp_fact.name);
+        log_error("could not assert `%s` entity type\n", tmp_fact.name);
         return -1;
     }
 
-    cached_element->attr_type = attr_type;
+    entity->attr_type = attr_type;
 
     return 0;
 }
 
 int
-db_retract_cached_element_type(struct __cached_element * cached_element)
+db_retract_kb_entity_type(struct kb_entity * entity)
 {
-    struct __cached_fact tmp_fact = { 0 };
+    struct kb_fact tmp_fact = { 0 };
 
-    if (__get_cached_element_type(&tmp_fact.name, cached_element->attr_type)) {
-        log_error("could not get cached_element type\n");
+    if (__get_kb_entity_type(&tmp_fact.name, entity->attr_type)) {
+        log_error("could not get entity type\n");
         return -1;
     }
 
-    tmp_fact.element = cached_element;
+    tmp_fact.entity = entity;
 
     if (db_retract_fact(&tmp_fact)) {
-        log_error("could not retract `%s` cached_element type\n", tmp_fact.name);
+        log_error("could not retract `%s` entity type\n", tmp_fact.name);
         return -1;
     }
 
-    cached_element->attr_type = 0;
+    entity->attr_type = 0;
 
     return 0;
 }
@@ -66,12 +66,17 @@ db_retract_cached_element_type(struct __cached_element * cached_element)
 
 static int
 __insert_db_fact(dl_db_t      db,
-                 const char * attribute_name,
+                 const char * predicate,
                  const char * object_name,
                  const char * value)
 {
-    if (db_make_literal(attribute_name, object_name, DATALOG_CONST_TERM, value, DATALOG_CONST_TERM, db)) {
-        log_error("db_make_literal() FAILED\n");
+    if (__db_make_literal(predicate,
+                          object_name,
+                          DATALOG_CONST_TERM,
+                          value,
+                          DATALOG_CONST_TERM,
+                          db)) {
+        log_error("__db_make_literal() FAILED\n");
         goto out_err;
     }
 
@@ -94,13 +99,13 @@ out_err:
 }
 
 int
-db_retract_fact(struct __cached_fact * cached_fact)
+db_retract_fact(struct kb_fact * cached_fact)
 {
     int mark = dl_mark(my_database);
 
     if (__insert_db_fact(my_database,
                          cached_fact->name,
-                         cached_fact->element->uuid_str,
+                         cached_fact->entity->uuid_str,
                          cached_fact->value)) {
         log_error("__insert_db_fact() FAILED\n");
         goto out_err;
@@ -119,13 +124,13 @@ out_err:
 }
 
 int
-db_assert_fact(struct __cached_fact * cached_fact)
+db_assert_fact(struct kb_fact * cached_fact)
 {
     int mark = dl_mark(my_database);
 
     if (__insert_db_fact(my_database,
                          cached_fact->name,
-                         cached_fact->element->uuid_str,
+                         cached_fact->entity->uuid_str,
                          cached_fact->value)) {
         log_error("__insert_db_fact() FAILED\n");
         goto out_err;
@@ -199,7 +204,7 @@ out_err:
 }
 
 int
-db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db)
+__db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db)
 {
     if (dl_pushstring(db, term)) {
         log_error("dl_pushstring(`%s`) FAILED\n", term);
@@ -222,12 +227,12 @@ db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db)
 }
 
 int
-db_make_literal(char *              predicate,
-                char *              first_term_str,
-                datalog_term_type_t first_term_type,
-                char *              second_term_str,
-                datalog_term_type_t second_term_type,
-                dl_db_t             db)
+__db_make_literal(char              * predicate,
+                  char              * first_term_str,
+                  datalog_term_type_t first_term_type,
+                  char              * second_term_str,
+                  datalog_term_type_t second_term_type,
+                  dl_db_t             db)
 {
     if (dl_pushliteral(db)) {
         log_error("dl_pushliteral() for atom FAILED\n");
@@ -246,12 +251,12 @@ db_make_literal(char *              predicate,
         }
     }
 
-    if (db_push_term(first_term_str, first_term_type, db)) {
+    if (__db_push_term(first_term_str, first_term_type, db)) {
         log_error("db_push_term(`%s`) FAILED\n", first_term_str);
         return -1;
     }
 
-    if (second_term_str && db_push_term(second_term_str, second_term_type, db)) {
+    if (second_term_str && __db_push_term(second_term_str, second_term_type, db)) {
         log_error("db_push_term(`%s`) FAILED\n", second_term_str);
         return -1;
     }
@@ -265,15 +270,14 @@ db_make_literal(char *              predicate,
 }
 
 int
-db_push_literal(char              * predicate,
-                char              * first_term_str,
-                datalog_term_type_t first_term_type,
-                char              * second_term_str,
-                datalog_term_type_t second_term_type,
-                dl_db_t             db)
+__db_push_literal(char              * predicate,
+                  char              * first_str,
+                  datalog_term_type_t first_type,
+                  char              * second_str,
+                  datalog_term_type_t second_type,
+                  dl_db_t             db)
 {
-    if (db_make_literal(
-            predicate, first_term_str, first_term_type, second_term_str, second_term_type, db)) {
+    if (__db_make_literal(predicate, first_str, first_type, second_str, second_type, db)) {
         log_error("db_make_literal() FAILED\n");
         return -1;
     }

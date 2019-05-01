@@ -342,7 +342,7 @@ __policy_rule_push_head(struct policy_rule * rule, dl_db_t db)
         return -1;
     }
 
-    if (db_make_literal(permission_string, "U", DATALOG_VAR_TERM, "O", DATALOG_VAR_TERM, db)) {
+    if (__db_make_literal(permission_string, "U", DATALOG_VAR_TERM, "O", DATALOG_VAR_TERM, db)) {
         log_error("db_make_literal() FAILED\n");
         return -1;
     }
@@ -373,12 +373,12 @@ policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
         return -1;
     }
 
-    if (db_push_literal("_isUser", "U", DATALOG_VAR_TERM, NULL, DATALOG_VAR_TERM, db)) {
+    if (__db_push_literal("_isUser", "U", DATALOG_VAR_TERM, NULL, DATALOG_VAR_TERM, db)) {
         log_error("db_push_literal(`isUser`) FAILED\n");
         return -1;
     }
 
-    if (db_push_literal("_isObject", "O", DATALOG_VAR_TERM, NULL, DATALOG_VAR_TERM, db)) {
+    if (__db_push_literal("_isObject", "O", DATALOG_VAR_TERM, NULL, DATALOG_VAR_TERM, db)) {
         log_error("db_push_literal(`isObject`) FAILED\n");
         return -1;
     }

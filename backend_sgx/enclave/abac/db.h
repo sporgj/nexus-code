@@ -19,16 +19,16 @@ typedef enum {
 
 
 int
-db_retract_fact(struct __cached_fact * cached_fact);
+db_retract_fact(struct kb_fact * cached_fact);
 
 int
-db_assert_fact(struct __cached_fact * cached_fact);
+db_assert_fact(struct kb_fact * cached_fact);
 
 int
-db_assert_cached_element_type(struct __cached_element * cached_element, attribute_type_t attr_type);
+db_assert_kb_entity_type(struct kb_entity * entity, attribute_type_t attr_type);
 
 int
-db_retract_cached_element_type(struct __cached_element * cached_element);
+db_retract_kb_entity_type(struct kb_entity * entity);
 
 int
 db_assert_policy_rule(struct policy_rule * rule);
@@ -36,20 +36,25 @@ db_assert_policy_rule(struct policy_rule * rule);
 int
 db_retract_policy_rule(struct policy_rule * rule);
 
-int
-db_make_literal(char              * predicate,
-                char              * first_term_str,
-                datalog_term_type_t first_term_type,
-                char              * second_term_str,
-                datalog_term_type_t second_term_type,
-                dl_db_t             db);
-int
-db_push_literal(char              * predicate,
-                char              * first_term_str,
-                datalog_term_type_t first_term_type,
-                char              * second_term_str,
-                datalog_term_type_t second_term_type,
-                dl_db_t             db);
+
+// these are to be used with care
 
 int
-db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db);
+__db_make_literal(char              * predicate,
+                  char              * first_term_str,
+                  datalog_term_type_t first_term_type,
+                  char              * second_term_str,
+                  datalog_term_type_t second_term_type,
+                  dl_db_t             db);
+
+
+int
+__db_push_literal(char              * predicate,
+                  char              * first_term_str,
+                  datalog_term_type_t first_term_type,
+                  char              * second_term_str,
+                  datalog_term_type_t second_term_type,
+                  dl_db_t             db);
+
+int
+__db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db);

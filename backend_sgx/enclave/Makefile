@@ -100,7 +100,6 @@ nexus_abac_objs := \
 	bouncer.o \
 	value.o \
 	atom.o \
-	enforcer.o \
 	system_functions.o \
 	boolean_operators.o \
 	runtime.o \

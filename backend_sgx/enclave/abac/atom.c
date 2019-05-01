@@ -565,7 +565,7 @@ policy_atom_is_valid(struct policy_atom * atom)
 }
 
 
-static const char *
+static inline const char *
 __atom_type_char_uppercase_str(char atom_type_char)
 {
     switch (atom_type_char) {
@@ -577,68 +577,6 @@ __atom_type_char_uppercase_str(char atom_type_char)
         log_error("unknown atom type\n");
         return NULL;
     }
-}
-
-static const char *
-__atom_type_to_uppercase_str(atom_type_t atom_type)
-{
-    switch (atom_type) {
-    case ATOM_TYPE_OBJECT:
-        return "O";
-    case ATOM_TYPE_USER:
-        return "U";
-    default:
-        log_error("unknown atom type\n");
-        return NULL;
-    }
-}
-
-static int
-__push_literal_to_db(char              * predicate,
-                     char              * first_term_str,
-                     datalog_term_type_t first_term_type,
-                     char              * second_term_str,
-                     datalog_term_type_t second_term_type,
-                     dl_db_t             db)
-{
-    if (dl_pushliteral(db)) {
-        log_error("dl_pushliteral() for atom FAILED\n");
-        return -1;
-    }
-
-    {
-        if (dl_pushstring(db, predicate)) {
-            log_error("dl_pushstring('%s')\n", predicate);
-            return -1;
-        }
-
-        if (dl_addpred(db)) {
-            log_error("dl_addpred() of atom's predicate FAILED\n");
-            return -1;
-        }
-    }
-
-    if (db_push_term(first_term_str, first_term_type, db)) {
-        log_error("__push_term_to_db(`%s`) FAILED\n", first_term_str);
-        return -1;
-    }
-
-    if (second_term_str && db_push_term(second_term_str, second_term_type, db)) {
-        log_error("__push_term_to_db(`%s`) FAILED\n", second_term_str);
-        return -1;
-    }
-
-    if (dl_makeliteral(db)) {
-        log_error("dl_makeliteral() FAILED\n");
-        return -1;
-    }
-
-    if (dl_addliteral(db)) {
-        log_error("dl_addliteral() FAILED\n");
-        return -1;
-    }
-
-    return 0;
 }
 
 static char *
@@ -666,12 +604,12 @@ __try_push_boolean_fact(struct atom_argument * atom_arg,
 
     snprintf(free_variable_str_dest, 10, "X%zu", *free_variable_index_ptr);
 
-    if (db_push_literal(&string_ptr[2],
-                        atom_type_str,
-                        DATALOG_VAR_TERM,
-                        free_variable_str_dest,
-                        DATALOG_VAR_TERM,
-                        db)) {
+    if (__db_push_literal(&string_ptr[2],
+                          atom_type_str,
+                          DATALOG_VAR_TERM,
+                          free_variable_str_dest,
+                          DATALOG_VAR_TERM,
+                          db)) {
         log_error("db_push_literal() FAILED\n");
         nexus_free(free_variable_str_dest);
         return NULL;
@@ -701,7 +639,7 @@ __push_boolean_atom_to_db(struct policy_atom * atom, size_t * free_variable_inde
 
 
     if (first_variable_str == NULL || second_variable_str == NULL) {
-        log_error("__try_push_boolean_argument() FAILED\n");
+        log_error("__try_push_boolean_fact() FAILED\n");
         goto out_err;
     }
 
@@ -714,16 +652,19 @@ __push_boolean_atom_to_db(struct policy_atom * atom, size_t * free_variable_inde
             return -1;
         }
 
-        if (db_push_literal(predicate,
-                            first_variable_str,
-                            first_variable_type,
-                            second_variable_str,
-                            second_variable_type,
-                            db)) {
-            log_error("db_push_literal() FAILED\n");
+        if (__db_push_literal(predicate,
+                              first_variable_str,
+                              first_variable_type,
+                              second_variable_str,
+                              second_variable_type,
+                              db)) {
+            log_error("__db_push_literal() FAILED\n");
             goto out_err;
         }
     }
+
+    nexus_free(first_variable_str);
+    nexus_free(second_variable_str);
 
     return 0;
 out_err:
@@ -736,6 +677,21 @@ out_err:
     }
 
     return -1;
+}
+
+
+static inline const char *
+__atom_type_to_uppercase_str(atom_type_t atom_type)
+{
+    switch (atom_type) {
+    case ATOM_TYPE_OBJECT:
+        return "O";
+    case ATOM_TYPE_USER:
+        return "U";
+    default:
+        log_error("unknown atom type\n");
+        return NULL;
+    }
 }
 
 static int
@@ -755,12 +711,12 @@ __push_normal_atom_to_db(struct policy_atom * atom, dl_db_t db)
 
     second_variable_str = atom_argument_string_val(atom_arg);
 
-    if (db_push_literal(atom->predicate,
-                        atom_type_str,
-                        DATALOG_VAR_TERM,
-                        second_variable_str,
-                        DATALOG_CONST_TERM,
-                        db)) {
+    if (__db_push_literal(atom->predicate,
+                          atom_type_str,
+                          DATALOG_VAR_TERM,
+                          second_variable_str,
+                          DATALOG_CONST_TERM,
+                          db)) {
         log_error("db_push_literal() FAILED\n");
         nexus_free(second_variable_str);
         return -1;

@@ -7,7 +7,7 @@
 
 
 // correspond to a particular user_profile, metadata or policy_store
-struct __cached_element {
+struct kb_entity {
     struct nexus_uuid uuid;
     char *            uuid_str;
 
@@ -17,7 +17,7 @@ struct __cached_element {
     struct hashmap    name_facts;  // facts indexed by name (sys functions)
 };
 
-struct __cached_fact {
+struct kb_fact {
     struct hashmap_entry hash_entry;
     struct nexus_uuid    uuid;
     char                 name[ATTRIBUTE_NAME_MAX];
@@ -27,30 +27,28 @@ struct __cached_fact {
     bool                 is_inserted;
     bool                 is_rule;
 
-    struct __cached_element * element;
+    struct kb_entity   * entity;
 };
 
 
-struct __cached_element *
-cached_element_new(struct nexus_uuid * uuid);
+struct kb_entity *
+kb_entity_new(struct nexus_uuid * uuid);
 
 void
-cached_element_free(struct __cached_element * cached_element);
+kb_entity_free(struct kb_entity * entity);
 
-struct __cached_fact *
-cached_element_put_uuid_fact(struct __cached_element * cached_element,
-                             struct nexus_uuid       * uuid,
-                             char                    * name,
-                             char                    * value);
+struct kb_fact *
+kb_entity_put_uuid_fact(struct kb_entity  * entity,
+                        struct nexus_uuid * uuid,
+                        char              * name,
+                        char              * value);
 
-struct __cached_fact *
-cached_element_put_name_fact(struct __cached_element * cached_element,
-                             char                    * name,
-                             char                    * value);
+struct kb_fact *
+kb_entity_put_name_fact(struct kb_entity * entity, char * name, char * value);
 
-struct __cached_fact *
-cached_element_find_uuid_fact(struct __cached_element * cached_element, struct nexus_uuid * uuid);
+struct kb_fact *
+kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid);
 
-struct __cached_fact *
-cached_element_find_name_fact(struct __cached_element * cached_element, char * name);
+struct kb_fact *
+kb_entity_find_name_fact(struct kb_entity * entity, char * name);
 
