@@ -2,8 +2,51 @@
 #include "db.h"
 
 
-dl_db_t my_database;
+static dl_db_t my_database;
 
+
+int
+db_init()
+{
+    my_database = datalog_engine_create();
+
+    if (my_database == NULL) {
+        log_error("could not create a new datalog engine\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+void
+db_exit()
+{
+    if (my_database) {
+        datalog_engine_destroy(my_database);
+    }
+
+    return 0;
+}
+
+int
+db_ask_permission(perm_type_t        perm_type,
+                  struct kb_entity * user_entity,
+                  struct kb_entity * object_entity)
+{
+    char * permission_string = perm_type_to_string(perm_type);
+
+    if (!datalog_engine_is_true(my_database,
+                                permission_string,
+                                user_entity->uuid_str,
+                                object_entity->uuid_str)) {
+        nexus_free(permission_string);
+        return -1;
+    }
+
+    nexus_free(permission_string);
+
+    return 0;
+}
 
 int
 __get_kb_entity_type(char * dest_buffer, attribute_type_t attr_type)

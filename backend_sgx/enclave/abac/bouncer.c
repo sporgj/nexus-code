@@ -20,7 +20,7 @@ struct abac_request {
     struct attribute_store  * attribute_store;
 
     struct nexus_metadata   * metadata;
-    struct kb_entity * object_element;
+    struct kb_entity * object_entity;
 
     struct user_profile     * user_profile;
 
@@ -28,16 +28,16 @@ struct abac_request {
 };
 
 
-static struct nexus_lru        * object_elements_map  = NULL;
+static struct nexus_lru        * object_entitys_map  = NULL;
 
-static struct kb_entity * user_profile_element = NULL;
-static struct kb_entity * policy_rules_element = NULL;
+static struct kb_entity * user_profile_entity = NULL;
+static struct kb_entity * policy_rules_entity = NULL;
 
 static void
 __destroy_abac_request(struct abac_request * abac_req);
 
 static struct kb_entity *
-__object_element_upsert(struct nexus_uuid * uuid);
+__cache_entity(struct nexus_uuid * uuid);
 
 
 
@@ -135,7 +135,7 @@ __abac_request_insert_sysfuncs(struct abac_request * abac_req)
 
     usr_sysfacts = system_function_export_sysfuncs(USER_FUNCTION);
 
-    if (__insert_system_functions(abac_req->user_profile, user_profile_element, usr_sysfacts)) {
+    if (__insert_system_functions(abac_req->user_profile, user_profile_entity, usr_sysfacts)) {
         log_error("could not insert user system functions\n");
         goto out_err;
     }
@@ -143,7 +143,7 @@ __abac_request_insert_sysfuncs(struct abac_request * abac_req)
     if (abac_req->metadata) {
         obj_sysfacts = system_function_export_sysfuncs(OBJECT_FUNCTION);
 
-        if (__insert_system_functions(abac_req->metadata, abac_req->object_element, obj_sysfacts)) {
+        if (__insert_system_functions(abac_req->metadata, abac_req->object_entity, obj_sysfacts)) {
             log_error("could not insert user system functions\n");
             goto out_err;
         }
@@ -231,7 +231,7 @@ __abac_request_insert_attributes(struct abac_request * abac_req)
     struct attribute_table * user_attr_table = abac_req->user_profile->attribute_table;
 
     // insert the user_profile attribute table
-    if (__insert_attribute_table(abac_req, user_profile_element, user_attr_table)) {
+    if (__insert_attribute_table(abac_req, user_profile_entity, user_attr_table)) {
         log_error("could not insert user_profile attribute table into database\n");
         goto out_err;
     }
@@ -240,7 +240,7 @@ __abac_request_insert_attributes(struct abac_request * abac_req)
     if (abac_req->metadata) {
         struct attribute_table * obj_attr_table = metadata_get_attribute_table(abac_req->metadata);
 
-        if (__insert_attribute_table(abac_req, abac_req->object_element, obj_attr_table)) {
+        if (__insert_attribute_table(abac_req, abac_req->object_entity, obj_attr_table)) {
             log_error("could not insert object attribute table into database\n");
             goto out_err;
         }
@@ -261,11 +261,11 @@ __insert_policy_rule(struct abac_request * abac_req, struct policy_rule * rule)
 {
     struct kb_fact * cached_fact = NULL;
 
-    cached_fact = kb_entity_find_uuid_fact(policy_rules_element, &rule->rule_uuid);
+    cached_fact = kb_entity_find_uuid_fact(policy_rules_entity, &rule->rule_uuid);
 
     if (cached_fact == NULL) {
         cached_fact
-            = kb_entity_put_uuid_fact(policy_rules_element, &rule->rule_uuid, "", NULL);
+            = kb_entity_put_uuid_fact(policy_rules_entity, &rule->rule_uuid, "", NULL);
         if (cached_fact == NULL) {
             log_error("could not cache policy rule\n");
             goto out_err;
@@ -348,9 +348,9 @@ __create_abac_request(struct nexus_metadata * metadata, perm_type_t perm_type)
     }
 
     if (access_req->metadata) {
-        access_req->object_element = __object_element_upsert(&access_req->metadata->uuid);
-        if (access_req->object_element == NULL) {
-            log_error("__upsert_element() for metadata failed FAILED\n");
+        access_req->object_entity = __cache_entity(&access_req->metadata->uuid);
+        if (access_req->object_entity == NULL) {
+            log_error("__upsert_entity() for metadata failed FAILED\n");
             goto out_err;
         }
     }
@@ -387,7 +387,7 @@ __init_user_attributes()
         return -1;
     }
 
-    if (db_assert_kb_entity_type(user_profile_element, USER_ATTRIBUTE_TYPE)) {
+    if (db_assert_kb_entity_type(user_profile_entity, USER_ATTRIBUTE_TYPE)) {
         log_error("db_assert_kb_entity_type() FAILED\n");
         return -1;
     }
@@ -410,9 +410,9 @@ __init_user_attributes()
 }
 
 static struct kb_entity *
-__object_element_upsert(struct nexus_uuid * uuid)
+__cache_entity(struct nexus_uuid * uuid)
 {
-    struct kb_entity * entity = nexus_lru_get(object_elements_map, uuid);
+    struct kb_entity * entity = nexus_lru_get(object_entitys_map, uuid);
 
     if (entity) {
         return entity;
@@ -420,7 +420,7 @@ __object_element_upsert(struct nexus_uuid * uuid)
 
     entity = kb_entity_new(uuid);
 
-    if (!nexus_lru_put(object_elements_map, &entity->uuid, entity)) {
+    if (!nexus_lru_put(object_entitys_map, &entity->uuid, entity)) {
         kb_entity_free(entity);
         log_error("nexus_lru_put() FAILED\n");
         return NULL;
@@ -435,7 +435,7 @@ __object_element_upsert(struct nexus_uuid * uuid)
 }
 
 static void
-__object_element_freer(uintptr_t element, uintptr_t key)
+__evict_entity(uintptr_t element, uintptr_t key)
 {
     struct kb_entity * entity = element;
 
@@ -449,21 +449,18 @@ __object_element_freer(uintptr_t element, uintptr_t key)
 int
 bouncer_init()
 {
-    my_database = datalog_engine_create();
-
-    if (my_database == NULL) {
-        log_error("could not create a new datalog engine\n");
+    if (db_init()) {
+        log_error("db_init() FAILED\n");
         return -1;
     }
 
     // create the necessary structures
     {
-        object_elements_map
-            = nexus_lru_create(16, __uuid_hasher, __uuid_equals, __object_element_freer);
+        object_entitys_map = nexus_lru_create(16, __uuid_hasher, __uuid_equals, __evict_entity);
 
-        policy_rules_element = kb_entity_new(abac_policy_store_uuid());
+        policy_rules_entity = kb_entity_new(abac_policy_store_uuid());
 
-        user_profile_element = kb_entity_new(&global_user_struct->user_uuid);
+        user_profile_entity = kb_entity_new(&global_user_struct->user_uuid);
     }
 
     if (__init_user_attributes()) {
@@ -473,7 +470,7 @@ bouncer_init()
 
     return 0;
 out_err:
-    nexus_lru_destroy(object_elements_map);
+    nexus_lru_destroy(object_entitys_map);
 
     return -1;
 }
@@ -481,20 +478,18 @@ out_err:
 void
 bouncer_destroy()
 {
-    if (my_database) {
-        datalog_engine_destroy(my_database);
+    db_exit();
+
+    if (object_entitys_map) {
+        nexus_lru_destroy(object_entitys_map);
     }
 
-    if (object_elements_map) {
-        nexus_lru_destroy(object_elements_map);
+    if (policy_rules_entity) {
+        kb_entity_free(policy_rules_entity);
     }
 
-    if (policy_rules_element) {
-        kb_entity_free(policy_rules_element);
-    }
-
-    if (user_profile_element) {
-        kb_entity_free(user_profile_element);
+    if (user_profile_entity) {
+        kb_entity_free(user_profile_entity);
     }
 }
 
@@ -530,21 +525,8 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
     }
 
     // query the database
-    {
-        char * permission_string = perm_type_to_string(perm_type);
-
-        if (!datalog_engine_is_true(my_database,
-                                    permission_string,
-                                    user_profile_element->uuid_str,
-                                    abac_req->object_element->uuid_str)) {
-            log_error("datalog_engine returned false\n");
-            nexus_free(permission_string);
-            goto out_err;
-        }
-
-        log_error("datalog_engine returned true\n");
-
-        nexus_free(permission_string);
+    if (db_ask_permission(perm_type, user_profile_entity, abac_req->object_entity)) {
+        goto out_err;
     }
 
     __destroy_abac_request(abac_req);

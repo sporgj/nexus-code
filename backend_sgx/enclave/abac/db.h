@@ -9,14 +9,23 @@
 #include "./datalog-engine/engine.h"
 
 
-extern dl_db_t my_database;
-
 
 typedef enum {
     DATALOG_VAR_TERM = 1,
     DATALOG_CONST_TERM
 } datalog_term_type_t;
 
+
+int
+db_init();
+
+void
+db_exit();
+
+int
+db_ask_permission(perm_type_t        perm_type,
+                  struct kb_entity * user_entity,
+                  struct kb_entity * obj_entity);
 
 int
 db_retract_fact(struct kb_fact * cached_fact);
