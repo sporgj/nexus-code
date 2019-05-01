@@ -21,6 +21,9 @@
 #include "lualib.h"
 
 
+extern void ocall_print(char * str);
+
+
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
   int i;
@@ -34,8 +37,10 @@ static int luaB_print (lua_State *L) {
     s = lua_tolstring(L, -1, &l);  /* get result */
     if (s == NULL)
       return luaL_error(L, "'tostring' must return a string to 'print'");
-    if (i>1) lua_writestring("\t", 1);
-    lua_writestring(s, l);
+    // if (i>1) lua_writestring("\t", 1);
+    if (i>1) ocall_print("\t");
+    // lua_writestring(s, l);
+    ocall_print((char *)s);
     lua_pop(L, 1);  /* pop result */
   }
   lua_writeline();
