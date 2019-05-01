@@ -1,6 +1,7 @@
 #include "abac_internal.h"
 #include "rule.h"
 #include "atom.h"
+#include "db.h"
 
 #include "../libnexus_trusted/nexus_str.h"
 #include "../libnexus_trusted/rapidstring.h"
@@ -332,65 +333,6 @@ out_err:
 }
 
 static int
-__policy_rule_push_dummies(struct policy_rule * rule, dl_db_t db)
-{
-    const char * predicate = "_isUser";
-    const char * term_var  = "U";
-
-    bool second_round = false;
-
-make_literal:
-    {
-        if (dl_pushliteral(db)) {
-            log_error("dl_pushliteral() FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_pushstring(db, predicate)) {
-            log_error("pushing rule predicate(`%s`) failed\n", predicate);
-            goto out_err;
-        }
-
-        if (dl_addpred(db)) {
-            log_error("dl_addpred() of atom's predicate FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_pushstring(db, term_var)) {
-            log_error("pushing term variable FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_addvar(db)) {
-            log_error("dl_addvar() FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_makeliteral(db)) {
-            log_error("dl_makeliteral() FAILED\n");
-            goto out_err;
-        }
-
-        if (dl_addliteral(db)) {
-            log_error("dl_addliteral() FAILED\n");
-            goto out_err;
-        }
-    }
-
-    if (second_round == false) {
-        predicate    = "_isObject";
-        term_var     = "O";
-        second_round = true;
-        goto make_literal;
-    }
-
-    return 0;
-
-out_err:
-    return -1;
-}
-
-static int
 __policy_rule_push_head(struct policy_rule * rule, dl_db_t db)
 {
     char * permission_string = perm_type_to_string(rule->perm_type);
@@ -400,51 +342,9 @@ __policy_rule_push_head(struct policy_rule * rule, dl_db_t db)
         return -1;
     }
 
-    if (dl_pushliteral(db)) {
-        log_error("dl_pushliteral() for rule_head FAILED\n");
-        goto out_err;
-    }
-
-    // push the permission
-    if (dl_pushstring(db, permission_string)) {
-        log_error("pushing rule predicate(`%s`) failed\n", permission_string);
-        goto out_err;
-    }
-
-    if (dl_addpred(db)) {
-        log_error("dl_addpred() of atom's predicate FAILED\n");
-        goto out_err;
-    }
-
-
-    // push the "U"
-    if (dl_pushstring(db, "U")) {
-        log_error("pushing 'U' variable FAILED\n");
-        goto out_err;
-    }
-
-    if (dl_addvar(db)) {
-        log_error("dl_addvar() FAILED\n");
-        goto out_err;
-    }
-
-
-    // push the "O"
-    if (dl_pushstring(db, "O")) {
-        log_error("pushing 'O' variable FAILED\n");
-        goto out_err;
-    }
-
-    if (dl_addvar(db)) {
-        log_error("dl_addvar() FAILED\n");
-        goto out_err;
-    }
-
-
-    // complete the literal composng the rule
-    if (dl_makeliteral(db)) {
-        log_error("dl_makeliteral() FAILED\n");
-        goto out_err;
+    if (db_make_literal(permission_string, "U", DATALOG_VAR_TERM, "O", DATALOG_VAR_TERM, db)) {
+        log_error("db_make_literal() FAILED\n");
+        return -1;
     }
 
     if (dl_pushhead(db)) {
@@ -473,6 +373,16 @@ policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
         return -1;
     }
 
+    if (db_push_literal("_isUser", "U", DATALOG_VAR_TERM, NULL, DATALOG_VAR_TERM, db)) {
+        log_error("db_push_literal(`isUser`) FAILED\n");
+        return -1;
+    }
+
+    if (db_push_literal("_isObject", "O", DATALOG_VAR_TERM, NULL, DATALOG_VAR_TERM, db)) {
+        log_error("db_push_literal(`isObject`) FAILED\n");
+        return -1;
+    }
+
 
     iter = list_iterator_new(&rule->atoms);
 
@@ -490,11 +400,6 @@ policy_rule_to_db(struct policy_rule * rule, dl_db_t db)
 
         list_iterator_next(iter);
     } while(list_iterator_is_valid(iter));
-
-    if (__policy_rule_push_dummies(rule, db)) {
-        log_error("__policy_rule_push_dummies() FAILED\n");
-        goto out_err;
-    }
 
     if (dl_makeclause(db)) {
         log_error("could not make rule clause\n");

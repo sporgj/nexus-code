@@ -70,52 +70,8 @@ __insert_db_fact(dl_db_t      db,
                  const char * object_name,
                  const char * value)
 {
-    // goal: name(object_name, value)
-    if (dl_pushliteral(db)) {
-        log_error("dl_pushliteral() for fact FAILED\n");
-        goto out_err;
-    }
-
-    // the name is the predicate
-    {
-        if (dl_pushstring(db, attribute_name)) {
-            log_error("pushing rule predicate(`%s`) failed\n", attribute_name);
-            goto out_err;
-        }
-
-        if (dl_addpred(db)) {
-            log_error("dl_addpred() of atom's predicate FAILED\n");
-            goto out_err;
-        }
-    }
-
-    // add the object name
-    {
-        if (dl_pushstring(db, object_name)) {
-            log_error("could not push string `%s`\n", object_name);
-            goto out_err;
-        }
-
-        if (dl_addconst(db)) {
-            log_error("could not add constant\n");
-            goto out_err;
-        }
-    }
-
-    if (value) {
-        if (dl_pushstring(db, value)) {
-            log_error("could not push string `%s`\n", value);
-            goto out_err;
-        }
-
-        if (dl_addconst(db)) {
-            log_error("could not add constant\n");
-            goto out_err;
-        }
-    }
-
-    if (dl_makeliteral(db)) {
-        log_error("dl_makeliteral() FAILED\n");
+    if (db_make_literal(attribute_name, object_name, DATALOG_CONST_TERM, value, DATALOG_CONST_TERM, db)) {
+        log_error("db_make_literal() FAILED\n");
         goto out_err;
     }
 
@@ -266,10 +222,10 @@ db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db)
 }
 
 int
-db_push_literal(char              * predicate,
-                char              * first_term_str,
+db_make_literal(char *              predicate,
+                char *              first_term_str,
                 datalog_term_type_t first_term_type,
-                char              * second_term_str,
+                char *              second_term_str,
                 datalog_term_type_t second_term_type,
                 dl_db_t             db)
 {
@@ -305,11 +261,27 @@ db_push_literal(char              * predicate,
         return -1;
     }
 
+    return 0;
+}
+
+int
+db_push_literal(char              * predicate,
+                char              * first_term_str,
+                datalog_term_type_t first_term_type,
+                char              * second_term_str,
+                datalog_term_type_t second_term_type,
+                dl_db_t             db)
+{
+    if (db_make_literal(
+            predicate, first_term_str, first_term_type, second_term_str, second_term_type, db)) {
+        log_error("db_make_literal() FAILED\n");
+        return -1;
+    }
+
     if (dl_addliteral(db)) {
         log_error("dl_addliteral() FAILED\n");
         return -1;
     }
 
     return 0;
-
 }

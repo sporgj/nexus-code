@@ -58,9 +58,10 @@ __register_fact_with_db(struct __cached_element * cached_element,
         }
 
         nexus_free(cached_fact->value);
-        cached_fact->value = value;
         cached_fact->is_inserted = false;
     }
+
+    cached_fact->value = value;
 
     if (db_assert_fact(cached_fact)) {
         log_error("db_retract_fact() FAILED\n");
@@ -509,6 +510,11 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
 
     if (__abac_request_insert_attributes(abac_req)) {
         log_error("__abac_request_insert_attributes() FAILED\n");
+        goto out_err;
+    }
+
+    if (__abac_request_insert_sysfuncs(abac_req)) {
+        log_error("__abac_request_insert_sysfuncs() FAILED\n");
         goto out_err;
     }
 

@@ -31,6 +31,7 @@ typedef enum {
     TOK_GT,
     TOK_GE,
     TOK_EE,
+    TOK_NE,
 
     TOK_END,
 } token_type_t;
@@ -74,6 +75,7 @@ token_is_boolean_op(struct my_token * token)
     case TOK_GT:
     case TOK_GE:
     case TOK_EE:
+    case TOK_NE:
         return true;
     }
 
@@ -270,6 +272,13 @@ __lex_boolean_op(struct my_lexer * lexer, char curr_char)
             __backup(lexer);
             return __tok(lexer, TOK_GT);
         }
+    case '!':
+        if (next_char == '=') {
+            return __tok(lexer, TOK_NE);
+        } else {
+            log_error("unknown character `%c` at pos %zu\n", next_char, lexer->pos - 1);
+            return __tok(lexer, TOK_UNKNOWN);
+        }
     case '=':
         if (next_char == '=') {
             return __tok(lexer, TOK_EE);
@@ -307,6 +316,7 @@ repeat:
         return __tok(lexer, TOK_RPAREN);
     case '<':
     case '>':
+    case '!':
     case '=':
         return __lex_boolean_op(lexer, c);
     case ':':
@@ -360,6 +370,8 @@ my_token_to_string(token_type_t type)
     switch (type) {
     case TOK_EE:
         return "==";
+    case TOK_NE:
+        return "!=";
     case TOK_GT:
         return ">";
     case TOK_LT:
