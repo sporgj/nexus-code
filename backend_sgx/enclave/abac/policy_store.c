@@ -348,7 +348,7 @@ __export_policy_rule(struct policy_rule * policy_rule, uint8_t * buffer, size_t 
 
     // perform the export
     nexus_uuid_copy(&policy_rule->rule_uuid, &exported_rule->rule_uuid);
-    strncpy(&exported_rule->rule_str, policy_string, NEXUS_POLICY_MAXLEN);
+    strncpy(exported_rule->rule_str, policy_string, NEXUS_POLICY_MAXLEN);
     exported_rule->total_len = total_len;
 
     nexus_free(policy_string);

@@ -18,7 +18,7 @@ struct __attr_table_entry {
 
 // adding and removing entries from the attribute table's hashmap
 
-static int
+static struct attribute_entry *
 __put_attr_entry(struct attribute_table * attribute_table,
                  struct nexus_uuid *      uuid,
                  char *                   value,
@@ -28,7 +28,7 @@ __put_attr_entry(struct attribute_table * attribute_table,
 
     if (len > ATTRIBUTE_VALUE_SIZE) {
         log_error("attribute value is too large (got=%zu, max=%zu)\n", len, ATTRIBUTE_VALUE_SIZE);
-        return -1;
+        return NULL;
     }
 
     new_entry = nexus_malloc(sizeof(struct attribute_entry));
@@ -43,7 +43,7 @@ __put_attr_entry(struct attribute_table * attribute_table,
 
     attribute_table->count += 1;
 
-    return 0;
+    return new_entry;
 }
 
 static int
@@ -175,7 +175,7 @@ __parse_attribute_table_body(struct attribute_table * attribute_table, uint8_t *
         if (__put_attr_entry(attribute_table,
                              &input_entry->attr_uuid,
                              input_entry->attr_val,
-                             input_entry->attr_val_len)) {
+                             input_entry->attr_val_len) == NULL) {
             log_error("__put_attr_entry FAILED\n");
             return -1;
         }
@@ -353,13 +353,13 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
 
         if (tmp_attribute_term) {
             // then copy its name into the pair
-            strncpy(&output_pair_ptr->term_str, tmp_attribute_term->name, NXS_ATTRIBUTE_NAME_MAX);
+            strncpy(output_pair_ptr->term_str, tmp_attribute_term->name, NXS_ATTRIBUTE_NAME_MAX);
         } else {
             // XXX: temporaray
-            strncpy(&output_pair_ptr->term_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
+            strncpy(output_pair_ptr->term_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
         }
 
-        strncpy(&output_pair_ptr->val_str, attr_entry->attr_val, NXS_ATTRIBUTE_VALUE_MAX);
+        strncpy(output_pair_ptr->val_str, attr_entry->attr_val, NXS_ATTRIBUTE_VALUE_MAX);
 
         copied += 1;
         output_pair_ptr += 1;

@@ -292,7 +292,7 @@ __abac_request_insert_rules(struct abac_request * abac_req)
     struct nexus_list_iterator * iter = NULL;
 
     if (abac_req->policy_store->rules_count == 0) {
-        return NULL;
+        return 0;
     }
 
     iter = list_iterator_new(&abac_req->policy_store->rules_list);
@@ -426,7 +426,7 @@ __cache_entity(struct nexus_uuid * uuid)
 
     if (db_assert_kb_entity_type(entity, OBJECT_ATTRIBUTE_TYPE)) {
         log_error("db_assert_kb_entity_type() FAILED\n");
-        return -1;
+        return NULL;
     }
 
     return entity;
@@ -435,13 +435,13 @@ __cache_entity(struct nexus_uuid * uuid)
 static void
 __evict_entity(uintptr_t element, uintptr_t key)
 {
-    struct kb_entity * entity = element;
+    struct kb_entity * entity = (struct kb_entity *)element;
 
     if (entity->attr_type) {
         db_retract_kb_entity_type(entity);
     }
 
-    kb_entity_free(element);
+    kb_entity_free(entity);
 }
 
 int

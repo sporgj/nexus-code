@@ -6,11 +6,15 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #include "abac_internal.h"
 #include "abac_types.h"
 
 #include <libnexus_trusted/rapidstring.h>
 
+
+struct attribute_store;
 
 struct attribute_table {
     struct nexus_uuid       uuid;
