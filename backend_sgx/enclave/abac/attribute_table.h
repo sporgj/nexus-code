@@ -20,6 +20,8 @@ struct attribute_table {
     struct nexus_uuid       uuid;
     size_t                  count;
 
+    size_t                  generation;
+
     struct hashmap          attribute_map;
 };
 

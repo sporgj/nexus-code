@@ -5,6 +5,7 @@
 
 struct __attr_table_hdr {
     size_t                  count;
+    size_t                  generation;
 } __attribute__((packed));
 
 
@@ -99,15 +100,18 @@ attribute_table_add(struct attribute_table * attribute_table,
 
     size_t len = strnlen(value, ATTRIBUTE_VALUE_SIZE);
 
-    if (entry == NULL) {
-        entry = __put_attr_entry(attribute_table, uuid, value, len);
+    if (entry) {
+        if (strncmp(entry->attr_val, value, ATTRIBUTE_VALUE_SIZE) == 0) {
+            return 0;
+        }
 
-        return 0;
+        entry->attr_val_len = len;
+        memcpy(entry->attr_val, value, len);
+    } else {
+        entry = __put_attr_entry(attribute_table, uuid, value, len);
     }
 
-    // update the entry
-    entry->attr_val_len = len;
-    memcpy(entry->attr_val, value, len);
+    attribute_table->generation += 1;
 
     return 0;
 }
@@ -115,7 +119,13 @@ attribute_table_add(struct attribute_table * attribute_table,
 int
 attribute_table_del(struct attribute_table * attribute_table, struct nexus_uuid * uuid)
 {
-    return __del_attr_entry(attribute_table, uuid);
+    if (__del_attr_entry(attribute_table, uuid)) {
+        return -1;
+    }
+
+    attribute_table->generation += 1;
+
+    return 0;
 }
 
 
@@ -158,6 +168,7 @@ __parse_attribute_table_hdr(struct attribute_table * attribute_table, uint8_t * 
     struct __attr_table_hdr * header = (struct __attr_table_hdr *)buffer;
 
     attribute_table->count = header->count;
+    attribute_table->generation = header->generation;
 
     return buffer + sizeof(struct __attr_table_hdr);
 }
@@ -229,6 +240,7 @@ __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t *
     struct __attr_table_hdr * dest_header = (struct __attr_table_hdr *)buffer;
 
     dest_header->count = attribute_table->count;
+    dest_header->generation = attribute_table->generation;
 
     return buffer + sizeof(struct __attr_table_hdr);
 }
