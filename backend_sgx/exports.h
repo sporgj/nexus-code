@@ -75,6 +75,9 @@ sgx_backend_abac_policy_del(struct nexus_uuid * uuid, struct nexus_volume * volu
 int
 sgx_backend_abac_policy_ls(struct nexus_volume * volume);
 
+int
+sgx_backend_abac_print_facts(struct nexus_volume * volume);
+
 
 // batch mode commands
 

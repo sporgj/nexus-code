@@ -67,3 +67,6 @@ __db_push_literal(char              * predicate,
 
 int
 __db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db);
+
+int
+UNSAFE_db_print_facts();

@@ -2,6 +2,7 @@
 
 #include "../abac/attribute_store.h"
 #include "../abac/policy_store.h"
+#include "../abac/db.h"
 
 
 int
@@ -525,4 +526,11 @@ out_err:
     abac_release_policy_store();
 
     return -1;
+}
+
+
+int
+ecall_abac_print_facts()
+{
+    return UNSAFE_db_print_facts();
 }

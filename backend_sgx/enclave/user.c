@@ -34,14 +34,6 @@ free_user(void * element)
 }
 
 static void
-__usertable_set_clean(struct nexus_usertable * usertable)
-{
-    if (usertable->metadata) {
-        __metadata_set_clean(usertable->metadata);
-    }
-}
-
-static void
 __usertable_set_dirty(struct nexus_usertable * usertable)
 {
     if (usertable->metadata) {
@@ -213,10 +205,6 @@ nexus_usertable_load(struct nexus_uuid * uuid, nexus_io_flags_t flags, struct ne
     struct nexus_usertable  * usertable     = NULL;
 
     struct nexus_crypto_buf * crypto_buffer = NULL;
-
-    uint8_t * buffer = NULL;
-
-    int ret = -1;
 
 
     crypto_buffer = nexus_crypto_buf_create(uuid, flags);

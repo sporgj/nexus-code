@@ -4,6 +4,9 @@
 
 #include <libnexus_trusted/nexus_uuid.h>
 #include <libnexus_trusted/hashmap.h>
+#include <libnexus_trusted/list.h>
+
+struct kb_fact;
 
 
 // correspond to a particular user_profile, metadata or policy_store
@@ -12,6 +15,7 @@ struct kb_entity {
     char *            uuid_str;
 
     attribute_type_t  attr_type; // denotes whether _isUser/_isObject have been added
+    const struct kb_fact * type_fact; // will be stored in the db
 
     struct hashmap    uuid_facts; // facts indexed by uuid (rules and attributes)
     struct hashmap    name_facts;  // facts indexed by name (sys functions)
@@ -28,6 +32,8 @@ struct kb_fact {
     bool                 is_rule;
 
     struct kb_entity   * entity;
+
+    struct list_head     fact_list;
 };
 
 
@@ -52,3 +58,7 @@ kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid);
 struct kb_fact *
 kb_entity_find_name_fact(struct kb_entity * entity, char * name);
 
+
+
+void
+kb_fact_free(struct kb_fact * cached_fact);

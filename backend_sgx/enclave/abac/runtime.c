@@ -11,8 +11,6 @@ static struct nexus_metadata * policy_store_metadata    = NULL;
 
 static struct nexus_metadata * current_userprofile_metadata = NULL;
 
-static struct abac_superinfo   global_abac_superinfo;
-
 
 int
 abac_global_export_macversion(struct mac_and_version * macversion)
@@ -98,7 +96,7 @@ abac_acquire_policy_store(nexus_io_flags_t flags)
             return NULL;
         }
 
-        return policy_store_metadata->attribute_store;
+        return policy_store_metadata->policy_store;
     }
 
     if (nexus_metadata_revalidate(policy_store_metadata, flags, &has_changed)) {

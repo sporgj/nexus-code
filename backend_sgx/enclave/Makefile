@@ -29,7 +29,7 @@ INCLUDE := -I$(SGX_SDK)/include \
 	-I. \
 	-I..
 
-CFLAGS  += -nostdinc \
+CFLAGS  += -nostdinc -w\
 	-fvisibility=hidden -fpie -fPIC -fstack-protector -mpclmul -maes -mavx \
 	-W -Wall -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter -std=gnu11 -fPIC\
 	-Werror=implicit-function-declaration

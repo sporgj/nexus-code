@@ -12,14 +12,16 @@ __new_cached_fact(struct nexus_uuid * uuid, char * name, char * value)
         nexus_uuid_copy(uuid, &new_fact->uuid);
     }
 
-    strncpy(&new_fact->name, name, ATTRIBUTE_NAME_MAX);
+    strncpy(new_fact->name, name, ATTRIBUTE_NAME_MAX);
     new_fact->value = value;
+
+    INIT_LIST_HEAD(&new_fact->fact_list);
 
     return new_fact;
 }
 
-static void
-__free_cached_fact(struct kb_fact * cached_fact)
+void
+kb_fact_free(struct kb_fact * cached_fact)
 {
     if (cached_fact->value) {
         nexus_free(cached_fact->value);
@@ -81,7 +83,7 @@ __delete_element_facts(struct kb_entity * entity, struct hashmap * facts_map)
             }
         }
 
-        __free_cached_fact(cached_fact);
+        kb_fact_free(cached_fact);
     } while (1);
 
     hashmap_free(facts_map, 0);
@@ -145,7 +147,7 @@ kb_entity_find_name_fact(struct kb_entity * entity, char * name)
 {
     struct kb_fact   tmp_fact = {0};
 
-    strncpy(&tmp_fact.name, name, ATTRIBUTE_NAME_MAX);
+    strncpy(tmp_fact.name, name, ATTRIBUTE_NAME_MAX);
     hashmap_entry_init(&tmp_fact, strhash(tmp_fact.name));
 
     return hashmap_get(&entity->name_facts, &tmp_fact, NULL);

@@ -97,5 +97,8 @@ enclave {
             [user_check] size_t                    * total_count_out,
             [user_check] size_t                    * result_count_out
         );
+
+
+        public int ecall_abac_print_facts();
     };
 };

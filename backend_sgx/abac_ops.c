@@ -334,3 +334,19 @@ out_err:
     nexus_free(rules_buffer);
     return -1;
 }
+
+int
+sgx_backend_abac_print_facts(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_print_facts(backend->enclave_id, &ret);
+
+    if (ret || err) {
+        log_error("ecall_abac_print_facts() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}

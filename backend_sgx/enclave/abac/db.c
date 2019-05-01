@@ -1,8 +1,15 @@
+#include "../enclave_internal.h"
+
 #include "abac_internal.h"
 #include "db.h"
 
+#include <libnexus_trusted/rapidstring.h>
+
 
 static dl_db_t my_database;
+
+static struct list_head cached_facts_list;
+static size_t           cached_facts_count;
 
 
 int
@@ -15,17 +22,20 @@ db_init()
         return -1;
     }
 
+    INIT_LIST_HEAD(&cached_facts_list);
+
     return 0;
 }
 
 void
 db_exit()
 {
+    // TODO remove the cached facts
+    //
+
     if (my_database) {
         datalog_engine_destroy(my_database);
     }
-
-    return 0;
 }
 
 int
@@ -49,33 +59,29 @@ db_ask_permission(perm_type_t        perm_type,
 }
 
 int
-__get_kb_entity_type(char * dest_buffer, attribute_type_t attr_type)
-{
-    if (attr_type == USER_ATTRIBUTE_TYPE) {
-        strncpy(dest_buffer, "_isUser", ATTRIBUTE_NAME_MAX);
-    } else if (attr_type == OBJECT_ATTRIBUTE_TYPE) {
-        strncpy(dest_buffer, "_isObject", ATTRIBUTE_NAME_MAX);
-    } else {
-        return -1;
-    }
-
-    return 0;
-}
-
-int
 db_assert_kb_entity_type(struct kb_entity * entity, attribute_type_t attr_type)
 {
-    struct kb_fact tmp_fact = { 0 };
+    char * entity_type_str = NULL;
 
-    if (__get_kb_entity_type(&tmp_fact.name, attr_type)) {
-        log_error("could not get entity type\n");
+    if (entity->type_fact) {
+        log_error("entity has already asserted its type\n");
         return -1;
     }
 
-    tmp_fact.entity = entity;
+    if (attr_type == USER_ATTRIBUTE_TYPE) {
+        entity_type_str = "_isUser";
+    } else if (attr_type == OBJECT_ATTRIBUTE_TYPE) {
+        entity_type_str = "_isObject";
+    } else {
+        log_error("unsupported attribute type\n");
+        return -1;
+    }
 
-    if (db_assert_fact(&tmp_fact)) {
-        log_error("could not assert `%s` entity type\n", tmp_fact.name);
+
+    entity->type_fact = kb_entity_put_name_fact(entity, entity_type_str, NULL);
+
+    if (db_assert_fact(entity->type_fact)) {
+        log_error("could not assert `%s` entity type\n", entity->uuid_str);
         return -1;
     }
 
@@ -87,21 +93,19 @@ db_assert_kb_entity_type(struct kb_entity * entity, attribute_type_t attr_type)
 int
 db_retract_kb_entity_type(struct kb_entity * entity)
 {
-    struct kb_fact tmp_fact = { 0 };
+    if (entity->type_fact == NULL) {
+        return 0;
+    }
 
-    if (__get_kb_entity_type(&tmp_fact.name, entity->attr_type)) {
-        log_error("could not get entity type\n");
+    if (db_retract_fact(entity->type_fact)) {
+        log_error("could not retract `%s` entity type\n", entity->uuid_str);
         return -1;
     }
 
-    tmp_fact.entity = entity;
-
-    if (db_retract_fact(&tmp_fact)) {
-        log_error("could not retract `%s` entity type\n", tmp_fact.name);
-        return -1;
-    }
+    kb_fact_free(entity->type_fact);
 
     entity->attr_type = 0;
+    entity->type_fact = NULL;
 
     return 0;
 }
@@ -159,6 +163,9 @@ db_retract_fact(struct kb_fact * cached_fact)
         goto out_err;
     }
 
+    list_del(&cached_fact->fact_list);
+    cached_facts_count -= 1;
+
     return 0;
 
 out_err:
@@ -190,6 +197,9 @@ db_assert_fact(struct kb_fact * cached_fact)
 
         goto out_err;
     }
+
+    list_add_tail(&cached_fact->fact_list, &cached_facts_list);
+    cached_facts_count += 1;
 
     return 0;
 out_err:
@@ -329,6 +339,39 @@ __db_push_literal(char              * predicate,
         log_error("dl_addliteral() FAILED\n");
         return -1;
     }
+
+    return 0;
+}
+
+
+int
+UNSAFE_db_print_facts()
+{
+    struct list_head * curr = NULL;
+    rapidstring string_builder;
+    char tmp_buffer[10] = { 0 };
+
+    rs_init(&string_builder);
+    snprintf(tmp_buffer, 10, "%zu", cached_facts_count);
+    rs_cat(&string_builder, tmp_buffer);
+    rs_cat(&string_builder, " Facts\n-----------\n");
+
+    list_for_each(curr, &cached_facts_list) {
+        struct kb_fact * cached_fact = container_of(curr, struct kb_fact, fact_list);
+
+        rs_cat(&string_builder, cached_fact->name);
+        rs_cat_n(&string_builder, "(", 1);
+        rs_cat(&string_builder, cached_fact->entity->uuid_str);
+        if (cached_fact->value) {
+            rs_cat_n(&string_builder, ", ", 2);
+            rs_cat(&string_builder, cached_fact->value);
+        }
+        rs_cat_n(&string_builder, ")\n", 2);
+    }
+
+    ocall_print(rs_data_c(&string_builder));
+
+    rs_free(&string_builder);
 
     return 0;
 }

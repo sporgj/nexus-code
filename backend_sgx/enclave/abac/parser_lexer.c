@@ -1,5 +1,3 @@
-#pragma once
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -294,7 +292,6 @@ __lex_boolean_op(struct my_lexer * lexer, char curr_char)
 struct my_token *
 lexer_next_token(struct my_lexer * lexer)
 {
-    struct my_token * token = NULL;
     char              c;
     char              n;
 
@@ -599,7 +596,6 @@ __parse_atom(struct my_parser * parser)
         goto out_err;
     }
 
-out_success:
     if (!policy_atom_is_valid(atom)) {
         log_error("policy_atom_is_valid() FAILED\n");
         goto out_err;
