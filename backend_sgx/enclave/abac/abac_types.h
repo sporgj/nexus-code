@@ -92,7 +92,7 @@ typedef enum {
 } sys_func_type_t;
 
 
-static atom_type_t
+static inline atom_type_t
 atom_type_from_char(char c)
 {
     if (c == 'u') {
@@ -104,7 +104,7 @@ atom_type_from_char(char c)
     return ATOM_TYPE_NONE;
 }
 
-static char *
+static inline char *
 perm_type_to_string(perm_type_t perm_type)
 {
     switch (perm_type) {
