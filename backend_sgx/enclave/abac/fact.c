@@ -152,3 +152,24 @@ kb_entity_find_name_fact(struct kb_entity * entity, char * name)
 
     return hashmap_get(&entity->name_facts, &tmp_fact, NULL);
 }
+
+bool
+kb_entity_needs_refresh(struct kb_entity * entity, struct nexus_metadata * metadata)
+{
+    if (entity->metadata_version != metadata->version) {
+        return true;
+    }
+
+    if (!entity->is_fully_asserted) {
+        return true;
+    }
+
+    return false;
+}
+
+void
+kb_entity_assert_fully(struct kb_entity * entity, struct nexus_metadata * metadata)
+{
+    entity->is_fully_asserted = true;
+    entity->metadata_version  = metadata->version;
+}

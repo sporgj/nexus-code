@@ -7,18 +7,23 @@
 #include <libnexus_trusted/list.h>
 
 struct kb_fact;
-
+struct nexus_metadata;
 
 // correspond to a particular user_profile, metadata or policy_store
 struct kb_entity {
-    struct nexus_uuid uuid;
-    char *            uuid_str;
+    struct nexus_uuid       uuid;
+    char *                  uuid_str;
 
-    attribute_type_t  attr_type; // denotes whether _isUser/_isObject have been added
-    const struct kb_fact * type_fact; // will be stored in the db
+    attribute_type_t        attr_type; // denotes whether _isUser/_isObject have been added
+    const struct kb_fact  * type_fact; // will be stored in the db
 
-    struct hashmap    uuid_facts; // facts indexed by uuid (rules and attributes)
-    struct hashmap    name_facts;  // facts indexed by name (sys functions)
+    struct hashmap          uuid_facts; // facts indexed by uuid (rules and attributes)
+    struct hashmap          name_facts;  // facts indexed by name (sys functions)
+
+    bool                    is_fully_asserted;
+
+    size_t                  attribute_table_generation;
+    size_t                  metadata_version;
 };
 
 struct kb_fact {
@@ -58,6 +63,12 @@ kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid);
 struct kb_fact *
 kb_entity_find_name_fact(struct kb_entity * entity, char * name);
 
+// checks if the entity is out of data or not fully asserted
+bool
+kb_entity_needs_refresh(struct kb_entity * entity, struct nexus_metadata * metadata);
+
+void
+kb_entity_assert_fully(struct kb_entity * entity, struct nexus_metadata * metadata);
 
 
 void

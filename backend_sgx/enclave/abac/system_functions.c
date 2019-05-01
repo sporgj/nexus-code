@@ -11,7 +11,7 @@
 
 struct __sys_func {
     char * name;
-    struct abac_value * (*handler)(void * arg);
+    struct abac_value * (*handler)(struct nexus_metadata *);
 
     sys_func_type_t type;
 };
@@ -24,23 +24,21 @@ sys_func_get_name(struct __sys_func * sys_func)
 }
 
 struct abac_value *
-__handle_uname(void * arg)
+__handle_uname(struct nexus_metadata * metadata)
 {
     return abac_value_from_str(global_user_struct->name);
 }
 
 struct abac_value *
-__handle_upkey(void * arg)
+__handle_upkey(struct nexus_metadata * metadata)
 {
     // TODO
     return NULL;
 }
 
 struct abac_value *
-__handle_opath(void * arg)
+__handle_opath(struct nexus_metadata * metadata)
 {
-    struct nexus_metadata * metadata = arg;
-
     struct nexus_dentry * dentry = metadata_get_dentry(metadata);
 
     if (dentry) {
@@ -51,10 +49,8 @@ __handle_opath(void * arg)
 }
 
 struct abac_value *
-__handle_oname(void * arg)
+__handle_oname(struct nexus_metadata * metadata)
 {
-    struct nexus_metadata * metadata = arg;
-
     struct nexus_dentry * dentry = metadata_get_dentry(metadata);
 
     if (dentry) {
@@ -65,10 +61,8 @@ __handle_oname(void * arg)
 }
 
 struct abac_value *
-__handle_osize(void * arg)
+__handle_osize(struct nexus_metadata * metadata)
 {
-    struct nexus_metadata * metadata = arg;
-
     if (metadata->type == NEXUS_DIRNODE) {
         return abac_value_from_int(metadata->dirnode->dir_entry_count);
     } else if (metadata->type == NEXUS_FILENODE) {
@@ -79,10 +73,8 @@ __handle_osize(void * arg)
 }
 
 struct abac_value *
-__handle_otype(void * arg)
+__handle_otype(struct nexus_metadata * metadata)
 {
-    struct nexus_metadata * metadata = arg;
-
     if (metadata->type == NEXUS_DIRNODE) {
         return abac_value_from_str("dir");
     } else if (metadata->type == NEXUS_FILENODE) {
@@ -158,49 +150,6 @@ system_function_execute(char * function_name, sys_func_type_t type, void * arg)
     return sys_function->handler(arg);
 }
 
-int
-system_function_export_facts(void * arg, sys_func_type_t type, rapidstring * string_builder)
-{
-    struct __sys_func * sys_function = system_functions;
-    char * term = NULL;
-    size_t skipped = 0;
-
-    if (type == USER_FUNCTION) {
-        term = "(u, \"";
-    } else if (type == OBJECT_FUNCTION) {
-        term = "(o, \"";
-    } else {
-        log_error("unknown sys_function type\n");
-        return -1;
-    }
-
-    // XXX: optimize
-    for (; sys_function->name != NULL; sys_function++) {
-        if (sys_function->type != type) {
-            continue;
-        }
-
-        struct abac_value * result = sys_function->handler(arg);
-        if (result == NULL) {
-            skipped += 1;
-            continue;
-        }
-
-        char * string_val = abac_value_stringify(result);
-
-        rs_cat(string_builder, sys_function->name);
-        rs_cat_n(string_builder, term, 5);
-        rs_cat(string_builder, string_val);
-        rs_cat_n(string_builder, "\").\n", 4);
-
-        nexus_free(string_val);
-        abac_value_free(result);
-    }
-
-    return 0;
-}
-
-
 struct nexus_list *
 system_function_export_sysfuncs(sys_func_type_t type)
 {
@@ -222,9 +171,9 @@ system_function_export_sysfuncs(sys_func_type_t type)
 
 // TODO optimize this. double allocation/copy with abac_value
 char *
-system_function_run(struct __sys_func * sys_func, void * arg)
+system_function_run(struct __sys_func * sys_func, struct nexus_metadata * metadata)
 {
-    struct abac_value * abac_value = sys_func->handler(arg);
+    struct abac_value * abac_value = sys_func->handler(metadata);
 
     if (abac_value == NULL) {
         return NULL;
