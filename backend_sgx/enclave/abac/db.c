@@ -352,12 +352,19 @@ UNSAFE_db_print_facts()
 {
     struct list_head * curr = NULL;
     rapidstring string_builder;
-    char tmp_buffer[10] = { 0 };
+    char tmp_buffer[20] = { 0 };
 
     rs_init(&string_builder);
-    snprintf(tmp_buffer, 10, "%zu", cached_facts_count);
+
+    snprintf(tmp_buffer, sizeof(tmp_buffer), "%zu Facts, ", cached_facts_count);
     rs_cat(&string_builder, tmp_buffer);
-    rs_cat(&string_builder, " Facts\n-----------\n");
+
+    int lua_memory = lua_gc(my_database, LUA_GCCOUNT, 0);
+
+    snprintf(tmp_buffer, sizeof(tmp_buffer), "%zu Kb in LUA", lua_memory);
+    rs_cat(&string_builder, tmp_buffer);
+
+    rs_cat(&string_builder, "\n-----------\n");
 
     list_for_each(curr, &cached_facts_list) {
         struct kb_fact * cached_fact = __kb_fact_from_db_list(curr);
