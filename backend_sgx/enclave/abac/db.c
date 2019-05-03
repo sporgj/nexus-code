@@ -159,10 +159,9 @@ db_retract_fact(struct kb_fact * cached_fact)
 
     cached_fact->is_inserted = true;
 
-    list_del(&cached_fact->entity_lru);
-    list_add_tail(&cached_fact->entity_lru, &cached_facts_list);
+    kb_fact_cool_down(cached_fact);
 
-    list_del(&cached_fact->db_list);
+    list_del_init(&cached_fact->db_list);
     cached_facts_count -= 1;
 
     return 0;
@@ -199,7 +198,9 @@ db_assert_fact(struct kb_fact * cached_fact)
 
     cached_fact->is_inserted = true;
 
-    list_move(&cached_fact->entity_lru, &cached_fact->entity->cached_facts_lru);
+    kb_fact_warm_up(cached_fact);
+
+    list_add(&cached_fact->db_list, &cached_facts_list);
 
     cached_facts_count += 1;
 

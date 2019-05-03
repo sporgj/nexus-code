@@ -81,6 +81,38 @@ abac_release_attribute_store()
 }
 
 struct policy_store *
+abac_refresh_bouncer_policy_store()
+{
+    struct nexus_uuid * uuid = abac_policy_store_uuid();
+
+    struct nexus_metadata * old_metadata = policy_store_metadata;
+    struct nexus_metadata * new_metadata = NULL;
+
+    if (old_metadata && !nexus_metadata_has_changed(old_metadata)) {
+        return policy_store_metadata->policy_store;
+    }
+
+    new_metadata = nexus_metadata_load(uuid, NEXUS_POLICY_STORE, NEXUS_FREAD);
+
+    if (new_metadata == NULL) {
+        log_error("nexus_metadata_load() FAILED\n");
+        return NULL;
+    }
+
+    if (bouncer_update_policy_store(old_metadata->policy_store, new_metadata->policy_store)) {
+        nexus_metadata_free(new_metadata);
+        log_error("bouncer_update_policy_store() FAILED\n");
+        return NULL;
+    }
+
+    nexus_metadata_free(old_metadata);
+
+    policy_store_metadata = new_metadata;
+
+    return policy_store_metadata->policy_store;
+}
+
+struct policy_store *
 abac_acquire_policy_store(nexus_io_flags_t flags)
 {
     struct nexus_uuid * uuid = abac_policy_store_uuid();

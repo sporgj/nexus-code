@@ -9,10 +9,13 @@
 struct kb_fact;
 struct nexus_metadata;
 
+struct policy_rule;
+
+
 // correspond to a particular user_profile, metadata or policy_store
 struct kb_entity {
     struct nexus_uuid       uuid;
-    char *                  uuid_str;
+    char                  * uuid_str;
 
     attribute_type_t        attr_type; // denotes whether _isUser/_isObject have been added
     const struct kb_fact  * type_fact; // will be stored in the db
@@ -25,7 +28,7 @@ struct kb_entity {
     size_t                  attribute_table_generation;
     size_t                  metadata_version;
 
-    struct list_head        cached_facts_lru;
+    struct list_head        uuid_facts_lru;
 };
 
 struct kb_fact {
@@ -36,9 +39,11 @@ struct kb_fact {
     char               * value;
 
     bool                 is_rule;
+    struct policy_rule * rule_ptr;
 
     // whether it is in the db
     bool                 is_inserted;
+    bool                 is_uuid_fact;
 
     struct kb_entity   * entity;
 
@@ -70,6 +75,13 @@ kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid);
 struct kb_fact *
 kb_entity_find_name_fact(struct kb_entity * entity, char * name);
 
+int
+kb_entity_del_uuid_fact(struct kb_entity * entity, struct kb_fact * fact);
+
+int
+kb_entity_del_name_fact(struct kb_entity * entity, struct kb_fact * fact);
+
+
 // checks if the entity is out of data or not fully asserted
 bool
 kb_entity_needs_refresh(struct kb_entity * entity, struct nexus_metadata * metadata);
@@ -89,3 +101,9 @@ kb_fact_update_value(struct kb_fact * fact, const char * value);
 
 void
 kb_fact_free(struct kb_fact * cached_fact);
+
+void
+kb_fact_warm_up(struct kb_fact * fact);
+
+void
+kb_fact_cool_down(struct kb_fact * fact);

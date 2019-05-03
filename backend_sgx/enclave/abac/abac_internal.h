@@ -56,6 +56,9 @@ abac_flush_policy_store();
 void
 abac_release_policy_store();
 
+struct policy_store *
+abac_refresh_bouncer_policy_store();
+
 
 // returns the global usertable
 struct nexus_usertable *
@@ -75,3 +78,8 @@ abac_release_current_user_profile();
 // defined inside datalog-engine/interp.c
 extern int
 datalog_evaluate(char * datalog_buffer_IN, char ** string_ans);
+
+
+int
+bouncer_update_policy_store(struct policy_store * old_policystore,
+                            struct policy_store * new_policystore);

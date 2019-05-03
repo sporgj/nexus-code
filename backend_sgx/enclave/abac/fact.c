@@ -40,6 +40,9 @@ kb_fact_update_value(struct kb_fact * fact, const char * value)
 void
 kb_fact_free(struct kb_fact * cached_fact)
 {
+    list_del(&cached_fact->entity_lru);
+    list_del(&cached_fact->db_list);
+
     if (cached_fact->value) {
         nexus_free(cached_fact->value);
     }
@@ -92,7 +95,7 @@ kb_entity_new(struct nexus_uuid * uuid, attribute_type_t attribute_type)
     hashmap_init(&entity->uuid_facts, (hashmap_cmp_fn)__uuid_facts_cmp, NULL, 17);
     hashmap_init(&entity->name_facts, (hashmap_cmp_fn)__name_facts_cmp, NULL, 7);
 
-    nexus_list_init(&entity->cached_facts_lru);
+    nexus_list_init(&entity->uuid_facts_lru);
 
     return entity;
 }
@@ -117,6 +120,7 @@ __delete_element_facts(struct kb_entity * entity, struct hashmap * facts_map)
             }
         }
 
+        list_del_init(&cached_fact->entity_lru);
         kb_fact_free(cached_fact);
     } while (1);
 
@@ -145,7 +149,10 @@ kb_entity_put_uuid_fact(struct kb_entity  * entity,
 
     hashmap_add(&entity->uuid_facts, &new_fact->hash_entry);
 
+    list_add_tail(&new_fact->entity_lru, &entity->uuid_facts_lru);
+
     new_fact->entity = entity;
+    new_fact->is_uuid_fact = true;
 
     return new_fact;
 }
@@ -153,13 +160,11 @@ kb_entity_put_uuid_fact(struct kb_entity  * entity,
 struct kb_fact *
 kb_entity_put_name_fact(struct kb_entity * entity, char * name, const char * value)
 {
-    struct kb_fact * new_fact = __new_cached_fact(NULL, name, NULL);
+    struct kb_fact * new_fact = __new_cached_fact(NULL, name, value);
 
     hashmap_entry_init(new_fact, strhash(new_fact->name));
 
     hashmap_add(&entity->name_facts, &new_fact->hash_entry);
-
-    list_add_tail(&new_fact->entity_lru, &entity->cached_facts_lru);
 
     new_fact->entity = entity;
 
@@ -179,22 +184,18 @@ kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid)
 }
 
 int
-kb_entity_del_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid)
+kb_entity_del_uuid_fact(struct kb_entity * entity, struct kb_fact * fact)
 {
-    struct kb_fact   tmp_fact = {0};
-
-    nexus_uuid_copy(uuid, &tmp_fact.uuid);
-    hashmap_entry_init(&tmp_fact, memhash(&tmp_fact.uuid, sizeof(struct nexus_uuid)));
-
-    struct kb_fact * rst_fact = hashmap_get(&entity->uuid_facts, &tmp_fact, NULL);
-
-    if (rst_fact == NULL) {
+    if ((entity != fact->entity) || !(fact->is_uuid_fact)) {
+        log_error("cached fact does not belong to entity\n");
         return -1;
     }
 
-    list_del(&rst_fact->entity_lru);
+    __hashmap_remove_entry(&entity->uuid_facts, &fact->hash_entry);
 
-    kb_fact_free(rst_fact);
+    fact->entity = NULL;
+
+    kb_fact_free(fact);
 
     return 0;
 }
@@ -211,22 +212,18 @@ kb_entity_find_name_fact(struct kb_entity * entity, char * name)
 }
 
 int
-kb_entity_del_name_fact(struct kb_entity * entity, char * name)
+kb_entity_del_name_fact(struct kb_entity * entity, struct kb_fact * fact)
 {
-    struct kb_fact tmp_fact = { 0 };
-
-    strncpy(tmp_fact.name, name, ATTRIBUTE_NAME_MAX);
-    hashmap_entry_init(&tmp_fact, strhash(tmp_fact.name));
-
-    struct kb_fact * rst_fact = hashmap_remove(&entity->name_facts, &tmp_fact, NULL);
-
-    if (rst_fact == NULL) {
+    if ((entity != fact->entity) || (fact->is_uuid_fact)) {
+        log_error("cached fact does not belong to entity or is uuid fact\n");
         return -1;
     }
 
-    list_del(&rst_fact->entity_lru);
+    __hashmap_remove_entry(&entity->uuid_facts, &fact->hash_entry);
 
-    kb_fact_free(rst_fact);
+    fact->entity = NULL;
+
+    kb_fact_free(fact);
 
     return 0;
 }
@@ -250,4 +247,26 @@ kb_entity_assert_fully(struct kb_entity * entity, struct nexus_metadata * metada
 {
     entity->is_fully_asserted = true;
     entity->metadata_version  = metadata->version;
+}
+
+
+void
+kb_fact_warm_up(struct kb_fact * fact)
+{
+    if (!fact->is_uuid_fact || !fact->entity) {
+        return;
+    }
+
+    list_move(&fact->entity_lru, &fact->entity->uuid_facts_lru);
+}
+
+void
+kb_fact_cool_down(struct kb_fact * fact)
+{
+    if (!fact->is_uuid_fact || !fact->entity) {
+        return;
+    }
+
+    list_del_init(&fact->entity_lru);
+    list_add_tail(&fact->entity_lru, &fact->entity->uuid_facts_lru);
 }

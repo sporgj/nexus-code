@@ -320,6 +320,16 @@ __read_object(struct nexus_uuid     * uuid,
     return object;
 }
 
+bool
+nexus_metadata_has_changed(struct nexus_metadata * metadata)
+{
+    bool has_changed;
+
+    buffer_layer_revalidate(&metadata->uuid, &has_changed);
+
+    return has_changed;
+}
+
 int
 nexus_metadata_revalidate(struct nexus_metadata * metadata,
                           nexus_io_flags_t        flags,
@@ -365,6 +375,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
     metadata->is_invalid = false;
 
     metadata->is_dirty = false;
+
+    metadata->version = version;
 
     return 0;
 }

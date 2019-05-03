@@ -45,11 +45,18 @@ __cache_obj_entity(struct nexus_metadata * metadata);
 
 
 static int
-__register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact, const char * value)
+__register_fact(struct kb_entity * entity,
+                struct kb_fact   * cached_fact,
+                const char       * value,
+                size_t             generation)
 {
+    if (cached_fact->generation == generation) {
+        return 0;
+    }
+
     if (cached_fact->is_inserted) {
         if (strncmp(cached_fact->value, value, ATTRIBUTE_VALUE_SIZE) == 0) {
-            return 0;
+            goto out_success;
         }
 
         // retract from datalog engine and update the value
@@ -65,6 +72,9 @@ __register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact,
         log_error("db_retract_fact() FAILED\n");
         return -1;
     }
+
+out_success:
+    cached_fact->generation = generation;
 
     return 0;
 }
@@ -98,13 +108,13 @@ __insert_system_functions(struct nexus_metadata * metadata,
         struct kb_fact * cached_fact = kb_entity_find_name_fact(entity, (char *)name);
 
         if (cached_fact == NULL) {
-            cached_fact = kb_entity_put_name_fact(entity, name, value);
+            cached_fact = kb_entity_put_name_fact(entity, (char *)name, value);
         }
 
-        if (__register_fact_with_db(entity, cached_fact, value)) {
+        if (__register_fact(entity, cached_fact, value, metadata->version)) {
             nexus_free(value);
             list_iterator_free(iter);
-            log_error("__register_fact_with_db() FAILED\n");
+            log_error("__register_fact() FAILED\n");
             return -1;
         }
 
@@ -123,7 +133,7 @@ next:
 
 // --[[ attributes
 
-static inline int
+static inline struct kb_fact *
 __new_attribute_fact(struct abac_request    * abac_req,
                      struct kb_entity       * entity,
                      struct attribute_entry * attr_entry)
@@ -134,12 +144,12 @@ __new_attribute_fact(struct abac_request    * abac_req,
 
     if (attr_term == NULL) {
         // TODO maybe report here?
-        return -1;
+        return NULL;
     }
 
     return kb_entity_put_uuid_fact(entity,
                                    &attr_entry->attr_uuid,
-                                   attr_term->name,
+                                   (char *)attr_term->name,
                                    attr_entry->attr_val);
 }
 
@@ -150,20 +160,20 @@ __insert_attribute_table(struct abac_request   * abac_req,
 {
     struct hashmap_iter iter;
 
-    struct attribute_table * attribute_table = metadata_get_attribute_table(metadata);
+    struct attribute_table * attr_table = metadata_get_attribute_table(metadata);
 
     if (!kb_entity_needs_refresh(entity, metadata)) {
         return 0;
     }
 
-    if (attribute_table->generation == entity->attribute_table_generation) {
+    if (attr_table->generation == entity->attribute_table_generation) {
         return 0;
     }
 
-    hashmap_iter_init(&attribute_table->attribute_map, &iter);
+    hashmap_iter_init(&attr_table->attribute_map, &iter);
 
     // start iterating the attribute table
-    do {
+    while (1) {
         struct attribute_entry * attr_entry = hashmap_iter_next(&iter);
 
         if (attr_entry == NULL) {
@@ -176,90 +186,44 @@ __insert_attribute_table(struct abac_request   * abac_req,
             cached_fact = __new_attribute_fact(abac_req, entity, attr_entry);
         }
 
-        if (__register_fact_with_db(entity, cached_fact, &attr_entry->attr_val)) {
-            log_error("__register_fact_with_db() FAILED\n");
+        if (__register_fact(entity, cached_fact, attr_entry->attr_val, attr_table->generation)) {
+            log_error("__register_fact() FAILED\n");
             return -1;
         }
 
-        cached_fact->generation = attribute_table->generation;
-    } while (1);
+        cached_fact->generation = attr_table->generation;
+    }
 
     // TODO retract the facts that are not suppose to be in the database
+    // pop out the deleted rules
+    {
+        struct list_head * curr = NULL;
+        struct list_head * next = NULL;
 
-    entity->attribute_table_generation = attribute_table->generation;
+        list_for_each_prev_safe(curr, next, &entity->uuid_facts_lru) {
+            struct kb_fact * cached_fact = __kb_fact_from_entity_list(curr);
+
+            if ((cached_fact->generation >= attr_table->generation)) {
+                // XXX: we should probably stop here
+                continue;
+            }
+
+            if (db_retract_fact(cached_fact)) {
+                log_error("db_retract_policy_rule() FAILED\n");
+                continue;
+            }
+
+            kb_entity_del_uuid_fact(entity, cached_fact);
+        }
+    }
+
+    entity->attribute_table_generation = attr_table->generation;
 
     return 0;
 }
 
 // --]] attributes
 
-
-// --[[ rules
-
-static int
-__insert_policy_rule(struct abac_request * abac_req, struct policy_rule * rule)
-{
-    struct kb_fact * cached_fact = NULL;
-
-    cached_fact = kb_entity_find_uuid_fact(policy_store_entity, &rule->rule_uuid);
-
-    if (cached_fact == NULL) {
-        cached_fact
-            = kb_entity_put_uuid_fact(policy_store_entity, &rule->rule_uuid, "", NULL);
-        if (cached_fact == NULL) {
-            log_error("could not cache policy rule\n");
-            goto out_err;
-        }
-
-        cached_fact->is_rule = true;
-    }
-
-    if (cached_fact->is_inserted == false) {
-        if (db_assert_policy_rule(rule)) {
-            log_error("db_assert_policy_rule() FAILED\n");
-            goto out_err;
-        }
-
-        cached_fact->is_inserted = true;
-    }
-
-    return 0;
-out_err:
-    return -1;
-}
-
-static int
-__abac_request_insert_rules(struct abac_request * abac_req)
-{
-    struct nexus_list_iterator * iter = NULL;
-
-    if ((abac_req->policy_store->rules_count == 0)
-        || !kb_entity_needs_refresh(policy_store_entity, abac_req->policy_store->metadata)) {
-        return 0;
-    }
-
-    iter = list_iterator_new(&abac_req->policy_store->rules_list);
-
-    do {
-        struct policy_rule * rule = list_iterator_get(iter);
-
-        if (__insert_policy_rule(abac_req, rule)) {
-            list_iterator_free(iter);
-            log_error("__insert_policy_rule() FAILED\n");
-            return -1;
-        }
-
-        list_iterator_next(iter);
-    } while(list_iterator_is_valid(iter));
-
-    list_iterator_free(iter);
-
-    kb_entity_assert_fully(policy_store_entity, abac_req->policy_store->metadata);
-
-    return 0;
-}
-
-// --]] rules
 
 static int
 __abac_request_insert_facts(struct abac_request   * abac_req,
@@ -304,7 +268,7 @@ __create_abac_request(struct nexus_metadata * metadata, perm_type_t perm_type)
     abac_req->obj_metadata = metadata;
     abac_req->perm_type    = perm_type;
 
-    abac_req->policy_store = abac_acquire_policy_store(NEXUS_FREAD);
+    abac_req->policy_store = abac_refresh_bouncer_policy_store();
     if (abac_req->policy_store == NULL) {
         log_error("could not acquire policy_store\n");
         return NULL;
@@ -445,7 +409,7 @@ void
 bouncer_destroy()
 {
     if (nexus_enclave_is_current_user_owner()) {
-        return 0;
+        return;
     }
 
     db_exit();
@@ -505,13 +469,7 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
         goto out_err;
     }
 
-    // 3 - insert attributes
-    if (__abac_request_insert_rules(abac_req)) {
-        log_error("__abac_request_insert_rules() FAILED\n");
-        goto out_err;
-    }
-
-    // 4 - query the database
+    // 3 - query the database
     if (db_ask_permission(perm_type, user_profile_entity, abac_req->obj_entity)) {
         nexus_printf(":( NO\n");
         goto out_err;
@@ -528,3 +486,93 @@ out_err:
     return false;
 }
 
+static int
+__insert_policy_rule(struct policy_store * policy_store, struct policy_rule * rule)
+{
+    struct kb_fact * cached_fact = kb_entity_find_uuid_fact(policy_store_entity, &rule->rule_uuid);
+
+    // we assume all rules are always inserted
+    if (cached_fact) {
+        goto out_success;
+    }
+
+    cached_fact = kb_entity_put_uuid_fact(policy_store_entity, &rule->rule_uuid, "", NULL);
+
+    if (cached_fact == NULL) {
+        log_error("could not cache policy rule\n");
+        goto out_err;
+    }
+
+    cached_fact->is_rule = true;
+
+    if (db_assert_policy_rule(rule)) {
+        log_error("db_assert_policy_rule() FAILED\n");
+        goto out_err;
+    }
+
+    cached_fact->is_inserted = true;
+
+out_success:
+    cached_fact->rule_ptr   = rule;
+    cached_fact->generation = policy_store->metadata->version;
+
+    // move it to the front
+    list_move(&cached_fact->entity_lru, &policy_store_entity->uuid_facts_lru);
+    return 0;
+
+out_err:
+    return -1;
+}
+
+int
+bouncer_update_policy_store(struct policy_store * old_policystore,
+                            struct policy_store * new_policystore)
+{
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
+    // insert the new rules
+    {
+        struct nexus_list_iterator * iter = list_iterator_new(&new_policystore->rules_list);
+
+        do {
+            struct policy_rule * rule = list_iterator_get(iter);
+
+            // try inserting the rul
+            if (__insert_policy_rule(new_policystore, rule)) {
+                log_error("__insert_policy_rule() FAILED\n");
+                list_iterator_free(iter);
+                return -1;
+            }
+
+            list_iterator_next(iter);
+        } while (list_iterator_is_valid(iter));
+
+        list_iterator_free(iter);
+    }
+
+    // pop out the deleted rules
+    {
+        struct list_head * curr = NULL;
+        struct list_head * next = NULL;
+
+        list_for_each_prev_safe(curr, next, &policy_store_entity->uuid_facts_lru) {
+            struct kb_fact * cached_fact_rule = __kb_fact_from_entity_list(curr);
+
+            if ((cached_fact_rule->generation >= new_policystore->metadata->version)) {
+                // XXX: we should probably stop here
+                continue;
+            }
+
+            if (db_retract_policy_rule(cached_fact_rule->rule_ptr)) {
+                log_error("db_retract_policy_rule() FAILED\n");
+                return -1;
+            }
+
+            kb_entity_del_uuid_fact(policy_store_entity, cached_fact_rule);
+        }
+    }
+
+    return 0;
+}
