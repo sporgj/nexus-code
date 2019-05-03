@@ -907,7 +907,7 @@ static struct _cmd cmds[]
           handle_abac_user_revoke,
           "Revokes a user attribute",
           "<username> <attribute>" },
-        { "abac_user_attribute_ls", handle_abac_user_ls, "List a user's attributes", "<username>" },
+        { "abac_user_ls", handle_abac_user_ls, "List a user's attributes", "<username>" },
 
         { "abac_object_grant",
           handle_abac_object_grant,
@@ -964,6 +964,8 @@ repl_volume_main(int argc, char ** argv)
             fflush(stdout);
             return 0;
         }
+
+        add_history(line);
 
         if (split_string_to_my_argv(line)) {
             return -1;
