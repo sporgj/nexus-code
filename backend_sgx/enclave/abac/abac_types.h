@@ -5,18 +5,14 @@
 #include "../libnexus_trusted/nexus_uuid.h"
 #include "../libnexus_trusted/nexus_list.h"
 
+#include "../libnexus_trusted/offsetof.h"
+
 #define ATTRIBUTE_NAME_MAX      (32)
 #define ATTRIBUTE_VALUE_SIZE    (64)
 
 #define NEXUS_POLICY_MAXLEN     (256)
 
 #define SYSTEM_FUNC_MAX_LENGTH  (ATTRIBUTE_NAME_MAX)
-
-#ifndef container_of
-#define container_of(ptr, type, member) ({                      \
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
-#endif
 
 
 typedef enum {
@@ -39,6 +35,7 @@ typedef enum {
 } pred_type_t;
 
 typedef enum {
+    UNKNOWN_ATTRIBUTE_TYPE = 0,
     USER_ATTRIBUTE_TYPE = 0x01,
     OBJECT_ATTRIBUTE_TYPE
 } attribute_type_t;

@@ -33,6 +33,9 @@ static struct nexus_lru * cached_obj_entities = NULL;
 static struct kb_entity * user_profile_entity = NULL;
 static struct kb_entity * policy_store_entity = NULL;
 
+static struct nexus_list * obj_system_functions = NULL;
+static struct nexus_list * usr_system_functions = NULL;
+
 static void
 __destroy_abac_request(struct abac_request * abac_req);
 
@@ -42,7 +45,7 @@ __cache_obj_entity(struct nexus_metadata * metadata);
 
 
 static int
-__register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact, char * value)
+__register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact, const char * value)
 {
     if (cached_fact->is_inserted) {
         if (strncmp(cached_fact->value, value, ATTRIBUTE_VALUE_SIZE) == 0) {
@@ -55,18 +58,13 @@ __register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact,
             return -1;
         }
 
-        nexus_free(cached_fact->value);
-        cached_fact->is_inserted = false;
+        kb_fact_update_value(cached_fact, value);
     }
-
-    cached_fact->value = value;
 
     if (db_assert_fact(cached_fact)) {
         log_error("db_retract_fact() FAILED\n");
         return -1;
     }
-
-    cached_fact->is_inserted = true;
 
     return 0;
 }
@@ -75,44 +73,42 @@ __register_fact_with_db(struct kb_entity * entity, struct kb_fact * cached_fact,
 // --[[ system facts
 
 static int
-__insert_system_functions(void              * user_or_object,
-                          struct kb_entity  * entity,
-                          struct nexus_list * sysfacts_list)
+__insert_system_functions(struct nexus_metadata * metadata,
+                          struct kb_entity      * entity,
+                          struct nexus_list     * sysfacts_list)
 {
     struct nexus_list_iterator * iter = list_iterator_new(sysfacts_list);
-
-    struct kb_fact * cached_fact = NULL;
 
     while (list_iterator_is_valid(iter)) {
         struct __sys_func * sys_func = list_iterator_get(iter);
 
-        const char * name      = sys_func_get_name(sys_func);
-        char *       new_value = system_function_run(sys_func, user_or_object);
+        struct abac_value * result   = system_function_run(sys_func, metadata);
 
-        if (new_value == NULL) {
-            // TODO report here
+        if (result == NULL) {
             goto next;
         }
 
-        // get the cached fact and compare its value
-        cached_fact = kb_entity_find_name_fact(entity, (char *)name);
+        char * value = abac_value_stringify(result);
 
-        if (cached_fact) {
-            // if the value is unchanged, let's skip
-            if ((strncmp(new_value, cached_fact->value, ATTRIBUTE_VALUE_SIZE) == 0)) {
-                nexus_free(new_value);
-                goto next;
-            }
-        } else {
-            cached_fact = kb_entity_put_name_fact(entity, name, new_value);
+        abac_value_free(result);
+
+
+        const char * name = sys_func_get_name(sys_func);
+
+        struct kb_fact * cached_fact = kb_entity_find_name_fact(entity, (char *)name);
+
+        if (cached_fact == NULL) {
+            cached_fact = kb_entity_put_name_fact(entity, name, value);
         }
 
-        if (__register_fact_with_db(entity, cached_fact, new_value)) {
+        if (__register_fact_with_db(entity, cached_fact, value)) {
+            nexus_free(value);
             list_iterator_free(iter);
             log_error("__register_fact_with_db() FAILED\n");
             return -1;
         }
 
+        nexus_free(value);
 next:
         list_iterator_next(iter);
     }
@@ -122,72 +118,29 @@ next:
     return 0;
 }
 
-static int
-__abac_request_insert_sysfuncs(struct abac_request * abac_req)
-{
-    struct nexus_list * usr_sysfacts = NULL;
-    struct nexus_list * obj_sysfacts = NULL;
-
-    int ret = -1;
-
-
-    if (kb_entity_needs_refresh(user_profile_entity, abac_req->usr_metadata)) {
-        usr_sysfacts = system_function_export_sysfuncs(USER_FUNCTION);
-
-        if (__insert_system_functions(abac_req->usr_metadata, user_profile_entity, usr_sysfacts)) {
-            log_error("could not insert user system functions\n");
-            goto out_err;
-        }
-
-        return 0;
-    }
-
-    if (abac_req->obj_metadata
-        && kb_entity_needs_refresh(abac_req->obj_entity, abac_req->obj_metadata)) {
-        obj_sysfacts = system_function_export_sysfuncs(OBJECT_FUNCTION);
-
-        if (__insert_system_functions(abac_req->obj_metadata, abac_req->obj_entity, obj_sysfacts)) {
-            log_error("could not insert user system functions\n");
-            goto out_err;
-        }
-    }
-
-
-    ret = 0;
-out_err:
-    if (usr_sysfacts) {
-        nexus_list_destroy(usr_sysfacts);
-        nexus_free(usr_sysfacts);
-    }
-
-    if (obj_sysfacts) {
-        nexus_list_destroy(obj_sysfacts);
-        nexus_free(obj_sysfacts);
-    }
-
-    return ret;
-}
-
 // --]] system facts
 
 
 // --[[ attributes
 
-static int
-__register_attribute_fact(struct kb_entity  * entity,
-                          struct nexus_uuid * attr_uuid,
-                          char              * name,
-                          char              * value)
+static inline int
+__new_attribute_fact(struct abac_request    * abac_req,
+                     struct kb_entity       * entity,
+                     struct attribute_entry * attr_entry)
 {
-    struct kb_fact * cached_fact = NULL;
+    const struct attribute_term * attr_term;
 
-    cached_fact = kb_entity_find_uuid_fact(entity, attr_uuid);
+    attr_term = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
 
-    if (cached_fact == NULL) {
-        cached_fact = kb_entity_put_uuid_fact(entity, attr_uuid, name, value);
+    if (attr_term == NULL) {
+        // TODO maybe report here?
+        return -1;
     }
 
-    return __register_fact_with_db(entity, cached_fact, value);
+    return kb_entity_put_uuid_fact(entity,
+                                   &attr_entry->attr_uuid,
+                                   attr_term->name,
+                                   attr_entry->attr_val);
 }
 
 static int
@@ -211,54 +164,31 @@ __insert_attribute_table(struct abac_request   * abac_req,
 
     // start iterating the attribute table
     do {
-        const struct attribute_term * attr_term;
-
-        struct attribute_entry      * attr_entry = hashmap_iter_next(&iter);
+        struct attribute_entry * attr_entry = hashmap_iter_next(&iter);
 
         if (attr_entry == NULL) {
             break;
         }
 
-        attr_term = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
+        struct kb_fact * cached_fact = kb_entity_find_uuid_fact(entity, &attr_entry->attr_uuid);
 
-        if (attr_term == NULL) {
-            // TODO maybe report here?
-            continue;
+        if (cached_fact == NULL) {
+            cached_fact = __new_attribute_fact(abac_req, entity, attr_entry);
         }
 
-        if (__register_attribute_fact(entity,
-                                      &attr_entry->attr_uuid,
-                                      attr_term->name,
-                                      attr_entry->attr_val)) {
-            log_error("could not push attribute pair (%s)\n", attr_term->name);
+        if (__register_fact_with_db(entity, cached_fact, &attr_entry->attr_val)) {
+            log_error("__register_fact_with_db() FAILED\n");
             return -1;
         }
+
+        cached_fact->generation = attribute_table->generation;
     } while (1);
+
+    // TODO retract the facts that are not suppose to be in the database
 
     entity->attribute_table_generation = attribute_table->generation;
 
     return 0;
-}
-
-static int
-__abac_request_insert_attributes(struct abac_request * abac_req)
-{
-    // insert the user_profile attribute table
-    if (__insert_attribute_table(abac_req, user_profile_entity, abac_req->usr_metadata)) {
-        log_error("could not insert user_profile attribute table into database\n");
-        goto out_err;
-    }
-
-    // insert the metadata attribute table
-    if (abac_req->obj_metadata
-        && (__insert_attribute_table(abac_req, abac_req->obj_entity, abac_req->obj_metadata))) {
-        log_error("could not insert object attribute table into database\n");
-        goto out_err;
-    }
-
-    return 0;
-out_err:
-    return -1;
 }
 
 // --]] attributes
@@ -298,7 +228,7 @@ out_err:
     return -1;
 }
 
-    static int
+static int
 __abac_request_insert_rules(struct abac_request * abac_req)
 {
     struct nexus_list_iterator * iter = NULL;
@@ -331,6 +261,40 @@ __abac_request_insert_rules(struct abac_request * abac_req)
 
 // --]] rules
 
+static int
+__abac_request_insert_facts(struct abac_request   * abac_req,
+                            struct kb_entity      * entity,
+                            struct nexus_metadata * metadata,
+                            struct nexus_list     * sys_functions)
+{
+    if (!kb_entity_needs_refresh(entity, metadata)) {
+        return 0;
+    }
+
+    // insert the type
+    if (db_assert_kb_entity_type(entity)) {
+        log_error("db_assert_kb_entity_type() FAILED\n");
+        return -1;
+    }
+
+    // insert the system functions
+    if (__insert_system_functions(metadata, entity, sys_functions)) {
+        log_error("__insert_system_functions() FAILED\n");
+        goto out_err;
+    }
+
+    // insert the attributes
+    if (__insert_attribute_table(abac_req, entity, metadata)) {
+        log_error("__insert_attribute_table() FAILED\n");
+        goto out_err;
+    }
+
+    kb_entity_assert_fully(entity, metadata);
+
+    return 0;
+out_err:
+    return -1;
+}
 
 static struct abac_request *
 __create_abac_request(struct nexus_metadata * metadata, perm_type_t perm_type)
@@ -390,36 +354,21 @@ __destroy_abac_request(struct abac_request * abac_req)
 static int
 __init_user_attributes()
 {
-    struct abac_request * abac_req = NULL;
+    struct abac_request * abac_req = __create_abac_request(NULL, PERM_READ);
 
-    if (nexus_enclave_is_current_user_owner()) {
-        return 0;
-    }
-
-    abac_req = __create_abac_request(NULL, PERM_READ);
     if (abac_req == NULL) {
         log_error("__create_abac_request() FAILED\n");
         return -1;
     }
 
-    if (db_assert_kb_entity_type(user_profile_entity, USER_ATTRIBUTE_TYPE)) {
-        log_error("db_assert_kb_entity_type() FAILED\n");
-        return -1;
-    }
-
-    if (__abac_request_insert_attributes(abac_req)) {
-        log_error("__abac_request_insert_attributes() FAILED\n");
+    if (__abac_request_insert_facts(abac_req,
+                                    user_profile_entity,
+                                    abac_req->usr_metadata,
+                                    usr_system_functions)) {
+        log_error("__abac_request_insert_facts() FAILED\n");
         __destroy_abac_request(abac_req);
         return -1;
     }
-
-    if (__abac_request_insert_sysfuncs(abac_req)) {
-        log_error("__abac_request_insert_sysfuncs() FAILED\n");
-        __destroy_abac_request(abac_req);
-        return -1;
-    }
-
-    kb_entity_assert_fully(user_profile_entity, abac_req->usr_metadata);
 
     __destroy_abac_request(abac_req);
 
@@ -435,16 +384,11 @@ __cache_obj_entity(struct nexus_metadata * metadata)
         return entity;
     }
 
-    entity = kb_entity_new(&metadata->uuid);
+    entity = kb_entity_new(&metadata->uuid, OBJECT_ATTRIBUTE_TYPE);
 
     if (!nexus_lru_put(cached_obj_entities, &entity->uuid, entity)) {
         kb_entity_free(entity);
         log_error("nexus_lru_put() FAILED\n");
-        return NULL;
-    }
-
-    if (db_assert_kb_entity_type(entity, OBJECT_ATTRIBUTE_TYPE)) {
-        log_error("db_assert_kb_entity_type() FAILED\n");
         return NULL;
     }
 
@@ -466,6 +410,10 @@ __evict_obj_entity(uintptr_t element, uintptr_t key)
 int
 bouncer_init()
 {
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
     if (db_init()) {
         log_error("db_init() FAILED\n");
         return -1;
@@ -474,9 +422,12 @@ bouncer_init()
     // create the necessary structures
     cached_obj_entities = nexus_lru_create(16, __uuid_hasher, __uuid_equals, __evict_obj_entity);
 
-    policy_store_entity = kb_entity_new(abac_policy_store_uuid());
+    policy_store_entity = kb_entity_new(abac_policy_store_uuid(), UNKNOWN_ATTRIBUTE_TYPE);
 
-    user_profile_entity = kb_entity_new(&global_user_struct->user_uuid);
+    user_profile_entity = kb_entity_new(&global_user_struct->user_uuid, USER_ATTRIBUTE_TYPE);
+
+    obj_system_functions = system_function_export_sysfuncs(OBJECT_FUNCTION);
+    usr_system_functions = system_function_export_sysfuncs(USER_FUNCTION);
 
     if (__init_user_attributes()) {
         log_error("__init_user_attributes() FAILED\n");
@@ -485,7 +436,7 @@ bouncer_init()
 
     return 0;
 out_err:
-    nexus_lru_destroy(cached_obj_entities);
+    bouncer_destroy();
 
     return -1;
 }
@@ -493,6 +444,10 @@ out_err:
 void
 bouncer_destroy()
 {
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
     db_exit();
 
     if (cached_obj_entities) {
@@ -506,44 +461,57 @@ bouncer_destroy()
     if (user_profile_entity) {
         kb_entity_free(user_profile_entity);
     }
+
+    if (obj_system_functions) {
+        nexus_list_destroy(obj_system_functions);
+        nexus_free(obj_system_functions);
+    }
+
+    if (usr_system_functions) {
+        nexus_list_destroy(usr_system_functions);
+        nexus_free(usr_system_functions);
+    }
 }
 
 bool
 bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
 {
-    struct abac_request * abac_req = NULL;
-
     if (nexus_enclave_is_current_user_owner()) {
         return true;
     }
 
-    abac_req = __create_abac_request(metadata, perm_type);
+    struct abac_request * abac_req = __create_abac_request(metadata, perm_type);
 
     if (abac_req == NULL) {
         log_error("__create_abac_request() FAILED\n");
         return -1;
     }
 
-    if (__abac_request_insert_attributes(abac_req)) {
-        log_error("__abac_request_insert_attributes() FAILED\n");
+    // 1 - insert the user profile facts
+    if (__abac_request_insert_facts(abac_req,
+                                    user_profile_entity,
+                                    abac_req->usr_metadata,
+                                    usr_system_functions)) {
+        log_error("__abac_request_insert_facts() user metadata FAILED\n");
         goto out_err;
     }
 
-    if (__abac_request_insert_sysfuncs(abac_req)) {
-        log_error("__abac_request_insert_sysfuncs() FAILED\n");
+    // 2 - insert the object facts
+    if (__abac_request_insert_facts(abac_req,
+                                    abac_req->obj_entity,
+                                    abac_req->obj_metadata,
+                                    obj_system_functions)) {
+        log_error("__abac_request_insert_facts() object metadata FAILED\n");
         goto out_err;
     }
 
-    // update the versions of the object and user entitie
-    kb_entity_assert_fully(user_profile_entity, abac_req->usr_metadata);
-    kb_entity_assert_fully(abac_req->obj_entity, abac_req->obj_metadata);
-
+    // 3 - insert attributes
     if (__abac_request_insert_rules(abac_req)) {
         log_error("__abac_request_insert_rules() FAILED\n");
         goto out_err;
     }
 
-    // query the database
+    // 4 - query the database
     if (db_ask_permission(perm_type, user_profile_entity, abac_req->obj_entity)) {
         nexus_printf(":( NO\n");
         goto out_err;

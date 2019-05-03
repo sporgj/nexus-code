@@ -2,9 +2,11 @@
 #include "fact.h"
 #include "db.h"
 
+#include <libnexus_trusted/offsetof.h>
+
 
 static struct kb_fact *
-__new_cached_fact(struct nexus_uuid * uuid, char * name, char * value)
+__new_cached_fact(struct nexus_uuid * uuid, char * name, const char * value)
 {
     struct kb_fact * new_fact = nexus_malloc(sizeof(struct kb_fact));
 
@@ -13,11 +15,26 @@ __new_cached_fact(struct nexus_uuid * uuid, char * name, char * value)
     }
 
     strncpy(new_fact->name, name, ATTRIBUTE_NAME_MAX);
-    new_fact->value = value;
 
-    INIT_LIST_HEAD(&new_fact->fact_list);
+    kb_fact_update_value(new_fact, value);
+
+    INIT_LIST_HEAD(&new_fact->db_list);
+    INIT_LIST_HEAD(&new_fact->entity_lru);
 
     return new_fact;
+}
+
+void
+kb_fact_update_value(struct kb_fact * fact, const char * value)
+{
+    if (fact->value) {
+        nexus_free(fact->value);
+        fact->value = NULL;
+    }
+
+    if (value) {
+        fact->value = strndup(value, ATTRIBUTE_VALUE_SIZE);
+    }
 }
 
 void
@@ -28,6 +45,19 @@ kb_fact_free(struct kb_fact * cached_fact)
     }
 
     nexus_free(cached_fact);
+}
+
+
+struct kb_fact *
+__kb_fact_from_db_list(struct list_head * db_list_ptr)
+{
+    return container_of(db_list_ptr, struct kb_fact, db_list);
+}
+
+struct kb_fact *
+__kb_fact_from_entity_list(struct list_head * entity_list_ptr)
+{
+    return container_of(entity_list_ptr, struct kb_fact, entity_lru);
 }
 
 static int
@@ -50,15 +80,19 @@ __name_facts_cmp(const void           * data,
 
 
 struct kb_entity *
-kb_entity_new(struct nexus_uuid * uuid)
+kb_entity_new(struct nexus_uuid * uuid, attribute_type_t attribute_type)
 {
     struct kb_entity * entity = nexus_malloc(sizeof(struct kb_entity));
 
     nexus_uuid_copy(uuid, &entity->uuid);
     entity->uuid_str = nexus_uuid_to_hex(uuid);
 
+    entity->attr_type = attribute_type;
+
     hashmap_init(&entity->uuid_facts, (hashmap_cmp_fn)__uuid_facts_cmp, NULL, 17);
     hashmap_init(&entity->name_facts, (hashmap_cmp_fn)__name_facts_cmp, NULL, 7);
+
+    nexus_list_init(&entity->cached_facts_lru);
 
     return entity;
 }
@@ -103,7 +137,7 @@ struct kb_fact *
 kb_entity_put_uuid_fact(struct kb_entity  * entity,
                         struct nexus_uuid * uuid,
                         char              * name,
-                        char              * value)
+                        const char        * value)
 {
     struct kb_fact * new_fact = __new_cached_fact(uuid, name, value);
 
@@ -117,13 +151,15 @@ kb_entity_put_uuid_fact(struct kb_entity  * entity,
 }
 
 struct kb_fact *
-kb_entity_put_name_fact(struct kb_entity * entity, char * name, char * value)
+kb_entity_put_name_fact(struct kb_entity * entity, char * name, const char * value)
 {
     struct kb_fact * new_fact = __new_cached_fact(NULL, name, NULL);
 
     hashmap_entry_init(new_fact, strhash(new_fact->name));
 
     hashmap_add(&entity->name_facts, &new_fact->hash_entry);
+
+    list_add_tail(&new_fact->entity_lru, &entity->cached_facts_lru);
 
     new_fact->entity = entity;
 
@@ -142,6 +178,27 @@ kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid)
     return hashmap_get(&entity->uuid_facts, &tmp_fact, NULL);
 }
 
+int
+kb_entity_del_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid)
+{
+    struct kb_fact   tmp_fact = {0};
+
+    nexus_uuid_copy(uuid, &tmp_fact.uuid);
+    hashmap_entry_init(&tmp_fact, memhash(&tmp_fact.uuid, sizeof(struct nexus_uuid)));
+
+    struct kb_fact * rst_fact = hashmap_get(&entity->uuid_facts, &tmp_fact, NULL);
+
+    if (rst_fact == NULL) {
+        return -1;
+    }
+
+    list_del(&rst_fact->entity_lru);
+
+    kb_fact_free(rst_fact);
+
+    return 0;
+}
+
 struct kb_fact *
 kb_entity_find_name_fact(struct kb_entity * entity, char * name)
 {
@@ -151,6 +208,27 @@ kb_entity_find_name_fact(struct kb_entity * entity, char * name)
     hashmap_entry_init(&tmp_fact, strhash(tmp_fact.name));
 
     return hashmap_get(&entity->name_facts, &tmp_fact, NULL);
+}
+
+int
+kb_entity_del_name_fact(struct kb_entity * entity, char * name)
+{
+    struct kb_fact tmp_fact = { 0 };
+
+    strncpy(tmp_fact.name, name, ATTRIBUTE_NAME_MAX);
+    hashmap_entry_init(&tmp_fact, strhash(tmp_fact.name));
+
+    struct kb_fact * rst_fact = hashmap_remove(&entity->name_facts, &tmp_fact, NULL);
+
+    if (rst_fact == NULL) {
+        return -1;
+    }
+
+    list_del(&rst_fact->entity_lru);
+
+    kb_fact_free(rst_fact);
+
+    return 0;
 }
 
 bool

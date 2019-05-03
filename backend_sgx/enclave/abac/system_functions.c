@@ -169,19 +169,8 @@ system_function_export_sysfuncs(sys_func_type_t type)
     return result_list;
 }
 
-// TODO optimize this. double allocation/copy with abac_value
-char *
+struct abac_value *
 system_function_run(struct __sys_func * sys_func, struct nexus_metadata * metadata)
 {
-    struct abac_value * abac_value = sys_func->handler(metadata);
-
-    if (abac_value == NULL) {
-        return NULL;
-    }
-
-    char * string_val = abac_value_stringify(abac_value);
-
-    abac_value_free(abac_value);
-
-    return string_val;
+    return sys_func->handler(metadata);
 }

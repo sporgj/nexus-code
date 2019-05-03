@@ -59,33 +59,31 @@ db_ask_permission(perm_type_t        perm_type,
 }
 
 int
-db_assert_kb_entity_type(struct kb_entity * entity, attribute_type_t attr_type)
+db_assert_kb_entity_type(struct kb_entity * entity)
 {
     char * entity_type_str = NULL;
 
-    if (entity->type_fact) {
-        log_error("entity has already asserted its type\n");
-        return -1;
+    if (entity->type_fact && entity->type_fact->is_inserted) {
+        return 0;
     }
 
-    if (attr_type == USER_ATTRIBUTE_TYPE) {
+    if (entity->attr_type == USER_ATTRIBUTE_TYPE) {
         entity_type_str = "_isUser";
-    } else if (attr_type == OBJECT_ATTRIBUTE_TYPE) {
+    } else if (entity->attr_type == OBJECT_ATTRIBUTE_TYPE) {
         entity_type_str = "_isObject";
     } else {
         log_error("unsupported attribute type\n");
         return -1;
     }
 
-
-    entity->type_fact = kb_entity_put_name_fact(entity, entity_type_str, NULL);
+    if (entity->type_fact == NULL) {
+        entity->type_fact = kb_entity_put_name_fact(entity, entity_type_str, NULL);
+    }
 
     if (db_assert_fact(entity->type_fact)) {
         log_error("could not assert `%s` entity type\n", entity->uuid_str);
         return -1;
     }
-
-    entity->attr_type = attr_type;
 
     return 0;
 }
@@ -97,15 +95,11 @@ db_retract_kb_entity_type(struct kb_entity * entity)
         return 0;
     }
 
+    // we just retract it later
     if (db_retract_fact(entity->type_fact)) {
         log_error("could not retract `%s` entity type\n", entity->uuid_str);
         return -1;
     }
-
-    kb_fact_free(entity->type_fact);
-
-    entity->attr_type = 0;
-    entity->type_fact = NULL;
 
     return 0;
 }
@@ -163,7 +157,12 @@ db_retract_fact(struct kb_fact * cached_fact)
         goto out_err;
     }
 
-    list_del(&cached_fact->fact_list);
+    cached_fact->is_inserted = true;
+
+    list_del(&cached_fact->entity_lru);
+    list_add_tail(&cached_fact->entity_lru, &cached_facts_list);
+
+    list_del(&cached_fact->db_list);
     cached_facts_count -= 1;
 
     return 0;
@@ -198,7 +197,10 @@ db_assert_fact(struct kb_fact * cached_fact)
         goto out_err;
     }
 
-    list_add_tail(&cached_fact->fact_list, &cached_facts_list);
+    cached_fact->is_inserted = true;
+
+    list_move(&cached_fact->entity_lru, &cached_fact->entity->cached_facts_lru);
+
     cached_facts_count += 1;
 
     return 0;
@@ -357,7 +359,7 @@ UNSAFE_db_print_facts()
     rs_cat(&string_builder, " Facts\n-----------\n");
 
     list_for_each(curr, &cached_facts_list) {
-        struct kb_fact * cached_fact = container_of(curr, struct kb_fact, fact_list);
+        struct kb_fact * cached_fact = __kb_fact_from_db_list(curr);
 
         rs_cat(&string_builder, cached_fact->name);
         rs_cat_n(&string_builder, "(", 1);

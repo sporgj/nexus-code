@@ -24,6 +24,8 @@ struct kb_entity {
 
     size_t                  attribute_table_generation;
     size_t                  metadata_version;
+
+    struct list_head        cached_facts_lru;
 };
 
 struct kb_fact {
@@ -33,17 +35,22 @@ struct kb_fact {
 
     char               * value;
 
-    bool                 is_inserted;
     bool                 is_rule;
+
+    // whether it is in the db
+    bool                 is_inserted;
 
     struct kb_entity   * entity;
 
-    struct list_head     fact_list;
+    size_t               generation;  // could also be a version
+
+    struct list_head     db_list;
+    struct list_head     entity_lru;   // all the assert facts will be towards the head
 };
 
 
 struct kb_entity *
-kb_entity_new(struct nexus_uuid * uuid);
+kb_entity_new(struct nexus_uuid * uuid, attribute_type_t attribute_type);
 
 void
 kb_entity_free(struct kb_entity * entity);
@@ -52,10 +59,10 @@ struct kb_fact *
 kb_entity_put_uuid_fact(struct kb_entity  * entity,
                         struct nexus_uuid * uuid,
                         char              * name,
-                        char              * value);
+                        const char        * value);
 
 struct kb_fact *
-kb_entity_put_name_fact(struct kb_entity * entity, char * name, char * value);
+kb_entity_put_name_fact(struct kb_entity * entity, char * name, const char * value);
 
 struct kb_fact *
 kb_entity_find_uuid_fact(struct kb_entity * entity, struct nexus_uuid * uuid);
@@ -70,6 +77,15 @@ kb_entity_needs_refresh(struct kb_entity * entity, struct nexus_metadata * metad
 void
 kb_entity_assert_fully(struct kb_entity * entity, struct nexus_metadata * metadata);
 
+
+struct kb_fact *
+__kb_fact_from_db_list(struct list_head * db_list_ptr);
+
+struct kb_fact *
+__kb_fact_from_entity_list(struct list_head * entity_list_ptr);
+
+void
+kb_fact_update_value(struct kb_fact * fact, const char * value);
 
 void
 kb_fact_free(struct kb_fact * cached_fact);

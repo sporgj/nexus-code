@@ -33,8 +33,9 @@ db_retract_fact(struct kb_fact * cached_fact);
 int
 db_assert_fact(struct kb_fact * cached_fact);
 
+// return's true if the entity type is already inserted
 int
-db_assert_kb_entity_type(struct kb_entity * entity, attribute_type_t attr_type);
+db_assert_kb_entity_type(struct kb_entity * entity);
 
 int
 db_retract_kb_entity_type(struct kb_entity * entity);

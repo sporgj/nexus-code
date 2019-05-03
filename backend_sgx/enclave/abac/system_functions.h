@@ -18,5 +18,5 @@ system_function_exists(char * function_name, sys_func_type_t type);
 struct nexus_list *
 system_function_export_sysfuncs(sys_func_type_t type);
 
-char *
+struct abac_value *
 system_function_run(struct __sys_func * sys_func, struct nexus_metadata * metadata);

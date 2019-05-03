@@ -53,22 +53,10 @@
 #include <nexus_heap.h>
 #include <nexus_hashtable.h>
 
+#include "libnexus_trusted/offsetof.h"
 
 #define ocall_debug(str) \
     ocall_print("enclave> " str "\n")
-
-
-/// copied from: https://github.com/rsbx/container_of/blob/container_of/offsetof.h
-
-#ifndef offsetof
-#define offsetof(CONTAINER_TYPE, MEMBER_NAME)                                                      \
-    ((size_t)((char *)&(((CONTAINER_TYPE *)(0))->MEMBER_NAME) - (char *)(0)))
-#endif /* offsetof */
-
-#ifndef container_of
-#define container_of(MEMBER_POINTER, CONTAINER_TYPE, MEMBER_NAME)                                  \
-    ((CONTAINER_TYPE *)((char *)(MEMBER_POINTER)-offsetof(CONTAINER_TYPE, MEMBER_NAME)))
-#endif
 
 
 extern struct nexus_volume         * global_volume;
