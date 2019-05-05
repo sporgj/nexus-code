@@ -250,6 +250,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 
     metadata->is_dirty = false;
 
+    metadata->version = version;
+
     return 0;
 }
 
