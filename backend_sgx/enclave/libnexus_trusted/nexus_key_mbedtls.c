@@ -17,16 +17,15 @@
 static char *
 __mbedtls_pub_key_to_str(struct nexus_key * key)
 {
-    unsigned char out_buf[16000]; // Constant size taken from mbedtls source code...
-
-    memset(out_buf, 0, 16000);
+    uint8_t * out_buf = nexus_malloc(16000); // Constant size taken from mbedtls source code...
 
     if (mbedtls_pk_write_pubkey_pem(key->key, out_buf, 16000) < 0) {
+        nexus_free(out_buf);
         log_error("Could not write MBEDTLS PRV key to string\n");
         return NULL;
     }
 
-    return strndup(out_buf, 16000);
+    return (char *)out_buf;
 }
 
 static char *

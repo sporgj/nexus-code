@@ -218,8 +218,6 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_fs_lookup * 
 {
     struct nexus_metadata * metadata = NULL;
 
-    struct nexus_uuid entry_uuid;
-
     int ret = -1;
 
 
@@ -468,7 +466,7 @@ ecall_fs_readlink(char * dirpath_IN, char * linkname_IN, char targetpath_out[NEX
 {
     struct nexus_metadata * metadata = NULL;
 
-    const char * result = NULL;
+    char * result = NULL;
 
     int ret = -1;
 

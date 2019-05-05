@@ -71,6 +71,9 @@ void
 dentry_put(struct nexus_dentry * dentry);
 
 
+void
+dentry_invalidate(struct nexus_dentry * dentry);
+
 int
 dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags);
 

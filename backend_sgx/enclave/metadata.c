@@ -1,5 +1,8 @@
 #include "enclave_internal.h"
 
+#include "dentry.h"
+#include "hardlink_table.h"
+
 
 void
 __metadata_set_clean(struct nexus_metadata * metadata)
@@ -167,6 +170,9 @@ nexus_metadata_free(struct nexus_metadata * metadata)
     case NEXUS_FILENODE:
         filenode_free(metadata->filenode);
         break;
+    case NEXUS_HARDLINK_TABLE:
+        hardlink_table_free(metadata->hardlink_table);
+        break;
     }
 
     if (metadata->dentry_count) {
@@ -271,6 +277,8 @@ nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags)
 
     metadata->version = version;
     metadata->is_dirty = false;
+
+    metadata->version = version;
 
     return 0;
 }

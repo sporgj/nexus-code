@@ -310,7 +310,6 @@ walk_path(struct path_walker * walker)
     nexus_dirent_type_t atype;
 
     char * name       = NULL;
-    char * next_token = NULL;
 
     struct nexus_dirnode * dirnode    = NULL;
 
