@@ -162,7 +162,7 @@ attribute_table_free(struct attribute_table * attribute_table)
 }
 
 
-uint8_t *
+static uint8_t *
 __parse_attribute_table_hdr(struct attribute_table * attribute_table, uint8_t * buffer)
 {
     struct __attr_table_hdr * header = (struct __attr_table_hdr *)buffer;
@@ -173,7 +173,7 @@ __parse_attribute_table_hdr(struct attribute_table * attribute_table, uint8_t * 
     return buffer + sizeof(struct __attr_table_hdr);
 }
 
-int
+static int
 __parse_attribute_table_body(struct attribute_table * attribute_table, uint8_t * buffer)
 {
     struct __attr_table_entry * input_entry = (struct __attr_table_entry *)buffer;
@@ -234,7 +234,7 @@ attribute_table_get_size(struct attribute_table * attribute_table)
 
 
 /// serializes the attribute table's header into the buffer and returns the buffer shifted
-uint8_t *
+static uint8_t *
 __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t * buffer)
 {
     struct __attr_table_hdr * dest_header = (struct __attr_table_hdr *)buffer;
@@ -245,7 +245,7 @@ __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t *
     return buffer + sizeof(struct __attr_table_hdr);
 }
 
-uint8_t *
+static uint8_t *
 __serialize_attribute_entry(struct attribute_entry * attribute_entry, uint8_t * buffer)
 {
     struct __attr_table_entry * dest_entry = (struct __attr_table_entry *)buffer;
@@ -375,7 +375,7 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
 
         copied += 1;
         output_pair_ptr += 1;
-    } while (1);
+    } while (copied < attribute_pair_capacity);
 
     *result_count = copied;
     *total_count = attribute_table->count;

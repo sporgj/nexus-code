@@ -47,10 +47,6 @@ struct attribute_term {
     struct nexus_uuid        uuid;
 };
 
-struct name_value_pair {
-    char name[ATTRIBUTE_NAME_MAX];
-    char * value;
-};
 
 
 struct policy_atom {
