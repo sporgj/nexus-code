@@ -95,24 +95,18 @@ policy_rule_datalog_string(struct policy_rule * rule)
 }
 
 int
-__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder, bool as_rule)
+__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder)
 {
     switch (perm_type) {
     case PERM_READ:
-        rs_cat(string_builder, "read");
+        rs_cat(string_builder, "read(u, o)");
         break;
     case PERM_WRITE:
-        rs_cat(string_builder, "write");
+        rs_cat(string_builder, "write(u, o)");
         break;
     default:
         log_error("invalid policy_rule type\n");
         return -1;
-    }
-
-    if (as_rule) {
-        rs_cat(string_builder, "(U, O)");
-    } else {
-        rs_cat(string_builder, "(u, o)");
     }
 
     return 0;
@@ -126,7 +120,7 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
         return -1;
     }
 
-    if (__permission_type_to_datalog(rule->perm_type, string_builder, true)) {
+    if (__permission_type_to_datalog(rule->perm_type, string_builder)) {
         log_error("__permission_type_to_datalog() FAILED\n");
         return -1;
     }
@@ -149,7 +143,7 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
                 rs_cat(string_builder, ", ");
             }
 
-            if (__policy_atom_to_str(atom, true, string_builder)) {
+            if (__policy_atom_to_str(atom, string_builder)) {
                 list_iterator_free(iter);
                 log_error("could not convert policy atom to string\n");
                 goto out_err;
@@ -161,18 +155,6 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
 
         list_iterator_free(iter);
     }
-
-    if ((rule->atom_types & ATOM_TYPE_ALL) != ATOM_TYPE_ALL) {
-        if ((rule->atom_types & ATOM_TYPE_USER) == 0) {
-            rs_cat(string_builder, ", _dummy(U)");
-        }
-
-        if ((rule->atom_types & ATOM_TYPE_OBJECT) == 0) {
-            rs_cat(string_builder, ", _dummy(O)");
-        }
-    }
-
-    rs_cat(string_builder, ".");
 
     return 0;
 

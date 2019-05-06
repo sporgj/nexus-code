@@ -86,14 +86,6 @@ __atom_argument_to_buffer(struct atom_argument * atom_arg, uint8_t * buffer, siz
     return (buffer + total_size);
 }
 
-static int
-__atom_argument_to_datalog(struct atom_argument * atom_arg,
-                           bool                   as_rule,
-                           rapidstring          * string_builder)
-{
-    return abac_value_as_datalog(atom_arg->abac_value, string_builder, as_rule);
-}
-
 char *
 atom_argument_string_val(const struct atom_argument * atom_arg)
 {
@@ -136,8 +128,29 @@ policy_atom_buf_size(struct policy_atom * atom)
     return sizeof(struct __policy_atom_buf) + atom->args_bufsize;
 }
 
+
 static int
-__stringify_boolean_atom(struct policy_atom * atom, bool as_rule, rapidstring * string_builder)
+__stringify_atom_argument(struct atom_argument * atom_arg, rapidstring * string_builder)
+{
+    char * string_value = abac_value_stringify(atom_arg->abac_value);
+
+    if (atom_arg->abac_value->type == ABAC_VALUE_STRING) {
+        rs_cat_n(string_builder, "\"", 1);
+    }
+
+    rs_cat(string_builder, string_value);
+
+    if (atom_arg->abac_value->type == ABAC_VALUE_STRING) {
+        rs_cat_n(string_builder, "\"", 1);
+    }
+
+    nexus_free(string_value);
+
+    return 0;
+}
+
+static int
+__stringify_boolean_atom(struct policy_atom * atom, rapidstring * string_builder)
 {
     struct atom_argument * atom_arg = NULL;
     int index = 0;
@@ -154,8 +167,8 @@ __stringify_boolean_atom(struct policy_atom * atom, bool as_rule, rapidstring * 
 restart:
     atom_arg = nexus_list_get(&atom->args_list, index);
 
-    if (__atom_argument_to_datalog(atom_arg, as_rule, string_builder)) {
-        log_error("__atom_argument_to_datalog() FAILED\n");
+    if (__stringify_atom_argument(atom_arg, string_builder)) {
+        log_error("__stringify_atom_argument() FAILED\n");
         return -1;
     }
 
@@ -171,15 +184,15 @@ restart:
 }
 
 static int
-__stringify_regular_atom(struct policy_atom * atom, bool as_rule, rapidstring * string_builder)
+__stringify_regular_atom(struct policy_atom * atom, rapidstring * string_builder)
 {
     rs_cat(string_builder, atom->predicate);
     rs_cat(string_builder, "(");
 
     if (atom->atom_type == ATOM_TYPE_USER) {
-        rs_cat(string_builder, "U");
+        rs_cat(string_builder, "u");
     } else if (atom->atom_type == ATOM_TYPE_OBJECT) {
-        rs_cat(string_builder, "O");
+        rs_cat(string_builder, "o");
     } else {
         log_error("atom type should be object or user\n");
         goto out_err;
@@ -195,8 +208,8 @@ __stringify_regular_atom(struct policy_atom * atom, bool as_rule, rapidstring * 
 
         rs_cat_n(string_builder, ", ", 2);
 
-        if (__atom_argument_to_datalog(atom_arg, as_rule, string_builder)) {
-            log_error("__atom_argument_to_datalog() FAILED\n");
+        if (__stringify_atom_argument(atom_arg, string_builder)) {
+            log_error("__stringify_atom_argument() FAILED\n");
             return -1;
         }
     }
@@ -209,14 +222,14 @@ out_err:
 }
 
 int
-__policy_atom_to_str(struct policy_atom * atom, bool as_rule, rapidstring * string_builder)
+__policy_atom_to_str(struct policy_atom * atom, rapidstring * string_builder)
 {
     if (atom->pred_type == PREDICATE_ATTR || atom->pred_type == PREDICATE_FUNC) {
-        if (__stringify_regular_atom(atom, as_rule, string_builder)) {
+        if (__stringify_regular_atom(atom, string_builder)) {
             return -1;
         }
     } else if (atom->pred_type == PREDICATE_BOOL) {
-        if (__stringify_boolean_atom(atom, as_rule, string_builder)) {
+        if (__stringify_boolean_atom(atom, string_builder)) {
             return -1;
         }
     } else {
@@ -228,7 +241,7 @@ __policy_atom_to_str(struct policy_atom * atom, bool as_rule, rapidstring * stri
 }
 
 char *
-policy_atom_to_str(struct policy_atom * atom, bool as_rule)
+policy_atom_to_str(struct policy_atom * atom)
 {
     char *      result_string = NULL;
     rapidstring string_builder;
@@ -236,7 +249,7 @@ policy_atom_to_str(struct policy_atom * atom, bool as_rule)
     // "10" is arbirtrary, it's my estimate for spacing and commas
     rs_init_w_cap(&string_builder, policy_atom_buf_size(atom) + 10);
 
-    if (__policy_atom_to_str(atom, as_rule, &string_builder)) {
+    if (__policy_atom_to_str(atom, &string_builder)) {
         log_error("__policy_atom_to_str() FAILED\n");
         rs_free(&string_builder);
         return NULL;

@@ -26,7 +26,7 @@ size_t
 policy_atom_buf_size(struct policy_atom * atom);
 
 char *
-policy_atom_to_str(struct policy_atom * atom, bool as_rule);
+policy_atom_to_str(struct policy_atom * atom);
 
 uint8_t *
 policy_atom_to_buf(struct policy_atom * atom, uint8_t * buffer, size_t buflen);
@@ -47,7 +47,7 @@ bool
 policy_atom_is_valid(struct policy_atom * atom);
 
 int
-__policy_atom_to_str(struct policy_atom * atom, bool as_rule, rapidstring * string_builder);
+__policy_atom_to_str(struct policy_atom * atom, rapidstring * string_builder);
 
 
 // converts what ever type stored in the argument to a string value

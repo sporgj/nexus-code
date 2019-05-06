@@ -69,6 +69,3 @@ abac_value_bufsize(struct abac_value * abac_value);
 
 char *
 abac_value_stringify(struct abac_value * abac_value);
-
-int
-abac_value_as_datalog(struct abac_value * abac_value, rapidstring * string_builder, bool as_rule);
