@@ -89,6 +89,11 @@ abac_refresh_bouncer_policy_store()
     struct nexus_metadata * new_metadata = NULL;
 
     if (old_metadata && !nexus_metadata_has_changed(old_metadata)) {
+        if (bouncer_update_policy_store(NULL, old_metadata->policy_store)) {
+            log_error("bouncer_update_policy_store() FAILED\n");
+            return NULL;
+        }
+
         return policy_store_metadata->policy_store;
     }
 

@@ -23,6 +23,9 @@ struct kb_entity {
     struct hashmap          uuid_facts; // facts indexed by uuid (rules and attributes)
     struct hashmap          name_facts;  // facts indexed by name (sys functions)
 
+    size_t                  uuid_facts_count;
+    size_t                  name_facts_count;
+
     bool                    is_fully_asserted;
 
     size_t                  attribute_table_generation;

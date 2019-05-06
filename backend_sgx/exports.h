@@ -78,6 +78,9 @@ sgx_backend_abac_policy_ls(struct nexus_volume * volume);
 int
 sgx_backend_abac_print_facts(struct nexus_volume * volume);
 
+int
+sgx_backend_abac_print_rules(struct nexus_volume * volume);
+
 
 // batch mode commands
 

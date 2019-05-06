@@ -353,6 +353,10 @@ UNSAFE_db_print_facts()
     struct list_head * curr = NULL;
     rapidstring string_builder;
 
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
     rs_init(&string_builder);
 
     // collect the overall stats
@@ -361,13 +365,13 @@ UNSAFE_db_print_facts()
 
         snprintf(tmp_buffer, sizeof(tmp_buffer), "%zu Facts", cached_facts_count);
         rs_cat(&string_builder, tmp_buffer);
+
         rs_cat(&string_builder, ", ");
 
         int lua_memory = lua_gc(my_database, LUA_GCCOUNT, 0);
 
         snprintf(tmp_buffer, sizeof(tmp_buffer), "%d Kb in LUA", lua_memory);
         rs_cat(&string_builder, tmp_buffer);
-        rs_cat(&string_builder, ", ");
     }
 
     rs_cat(&string_builder, "\n-----------\n");

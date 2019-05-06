@@ -759,11 +759,23 @@ handle_abac_policy_ls(int argc, char ** argv)
 
     return 0;
 }
+
 static int
 handle_abac_print_facts(int argc, char ** argv)
 {
     if (sgx_backend_abac_print_facts(mounted_volume)) {
         log_error("sgx_backend_abac_print_facts() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+handle_abac_print_rules(int argc, char ** argv)
+{
+    if (sgx_backend_abac_print_rules(mounted_volume)) {
+        log_error("sgx_backend_abac_print_rules() FAILED\n");
         return -1;
     }
 
@@ -924,6 +936,7 @@ static struct _cmd cmds[]
         { "abac_policy_ls", handle_abac_policy_ls, "List volume policies", "" },
 
         { "abac_print_facts", handle_abac_print_facts, "List current facts", "" },
+        { "abac_print_rules", handle_abac_print_rules, "List current rules", "" },
 
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };

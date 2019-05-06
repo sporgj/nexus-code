@@ -532,11 +532,15 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
         return 0;
     }
 
+    if (policy_store_entity->metadata_version == new_policystore->metadata->version) {
+        return 0;
+    }
+
     // insert the new rules
     {
         struct nexus_list_iterator * iter = list_iterator_new(&new_policystore->rules_list);
 
-        do {
+        while (list_iterator_is_valid(iter)) {
             struct policy_rule * rule = list_iterator_get(iter);
 
             // try inserting the rul
@@ -547,7 +551,7 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
             }
 
             list_iterator_next(iter);
-        } while (list_iterator_is_valid(iter));
+        }
 
         list_iterator_free(iter);
     }
@@ -574,5 +578,55 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
         }
     }
 
+    policy_store_entity->metadata_version = new_policystore->metadata->version;
+    policy_store_entity->is_fully_asserted = true;
+
     return 0;
+}
+
+
+int
+UNSAFE_bouncer_print_rules()
+{
+    rapidstring string_builder;
+
+    struct list_head * curr = NULL;
+
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
+
+    rs_init(&string_builder);
+
+    {
+        char tmp_buffer[64] = { 0 };
+
+        snprintf(tmp_buffer, sizeof(tmp_buffer), "%zu Rules", policy_store_entity->uuid_facts_count);
+        rs_cat(&string_builder, tmp_buffer);
+
+        rs_cat(&string_builder, "\n-----------\n");
+    }
+
+
+    list_for_each(curr, &policy_store_entity->uuid_facts_lru) {
+        struct kb_fact * cached_fact = __kb_fact_from_entity_list(curr);
+
+        if (__policy_rule_datalog_string(cached_fact->rule_ptr, &string_builder)) {
+            log_error("__policy_rule_datalog_string() FAILED\n");
+            goto out_err;
+        }
+
+        rs_cat_n(&string_builder, "\n", 1);
+    }
+
+    ocall_print(rs_data_c(&string_builder));
+
+    rs_free(&string_builder);
+
+    return 0;
+out_err:
+    rs_free(&string_builder);
+
+    return -1;
 }

@@ -151,6 +151,8 @@ kb_entity_put_uuid_fact(struct kb_entity  * entity,
 
     list_add_tail(&new_fact->entity_lru, &entity->uuid_facts_lru);
 
+    entity->uuid_facts_count += 1;
+
     new_fact->entity = entity;
     new_fact->is_uuid_fact = true;
 
@@ -167,6 +169,8 @@ kb_entity_put_name_fact(struct kb_entity * entity, char * name, const char * val
     hashmap_add(&entity->name_facts, &new_fact->hash_entry);
 
     new_fact->entity = entity;
+
+    entity->name_facts_count += 1;
 
     return new_fact;
 }
@@ -195,6 +199,8 @@ kb_entity_del_uuid_fact(struct kb_entity * entity, struct kb_fact * fact)
 
     fact->entity = NULL;
 
+    entity->uuid_facts_count -= 1;
+
     kb_fact_free(fact);
 
     return 0;
@@ -222,6 +228,8 @@ kb_entity_del_name_fact(struct kb_entity * entity, struct kb_fact * fact)
     __hashmap_remove_entry(&entity->uuid_facts, &fact->hash_entry);
 
     fact->entity = NULL;
+
+    entity->name_facts_count -= 1;
 
     kb_fact_free(fact);
 

@@ -534,3 +534,9 @@ ecall_abac_print_facts()
 {
     return UNSAFE_db_print_facts();
 }
+
+int
+ecall_abac_print_rules()
+{
+    return UNSAFE_bouncer_print_rules();
+}

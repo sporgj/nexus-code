@@ -100,5 +100,7 @@ enclave {
 
 
         public int ecall_abac_print_facts();
+
+        public int ecall_abac_print_rules();
     };
 };
