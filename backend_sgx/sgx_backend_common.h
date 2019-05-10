@@ -85,3 +85,13 @@ struct nxs_policy_rule {
     struct nexus_uuid rule_uuid;
     char              rule_str[0];
 };
+
+
+struct nxs_telemetry {
+    size_t     lua_memory_kilobytes;
+
+    size_t     total_allocated_bytes;
+
+    size_t     asserted_facts_count;
+    size_t     asserted_rules_count;
+};

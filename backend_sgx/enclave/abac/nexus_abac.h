@@ -62,6 +62,8 @@ struct policy_rule *
 parse_abac_policy(char * policy_string);
 
 
-// enforcer
 int
 UNSAFE_bouncer_print_rules();
+
+void
+abac_export_telemetry(struct nxs_telemetry * telemetry);

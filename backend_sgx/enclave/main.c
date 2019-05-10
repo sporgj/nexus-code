@@ -17,6 +17,32 @@ struct nexus_user   * global_user_struct        = NULL;
 sgx_spinlock_t        vfs_ops_lock              = SGX_SPINLOCK_INITIALIZER;
 
 
+
+// ============================================
+// --------------------------------------------
+// ============================================
+// Small hack for getting the memory usage from the enclave heap
+
+struct mallinfo {
+    int arena;     /* Non-mmapped space allocated (bytes) */
+    int ordblks;   /* Number of free chunks */
+    int smblks;    /* Number of free fastbin blocks */
+    int hblks;     /* Number of mmapped regions */
+    int hblkhd;    /* Space allocated in mmapped regions (bytes) */
+    int usmblks;   /* Maximum total allocated space (bytes) */
+    int fsmblks;   /* Space in freed fastbin blocks (bytes) */
+    int uordblks;  /* Total allocated space (bytes) */
+    int fordblks;  /* Total free space (bytes) */
+    int keepcost;  /* Top-most, releasable space (bytes) */
+};
+
+extern struct mallinfo dlmallinfo();
+
+// ============================================
+// --------------------------------------------
+// ============================================
+
+
 int
 ecall_init_enclave(struct nexus_volume  * volume,
                    struct nexus_heap    * heap)
@@ -45,6 +71,18 @@ ecall_init_enclave(struct nexus_volume  * volume,
 
         global_log2chunk_size = pow2 - 1;
     }
+
+    return 0;
+}
+
+int
+ecall_export_telemetry(struct nxs_telemetry * telemetry_out)
+{
+    abac_export_telemetry(telemetry_out);
+
+    struct mallinfo malloc_info = dlmallinfo();
+
+    telemetry_out->total_allocated_bytes = malloc_info.uordblks;
 
     return 0;
 }

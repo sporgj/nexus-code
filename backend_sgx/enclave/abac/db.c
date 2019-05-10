@@ -11,6 +11,7 @@ static dl_db_t my_database;
 static struct list_head cached_facts_list;
 static size_t           cached_facts_count;
 
+static size_t           cached_rules_count;
 
 int
 db_init()
@@ -232,6 +233,8 @@ db_assert_policy_rule(struct policy_rule * rule)
         goto out_err;
     }
 
+    cached_rules_count += 1;
+
     return 0;
 out_err:
     dl_reset(my_database, mark);
@@ -252,6 +255,8 @@ db_retract_policy_rule(struct policy_rule * rule)
         log_error("dl_retract() FAILED\n");
         goto out_err;
     }
+
+    cached_rules_count -= 1;
 
     return 0;
 out_err:
@@ -346,6 +351,18 @@ __db_push_literal(char              * predicate,
     return 0;
 }
 
+void
+db_export_telemetry(struct nxs_telemetry * telemetry)
+{
+    if (nexus_enclave_is_current_user_owner()) {
+        return;
+    }
+
+    telemetry->lua_memory_kilobytes = datalog_engine_lua_kilobytes(my_database);
+
+    telemetry->asserted_facts_count = cached_facts_count;
+    telemetry->asserted_rules_count = cached_rules_count;
+}
 
 int
 UNSAFE_db_print_facts()
@@ -359,22 +376,14 @@ UNSAFE_db_print_facts()
 
     rs_init(&string_builder);
 
-    // collect the overall stats
     {
-        char tmp_buffer[64] = { 0 };
+        char tmp_buffer[32] = { 0 };
 
         snprintf(tmp_buffer, sizeof(tmp_buffer), "%zu Facts", cached_facts_count);
         rs_cat(&string_builder, tmp_buffer);
 
-        rs_cat(&string_builder, ", ");
-
-        int lua_memory = lua_gc(my_database, LUA_GCCOUNT, 0);
-
-        snprintf(tmp_buffer, sizeof(tmp_buffer), "%d Kb in LUA", lua_memory);
-        rs_cat(&string_builder, tmp_buffer);
+        rs_cat(&string_builder, "\n-----------\n");
     }
-
-    rs_cat(&string_builder, "\n-----------\n");
 
     list_for_each(curr, &cached_facts_list) {
         struct kb_fact * cached_fact = __kb_fact_from_db_list(curr);
@@ -382,11 +391,13 @@ UNSAFE_db_print_facts()
         rs_cat(&string_builder, cached_fact->name);
         rs_cat_n(&string_builder, "(", 1);
         rs_cat(&string_builder, cached_fact->entity->uuid_str);
+
         if (cached_fact->value) {
-            rs_cat_n(&string_builder, ", ", 2);
+            rs_cat_n(&string_builder, ", \"", 3);
             rs_cat(&string_builder, cached_fact->value);
         }
-        rs_cat_n(&string_builder, ")\n", 2);
+
+        rs_cat_n(&string_builder, "\")\n", 3);
     }
 
     ocall_print(rs_data_c(&string_builder));

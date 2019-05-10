@@ -367,3 +367,52 @@ err:
 
     return -1;
 }
+
+
+// https://gist.github.com/dgoguerra/7194777
+static const char *
+humanSize(uint64_t bytes)
+{
+    char * suffix[] = { "B", "KB", "MB", "GB", "TB" };
+    char   length   = sizeof(suffix) / sizeof(suffix[0]);
+
+    int    i        = 0;
+    double dblBytes = bytes;
+
+    if (bytes > 1024) {
+        for (i = 0; (bytes / 1024) > 0 && i < length - 1; i++, bytes /= 1024)
+            dblBytes = bytes / 1024.0;
+    }
+
+    static char output[200];
+    sprintf(output, "%.02lf %s", dblBytes, suffix[i]);
+    return output;
+}
+
+int
+sgx_backend_print_telemetry(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    struct nxs_telemetry telemetry;
+
+    int ret = -1;
+    int err = ecall_export_telemetry(backend->enclave_id, &ret, &telemetry);
+
+    if (ret || err) {
+        log_error("ecall_export_telemetry() ret=%d, err=%d\n", ret, err);
+        return -1;
+    }
+
+    // perform the printing
+    {
+        printf("TELEMETRY INFO\n---\n");
+
+        printf("Allocated memory: %s\n", humanSize(telemetry.total_allocated_bytes));
+        printf("Lua memory: %zu KB\n", telemetry.lua_memory_kilobytes);
+        printf("Facts count: %zu\n", telemetry.asserted_facts_count);
+        printf("Rules count: %zu\n", telemetry.asserted_rules_count);
+    }
+
+    return 0;
+}

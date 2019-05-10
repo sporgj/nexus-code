@@ -76,6 +76,17 @@ __read_pubkey_file(char * pubkey_fpath, size_t * pubkey_len)
 }
 
 static int
+handle_telemetry(int argc, char ** argv)
+{
+    if (sgx_backend_print_telemetry(mounted_volume)) {
+        log_error("sgx_backend_print_telemetry() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
 handle_user_list(int argc, char ** argv)
 {
     return nexus_backend_user_list(mounted_volume);
@@ -937,6 +948,8 @@ static struct _cmd cmds[]
 
         { "abac_print_facts", handle_abac_print_facts, "List current facts", "" },
         { "abac_print_rules", handle_abac_print_rules, "List current rules", "" },
+
+        { "telemetry", handle_telemetry, "Prints Telemetry", "" },
 
         { "help", help, "Prints usage", "" },
         { 0, 0, 0, 0 } };

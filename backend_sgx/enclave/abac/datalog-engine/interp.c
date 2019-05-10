@@ -201,3 +201,10 @@ out_err:
     dl_reset(db, mark);
     return false;
 }
+
+
+size_t
+datalog_engine_lua_kilobytes(dl_db_t db)
+{
+    return (size_t)lua_gc(db, LUA_GCCOUNT, 0);
+}

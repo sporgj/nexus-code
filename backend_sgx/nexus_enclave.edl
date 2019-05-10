@@ -57,6 +57,11 @@ enclave {
             [user_check] struct nexus_key_buffer  * sealed_volkey_keybuf_out
         );
 
+        public int ecall_export_telemetry
+        (
+            [out] struct nxs_telemetry * telemetry
+        );
+
         // volume management
 
         /**

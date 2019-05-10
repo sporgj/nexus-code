@@ -13,3 +13,5 @@ datalog_engine_is_true(dl_db_t db,
                        char *  permission_str,
                        char *  user_uuid_str,
                        char *  obj_uuid_str);
+size_t
+datalog_engine_lua_kilobytes(dl_db_t db);

@@ -9,6 +9,9 @@
 #include <nexus_volume.h>
 
 int
+sgx_backend_print_telemetry(struct nexus_volume * volume);
+
+int
 sgx_backend_export_rootkey(char                * destination_path,
                            char                * other_instance_fpath,
                            struct nexus_volume * volume);

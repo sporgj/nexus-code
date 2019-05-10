@@ -9,6 +9,7 @@
 #include "./datalog-engine/engine.h"
 
 
+struct nxs_telemetry;
 
 typedef enum {
     DATALOG_VAR_TERM = 1,
@@ -69,5 +70,12 @@ __db_push_literal(char              * predicate,
 int
 __db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db);
 
+
+void
+db_export_lua_kilobytes(size_t * lua_kilobytes);
+
 int
 UNSAFE_db_print_facts();
+
+void
+db_export_telemetry(struct nxs_telemetry * telemetry);

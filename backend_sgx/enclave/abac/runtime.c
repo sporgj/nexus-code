@@ -390,3 +390,10 @@ abac_release_current_user_profile()
 {
     nexus_metadata_unlock(current_userprofile_metadata);
 }
+
+
+void
+abac_export_telemetry(struct nxs_telemetry * telemetry)
+{
+    db_export_telemetry(telemetry);
+}
