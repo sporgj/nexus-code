@@ -39,25 +39,13 @@ policy_rule_new(perm_type_t permission)
     return rule;
 }
 
-static perm_type_t
-__permission_from_string(char * permission_str)
-{
-    if (strncmp("read", permission_str, 20) == 0) {
-        return PERM_READ;
-    } else if (strncmp("write", permission_str, 20) == 0) {
-        return PERM_WRITE;
-    }
-
-    return 0;
-}
-
 struct policy_rule *
 policy_rule_new_from_perm_str(char * permission_str)
 {
-    perm_type_t perm = __permission_from_string(permission_str);
+    perm_type_t perm = perm_type_from_string(permission_str);
 
-    if (perm == 0) {
-        log_error("__permission_from_string() FAILED\n");
+    if (perm == PERM_UNK) {
+        log_error("perm_type_from_string() FAILED\n");
         return NULL;
     }
 
@@ -95,24 +83,6 @@ policy_rule_datalog_string(struct policy_rule * rule)
 }
 
 int
-__permission_type_to_datalog(perm_type_t perm_type, rapidstring * string_builder)
-{
-    switch (perm_type) {
-    case PERM_READ:
-        rs_cat(string_builder, "read(u, o)");
-        break;
-    case PERM_WRITE:
-        rs_cat(string_builder, "write(u, o)");
-        break;
-    default:
-        log_error("invalid policy_rule type\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-int
 __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_builder)
 {
     if (rule->atom_count < 1) {
@@ -120,12 +90,20 @@ __policy_rule_datalog_string(struct policy_rule * rule, rapidstring * string_bui
         return -1;
     }
 
-    if (__permission_type_to_datalog(rule->perm_type, string_builder)) {
-        log_error("__permission_type_to_datalog() FAILED\n");
-        return -1;
-    }
+    // print the head
+    {
+        char * permission_str = perm_type_to_string(rule->perm_type);
 
-    rs_cat(string_builder, " :- ");
+        if (permission_str == NULL) {
+            log_error("perm_type_to_string() FAILED\n");
+        }
+
+        rs_cat(string_builder, permission_str);
+
+        nexus_free(permission_str);
+
+        rs_cat(string_builder, "(u, o) :- ");
+    }
 
     {
         struct nexus_list_iterator * iter = list_iterator_new(&rule->atoms);

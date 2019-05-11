@@ -97,6 +97,7 @@ nexus_abac_objs := \
 	$(datalog_engine_objs) \
 	db.o \
 	fact.o \
+	perm.o \
 	bouncer.o \
 	value.o \
 	atom.o \

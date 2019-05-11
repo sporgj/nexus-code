@@ -285,6 +285,12 @@ attribute_store_add(struct attribute_store * attr_store, char * name, attribute_
         return -1;
     }
 
+    // make sure it's not a permission types
+    if (perm_type_from_string(name) != PERM_UNK) {
+        log_error("illegal attribute name specified (%s)\n", name);
+        return -1;
+    }
+
     nexus_uuid_gen(&uuid);
 
     __put_attribute(attr_store, name, &uuid, type);

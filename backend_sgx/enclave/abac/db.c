@@ -395,9 +395,10 @@ UNSAFE_db_print_facts()
         if (cached_fact->value) {
             rs_cat_n(&string_builder, ", \"", 3);
             rs_cat(&string_builder, cached_fact->value);
+            rs_cat_n(&string_builder, "\"", 1);
         }
 
-        rs_cat_n(&string_builder, "\")\n", 3);
+        rs_cat_n(&string_builder, ")\n", 2);
     }
 
     ocall_print(rs_data_c(&string_builder));

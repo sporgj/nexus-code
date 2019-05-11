@@ -16,8 +16,11 @@
 
 
 typedef enum {
-    PERM_READ = 0x01,
-    PERM_WRITE,
+    PERM_UNK                = -0x1,
+    PERM_READ               = 0x01,
+    PERM_WRITE              = 0x02,
+    PERM_CREATE             = 0x03,
+    PERM_DELETE             = 0x04,
 } perm_type_t;
 
 typedef enum {
@@ -97,15 +100,11 @@ atom_type_from_char(char c)
     return ATOM_TYPE_NONE;
 }
 
-static inline char *
-perm_type_to_string(perm_type_t perm_type)
-{
-    switch (perm_type) {
-    case PERM_READ:
-        return strndup("read", 5);
-    case PERM_WRITE:
-        return strndup("write", 6);
-    }
 
-    return NULL;
-}
+// perm.c
+
+perm_type_t
+perm_type_from_string(char * str);
+
+char *
+perm_type_to_string(perm_type_t perm_type);
