@@ -105,8 +105,13 @@ attribute_table_add(struct attribute_table * attribute_table,
             return 0;
         }
 
+        if (len == 0) {
+            memset(entry->attr_val, 0, ATTRIBUTE_VALUE_SIZE);
+        } else {
+            memcpy(entry->attr_val, value, len);
+        }
+
         entry->attr_val_len = len;
-        memcpy(entry->attr_val, value, len);
     } else {
         entry = __put_attr_entry(attribute_table, uuid, value, len);
     }

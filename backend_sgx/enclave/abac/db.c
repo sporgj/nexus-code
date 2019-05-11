@@ -267,6 +267,10 @@ out_err:
 int
 __db_push_term(char * term, datalog_term_type_t term_type, dl_db_t db)
 {
+    if (strnlen(term, ATTRIBUTE_VALUE_SIZE) == 0) {
+        return 0;
+    }
+
     if (dl_pushstring(db, term)) {
         log_error("dl_pushstring(`%s`) FAILED\n", term);
         return -1;
@@ -392,7 +396,7 @@ UNSAFE_db_print_facts()
         rs_cat_n(&string_builder, "(", 1);
         rs_cat(&string_builder, cached_fact->entity->uuid_str);
 
-        if (cached_fact->value) {
+        if (cached_fact->value && strnlen(cached_fact->value, ATTRIBUTE_VALUE_SIZE)) {
             rs_cat_n(&string_builder, ", \"", 3);
             rs_cat(&string_builder, cached_fact->value);
             rs_cat_n(&string_builder, "\"", 1);

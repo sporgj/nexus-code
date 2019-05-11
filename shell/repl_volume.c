@@ -571,14 +571,14 @@ handle_abac_user_grant(int argc, char ** argv)
 
     int ret = -1;
 
-    if (argc < 3) {
+    if (argc < 2) {
         usage("abac_user_grant");
         return -1;
     }
 
     username        = strndup(argv[0], 32);
     attribute_name  = strndup(argv[1], 32);
-    attribute_value = strndup(argv[2], 256);
+    attribute_value = strndup((argc > 2 ? argv[2] : ""), 256);
 
     ret = sgx_backend_abac_user_grant(username, attribute_name, attribute_value, mounted_volume);
 
@@ -644,14 +644,14 @@ handle_abac_object_grant(int argc, char ** argv)
 
     int ret = -1;
 
-    if (argc < 3) {
+    if (argc < 2) {
         usage("abac_object_grant");
         return -1;
     }
 
     path            = strndup(argv[0], 32);
     attribute_name  = strndup(argv[1], 32);
-    attribute_value = strndup(argv[2], 256);
+    attribute_value = strndup((argc > 2 ? argv[2] : ""), 256);
 
     ret = sgx_backend_abac_object_grant(path, attribute_name, attribute_value, mounted_volume);
 

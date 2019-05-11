@@ -722,7 +722,12 @@ __push_normal_atom_to_db(struct policy_atom * atom, dl_db_t db)
     }
 
 
-    second_variable_str = atom_argument_string_val(atom_arg);
+    // handle unary atom values
+    if (atom_arg) {
+        second_variable_str = atom_argument_string_val(atom_arg);
+    } else {
+        second_variable_str = strndup("", 2);
+    }
 
     if (__db_push_literal(atom->predicate,
                           atom_type_str,
