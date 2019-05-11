@@ -133,10 +133,15 @@ create_file_main(int argc, char ** argv);
 extern int
 repl_volume_main(int argc, char ** argv);
 
+int
+filler_volume_main(int argc, char ** argv);
+
+
 static struct nexus_cmd cmds[] = { { "init", init_main, "Initialize Nexus Environment" },
                                    { "create", create_volume_main, "Create a Nexus Volume" },
                                    { "delete", delete_volume_main, "Delete a Nexus Volume" },
                                    { "repl", repl_volume_main, "Shows the REPL command line" },
+                                   { "filler", filler_volume_main, "Prefills the volume line" },
                                    { "create_file", create_file_main, "Create a new file" },
                                    { "export_rootkey", export_rootkey_main, "Export the rootkey exchange message" },
                                    { "import_rootkey", import_rootkey_main, "Import the sealed rootkey into the config" },

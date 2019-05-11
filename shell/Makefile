@@ -16,7 +16,7 @@ else
 endif
 
 
-INCLUDES := -I../libnexus
+INCLUDES := -I../libnexus -I../
 CFLAGS = -g -W -Wall -Werror -D_GNU_SOURCE -Wno-nonnull -Wno-unused-parameter  -std=gnu11 $(INCLUDES)
 LDFLAGS +=  -Wl,--whole-archive
 
@@ -25,10 +25,11 @@ AR = ar
 
 
 exec_objs :=	main.o \
+		filler.o \
 		create_volume.o \
 		delete_volume.o \
 		repl_volume.o \
-		fs.o \
+		fs.o
 
 
 execs := nexus_shell
@@ -44,7 +45,7 @@ build = \
         fi
 
 
-all: nexus_shell
+all: $(execs)
 
 % : %.c
 	$(call build,CC,$(CC) $(CFLAGS) $< -o $@)
