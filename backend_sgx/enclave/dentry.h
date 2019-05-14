@@ -83,8 +83,20 @@ dentry_revalidate(struct nexus_dentry * dentry, nexus_io_flags_t flags);
 struct nexus_dentry *
 dentry_lookup(struct path_walker * walker);
 
+struct nexus_dentry *
+dentry_create_tmp(struct nexus_dentry * parent_dentry,
+                  struct nexus_uuid   * uuid,
+                  const char          * name,
+                  nexus_dirent_type_t   type);
+
+void
+dentry_delete_tmp(struct nexus_dentry * dentry);
+
 void
 dentry_delete(struct nexus_dentry * dentry);
+
+struct nexus_dentry *
+dentry_get_child(struct nexus_dentry * parent_dentry, const char * child_filename);
 
 /**
  * @param parent_dentry

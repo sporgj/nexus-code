@@ -48,6 +48,31 @@ d_free(struct nexus_dentry * dentry)
     nexus_free(dentry);
 }
 
+struct nexus_dentry *
+dentry_create_tmp(struct nexus_dentry * parent_dentry,
+                  struct nexus_uuid   * uuid,
+                  const char          * name,
+                  nexus_dirent_type_t   type)
+{
+    struct nexus_dentry * dentry = d_alloc(NULL, uuid, name, type);
+
+    nexus_metadata_type_t tmp_metadata_type = (type == NEXUS_DIR ? NEXUS_DIRNODE : NEXUS_FILENODE);
+
+    dentry->metadata = nexus_metadata_create(uuid, tmp_metadata_type);
+
+    dentry->parent = dentry_get(parent_dentry);
+
+    return dentry;
+}
+
+void
+dentry_delete_tmp(struct nexus_dentry * dentry)
+{
+    dentry_put(dentry->parent);
+    nexus_metadata_free(dentry->metadata);
+    d_free(dentry);
+}
+
 void
 dcache_init_root()
 {
@@ -202,6 +227,12 @@ dentry_delete(struct nexus_dentry * dentry)
 
     // move it to the pruned list, will be collected later
     list_add(&dentry->siblings, &dcache_pruned_dentries);
+}
+
+struct nexus_dentry *
+dentry_get_child(struct nexus_dentry * parent_dentry, const char * child_filename)
+{
+    return d_lookup(parent_dentry, child_filename);
 }
 
 void

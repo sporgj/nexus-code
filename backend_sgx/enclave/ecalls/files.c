@@ -16,6 +16,11 @@ ecall_fs_truncate(char * filepath_IN, size_t size, struct nexus_stat * stat_out)
         return -1;
     }
 
+    // ACCESS CONTROL
+    if (!bouncer_access_check(metadata, PERM_WRITE)) {
+        log_error("ACCESS DENIED\n");
+        nexus_vfs_put(metadata);
+    }
 
     // TODO check access control
     filenode_set_filesize(metadata->filenode, size);
@@ -49,6 +54,8 @@ __nxs_file_crypto_start(char              * filepath_IN,
 
     nexus_io_flags_t io_mode = (crypto_mode == NEXUS_ENCRYPT) ? NEXUS_FRDWR : NEXUS_FREAD;
 
+    perm_type_t permission = (io_mode == NEXUS_FREAD ? PERM_READ : PERM_WRITE);
+
     int xfer_id = -1;
 
 
@@ -63,6 +70,11 @@ __nxs_file_crypto_start(char              * filepath_IN,
         return -1;
     }
 
+    // ACCESS CONTROL
+    if (!bouncer_access_check(metadata, permission)) {
+        log_error("ACCESS DENIED\n");
+        goto out_err;
+    }
 
     if (crypto_mode == NEXUS_ENCRYPT && filenode_set_filesize(metadata->filenode, filesize)) {
         log_error("filenode_set_filesize(%zu) FAILED\n", filesize);

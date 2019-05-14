@@ -9,6 +9,32 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
 {
     nexus_uuid_gen(entry_uuid);
 
+    // perform the access check
+    {
+        struct nexus_dentry * parent_dentry = metadata_get_dentry(parent_dirnode->metadata);
+        struct nexus_dentry * tmp_dentry    = NULL;
+
+        if (parent_dentry == NULL) {
+            log_error("could not get parent dentry from dirnode\n");
+            return -1;
+        }
+
+        tmp_dentry = dentry_create_tmp(parent_dentry, entry_uuid, filename_IN, type_IN);
+
+        if (tmp_dentry == NULL) {
+            log_error("dentry_create_tmp() FAILED\n");
+            return -1;
+        }
+
+        if (!bouncer_access_check(tmp_dentry->metadata, PERM_CREATE)) {
+            log_error("ACCESS DENIED\n");
+            dentry_delete_tmp(tmp_dentry);
+            return -1;
+        }
+
+        dentry_delete_tmp(tmp_dentry);
+    }
+
     if (buffer_layer_new(entry_uuid)) {
         log_error("buffer_layer_new() FAILED\n");
         return -1;
@@ -44,11 +70,6 @@ ecall_fs_create(char                * dirpath_IN,
         log_error("could not get metadata\n");
         sgx_spin_unlock(&vfs_ops_lock);
         return -1;
-    }
-
-    if (!bouncer_access_check(metadata, PERM_WRITE)) {
-        log_error("you are not allowed\n");
-        goto out;
     }
 
     // perform the create operation
@@ -133,6 +154,48 @@ __nxs_fs_remove(struct nexus_metadata  * metadata,
     tmp_uuid = &direntry->dir_rec.link_uuid;
     tmp_type = direntry->dir_rec.type;
 
+    // access control
+    {
+        struct nexus_dentry * parent_dentry = metadata_get_dentry(metadata);
+        struct nexus_dentry * child_dentry  = NULL;
+
+        if (parent_dentry == NULL) {
+            log_error("could not get parent dentry from dirnode\n");
+            return -1;
+        }
+
+        // let's used the saved child dentry
+        child_dentry = dentry_get_child(parent_dentry, filename_IN);
+
+        if (child_dentry) {
+            if (bouncer_access_check(child_dentry->metadata, PERM_DELETE)) {
+                goto perform_removal;
+            } else {
+                log_error("ACCESS DENIED\n");
+                return -1;
+            }
+        } else {
+            // if the metadata is not on the tree...
+            struct nexus_dentry * tmp_dentry = NULL;
+
+            tmp_dentry = dentry_create_tmp(parent_dentry, tmp_uuid, filename_IN, tmp_type);
+
+            if (tmp_dentry == NULL) {
+                log_error("dentry_create_tmp() FAILED\n");
+                return -1;
+            }
+
+            if (!bouncer_access_check(tmp_dentry->metadata, PERM_DELETE)) {
+                log_error("ACCESS DENIED\n");
+                dentry_delete_tmp(tmp_dentry);
+                return -1;
+            }
+
+            dentry_delete_tmp(tmp_dentry);
+        }
+    }
+
+perform_removal:
     *should_remove = true;
 
     if (tmp_type == NEXUS_REG) {
@@ -234,6 +297,11 @@ ecall_fs_lookup(char * dirpath_IN, char * filename_IN, struct nexus_fs_lookup * 
         log_error("could not get metadata\n");
         sgx_spin_unlock(&vfs_ops_lock);
         return -1;
+    }
+
+    if (!bouncer_access_check(metadata, PERM_READ)) {
+        log_error("ACCESS DENIED\n");
+        goto out;
     }
 
     ret = __nxs_fs_lookup(metadata->dirnode, filename_IN, lookup_out);
@@ -356,6 +424,11 @@ ecall_fs_readdir(char                * dirpath_IN,
     if (metadata == NULL) {
         log_error("could not get metadata\n");
         sgx_spin_unlock(&vfs_ops_lock);
+        return -1;
+    }
+
+    if (!bouncer_access_check(metadata, PERM_READ)) {
+        log_error("ACCESS DENIED\n");
         return -1;
     }
 
