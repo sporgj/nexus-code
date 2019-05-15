@@ -56,6 +56,7 @@ __register_fact(struct kb_entity * entity,
 
     if (cached_fact->is_inserted) {
         if (strncmp(cached_fact->value, value, ATTRIBUTE_VALUE_SIZE) == 0) {
+            db_reaffirm_fact(cached_fact);
             goto out_success;
         }
 

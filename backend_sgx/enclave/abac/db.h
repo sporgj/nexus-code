@@ -34,6 +34,10 @@ db_retract_fact(struct kb_fact * cached_fact);
 int
 db_assert_fact(struct kb_fact * cached_fact);
 
+// moves the asserted cached fact to the front of both db & entity lists
+void
+db_reaffirm_fact(struct kb_fact * cached_fact);
+
 // return's true if the entity type is already inserted
 int
 db_assert_kb_entity_type(struct kb_entity * entity);

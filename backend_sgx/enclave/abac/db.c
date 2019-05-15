@@ -211,6 +211,17 @@ out_err:
     return -1;
 }
 
+void
+db_reaffirm_fact(struct kb_fact * cached_fact)
+{
+    if (!cached_fact->is_inserted) {
+        return;
+    }
+
+    kb_fact_warm_up(cached_fact);
+    list_move(&cached_fact->db_list, &cached_facts_list);
+}
+
 int
 db_assert_policy_rule(struct policy_rule * rule)
 {
