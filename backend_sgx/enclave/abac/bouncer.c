@@ -51,6 +51,7 @@ __register_fact(struct kb_entity * entity,
                 size_t             generation)
 {
     if (cached_fact->generation == generation) {
+        db_reaffirm_fact(cached_fact);
         return 0;
     }
 
