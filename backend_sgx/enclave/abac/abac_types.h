@@ -5,6 +5,7 @@
 #include "../libnexus_trusted/nexus_uuid.h"
 #include "../libnexus_trusted/nexus_list.h"
 
+#include "../libnexus_trusted/hashmap.h"
 #include "../libnexus_trusted/offsetof.h"
 
 #define ATTRIBUTE_NAME_MAX      (32)
@@ -44,6 +45,7 @@ typedef enum {
 } attribute_type_t;
 
 struct attribute_schema {
+    struct hashmap_entry     hash_entry;
     struct list_head         list_entry;
     attribute_type_t         type;
     char                     name[ATTRIBUTE_NAME_MAX];

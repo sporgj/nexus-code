@@ -16,6 +16,7 @@ struct attribute_store {
 
     struct nexus_mac         mac;
 
+    struct hashmap           map_attribute_schemas; // lookup by uuid
     struct list_head         list_attribute_schemas;
 
     struct nexus_metadata  * metadata;

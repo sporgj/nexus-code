@@ -53,18 +53,12 @@ __find_attribute_schema_by_name(struct attribute_store * attribute_store, char *
 static struct attribute_schema *
 __find_attribute_schema_by_uuid(struct attribute_store * attribute_store, struct nexus_uuid * uuid)
 {
-    struct list_head * curr = NULL;
+    struct attribute_schema tmp_schema;
 
-    list_for_each(curr, &attribute_store->list_attribute_schemas)
-    {
-        struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
+    hashmap_entry_init(&tmp_schema.hash_entry, memhash(uuid, sizeof(struct nexus_uuid)));
+    nexus_uuid_copy(uuid, &tmp_schema.uuid);
 
-        if (nexus_uuid_compare(&schema->uuid, uuid) == 0) {
-            return schema;
-        }
-    }
-
-    return NULL;
+    return hashmap_get(&attribute_store->map_attribute_schemas, &tmp_schema, NULL);
 }
 
 static struct attribute_schema *
@@ -79,6 +73,9 @@ __put_attribute(struct attribute_store * attribute_store,
     strncpy(schema->name, name, ATTRIBUTE_NAME_MAX);
     schema->type = type;
 
+    hashmap_entry_init(&schema->hash_entry, memhash(&schema->uuid, sizeof(struct nexus_uuid)));
+    hashmap_add(&attribute_store->map_attribute_schemas, &schema->hash_entry);
+
     list_add_tail(&schema->list_entry, &attribute_store->list_attribute_schemas);
     attribute_store->count += 1;
 
@@ -88,6 +85,7 @@ __put_attribute(struct attribute_store * attribute_store,
 static void
 __del_attribute(struct attribute_store * attribute_store, struct attribute_schema * schema)
 {
+    __hashmap_remove_entry(&attribute_store->map_attribute_schemas, &schema->hash_entry);
     list_del(&schema->list_entry);
     attribute_store->count -= 1;
 
@@ -96,6 +94,15 @@ __del_attribute(struct attribute_store * attribute_store, struct attribute_schem
 
 
 // -- creating/destroying
+
+static int
+__uuid_hashmap_cmp(const void                    * data,
+                   const struct attribute_schema * entry1,
+                   const struct attribute_schema * entry2,
+                   const void                    * keydata)
+{
+    return nexus_uuid_compare(&entry1->uuid, &entry2->uuid);
+}
 
 struct attribute_store *
 attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
@@ -106,6 +113,9 @@ attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
     nexus_uuid_copy(root_uuid, &attribute_store->root_uuid);
 
     INIT_LIST_HEAD(&attribute_store->list_attribute_schemas);
+
+    hashmap_init(
+        &attribute_store->map_attribute_schemas, (hashmap_cmp_fn)__uuid_hashmap_cmp, NULL, 0);
 
     return attribute_store;
 }
@@ -123,6 +133,8 @@ attribute_store_free(struct attribute_store * attr_store)
         list_del(&schema->list_entry);
         nexus_free(schema);
     }
+
+    hashmap_free(&attr_store->map_attribute_schemas, 0);
 
     nexus_free(attr_store);
 }
