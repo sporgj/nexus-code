@@ -168,6 +168,8 @@ kb_entity_put_name_fact(struct kb_entity * entity, char * name, const char * val
 
     hashmap_add(&entity->name_facts, &new_fact->hash_entry);
 
+    list_add_tail(&new_fact->entity_lru, &entity->name_facts_lru);
+
     new_fact->entity = entity;
 
     entity->name_facts_count += 1;
@@ -201,6 +203,8 @@ kb_entity_del_uuid_fact(struct kb_entity * entity, struct kb_fact * fact)
 
     entity->uuid_facts_count -= 1;
 
+    list_del(&fact->entity_lru);
+
     kb_fact_free(fact);
 
     return 0;
@@ -231,6 +235,8 @@ kb_entity_del_name_fact(struct kb_entity * entity, struct kb_fact * fact)
 
     entity->name_facts_count -= 1;
 
+    list_del(&fact->entity_lru);
+
     kb_fact_free(fact);
 
     return 0;
@@ -239,21 +245,40 @@ kb_entity_del_name_fact(struct kb_entity * entity, struct kb_fact * fact)
 bool
 kb_entity_needs_refresh(struct kb_entity * entity, struct nexus_metadata * metadata)
 {
-    if (entity->metadata_version != metadata->version) {
-        return true;
-    }
-
-    if (!entity->is_fully_asserted) {
+    if (!kb_entity_is_fully_asserted(entity) || (entity->metadata_version != metadata->version)) {
         return true;
     }
 
     return false;
 }
 
+bool
+kb_entity_is_fully_asserted(struct kb_entity * entity)
+{
+    struct kb_fact * coldest_fact = NULL;
+
+    if (entity->name_facts_count) {
+        coldest_fact = list_last_entry(&entity->name_facts_lru, struct kb_fact, entity_lru);
+
+        if (!coldest_fact->is_inserted) {
+            return false;
+        }
+    }
+
+    if (entity->uuid_facts_count) {
+        coldest_fact = list_last_entry(&entity->uuid_facts_lru, struct kb_fact, entity_lru);
+
+        if (!coldest_fact->is_inserted) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void
 kb_entity_assert_fully(struct kb_entity * entity, struct nexus_metadata * metadata)
 {
-    entity->is_fully_asserted = true;
     entity->metadata_version  = metadata->version;
 }
 
@@ -261,20 +286,29 @@ kb_entity_assert_fully(struct kb_entity * entity, struct nexus_metadata * metada
 void
 kb_fact_warm_up(struct kb_fact * fact)
 {
-    if (!fact->is_uuid_fact || !fact->entity) {
+    if (!fact->entity) {
         return;
     }
 
-    list_move(&fact->entity_lru, &fact->entity->uuid_facts_lru);
+    if (fact->is_uuid_fact) {
+        list_move(&fact->entity_lru, &fact->entity->uuid_facts_lru);
+    } else {
+        list_move(&fact->entity_lru, &fact->entity->name_facts_lru);
+    }
 }
 
 void
 kb_fact_cool_down(struct kb_fact * fact)
 {
-    if (!fact->is_uuid_fact || !fact->entity) {
+    if (!fact->entity) {
         return;
     }
 
     list_del_init(&fact->entity_lru);
-    list_add_tail(&fact->entity_lru, &fact->entity->uuid_facts_lru);
+
+    if (fact->is_uuid_fact) {
+        list_add_tail(&fact->entity_lru, &fact->entity->uuid_facts_lru);
+    } else {
+        list_add_tail(&fact->entity_lru, &fact->entity->name_facts_lru);
+    }
 }

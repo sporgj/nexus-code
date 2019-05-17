@@ -6,6 +6,9 @@
 #include <libnexus_trusted/rapidstring.h>
 
 
+#define MAX_CACHED_FACTS     (50)
+
+
 static dl_db_t my_database;
 
 static struct list_head cached_facts_list;
@@ -62,22 +65,22 @@ db_ask_permission(perm_type_t        perm_type,
 int
 db_assert_kb_entity_type(struct kb_entity * entity)
 {
-    char * entity_type_str = NULL;
-
     if (entity->type_fact && entity->type_fact->is_inserted) {
         return 0;
     }
 
-    if (entity->attr_type == USER_ATTRIBUTE_TYPE) {
-        entity_type_str = "_isUser";
-    } else if (entity->attr_type == OBJECT_ATTRIBUTE_TYPE) {
-        entity_type_str = "_isObject";
-    } else {
-        log_error("unsupported attribute type\n");
-        return -1;
-    }
-
     if (entity->type_fact == NULL) {
+        char * entity_type_str = NULL;
+
+        if (entity->attr_type == USER_ATTRIBUTE_TYPE) {
+            entity_type_str = "_isUser";
+        } else if (entity->attr_type == OBJECT_ATTRIBUTE_TYPE) {
+            entity_type_str = "_isObject";
+        } else {
+            log_error("unsupported attribute type\n");
+            return -1;
+        }
+
         entity->type_fact = kb_entity_put_name_fact(entity, entity_type_str, NULL);
     }
 
@@ -92,11 +95,10 @@ db_assert_kb_entity_type(struct kb_entity * entity)
 int
 db_retract_kb_entity_type(struct kb_entity * entity)
 {
-    if (entity->type_fact == NULL) {
+    if (entity->type_fact == NULL || !entity->type_fact->is_inserted) {
         return 0;
     }
 
-    // we just retract it later
     if (db_retract_fact(entity->type_fact)) {
         log_error("could not retract `%s` entity type\n", entity->uuid_str);
         return -1;
@@ -172,10 +174,38 @@ out_err:
     return -1;
 }
 
+
+static int
+__make_space()
+{
+    if (cached_facts_count < MAX_CACHED_FACTS) {
+        return 0;
+    }
+
+    struct kb_fact * asserted_fact = NULL;
+
+    asserted_fact = list_last_entry(&cached_facts_list, struct kb_fact, db_list);
+
+    if (db_retract_fact(asserted_fact)) {
+        log_error("could not retract fact\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
 int
 db_assert_fact(struct kb_fact * cached_fact)
 {
-    int mark = dl_mark(my_database);
+    int mark = -1;
+
+    if (__make_space()) {
+        log_error("could not make space for the new fact\n");
+        return -1;
+    }
+
+    mark = dl_mark(my_database);
 
     if (__insert_db_fact(my_database,
                          cached_fact->name,

@@ -186,14 +186,17 @@ __insert_attribute_table(struct abac_request   * abac_req,
 
         if (cached_fact == NULL) {
             cached_fact = __new_attribute_fact(abac_req, entity, attr_entry);
+
+            if (cached_fact == NULL) {
+                // XXX: could be a deleted schema. report here?
+                continue;
+            }
         }
 
         if (__register_fact(entity, cached_fact, attr_entry->attr_val, attr_table->generation)) {
             log_error("__register_fact() FAILED\n");
             return -1;
         }
-
-        cached_fact->generation = attr_table->generation;
     }
 
     // TODO retract the facts that are not suppose to be in the database
@@ -233,10 +236,6 @@ __abac_request_insert_facts(struct abac_request   * abac_req,
                             struct nexus_metadata * metadata,
                             struct nexus_list     * sys_functions)
 {
-    if (!kb_entity_needs_refresh(entity, metadata)) {
-        return 0;
-    }
-
     // insert the type
     if (db_assert_kb_entity_type(entity)) {
         log_error("db_assert_kb_entity_type() FAILED\n");
@@ -518,8 +517,8 @@ out_success:
     cached_fact->rule_ptr   = rule;
     cached_fact->generation = policy_store->metadata->version;
 
-    // move it to the front
-    list_move(&cached_fact->entity_lru, &policy_store_entity->uuid_facts_lru);
+    kb_fact_warm_up(cached_fact);
+
     return 0;
 
 out_err:
@@ -534,7 +533,8 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
         return 0;
     }
 
-    if (policy_store_entity->metadata_version == new_policystore->metadata->version) {
+    if (!kb_entity_needs_refresh(policy_store_entity, new_policystore->metadata)) {
+        // XXX: when switching to filtered rules, remember to check the count of uuid facts
         return 0;
     }
 
@@ -545,7 +545,6 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
         while (list_iterator_is_valid(iter)) {
             struct policy_rule * rule = list_iterator_get(iter);
 
-            // try inserting the rul
             if (__insert_policy_rule(new_policystore, rule)) {
                 log_error("__insert_policy_rule() FAILED\n");
                 list_iterator_free(iter);
@@ -580,8 +579,7 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
         }
     }
 
-    policy_store_entity->metadata_version = new_policystore->metadata->version;
-    policy_store_entity->is_fully_asserted = true;
+    kb_entity_assert_fully(policy_store_entity, new_policystore->metadata);
 
     return 0;
 }

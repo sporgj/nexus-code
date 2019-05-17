@@ -26,12 +26,11 @@ struct kb_entity {
     size_t                  uuid_facts_count;
     size_t                  name_facts_count;
 
-    bool                    is_fully_asserted;
-
     size_t                  attribute_table_generation;
     size_t                  metadata_version;
 
     struct list_head        uuid_facts_lru;
+    struct list_head        name_facts_lru;
 };
 
 struct kb_fact {
@@ -62,6 +61,11 @@ kb_entity_new(struct nexus_uuid * uuid, attribute_type_t attribute_type);
 
 void
 kb_entity_free(struct kb_entity * entity);
+
+// returns true if all its facts are inside the database
+// will also return true if the entity has no facts
+bool
+kb_entity_is_fully_asserted(struct kb_entity * entity);
 
 struct kb_fact *
 kb_entity_put_uuid_fact(struct kb_entity  * entity,
