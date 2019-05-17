@@ -22,6 +22,8 @@ struct attribute_table {
 
     size_t                  generation;
 
+    struct mac_and_version  attribute_store_macversion;
+
     struct hashmap          attribute_map;
 };
 

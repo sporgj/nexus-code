@@ -6,8 +6,6 @@
 struct __user_profile_hdr {
     struct nexus_uuid      my_uuid;
     struct nexus_uuid      root_uuid;
-
-    __mac_and_version_bytes_t attribute_store_macversion_bytes;
 } __attribute__((packed));
 
 
@@ -68,9 +66,6 @@ user_profile_from_buffer(uint8_t * buffer, size_t buflen)
 
         nexus_uuid_copy(&header->root_uuid, &user_profile->root_uuid);
         nexus_uuid_copy(&header->my_uuid, &user_profile->my_uuid);
-
-        __mac_and_version_from_buf(&user_profile->attribute_store_macversion,
-                                   (uint8_t *)&header->attribute_store_macversion_bytes);
     }
 
     buffer += sizeof(struct __user_profile_hdr);
@@ -126,8 +121,6 @@ __user_profile_serialize(struct user_profile     * user_profile,
 
          nexus_uuid_copy(&user_profile->my_uuid, &header->my_uuid);
          nexus_uuid_copy(&user_profile->root_uuid, &header->root_uuid);
-         __mac_and_version_to_buf(&user_profile->attribute_store_macversion,
-                                  (uint8_t *)&header->attribute_store_macversion_bytes);
     }
 
     buffer += sizeof(struct __user_profile_hdr);
@@ -154,12 +147,6 @@ user_profile_store(struct user_profile * user_profile, uint32_t version, struct 
 
     size_t serialized_buflen = __get_user_profile_size(user_profile);
 
-
-    // update the mac version
-    if (abac_global_export_macversion(&user_profile->attribute_store_macversion)) {
-        log_error("could not export mac version\n");
-        return -1;
-    }
 
     crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &user_profile->my_uuid);
 

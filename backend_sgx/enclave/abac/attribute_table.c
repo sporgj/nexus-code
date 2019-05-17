@@ -6,6 +6,8 @@
 struct __attr_table_hdr {
     size_t                  count;
     size_t                  generation;
+
+    __mac_and_version_bytes_t attribute_store_macversion_bytes;
 } __attribute__((packed));
 
 
@@ -175,6 +177,9 @@ __parse_attribute_table_hdr(struct attribute_table * attribute_table, uint8_t * 
     attribute_table->count = header->count;
     attribute_table->generation = header->generation;
 
+    __mac_and_version_from_buf(&attribute_table->attribute_store_macversion,
+                               (uint8_t *)&header->attribute_store_macversion_bytes);
+
     return buffer + sizeof(struct __attr_table_hdr);
 }
 
@@ -247,6 +252,9 @@ __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t *
     dest_header->count = attribute_table->count;
     dest_header->generation = attribute_table->generation;
 
+    __mac_and_version_to_buf(&attribute_table->attribute_store_macversion,
+                             (uint8_t *)&dest_header->attribute_store_macversion_bytes);
+
     return buffer + sizeof(struct __attr_table_hdr);
 }
 
@@ -271,6 +279,12 @@ attribute_table_store(struct attribute_table * attribute_table, uint8_t * buffer
 
     if (buflen < total_len) {
         log_error("attribute_table buffer too small. (got=%zu, min=%zu)\n", buflen, total_len);
+        return -1;
+    }
+
+    // update the mac version
+    if (abac_global_export_macversion(&attribute_table->attribute_store_macversion)) {
+        log_error("could not export mac version\n");
         return -1;
     }
 

@@ -15,8 +15,6 @@ struct user_profile {
 
     size_t                          attribute_count;
 
-    struct mac_and_version          attribute_store_macversion;
-
     struct nexus_mac                mac;
 
     struct attribute_table        * attribute_table;
