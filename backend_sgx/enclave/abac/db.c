@@ -160,7 +160,7 @@ db_retract_fact(struct kb_fact * cached_fact)
         goto out_err;
     }
 
-    cached_fact->is_inserted = true;
+    cached_fact->is_inserted = false;
 
     kb_fact_cool_down(cached_fact);
 
@@ -176,22 +176,31 @@ out_err:
 
 
 static int
-__make_space()
+__make_space(struct kb_fact * fact)
 {
     if (cached_facts_count < MAX_CACHED_FACTS) {
         return 0;
     }
 
-    struct kb_fact * asserted_fact = NULL;
+    struct list_head * curr = NULL;
+    struct list_head * next = NULL;
 
-    asserted_fact = list_last_entry(&cached_facts_list, struct kb_fact, db_list);
+    list_for_each_prev_safe(curr, next, &cached_facts_list) {
+        struct kb_fact * asserted_fact = list_last_entry(curr, struct kb_fact, db_list);
 
-    if (db_retract_fact(asserted_fact)) {
-        log_error("could not retract fact\n");
-        return -1;
+        if (asserted_fact->entity == fact->entity) {
+            continue;
+        }
+
+        if (db_retract_fact(asserted_fact)) {
+            log_error("could not retract fact\n");
+            return -1;
+        } else {
+            return 0;
+        }
     }
 
-    return 0;
+    return -1;
 }
 
 
@@ -200,7 +209,12 @@ db_assert_fact(struct kb_fact * cached_fact)
 {
     int mark = -1;
 
-    if (__make_space()) {
+    if (cached_fact->is_inserted) {
+        nexus_printf("WARNING: tring to add indeserted fact\n");
+        return 0;
+    }
+
+    if (__make_space(cached_fact)) {
         log_error("could not make space for the new fact\n");
         return -1;
     }
