@@ -68,14 +68,14 @@ struct nxs_user_buffer {
 };
 
 
-struct nxs_attribute_term {
-    char    term_str[NXS_ATTRIBUTE_NAME_MAX];
+struct nxs_attribute_schema {
+    char    schema_str[NXS_ATTRIBUTE_NAME_MAX];
     char    type_str[10]; // "user"|"object"
 } __attribute__((packed));
 
 
 struct nxs_attribute_pair {
-    char    term_str[NXS_ATTRIBUTE_NAME_MAX];
+    char    schema_str[NXS_ATTRIBUTE_NAME_MAX];
     char    val_str[NXS_ATTRIBUTE_VALUE_MAX];
 };
 

@@ -24,74 +24,74 @@ __get_attribute_store_size(struct attribute_store * attribute_store)
            + (attribute_store->count * sizeof(struct __attr_store_entry));
 }
 
-static inline struct attribute_term *
-__attribute_term_from_list_entry(struct list_head * entry)
+static inline struct attribute_schema *
+__attribute_schema_from_list_entry(struct list_head * entry)
 {
-    return (struct attribute_term *) container_of(entry, struct attribute_term, list_entry);
+    return (struct attribute_schema *) container_of(entry, struct attribute_schema, list_entry);
 }
 
-static struct attribute_term *
-__find_attribute_term_by_name(struct attribute_store * attribute_store, char * name)
+static struct attribute_schema *
+__find_attribute_schema_by_name(struct attribute_store * attribute_store, char * name)
 {
     struct list_head * curr = NULL;
 
     size_t len = strnlen(name, ATTRIBUTE_NAME_MAX);
 
-    list_for_each(curr, &attribute_store->list_attribute_terms)
+    list_for_each(curr, &attribute_store->list_attribute_schemas)
     {
-        struct attribute_term * term = __attribute_term_from_list_entry(curr);
+        struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
-        if ((len == strnlen(term->name, ATTRIBUTE_NAME_MAX))
-            && (memcmp(name, term->name, len) == 0)) {
-            return term;
+        if ((len == strnlen(schema->name, ATTRIBUTE_NAME_MAX))
+            && (memcmp(name, schema->name, len) == 0)) {
+            return schema;
         }
     }
 
     return NULL;
 }
 
-static struct attribute_term *
-__find_attribute_term_by_uuid(struct attribute_store * attribute_store, struct nexus_uuid * uuid)
+static struct attribute_schema *
+__find_attribute_schema_by_uuid(struct attribute_store * attribute_store, struct nexus_uuid * uuid)
 {
     struct list_head * curr = NULL;
 
-    list_for_each(curr, &attribute_store->list_attribute_terms)
+    list_for_each(curr, &attribute_store->list_attribute_schemas)
     {
-        struct attribute_term * term = __attribute_term_from_list_entry(curr);
+        struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
-        if (nexus_uuid_compare(&term->uuid, uuid) == 0) {
-            return term;
+        if (nexus_uuid_compare(&schema->uuid, uuid) == 0) {
+            return schema;
         }
     }
 
     return NULL;
 }
 
-static struct attribute_term *
+static struct attribute_schema *
 __put_attribute(struct attribute_store * attribute_store,
                 char *                   name,
                 struct nexus_uuid *      uuid,
                 attribute_type_t         type)
 {
-    struct attribute_term * term = nexus_malloc(sizeof(struct attribute_term));
+    struct attribute_schema * schema = nexus_malloc(sizeof(struct attribute_schema));
 
-    nexus_uuid_copy(uuid, &term->uuid);
-    strncpy(term->name, name, ATTRIBUTE_NAME_MAX);
-    term->type = type;
+    nexus_uuid_copy(uuid, &schema->uuid);
+    strncpy(schema->name, name, ATTRIBUTE_NAME_MAX);
+    schema->type = type;
 
-    list_add_tail(&term->list_entry, &attribute_store->list_attribute_terms);
+    list_add_tail(&schema->list_entry, &attribute_store->list_attribute_schemas);
     attribute_store->count += 1;
 
-    return term;
+    return schema;
 }
 
 static void
-__del_attribute(struct attribute_store * attribute_store, struct attribute_term * term)
+__del_attribute(struct attribute_store * attribute_store, struct attribute_schema * schema)
 {
-    list_del(&term->list_entry);
+    list_del(&schema->list_entry);
     attribute_store->count -= 1;
 
-    nexus_free(term);
+    nexus_free(schema);
 }
 
 
@@ -105,7 +105,7 @@ attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
     nexus_uuid_copy(uuid, &attribute_store->my_uuid);
     nexus_uuid_copy(root_uuid, &attribute_store->root_uuid);
 
-    INIT_LIST_HEAD(&attribute_store->list_attribute_terms);
+    INIT_LIST_HEAD(&attribute_store->list_attribute_schemas);
 
     return attribute_store;
 }
@@ -116,12 +116,12 @@ attribute_store_free(struct attribute_store * attr_store)
     struct list_head * curr = NULL;
     struct list_head * next = NULL;
 
-    list_for_each_safe(curr, next, &attr_store->list_attribute_terms)
+    list_for_each_safe(curr, next, &attr_store->list_attribute_schemas)
     {
-        struct attribute_term * term = __attribute_term_from_list_entry(curr);
+        struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
-        list_del(&term->list_entry);
-        nexus_free(term);
+        list_del(&schema->list_entry);
+        nexus_free(schema);
     }
 
     nexus_free(attr_store);
@@ -200,13 +200,13 @@ attribute_store_serialize(struct attribute_store * attribute_store, uint8_t * bu
     // now serialize the entries
     out_entry = (struct __attr_store_entry *)(buffer + sizeof(struct __attr_store_hdr));
 
-    list_for_each(curr, &attribute_store->list_attribute_terms)
+    list_for_each(curr, &attribute_store->list_attribute_schemas)
     {
-        struct attribute_term * term = __attribute_term_from_list_entry(curr);
+        struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
-        nexus_uuid_copy(&term->uuid, &out_entry->uuid);
-        out_entry->type = term->type;
-        memcpy(out_entry->name, term->name, ATTRIBUTE_NAME_MAX);
+        nexus_uuid_copy(&schema->uuid, &out_entry->uuid);
+        out_entry->type = schema->type;
+        memcpy(out_entry->name, schema->name, ATTRIBUTE_NAME_MAX);
 
         out_entry += 1;
     }
@@ -272,11 +272,11 @@ __attribute_store_set_dirty(struct attribute_store * attribute_store)
 int
 attribute_store_add(struct attribute_store * attr_store, char * name, attribute_type_t type)
 {
-    struct attribute_term * term = __find_attribute_term_by_name(attr_store, name);
+    struct attribute_schema * schema = __find_attribute_schema_by_name(attr_store, name);
 
     struct nexus_uuid uuid;
 
-    if (term != NULL) {
+    if (schema != NULL) {
         return -1;
     }
 
@@ -303,29 +303,29 @@ attribute_store_add(struct attribute_store * attr_store, char * name, attribute_
 int
 attribute_store_del(struct attribute_store * attr_store, char * name)
 {
-    struct attribute_term * term = __find_attribute_term_by_name(attr_store, name);
+    struct attribute_schema * schema = __find_attribute_schema_by_name(attr_store, name);
 
-    if (term == NULL) {
+    if (schema == NULL) {
         return -1;
     }
 
-    __del_attribute(attr_store, term);
+    __del_attribute(attr_store, schema);
 
     __attribute_store_set_dirty(attr_store);
 
     return 0;
 }
 
-const struct attribute_term *
+const struct attribute_schema *
 attribute_store_find_uuid(struct attribute_store * attr_store, struct nexus_uuid * uuid)
 {
-    return __find_attribute_term_by_uuid(attr_store, uuid);
+    return __find_attribute_schema_by_uuid(attr_store, uuid);
 }
 
-const struct attribute_term *
+const struct attribute_schema *
 attribute_store_find_name(struct attribute_store * attr_store, char * name)
 {
-    return __find_attribute_term_by_name(attr_store, name);
+    return __find_attribute_schema_by_name(attr_store, name);
 }
 
 void
@@ -336,36 +336,37 @@ attribute_store_export_macversion(struct attribute_store * attr_store,
 }
 
 int
-UNSAFE_attribute_store_export_terms(struct attribute_store    * attr_store,
-                                    struct nxs_attribute_term * attribute_term_array_out,
-                                    size_t                      attribute_term_array_capacity,
-                                    size_t                      offset,
-                                    size_t                    * total_count_out,
-                                    size_t                    * result_count_out)
+UNSAFE_attribute_store_export(struct attribute_store      * attr_store,
+                              struct nxs_attribute_schema * attribute_schema_array_out,
+                              size_t                        attribute_schema_array_capacity,
+                              size_t                        offset,
+                              size_t                      * total_count_out,
+                              size_t                      * result_count_out)
 {
     struct list_head * curr = NULL;
 
-    struct nxs_attribute_term * out_attribute_term = attribute_term_array_out;
+    struct nxs_attribute_schema * out_attribute_schema = attribute_schema_array_out;
 
     size_t copied = 0;
 
 
-    list_for_each(curr, &attr_store->list_attribute_terms)
+    list_for_each(curr, &attr_store->list_attribute_schemas)
     {
         if (offset) {
             offset -= 1;
             continue;
         }
 
-        struct attribute_term * term = __attribute_term_from_list_entry(curr);
+        struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
-        strncpy(out_attribute_term->term_str, term->name, ATTRIBUTE_NAME_MAX);
-        attribute_type_to_str(term->type, out_attribute_term->type_str, sizeof(out_attribute_term->type_str));
+        strncpy(out_attribute_schema->schema_str, schema->name, ATTRIBUTE_NAME_MAX);
+        attribute_type_to_str(
+            schema->type, out_attribute_schema->type_str, sizeof(out_attribute_schema->type_str));
 
-        out_attribute_term += 1;
+        out_attribute_schema += 1;
         copied += 1;
 
-        if (copied == attribute_term_array_capacity) {
+        if (copied == attribute_schema_array_capacity) {
             break;
         }
     }

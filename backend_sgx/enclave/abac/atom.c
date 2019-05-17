@@ -436,7 +436,7 @@ policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
 static bool
 __check_attribute(char * attribute_name, atom_type_t atom_type, struct nexus_uuid * uuid_optional)
 {
-    const struct attribute_term * term             = NULL;
+    const struct attribute_schema * term             = NULL;
     struct attribute_store      * global_attrstore = abac_acquire_attribute_store(NEXUS_FREAD);
 
     if (global_attrstore == NULL) {

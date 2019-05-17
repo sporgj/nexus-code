@@ -43,7 +43,7 @@ typedef enum {
     OBJECT_ATTRIBUTE_TYPE
 } attribute_type_t;
 
-struct attribute_term {
+struct attribute_schema {
     struct list_head         list_entry;
     attribute_type_t         type;
     char                     name[ATTRIBUTE_NAME_MAX];

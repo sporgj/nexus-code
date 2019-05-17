@@ -69,8 +69,8 @@ err:
 }
 
 int
-ecall_abac_attribute_ls(struct nxs_attribute_term * attribute_term_array_out,
-                        size_t                      attribute_term_array_capacity,
+ecall_abac_attribute_ls(struct nxs_attribute_schema * attribute_schema_array_out,
+                        size_t                      attribute_schema_array_capacity,
                         size_t                      offset,
                         size_t                    * total_count_out,
                         size_t                    * result_count_out)
@@ -83,12 +83,12 @@ ecall_abac_attribute_ls(struct nxs_attribute_term * attribute_term_array_out,
         return -1;
     }
 
-    if (UNSAFE_attribute_store_export_terms(attribute_store,
-                                            attribute_term_array_out,
-                                            attribute_term_array_capacity,
-                                            offset,
-                                            total_count_out,
-                                            result_count_out)) {
+    if (UNSAFE_attribute_store_export(attribute_store,
+                                      attribute_schema_array_out,
+                                      attribute_schema_array_capacity,
+                                      offset,
+                                      total_count_out,
+                                      result_count_out)) {
         log_error("UNSAFE_attribute_store_export_terms FAILED\n");
         goto err;
     }
@@ -190,7 +190,7 @@ static int
 __do_object_attribute_grant(struct nexus_metadata * metadata, char * name, char * value)
 {
     struct attribute_table * attribute_table = NULL;
-    struct attribute_term  * attribute_term  = NULL;
+    struct attribute_schema  * attribute_schema  = NULL;
     struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
 
     if (attribute_store == NULL) {
@@ -198,15 +198,15 @@ __do_object_attribute_grant(struct nexus_metadata * metadata, char * name, char 
         return -1;
     }
 
-    attribute_term = (struct attribute_term *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
 
-    if (attribute_term == NULL) {
+    if (attribute_schema == NULL) {
         log_error("could not find object attribute (%s) in store\n", name);
         return -1;
     }
 
-    if (attribute_term->type != OBJECT_ATTRIBUTE_TYPE) {
-        log_error("incorrect attribute type for (%s)\n", attribute_term->name);
+    if (attribute_schema->type != OBJECT_ATTRIBUTE_TYPE) {
+        log_error("incorrect attribute type for (%s)\n", attribute_schema->name);
         return -1;
     }
 
@@ -219,7 +219,7 @@ __do_object_attribute_grant(struct nexus_metadata * metadata, char * name, char 
         return -1;
     }
 
-    if (attribute_table_add(attribute_table, &attribute_term->uuid, value)) {
+    if (attribute_table_add(attribute_table, &attribute_schema->uuid, value)) {
         log_error("attribute_table_add() FAILED\n");
         return -1;
     }
@@ -271,7 +271,7 @@ static int
 __do_object_attribute_revoke(struct nexus_metadata * metadata, char * name)
 {
     struct attribute_table * attribute_table = NULL;
-    struct attribute_term  * attribute_term  = NULL;
+    struct attribute_schema  * attribute_schema  = NULL;
     struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
 
     if (attribute_store == NULL) {
@@ -279,15 +279,15 @@ __do_object_attribute_revoke(struct nexus_metadata * metadata, char * name)
         return -1;
     }
 
-    attribute_term = (struct attribute_term *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
 
-    if (attribute_term == NULL) {
+    if (attribute_schema == NULL) {
         log_error("could not find object attribute (%s) in store\n", name);
         return -1;
     }
 
-    if (attribute_term->type != OBJECT_ATTRIBUTE_TYPE) {
-        log_error("incorrect attribute type for (%s)\n", attribute_term->name);
+    if (attribute_schema->type != OBJECT_ATTRIBUTE_TYPE) {
+        log_error("incorrect attribute type for (%s)\n", attribute_schema->name);
         return -1;
     }
 
@@ -300,7 +300,7 @@ __do_object_attribute_revoke(struct nexus_metadata * metadata, char * name)
         return -1;
     }
 
-    if (attribute_table_del(attribute_table, &attribute_term->uuid)) {
+    if (attribute_table_del(attribute_table, &attribute_schema->uuid)) {
         log_error("attribute_table_del() FAILED\n");
         return -1;
     }

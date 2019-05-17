@@ -140,18 +140,18 @@ __new_attribute_fact(struct abac_request    * abac_req,
                      struct kb_entity       * entity,
                      struct attribute_entry * attr_entry)
 {
-    const struct attribute_term * attr_term;
+    const struct attribute_schema * schema;
 
-    attr_term = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
+    schema = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
 
-    if (attr_term == NULL) {
+    if (schema == NULL) {
         // TODO maybe report here?
         return NULL;
     }
 
     return kb_entity_put_uuid_fact(entity,
                                    &attr_entry->attr_uuid,
-                                   (char *)attr_term->name,
+                                   (char *)schema->name, // FIXME (const usage)
                                    attr_entry->attr_val);
 }
 

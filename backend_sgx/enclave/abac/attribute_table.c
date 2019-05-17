@@ -312,7 +312,7 @@ attribute_table_export_facts(struct attribute_table * attribute_table,
                              rapidstring            * string_builder,
                              size_t                 * p_skip_count)
 {
-    const struct attribute_term * attr_term;
+    const struct attribute_schema * attr_term;
 
     struct hashmap_iter iter;
 
@@ -360,7 +360,7 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
 
     struct nxs_attribute_pair * output_pair_ptr = attribute_pair_array;
 
-    struct attribute_term * tmp_attribute_term = NULL;
+    struct attribute_schema * tmp_attribute_schema = NULL;
 
     size_t copied = 0;
 
@@ -380,14 +380,14 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
         }
 
         // copy out the attribute pair
-        tmp_attribute_term = attribute_store_find_uuid(attribute_store, &attr_entry->attr_uuid);
+        tmp_attribute_schema = attribute_store_find_uuid(attribute_store, &attr_entry->attr_uuid);
 
-        if (tmp_attribute_term) {
+        if (tmp_attribute_schema) {
             // then copy its name into the pair
-            strncpy(output_pair_ptr->term_str, tmp_attribute_term->name, NXS_ATTRIBUTE_NAME_MAX);
+            strncpy(output_pair_ptr->schema_str, tmp_attribute_schema->name, NXS_ATTRIBUTE_NAME_MAX);
         } else {
             // XXX: temporaray
-            strncpy(output_pair_ptr->term_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
+            strncpy(output_pair_ptr->schema_str, "XXX", NXS_ATTRIBUTE_NAME_MAX);
         }
 
         strncpy(output_pair_ptr->val_str, attr_entry->attr_val, NXS_ATTRIBUTE_VALUE_MAX);

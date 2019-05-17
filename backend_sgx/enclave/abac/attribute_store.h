@@ -16,7 +16,7 @@ struct attribute_store {
 
     struct nexus_mac         mac;
 
-    struct list_head         list_attribute_terms;
+    struct list_head         list_attribute_schemas;
 
     struct nexus_metadata  * metadata;
 };
@@ -29,10 +29,10 @@ void
 attribute_store_free(struct attribute_store * attr_store);
 
 
-const struct attribute_term *
+const struct attribute_schema *
 attribute_store_find_uuid(struct attribute_store * attr_store, struct nexus_uuid * uuid);
 
-const struct attribute_term *
+const struct attribute_schema *
 attribute_store_find_name(struct attribute_store * attr_store, char * name);
 
 void
@@ -56,10 +56,10 @@ int
 attribute_store_store(struct attribute_store * attr_store, size_t version, struct nexus_mac * mac);
 
 int
-UNSAFE_attribute_store_export_terms(struct attribute_store    * attr_store,
-                                    struct nxs_attribute_term * attribute_term_array_out,
-                                    size_t                      attribute_term_array_capacity,
-                                    size_t                      offset,
-                                    size_t                    * total_count_out,
-                                    size_t                    * result_count_out);
+UNSAFE_attribute_store_export(struct attribute_store      * attr_store,
+                              struct nxs_attribute_schema * attribute_schema_array_out,
+                              size_t                        attribute_schema_array_capacity,
+                              size_t                        offset,
+                              size_t                      * total_count_out,
+                              size_t                      * result_count_out);
 

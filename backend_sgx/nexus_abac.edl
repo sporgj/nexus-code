@@ -20,11 +20,11 @@ enclave {
         /** Lists the attributes defined in the volume */
         public int ecall_abac_attribute_ls
         (
-            [user_check] struct nxs_attribute_term * attribute_array_out,
-                         size_t                      attribute_array_capacity,
-                         size_t                      offset,
-            [user_check] size_t                    * total_count_out,
-            [user_check] size_t                    * result_count_out
+            [user_check] struct nxs_attribute_schema * attribute_array_out,
+                         size_t                        attribute_array_capacity,
+                         size_t                        offset,
+            [user_check] size_t                      * total_count_out,
+            [user_check] size_t                      * result_count_out
         );
 
 

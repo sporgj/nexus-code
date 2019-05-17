@@ -180,7 +180,7 @@ out_err:
 int
 user_profile_grant_attribute(struct user_profile * user_profile, char * name, char * value)
 {
-    struct attribute_term * attribute_term = NULL;
+    struct attribute_schema * attribute_schema = NULL;
 
     struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
 
@@ -189,19 +189,19 @@ user_profile_grant_attribute(struct user_profile * user_profile, char * name, ch
         return -1;
     }
 
-    attribute_term = (struct attribute_term *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
 
-    if (attribute_term == NULL) {
+    if (attribute_schema == NULL) {
         log_error("could not find attribute (%s) in store\n", name);
         return -1;
     }
 
-    if (attribute_term->type != USER_ATTRIBUTE_TYPE) {
-        log_error("attribute type for (%s) is not user\n", attribute_term->name);
+    if (attribute_schema->type != USER_ATTRIBUTE_TYPE) {
+        log_error("attribute type for (%s) is not user\n", attribute_schema->name);
         return -1;
     }
 
-    if (attribute_table_add(user_profile->attribute_table, &attribute_term->uuid, value)) {
+    if (attribute_table_add(user_profile->attribute_table, &attribute_schema->uuid, value)) {
         log_error("attribute_table_add() FAILED\n");
         return -1;
     }
@@ -214,7 +214,7 @@ user_profile_grant_attribute(struct user_profile * user_profile, char * name, ch
 int
 user_profile_revoke_attribute(struct user_profile * user_profile, char * name)
 {
-    struct attribute_term * attribute_term = NULL;
+    struct attribute_schema * attribute_schema = NULL;
 
     struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
 
@@ -223,14 +223,14 @@ user_profile_revoke_attribute(struct user_profile * user_profile, char * name)
         return -1;
     }
 
-    attribute_term = (struct attribute_term *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
 
-    if (attribute_term == NULL) {
+    if (attribute_schema == NULL) {
         log_error("could not find attribute (%s) in store\n", name);
         return -1;
     }
 
-    if (attribute_table_del(user_profile->attribute_table, &attribute_term->uuid)) {
+    if (attribute_table_del(user_profile->attribute_table, &attribute_schema->uuid)) {
         log_error("attribute_table_del() FAILED\n");
         return -1;
     }
