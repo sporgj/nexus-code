@@ -25,6 +25,13 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
 
     global_supernode = supernode;
 
+    // this has to be created first (dirnode->attribute_table requires an attribute_space)
+    if (abac_runtime_create(&supernode->abac_superinfo)) {
+        ret = -1;
+        log_error("abac_runtime_create() FAILED\n");
+        goto out;
+    }
+
     // root dirnode
     {
         ret = -1;
@@ -89,12 +96,6 @@ nx_create_volume(char * user_pubkey, struct nexus_uuid * supernode_uuid_out)
         }
 
         nexus_usertable_free(usertable);
-    }
-
-    if (abac_runtime_create(&supernode->abac_superinfo)) {
-        ret = -1;
-        log_error("abac_runtime_create() FAILED\n");
-        goto out;
     }
 
     // creates the supernode & its accompanying usertable

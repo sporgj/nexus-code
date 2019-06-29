@@ -14,7 +14,7 @@
 #include <libnexus_trusted/rapidstring.h>
 
 
-struct attribute_store;
+struct attribute_space;
 
 struct attribute_table {
     struct nexus_uuid       uuid;
@@ -22,7 +22,7 @@ struct attribute_table {
 
     size_t                  generation;
 
-    struct mac_and_version  attribute_store_macversion;
+    struct mac_and_version  attribute_space_macversion;
 
     struct hashmap          attribute_map;
 };
@@ -65,14 +65,14 @@ attribute_table_find(struct attribute_table * attribute_table, struct nexus_uuid
 /// exports all the attribute pairs as datalog facts
 int
 attribute_table_export_facts(struct attribute_table * attribute_table,
-                             struct attribute_store * attribute_store,
+                             struct attribute_space * attribute_space,
                              char                   * first_term,
                              rapidstring            * string_builder,
                              size_t                 * p_skip_count);
 
 int
 attribute_table_export_to_datalog_db(struct attribute_table * attribute_table,
-                                     struct attribute_store * attribute_store,
+                                     struct attribute_space * attribute_space,
                                      struct nexus_uuid      * object_uuid,
                                      rapidstring            * string_builder,
                                      size_t                 * p_skip_count);
@@ -81,7 +81,7 @@ attribute_table_export_to_datalog_db(struct attribute_table * attribute_table,
 // writes all the attribute pairs stored in the table
 int
 UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
-                          struct attribute_store    * attribute_store,
+                          struct attribute_space    * attribute_space,
                           struct nxs_attribute_pair * attribute_pair_array,
                           size_t                      attribute_pair_capacity,
                           size_t                      offset,

@@ -54,7 +54,7 @@ struct nexus_metadata {
 
         struct nexus_usertable   * user_table;
 
-        struct attribute_store   * attribute_store;
+        struct attribute_space   * attribute_space;
         struct policy_store      * policy_store;
         struct user_profile      * user_profile;
 

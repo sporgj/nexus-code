@@ -8,7 +8,7 @@
 #include "abac_types.h"
 #include "abac_internal.h"
 
-struct attribute_store {
+struct attribute_space {
     struct nexus_uuid        my_uuid;
     struct nexus_uuid        root_uuid;
 
@@ -23,41 +23,41 @@ struct attribute_store {
 };
 
 
-struct attribute_store *
-attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid);
+struct attribute_space *
+attribute_space_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid);
 
 void
-attribute_store_free(struct attribute_store * attr_store);
+attribute_space_free(struct attribute_space * attr_space);
 
 
 const struct attribute_schema *
-attribute_store_find_uuid(struct attribute_store * attr_store, struct nexus_uuid * uuid);
+attribute_space_find_uuid(struct attribute_space * attr_space, struct nexus_uuid * uuid);
 
 const struct attribute_schema *
-attribute_store_find_name(struct attribute_store * attr_store, char * name);
+attribute_space_find_name(struct attribute_space * attr_space, char * name);
 
 void
-attribute_store_export_macversion(struct attribute_store * attr_store,
+attribute_space_export_macversion(struct attribute_space * attr_space,
                                   struct mac_and_version * macversion);
 
 int
-attribute_store_add(struct attribute_store * attr_store, char * name, attribute_type_t type);
+attribute_space_add(struct attribute_space * attr_space, char * name, attribute_type_t type);
 
 int
-attribute_store_del(struct attribute_store * attr_store, char * name);
+attribute_space_del(struct attribute_space * attr_space, char * name);
 
 
-struct attribute_store *
-attribute_store_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer);
+struct attribute_space *
+attribute_space_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer);
 
-struct attribute_store *
-attribute_store_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
-
-int
-attribute_store_store(struct attribute_store * attr_store, size_t version, struct nexus_mac * mac);
+struct attribute_space *
+attribute_space_load(struct nexus_uuid * uuid, nexus_io_flags_t flags);
 
 int
-UNSAFE_attribute_store_export(struct attribute_store      * attr_store,
+attribute_space_store(struct attribute_space * attr_space, size_t version, struct nexus_mac * mac);
+
+int
+UNSAFE_attribute_space_export(struct attribute_space      * attr_space,
                               struct nxs_attribute_schema * attribute_schema_array_out,
                               size_t                        attribute_schema_array_capacity,
                               size_t                        offset,

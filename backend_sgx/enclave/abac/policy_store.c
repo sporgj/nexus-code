@@ -7,7 +7,7 @@ struct __policy_store_hdr {
     struct nexus_uuid   my_uuid;
     struct nexus_uuid   root_uuid;
 
-    __mac_and_version_bytes_t attribute_store_macversion_bytes;
+    __mac_and_version_bytes_t attribute_space_macversion_bytes;
 
     uint32_t            rules_count;
 } __attribute__((packed));
@@ -136,8 +136,8 @@ __policy_store_parse(uint8_t * buffer, size_t buflen)
     // parse the header (rules_count is below)
     policy_store = policy_store_create(&header->root_uuid, &header->my_uuid);
 
-    __mac_and_version_from_buf(&policy_store->attribute_store_macversion,
-                               (uint8_t *)&header->attribute_store_macversion_bytes);
+    __mac_and_version_from_buf(&policy_store->attribute_space_macversion,
+                               (uint8_t *)&header->attribute_space_macversion_bytes);
 
 
     buffer += sizeof(struct __policy_store_hdr);
@@ -237,8 +237,8 @@ __policy_store_serialize(struct policy_store     * policy_store,
 
          header->rules_count = policy_store->rules_count;
 
-         __mac_and_version_to_buf(&policy_store->attribute_store_macversion,
-                                  (uint8_t *)&header->attribute_store_macversion_bytes);
+         __mac_and_version_to_buf(&policy_store->attribute_space_macversion,
+                                  (uint8_t *)&header->attribute_space_macversion_bytes);
     }
 
     buffer += sizeof(struct __policy_store_hdr);
@@ -267,7 +267,7 @@ policy_store_store(struct policy_store * policy_store, uint32_t version, struct 
 
 
     // update the mac version
-    if (abac_global_export_macversion(&policy_store->attribute_store_macversion)) {
+    if (abac_global_export_macversion(&policy_store->attribute_space_macversion)) {
         log_error("could not export mac version\n");
         return -1;
     }
@@ -332,32 +332,30 @@ __export_policy_rule(struct policy_rule * policy_rule, uint8_t * buffer, size_t 
 
     char * policy_string = policy_rule_datalog_string(policy_rule);
 
-    size_t total_len = 0;
+    size_t policy_len = 0;
+    size_t total_len  = 0;
 
     if (policy_string == NULL) {
         log_error("could not export policy string\n");
         return NULL;
     }
 
-    total_len = strnlen(policy_string, NEXUS_POLICY_MAXLEN) + sizeof(struct nxs_policy_rule) + 1;
+    policy_len = strnlen(policy_string, NEXUS_POLICY_MAXLEN);
+    total_len = policy_len + sizeof(struct nxs_policy_rule) + 1;
 
     if (total_len > buflen) {
-        log_error("export buffer is too small. rule_size=%zu, buflen=%zu\n", total_len, buflen);
-        goto out_err;
+        nexus_free(policy_string);
+        return buffer;
     }
 
     // perform the export
     nexus_uuid_copy(&policy_rule->rule_uuid, &exported_rule->rule_uuid);
-    strncpy(exported_rule->rule_str, policy_string, NEXUS_POLICY_MAXLEN);
+    strncpy(exported_rule->rule_str, policy_string, policy_len);
     exported_rule->total_len = total_len;
 
     nexus_free(policy_string);
 
     return (buffer + total_len);
-out_err:
-    nexus_free(policy_string);
-
-    return NULL;
 }
 
 int
@@ -393,6 +391,11 @@ policy_store_ls(struct policy_store * policy_store,
             goto out_err;
         }
 
+        // if it has not moved, we need to stop here
+        if (next_outptr == output_bufptr) {
+            goto out_success;
+        }
+
         output_buflen -= (next_outptr - output_bufptr);
         output_bufptr = next_outptr;
 
@@ -402,6 +405,7 @@ skip:
     } while(list_iterator_is_valid(iter));
 
 
+out_success:
     *result_count = count;
     *total_count  = policy_store->rules_count;
 

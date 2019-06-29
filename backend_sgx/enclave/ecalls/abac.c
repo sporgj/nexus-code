@@ -1,6 +1,6 @@
 #include "../enclave_internal.h"
 
-#include "../abac/attribute_store.h"
+#include "../abac/attribute_space.h"
 #include "../abac/policy_store.h"
 #include "../abac/db.h"
 
@@ -8,12 +8,12 @@
 int
 ecall_abac_attribute_add(char * attribute_name_IN, char * attribute_type_str_IN)
 {
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FRDWR);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FRDWR);
 
     attribute_type_t attribute_type;
 
-    if (attribute_store == NULL) {
-        log_error("abac_acquire_attribute_store() FAILED\n");
+    if (attribute_space == NULL) {
+        log_error("abac_acquire_attribute_space() FAILED\n");
         return -1;
     }
 
@@ -24,19 +24,19 @@ ecall_abac_attribute_add(char * attribute_name_IN, char * attribute_type_str_IN)
         goto err;
     }
 
-    if (attribute_store_add(attribute_store, attribute_name_IN, attribute_type)) {
+    if (attribute_space_add(attribute_space, attribute_name_IN, attribute_type)) {
         log_error("could not add attribute: `%s`\n", attribute_name_IN);
         goto err;
     }
 
-    if (abac_flush_attribute_store()) {
-        log_error("abac_flush_attribute_store() FAILED\n");
+    if (abac_flush_attribute_space()) {
+        log_error("abac_flush_attribute_space() FAILED\n");
         return -1;
     }
 
     return 0;
 err:
-    abac_release_attribute_store();
+    abac_release_attribute_space();
 
     return -1;
 }
@@ -44,26 +44,26 @@ err:
 int
 ecall_abac_attribute_del(char * attribute_name_IN)
 {
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FRDWR);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FRDWR);
 
-    if (attribute_store == NULL) {
-        log_error("abac_acquire_attribute_store() FAILED\n");
+    if (attribute_space == NULL) {
+        log_error("abac_acquire_attribute_space() FAILED\n");
         return -1;
     }
 
-    if (attribute_store_del(attribute_store, attribute_name_IN)) {
+    if (attribute_space_del(attribute_space, attribute_name_IN)) {
         log_error("could not delete attribute: `%s`\n", attribute_name_IN);
         goto err;
     }
 
-    if (abac_flush_attribute_store()) {
-        log_error("abac_flush_attribute_store() FAILED\n");
+    if (abac_flush_attribute_space()) {
+        log_error("abac_flush_attribute_space() FAILED\n");
         return -1;
     }
 
     return 0;
 err:
-    abac_release_attribute_store();
+    abac_release_attribute_space();
 
     return -1;
 }
@@ -76,28 +76,28 @@ ecall_abac_attribute_ls(struct nxs_attribute_schema * attribute_schema_array_out
                         size_t                    * result_count_out)
 {
 
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FRDWR);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FRDWR);
 
-    if (attribute_store == NULL) {
-        log_error("abac_acquire_attribute_store() FAILED\n");
+    if (attribute_space == NULL) {
+        log_error("abac_acquire_attribute_space() FAILED\n");
         return -1;
     }
 
-    if (UNSAFE_attribute_store_export(attribute_store,
+    if (UNSAFE_attribute_space_export(attribute_space,
                                       attribute_schema_array_out,
                                       attribute_schema_array_capacity,
                                       offset,
                                       total_count_out,
                                       result_count_out)) {
-        log_error("UNSAFE_attribute_store_export_terms FAILED\n");
+        log_error("UNSAFE_attribute_space_export_terms FAILED\n");
         goto err;
     }
 
-    abac_release_attribute_store();
+    abac_release_attribute_space();
 
     return 0;
 err:
-    abac_release_attribute_store();
+    abac_release_attribute_space();
 
     return -1;
 }
@@ -191,14 +191,14 @@ __do_object_attribute_grant(struct nexus_metadata * metadata, char * name, char 
 {
     struct attribute_table * attribute_table = NULL;
     struct attribute_schema  * attribute_schema  = NULL;
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
+    if (attribute_space == NULL) {
         log_error("could not get global attribute store\n");
         return -1;
     }
 
-    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_space_find_name(attribute_space, name);
 
     if (attribute_schema == NULL) {
         log_error("could not find object attribute (%s) in store\n", name);
@@ -272,14 +272,14 @@ __do_object_attribute_revoke(struct nexus_metadata * metadata, char * name)
 {
     struct attribute_table * attribute_table = NULL;
     struct attribute_schema  * attribute_schema  = NULL;
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
+    if (attribute_space == NULL) {
         log_error("could not get global attribute store\n");
         return -1;
     }
 
-    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_space_find_name(attribute_space, name);
 
     if (attribute_schema == NULL) {
         log_error("could not find object attribute (%s) in store\n", name);
@@ -355,10 +355,10 @@ __do_object_attribute_ls(struct nexus_metadata     * metadata,
                          size_t                    * total_count)
 {
     struct attribute_table * attribute_table = NULL;
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
-        log_error("could not get attribute_store\n");
+    if (attribute_space == NULL) {
+        log_error("could not get attribute_space\n");
         return -1;
     }
 
@@ -372,7 +372,7 @@ __do_object_attribute_ls(struct nexus_metadata     * metadata,
     }
 
     return  UNSAFE_attribute_table_ls(attribute_table,
-                                      attribute_store,
+                                      attribute_space,
                                       attribute_pair_array,
                                       attribute_pair_capacity,
                                       offset,

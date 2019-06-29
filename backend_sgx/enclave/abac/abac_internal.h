@@ -18,7 +18,7 @@ int
 abac_global_export_macversion(struct mac_and_version * macversion);
 
 struct nexus_uuid *
-abac_attribute_store_uuid();
+abac_attribute_space_uuid();
 
 struct nexus_uuid *
 abac_policy_store_uuid();
@@ -35,14 +35,14 @@ attribute_type_from_str(char * attribute_type_str);
 
 // attribute-store meteadata management
 
-struct attribute_store *
-abac_acquire_attribute_store(nexus_io_flags_t flags);
+struct attribute_space *
+abac_acquire_attribute_space(nexus_io_flags_t flags);
 
 int
-abac_flush_attribute_store();
+abac_flush_attribute_space();
 
 void
-abac_release_attribute_store();
+abac_release_attribute_space();
 
 
 // policy store

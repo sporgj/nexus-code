@@ -28,7 +28,7 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
 
     struct hardlink_table  * hardlink_table  = NULL;
 
-    struct attribute_store * attribute_store = NULL;
+    struct attribute_space * attribute_space = NULL;
     struct policy_store    * policy_store    = NULL;
     struct user_profile    * user_profile    = NULL;
 
@@ -74,12 +74,12 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
         hardlink_table->metadata = metadata;
         break;
     case NEXUS_ATTRIBUTE_STORE:
-        if (metadata->attribute_store) {
-            attribute_store_free(metadata->attribute_store);
+        if (metadata->attribute_space) {
+            attribute_space_free(metadata->attribute_space);
         }
 
-        attribute_store = object;
-        attribute_store->metadata = metadata;
+        attribute_space = object;
+        attribute_space->metadata = metadata;
         break;
     case NEXUS_POLICY_STORE:
         if (metadata->policy_store) {
@@ -144,7 +144,7 @@ nexus_metadata_export_mac(struct nexus_metadata * metadata, struct nexus_mac * m
 {
     switch (metadata->type) {
     case NEXUS_ATTRIBUTE_STORE:
-        nexus_mac_copy(&metadata->attribute_store->mac, mac);
+        nexus_mac_copy(&metadata->attribute_space->mac, mac);
         return 0;
     }
 
@@ -175,7 +175,7 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_t
         object = hardlink_table_create(&global_supernode->root_uuid, uuid);
         break;
     case NEXUS_ATTRIBUTE_STORE:
-        object = attribute_store_create(&global_supernode->root_uuid, uuid);
+        object = attribute_space_create(&global_supernode->root_uuid, uuid);
         break;
     case NEXUS_POLICY_STORE:
         object = policy_store_create(&global_supernode->root_uuid, uuid);
@@ -211,7 +211,7 @@ nexus_metadata_free(struct nexus_metadata * metadata)
         hardlink_table_free(metadata->hardlink_table);
         break;
     case NEXUS_ATTRIBUTE_STORE:
-        attribute_store_free(metadata->attribute_store);
+        attribute_space_free(metadata->attribute_space);
         break;
     case NEXUS_POLICY_STORE:
         policy_store_free(metadata->policy_store);
@@ -274,7 +274,7 @@ __read_object(struct nexus_uuid     * uuid,
             object = filenode_create(&global_supernode->root_uuid, uuid);
             break;
         case NEXUS_ATTRIBUTE_STORE:
-            object = attribute_store_create(&global_supernode->root_uuid, uuid);
+            object = attribute_space_create(&global_supernode->root_uuid, uuid);
             break;
         case NEXUS_POLICY_STORE:
             object = policy_store_create(&global_supernode->root_uuid, uuid);
@@ -301,7 +301,7 @@ __read_object(struct nexus_uuid     * uuid,
             object = hardlink_table_from_crypto_buf(crypto_buf, flags);
             break;
         case NEXUS_ATTRIBUTE_STORE:
-            object = attribute_store_from_crypto_buf(crypto_buf);
+            object = attribute_space_from_crypto_buf(crypto_buf);
             break;
         case NEXUS_POLICY_STORE:
             object = policy_store_from_crypto_buf(crypto_buf);
@@ -423,7 +423,7 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         ret = hardlink_table_store(metadata->hardlink_table, metadata->version, NULL);
         break;
     case NEXUS_ATTRIBUTE_STORE:
-        ret = attribute_store_store(metadata->attribute_store, metadata->version, NULL);
+        ret = attribute_space_store(metadata->attribute_space, metadata->version, NULL);
         break;
     case NEXUS_POLICY_STORE:
         ret = policy_store_store(metadata->policy_store, metadata->version, NULL);

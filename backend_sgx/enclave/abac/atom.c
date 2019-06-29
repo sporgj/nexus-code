@@ -437,14 +437,14 @@ static bool
 __check_attribute(char * attribute_name, atom_type_t atom_type, struct nexus_uuid * uuid_optional)
 {
     const struct attribute_schema * term             = NULL;
-    struct attribute_store      * global_attrstore = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space      * global_attrstore = abac_acquire_attribute_space(NEXUS_FREAD);
 
     if (global_attrstore == NULL) {
-        log_error("could not acquire attribute_store\n");
+        log_error("could not acquire attribute_space\n");
         return false;
     }
 
-    term = attribute_store_find_name(global_attrstore, attribute_name);
+    term = attribute_space_find_name(global_attrstore, attribute_name);
 
     if (term == NULL) {
         log_error("could not find attribute (%s) in store\n", attribute_name);
@@ -470,11 +470,11 @@ __check_attribute(char * attribute_name, atom_type_t atom_type, struct nexus_uui
         nexus_uuid_copy(&term->uuid, uuid_optional);
     }
 
-    abac_release_attribute_store();
+    abac_release_attribute_space();
 
     return true;
 out_err:
-    abac_release_attribute_store();
+    abac_release_attribute_space();
 
     return false;
 }

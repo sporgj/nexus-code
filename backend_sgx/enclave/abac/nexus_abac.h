@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "attribute_store.h"
+#include "attribute_space.h"
 #include "policy_store.h"
 #include "rule.h"
 #include "user_profile.h"
@@ -11,12 +11,12 @@
 
 struct abac_superinfo {
     struct nexus_uuid policy_store_uuid;
-    struct nexus_uuid attribute_store_uuid;
+    struct nexus_uuid attribute_space_uuid;
 } __attribute__((packed));
 
 
 /**
- * Called at volume mount. Reads the attribute_store and user_profile from
+ * Called at volume mount. Reads the attribute_space and user_profile from
  * the backend.
  */
 int

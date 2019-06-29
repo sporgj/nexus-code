@@ -1,5 +1,5 @@
 #include "user_profile.h"
-#include "attribute_store.h"
+#include "attribute_space.h"
 #include "attribute_table.h"
 
 
@@ -182,14 +182,14 @@ user_profile_grant_attribute(struct user_profile * user_profile, char * name, ch
 {
     struct attribute_schema * attribute_schema = NULL;
 
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
+    if (attribute_space == NULL) {
         log_error("could not get global attribute store\n");
         return -1;
     }
 
-    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_space_find_name(attribute_space, name);
 
     if (attribute_schema == NULL) {
         log_error("could not find attribute (%s) in store\n", name);
@@ -216,14 +216,14 @@ user_profile_revoke_attribute(struct user_profile * user_profile, char * name)
 {
     struct attribute_schema * attribute_schema = NULL;
 
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
+    if (attribute_space == NULL) {
         log_error("could not get global attribute store\n");
         return -1;
     }
 
-    attribute_schema = (struct attribute_schema *)attribute_store_find_name(attribute_store, name);
+    attribute_schema = (struct attribute_schema *)attribute_space_find_name(attribute_space, name);
 
     if (attribute_schema == NULL) {
         log_error("could not find attribute (%s) in store\n", name);
@@ -248,15 +248,15 @@ UNSAFE_user_profile_attribute_ls(struct user_profile       * user_profile,
                                  size_t                    * result_count,
                                  size_t                    * total_count)
 {
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
-        log_error("could not get attribute_store\n");
+    if (attribute_space == NULL) {
+        log_error("could not get attribute_space\n");
         return -1;
     }
 
     return UNSAFE_attribute_table_ls(user_profile->attribute_table,
-                                     attribute_store,
+                                     attribute_space,
                                      attribute_pair_array,
                                      attribute_pair_capacity,
                                      offset,

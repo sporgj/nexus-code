@@ -84,7 +84,7 @@ struct nxs_policy_rule {
     size_t            total_len;
     struct nexus_uuid rule_uuid;
     char              rule_str[0];
-};
+} __attribute__((packed));
 
 
 struct nxs_telemetry {

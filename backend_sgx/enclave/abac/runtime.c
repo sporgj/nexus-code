@@ -6,7 +6,7 @@
 #include "../enclave_internal.h"
 
 
-static struct nexus_metadata * attribute_store_metadata = NULL;
+static struct nexus_metadata * attribute_space_metadata = NULL;
 static struct nexus_metadata * policy_store_metadata    = NULL;
 
 static struct nexus_metadata * current_userprofile_metadata = NULL;
@@ -15,24 +15,24 @@ static struct nexus_metadata * current_userprofile_metadata = NULL;
 int
 abac_global_export_macversion(struct mac_and_version * macversion)
 {
-    struct attribute_store * attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
+    struct attribute_space * attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
 
-    if (attribute_store == NULL) {
+    if (attribute_space == NULL) {
         log_error("could not get attribute store\n");
         return -1;
     }
 
-    nexus_metadata_export_mac(attribute_store->metadata, &macversion->mac);
-    macversion->version = attribute_store->metadata->version;
+    nexus_metadata_export_mac(attribute_space->metadata, &macversion->mac);
+    macversion->version = attribute_space->metadata->version;
 
     return 0;
 }
 
 
 struct nexus_uuid *
-abac_attribute_store_uuid()
+abac_attribute_space_uuid()
 {
-    return &global_supernode->abac_superinfo.attribute_store_uuid;
+    return &global_supernode->abac_superinfo.attribute_space_uuid;
 }
 
 struct nexus_uuid *
@@ -41,43 +41,43 @@ abac_policy_store_uuid()
     return &global_supernode->abac_superinfo.policy_store_uuid;
 }
 
-struct attribute_store *
-abac_acquire_attribute_store(nexus_io_flags_t flags)
+struct attribute_space *
+abac_acquire_attribute_space(nexus_io_flags_t flags)
 {
-    struct nexus_uuid * uuid = abac_attribute_store_uuid();
+    struct nexus_uuid * uuid = abac_attribute_space_uuid();
 
     bool has_changed;
 
 
-    if (attribute_store_metadata == NULL) {
-        attribute_store_metadata = nexus_metadata_load(uuid, NEXUS_ATTRIBUTE_STORE, flags);
+    if (attribute_space_metadata == NULL) {
+        attribute_space_metadata = nexus_metadata_load(uuid, NEXUS_ATTRIBUTE_STORE, flags);
 
-        if (attribute_store_metadata == NULL) {
+        if (attribute_space_metadata == NULL) {
             log_error("nexus_metadata_load() FAILED\n");
             return NULL;
         }
 
-        return attribute_store_metadata->attribute_store;
+        return attribute_space_metadata->attribute_space;
     }
 
-    if (nexus_metadata_revalidate(attribute_store_metadata, flags, &has_changed)) {
+    if (nexus_metadata_revalidate(attribute_space_metadata, flags, &has_changed)) {
         log_error("nexus_metadata_revalidate() FAILED\n");
         return NULL;
     }
 
-    return attribute_store_metadata->attribute_store;
+    return attribute_space_metadata->attribute_space;
 }
 
 int
-abac_flush_attribute_store()
+abac_flush_attribute_space()
 {
-    return nexus_metadata_store(attribute_store_metadata);
+    return nexus_metadata_store(attribute_space_metadata);
 }
 
 void
-abac_release_attribute_store()
+abac_release_attribute_space()
 {
-    nexus_metadata_unlock(attribute_store_metadata);
+    nexus_metadata_unlock(attribute_space_metadata);
 }
 
 struct policy_store *
@@ -159,7 +159,7 @@ abac_release_policy_store()
 int
 abac_runtime_mount()
 {
-    if (abac_acquire_attribute_store(NEXUS_FREAD) == NULL) {
+    if (abac_acquire_attribute_space(NEXUS_FREAD) == NULL) {
         log_error("could not load attribute store\n");
         return -1;
     }
@@ -183,15 +183,15 @@ abac_runtime_create(struct abac_superinfo * dst_abac_superinfo)
     struct nexus_metadata * tmp_metadata = NULL;
 
     struct nexus_uuid * policy_store_uuid    = &dst_abac_superinfo->policy_store_uuid;
-    struct nexus_uuid * attribute_store_uuid = &dst_abac_superinfo->attribute_store_uuid;
+    struct nexus_uuid * attribute_space_uuid = &dst_abac_superinfo->attribute_space_uuid;
 
 
     nexus_uuid_gen(policy_store_uuid);
-    nexus_uuid_gen(attribute_store_uuid);
+    nexus_uuid_gen(attribute_space_uuid);
 
     // create the attribute store metadata
     {
-        tmp_metadata = nexus_metadata_create(attribute_store_uuid, NEXUS_ATTRIBUTE_STORE);
+        tmp_metadata = nexus_metadata_create(attribute_space_uuid, NEXUS_ATTRIBUTE_STORE);
         if (tmp_metadata == NULL) {
             log_error("nexus_metadata_create() FAILED\n");
             goto out_err;

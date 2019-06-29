@@ -41,7 +41,7 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
 
     struct sgx_backend * backend = __sgx_backend_from_volume(volume);
 
-    struct nxs_attribute_term term_array[_ARRAY_LEN];
+    struct nxs_attribute_schema schema_array[_ARRAY_LEN];
 
     size_t offset      = 0;
     size_t total_size  = 0;
@@ -52,7 +52,7 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
 
     do {
         err = ecall_abac_attribute_ls(
-            backend->enclave_id, &ret, term_array, _ARRAY_LEN, offset, &total_size, &result_size);
+            backend->enclave_id, &ret, schema_array, _ARRAY_LEN, offset, &total_size, &result_size);
 
         if (ret || err) {
             log_error("ecall_abac_attribute_ls() FAILED. err=%x, ret=%d\n", err, ret);
@@ -64,7 +64,7 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
         }
 
         for (size_t i = 0; i < result_size; i++) {
-            printf("\t %s [%s]\n", term_array[i].term_str, term_array[i].type_str);
+            printf("\t %s [%s]\n", schema_array[i].schema_str, schema_array[i].type_str);
         }
 
         offset += result_size;
@@ -147,7 +147,7 @@ sgx_backend_abac_user_ls(char * username, struct nexus_volume * volume)
         }
 
         for (size_t i = 0; i < result_size; i++) {
-            printf("\t %s [%s]\n", pair_array[i].term_str, pair_array[i].val_str);
+            printf("\t %s [%s]\n", pair_array[i].schema_str, pair_array[i].val_str);
         }
 
         offset += result_size;
@@ -230,7 +230,7 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
         }
 
         for (size_t i = 0; i < result_size; i++) {
-            printf("\t %s [%s]\n", pair_array[i].term_str, pair_array[i].val_str);
+            printf("\t %s [%s]\n", pair_array[i].schema_str, pair_array[i].val_str);
         }
 
         offset += result_size;

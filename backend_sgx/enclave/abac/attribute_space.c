@@ -1,15 +1,15 @@
 #include <ctype.h>
 
-#include "attribute_store.h"
+#include "attribute_space.h"
 
-struct __attr_store_hdr {
+struct __attr_space_hdr {
     struct nexus_uuid my_uuid;
     struct nexus_uuid root_uuid;
 
     uint32_t count;
 } __attribute__((packed));
 
-struct __attr_store_entry {
+struct __attr_space_entry {
     attribute_type_t  type;
     char              name[ATTRIBUTE_NAME_MAX];
     struct nexus_uuid uuid;
@@ -18,10 +18,10 @@ struct __attr_store_entry {
 
 
 static inline size_t
-__get_attribute_store_size(struct attribute_store * attribute_store)
+__get_attribute_space_size(struct attribute_space * attribute_space)
 {
-    return sizeof(struct __attr_store_hdr)
-           + (attribute_store->count * sizeof(struct __attr_store_entry));
+    return sizeof(struct __attr_space_hdr)
+           + (attribute_space->count * sizeof(struct __attr_space_entry));
 }
 
 static inline struct attribute_schema *
@@ -31,13 +31,13 @@ __attribute_schema_from_list_entry(struct list_head * entry)
 }
 
 static struct attribute_schema *
-__find_attribute_schema_by_name(struct attribute_store * attribute_store, char * name)
+__find_attribute_schema_by_name(struct attribute_space * attribute_space, char * name)
 {
     struct list_head * curr = NULL;
 
     size_t len = strnlen(name, ATTRIBUTE_NAME_MAX);
 
-    list_for_each(curr, &attribute_store->list_attribute_schemas)
+    list_for_each(curr, &attribute_space->list_attribute_schemas)
     {
         struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
@@ -51,18 +51,18 @@ __find_attribute_schema_by_name(struct attribute_store * attribute_store, char *
 }
 
 static struct attribute_schema *
-__find_attribute_schema_by_uuid(struct attribute_store * attribute_store, struct nexus_uuid * uuid)
+__find_attribute_schema_by_uuid(struct attribute_space * attribute_space, struct nexus_uuid * uuid)
 {
     struct attribute_schema tmp_schema;
 
     hashmap_entry_init(&tmp_schema.hash_entry, memhash(uuid, sizeof(struct nexus_uuid)));
     nexus_uuid_copy(uuid, &tmp_schema.uuid);
 
-    return hashmap_get(&attribute_store->map_attribute_schemas, &tmp_schema, NULL);
+    return hashmap_get(&attribute_space->map_attribute_schemas, &tmp_schema, NULL);
 }
 
 static struct attribute_schema *
-__put_attribute(struct attribute_store * attribute_store,
+__put_attribute(struct attribute_space * attribute_space,
                 char *                   name,
                 struct nexus_uuid *      uuid,
                 attribute_type_t         type)
@@ -74,20 +74,20 @@ __put_attribute(struct attribute_store * attribute_store,
     schema->type = type;
 
     hashmap_entry_init(&schema->hash_entry, memhash(&schema->uuid, sizeof(struct nexus_uuid)));
-    hashmap_add(&attribute_store->map_attribute_schemas, &schema->hash_entry);
+    hashmap_add(&attribute_space->map_attribute_schemas, &schema->hash_entry);
 
-    list_add_tail(&schema->list_entry, &attribute_store->list_attribute_schemas);
-    attribute_store->count += 1;
+    list_add_tail(&schema->list_entry, &attribute_space->list_attribute_schemas);
+    attribute_space->count += 1;
 
     return schema;
 }
 
 static void
-__del_attribute(struct attribute_store * attribute_store, struct attribute_schema * schema)
+__del_attribute(struct attribute_space * attribute_space, struct attribute_schema * schema)
 {
-    __hashmap_remove_entry(&attribute_store->map_attribute_schemas, &schema->hash_entry);
+    __hashmap_remove_entry(&attribute_space->map_attribute_schemas, &schema->hash_entry);
     list_del(&schema->list_entry);
-    attribute_store->count -= 1;
+    attribute_space->count -= 1;
 
     nexus_free(schema);
 }
@@ -104,29 +104,29 @@ __uuid_hashmap_cmp(const void                    * data,
     return nexus_uuid_compare(&entry1->uuid, &entry2->uuid);
 }
 
-struct attribute_store *
-attribute_store_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
+struct attribute_space *
+attribute_space_create(struct nexus_uuid * root_uuid, struct nexus_uuid * uuid)
 {
-    struct attribute_store * attribute_store = nexus_malloc(sizeof(struct attribute_store));
+    struct attribute_space * attribute_space = nexus_malloc(sizeof(struct attribute_space));
 
-    nexus_uuid_copy(uuid, &attribute_store->my_uuid);
-    nexus_uuid_copy(root_uuid, &attribute_store->root_uuid);
+    nexus_uuid_copy(uuid, &attribute_space->my_uuid);
+    nexus_uuid_copy(root_uuid, &attribute_space->root_uuid);
 
-    INIT_LIST_HEAD(&attribute_store->list_attribute_schemas);
+    INIT_LIST_HEAD(&attribute_space->list_attribute_schemas);
 
     hashmap_init(
-        &attribute_store->map_attribute_schemas, (hashmap_cmp_fn)__uuid_hashmap_cmp, NULL, 0);
+        &attribute_space->map_attribute_schemas, (hashmap_cmp_fn)__uuid_hashmap_cmp, NULL, 0);
 
-    return attribute_store;
+    return attribute_space;
 }
 
 void
-attribute_store_free(struct attribute_store * attr_store)
+attribute_space_free(struct attribute_space * attr_space)
 {
     struct list_head * curr = NULL;
     struct list_head * next = NULL;
 
-    list_for_each_safe(curr, next, &attr_store->list_attribute_schemas)
+    list_for_each_safe(curr, next, &attr_space->list_attribute_schemas)
     {
         struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
@@ -134,44 +134,44 @@ attribute_store_free(struct attribute_store * attr_store)
         nexus_free(schema);
     }
 
-    hashmap_free(&attr_store->map_attribute_schemas, 0);
+    hashmap_free(&attr_space->map_attribute_schemas, 0);
 
-    nexus_free(attr_store);
+    nexus_free(attr_space);
 }
 
 
 // -- store/load
 
-static struct attribute_store *
-attribute_store_from_buffer(uint8_t * buffer, size_t buflen)
+static struct attribute_space *
+attribute_space_from_buffer(uint8_t * buffer, size_t buflen)
 {
-    struct __attr_store_hdr * header = (struct __attr_store_hdr *)buffer;
+    struct __attr_space_hdr * header = (struct __attr_space_hdr *)buffer;
 
-    struct __attr_store_entry * in_entry = NULL;
+    struct __attr_space_entry * in_entry = NULL;
 
-    struct attribute_store * attribute_store = NULL;
+    struct attribute_space * attribute_space = NULL;
 
-    if (buflen < sizeof(struct __attr_store_hdr)) {
+    if (buflen < sizeof(struct __attr_space_hdr)) {
         log_error("buffer is too small\n");
     }
 
-    attribute_store = attribute_store_create(&header->root_uuid, &header->my_uuid);
+    attribute_space = attribute_space_create(&header->root_uuid, &header->my_uuid);
 
     // now parse the entries
-    in_entry = (struct __attr_store_entry *)(buffer + sizeof(struct __attr_store_hdr));
+    in_entry = (struct __attr_space_entry *)(buffer + sizeof(struct __attr_space_hdr));
 
     for (size_t i = 0; i < header->count; i++) {
-        __put_attribute(attribute_store, in_entry->name, &in_entry->uuid, in_entry->type);
+        __put_attribute(attribute_space, in_entry->name, &in_entry->uuid, in_entry->type);
         in_entry += 1;
     }
 
-    return attribute_store;
+    return attribute_space;
 }
 
-struct attribute_store *
-attribute_store_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
+struct attribute_space *
+attribute_space_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
 {
-    struct attribute_store * attribute_store = NULL;
+    struct attribute_space * attribute_space = NULL;
     struct nexus_mac mac;
 
     size_t    buflen = 0;
@@ -182,37 +182,37 @@ attribute_store_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
         return NULL;
     }
 
-    attribute_store = attribute_store_from_buffer(buffer, buflen);
+    attribute_space = attribute_space_from_buffer(buffer, buflen);
 
-    if (attribute_store == NULL) {
-        log_error("attribute_store_from_buffer FAILED\n");
+    if (attribute_space == NULL) {
+        log_error("attribute_space_from_buffer FAILED\n");
         return NULL;
     }
 
-    nexus_mac_copy(&mac, &attribute_store->mac);
+    nexus_mac_copy(&mac, &attribute_space->mac);
 
-    return attribute_store;
+    return attribute_space;
 }
 
 static int
-attribute_store_serialize(struct attribute_store * attribute_store, uint8_t * buffer)
+attribute_space_serialize(struct attribute_space * attribute_space, uint8_t * buffer)
 {
-    struct __attr_store_hdr * header = (struct __attr_store_hdr *)buffer;
+    struct __attr_space_hdr * header = (struct __attr_space_hdr *)buffer;
 
     struct list_head * curr = NULL;
 
-    struct __attr_store_entry * out_entry = NULL;
+    struct __attr_space_entry * out_entry = NULL;
 
 
     // serialize the header
-    nexus_uuid_copy(&attribute_store->my_uuid, &header->my_uuid);
-    nexus_uuid_copy(&attribute_store->root_uuid, &header->root_uuid);
-    header->count = attribute_store->count;
+    nexus_uuid_copy(&attribute_space->my_uuid, &header->my_uuid);
+    nexus_uuid_copy(&attribute_space->root_uuid, &header->root_uuid);
+    header->count = attribute_space->count;
 
     // now serialize the entries
-    out_entry = (struct __attr_store_entry *)(buffer + sizeof(struct __attr_store_hdr));
+    out_entry = (struct __attr_space_entry *)(buffer + sizeof(struct __attr_space_hdr));
 
-    list_for_each(curr, &attribute_store->list_attribute_schemas)
+    list_for_each(curr, &attribute_space->list_attribute_schemas)
     {
         struct attribute_schema * schema = __attribute_schema_from_list_entry(curr);
 
@@ -227,11 +227,11 @@ attribute_store_serialize(struct attribute_store * attribute_store, uint8_t * bu
 }
 
 int
-attribute_store_store(struct attribute_store * attribute_store,
+attribute_space_store(struct attribute_space * attribute_space,
                       size_t                   version,
                       struct nexus_mac       * mac)
 {
-    size_t serialized_buflen = __get_attribute_store_size(attribute_store);
+    size_t serialized_buflen = __get_attribute_space_size(attribute_space);
 
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
@@ -239,7 +239,7 @@ attribute_store_store(struct attribute_store * attribute_store,
     uint8_t * buffer = NULL;
 
 
-    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &attribute_store->my_uuid);
+    crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &attribute_space->my_uuid);
     if (crypto_buffer == NULL) {
         log_error("nexus_crypto_buf_new() FAILED\n");
         return -1;
@@ -251,12 +251,12 @@ attribute_store_store(struct attribute_store * attribute_store,
         goto out_err;
     }
 
-    if (attribute_store_serialize(attribute_store, buffer)) {
-        log_error("attribute_store_serialize() FAILED\n");
+    if (attribute_space_serialize(attribute_space, buffer)) {
+        log_error("attribute_space_serialize() FAILED\n");
         goto out_err;
     }
 
-    if (nexus_crypto_buf_put(crypto_buffer, &attribute_store->mac)) {
+    if (nexus_crypto_buf_put(crypto_buffer, &attribute_space->mac)) {
         log_error("nexus_crypto_buf_put() FAILED\n");
         goto out_err;
     }
@@ -271,20 +271,20 @@ out_err:
 }
 
 
-// -- add/del from attribute_store
+// -- add/del from attribute_space
 
 static void
-__attribute_store_set_dirty(struct attribute_store * attribute_store)
+__attribute_space_set_dirty(struct attribute_space * attribute_space)
 {
-    if (attribute_store->metadata) {
-        __metadata_set_dirty(attribute_store->metadata);
+    if (attribute_space->metadata) {
+        __metadata_set_dirty(attribute_space->metadata);
     }
 }
 
 int
-attribute_store_add(struct attribute_store * attr_store, char * name, attribute_type_t type)
+attribute_space_add(struct attribute_space * attr_space, char * name, attribute_type_t type)
 {
-    struct attribute_schema * schema = __find_attribute_schema_by_name(attr_store, name);
+    struct attribute_schema * schema = __find_attribute_schema_by_name(attr_space, name);
 
     struct nexus_uuid uuid;
 
@@ -305,50 +305,50 @@ attribute_store_add(struct attribute_store * attr_store, char * name, attribute_
 
     nexus_uuid_gen(&uuid);
 
-    __put_attribute(attr_store, name, &uuid, type);
+    __put_attribute(attr_space, name, &uuid, type);
 
-    __attribute_store_set_dirty(attr_store);
+    __attribute_space_set_dirty(attr_space);
 
     return 0;
 }
 
 int
-attribute_store_del(struct attribute_store * attr_store, char * name)
+attribute_space_del(struct attribute_space * attr_space, char * name)
 {
-    struct attribute_schema * schema = __find_attribute_schema_by_name(attr_store, name);
+    struct attribute_schema * schema = __find_attribute_schema_by_name(attr_space, name);
 
     if (schema == NULL) {
         return -1;
     }
 
-    __del_attribute(attr_store, schema);
+    __del_attribute(attr_space, schema);
 
-    __attribute_store_set_dirty(attr_store);
+    __attribute_space_set_dirty(attr_space);
 
     return 0;
 }
 
 const struct attribute_schema *
-attribute_store_find_uuid(struct attribute_store * attr_store, struct nexus_uuid * uuid)
+attribute_space_find_uuid(struct attribute_space * attr_space, struct nexus_uuid * uuid)
 {
-    return __find_attribute_schema_by_uuid(attr_store, uuid);
+    return __find_attribute_schema_by_uuid(attr_space, uuid);
 }
 
 const struct attribute_schema *
-attribute_store_find_name(struct attribute_store * attr_store, char * name)
+attribute_space_find_name(struct attribute_space * attr_space, char * name)
 {
-    return __find_attribute_schema_by_name(attr_store, name);
+    return __find_attribute_schema_by_name(attr_space, name);
 }
 
 void
-attribute_store_export_macversion(struct attribute_store * attr_store,
+attribute_space_export_macversion(struct attribute_space * attr_space,
                                   struct mac_and_version * macversion)
 {
-    nexus_mac_copy(&attr_store->mac, &macversion->mac);
+    nexus_mac_copy(&attr_space->mac, &macversion->mac);
 }
 
 int
-UNSAFE_attribute_store_export(struct attribute_store      * attr_store,
+UNSAFE_attribute_space_export(struct attribute_space      * attr_space,
                               struct nxs_attribute_schema * attribute_schema_array_out,
                               size_t                        attribute_schema_array_capacity,
                               size_t                        offset,
@@ -362,7 +362,7 @@ UNSAFE_attribute_store_export(struct attribute_store      * attr_store,
     size_t copied = 0;
 
 
-    list_for_each(curr, &attr_store->list_attribute_schemas)
+    list_for_each(curr, &attr_space->list_attribute_schemas)
     {
         if (offset) {
             offset -= 1;
@@ -384,7 +384,7 @@ UNSAFE_attribute_store_export(struct attribute_store      * attr_store,
     }
 
     *result_count_out = copied;
-    *total_count_out = attr_store->count;
+    *total_count_out = attr_space->count;
 
     return 0;
 }

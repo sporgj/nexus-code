@@ -11,7 +11,7 @@ struct policy_store {
 
     struct nexus_mac        mac;
 
-    struct mac_and_version  attribute_store_macversion;
+    struct mac_and_version  attribute_space_macversion;
 
     struct nexus_list       rules_list;
 

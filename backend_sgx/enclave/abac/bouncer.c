@@ -17,7 +17,7 @@
 
 struct abac_request {
     struct policy_store     * policy_store;
-    struct attribute_store  * attribute_store;
+    struct attribute_space  * attribute_space;
 
     struct nexus_metadata   * obj_metadata;
     struct kb_entity        * obj_entity;
@@ -142,7 +142,7 @@ __new_attribute_fact(struct abac_request    * abac_req,
 {
     const struct attribute_schema * schema;
 
-    schema = attribute_store_find_uuid(abac_req->attribute_store, &attr_entry->attr_uuid);
+    schema = attribute_space_find_uuid(abac_req->attribute_space, &attr_entry->attr_uuid);
 
     if (schema == NULL) {
         // TODO maybe report here?
@@ -275,17 +275,17 @@ __create_abac_request(struct nexus_metadata * metadata, perm_type_t perm_type)
         return NULL;
     }
 
-    abac_req->attribute_store = abac_acquire_attribute_store(NEXUS_FREAD);
-    if (abac_req->attribute_store == NULL) {
+    abac_req->attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
+    if (abac_req->attribute_space == NULL) {
         abac_release_policy_store();
-        log_error("could not acquire attribute_store\n");
+        log_error("could not acquire attribute_space\n");
         return NULL;
     }
 
     struct user_profile * user_profile = abac_acquire_current_user_profile(NEXUS_FREAD);
     if (user_profile == NULL) {
         abac_release_policy_store();
-        abac_release_attribute_store();
+        abac_release_attribute_space();
         return NULL;
     }
 
@@ -310,7 +310,7 @@ static void
 __destroy_abac_request(struct abac_request * abac_req)
 {
     abac_release_policy_store();
-    abac_release_attribute_store();
+    abac_release_attribute_space();
     abac_release_current_user_profile();
 
     nexus_free(abac_req);

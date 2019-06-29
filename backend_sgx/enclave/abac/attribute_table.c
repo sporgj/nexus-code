@@ -7,7 +7,7 @@ struct __attr_table_hdr {
     size_t                  count;
     size_t                  generation;
 
-    __mac_and_version_bytes_t attribute_store_macversion_bytes;
+    __mac_and_version_bytes_t attribute_space_macversion_bytes;
 } __attribute__((packed));
 
 
@@ -177,8 +177,8 @@ __parse_attribute_table_hdr(struct attribute_table * attribute_table, uint8_t * 
     attribute_table->count = header->count;
     attribute_table->generation = header->generation;
 
-    __mac_and_version_from_buf(&attribute_table->attribute_store_macversion,
-                               (uint8_t *)&header->attribute_store_macversion_bytes);
+    __mac_and_version_from_buf(&attribute_table->attribute_space_macversion,
+                               (uint8_t *)&header->attribute_space_macversion_bytes);
 
     return buffer + sizeof(struct __attr_table_hdr);
 }
@@ -252,8 +252,8 @@ __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t *
     dest_header->count = attribute_table->count;
     dest_header->generation = attribute_table->generation;
 
-    __mac_and_version_to_buf(&attribute_table->attribute_store_macversion,
-                             (uint8_t *)&dest_header->attribute_store_macversion_bytes);
+    __mac_and_version_to_buf(&attribute_table->attribute_space_macversion,
+                             (uint8_t *)&dest_header->attribute_space_macversion_bytes);
 
     return buffer + sizeof(struct __attr_table_hdr);
 }
@@ -283,7 +283,7 @@ attribute_table_store(struct attribute_table * attribute_table, uint8_t * buffer
     }
 
     // update the mac version
-    if (abac_global_export_macversion(&attribute_table->attribute_store_macversion)) {
+    if (abac_global_export_macversion(&attribute_table->attribute_space_macversion)) {
         log_error("could not export mac version\n");
         return -1;
     }
@@ -307,7 +307,7 @@ attribute_table_store(struct attribute_table * attribute_table, uint8_t * buffer
 
 int
 attribute_table_export_facts(struct attribute_table * attribute_table,
-                             struct attribute_store * attribute_store,
+                             struct attribute_space * attribute_space,
                              char                   * first_term,
                              rapidstring            * string_builder,
                              size_t                 * p_skip_count)
@@ -326,7 +326,7 @@ attribute_table_export_facts(struct attribute_table * attribute_table,
             break;
         }
 
-        attr_term = attribute_store_find_uuid(attribute_store, &attr_entry->attr_uuid);
+        attr_term = attribute_space_find_uuid(attribute_space, &attr_entry->attr_uuid);
         if (attr_term == NULL) {
             // TODO maybe report here?
             skip_count += 1;
@@ -349,7 +349,7 @@ attribute_table_export_facts(struct attribute_table * attribute_table,
 
 int
 UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
-                          struct attribute_store    * attribute_store,
+                          struct attribute_space    * attribute_space,
                           struct nxs_attribute_pair * attribute_pair_array,
                           size_t                      attribute_pair_capacity,
                           size_t                      offset,
@@ -380,7 +380,7 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
         }
 
         // copy out the attribute pair
-        tmp_attribute_schema = attribute_store_find_uuid(attribute_store, &attr_entry->attr_uuid);
+        tmp_attribute_schema = attribute_space_find_uuid(attribute_space, &attr_entry->attr_uuid);
 
         if (tmp_attribute_schema) {
             // then copy its name into the pair
