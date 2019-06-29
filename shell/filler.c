@@ -13,12 +13,6 @@
 
 static struct nexus_volume * mounted_volume;
 
-static const char * WORDS_FILE = "google-10000-english.txt";
-static size_t       WORDS_MAX  = 10000;
-
-
-static FILE       * words_fileptr = NULL;
-
 
 static void
 usage(char * handle_cmd);
@@ -52,46 +46,112 @@ read_line(FILE * fp)
 static int
 __attributes_filler(int argc, char ** argv)
 {
-    int created = 0;
+    size_t created = 0;
 
     if (argc < 1) {
         usage("attributes");
         return -1;
     }
 
-    int count_arg = atoi(argv[0]);
+    char * filepath = strndup(argv[0], PATH_MAX);
 
-    if (count_arg <= 0 || (count_arg > (int)WORDS_MAX)) {
-        log_error("invalid count argument (%s)\n", argv[0]);
-        return -1;
+    FILE * file_ptr = fopen(filepath, "r");
+
+    if (file_ptr == NULL) {
+        log_error("could not open file %s\n", filepath);
+        goto out_err;
     }
 
-    nexus_printf("Creating %d attributes...\n", count_arg);
+    while (feof(file_ptr) == false) {
+        // <attr_name, attr_type>
+        char * attribute_pair = read_line(file_ptr);
+        if (attribute_pair == NULL) {
+            break;
+        }
 
-    rewind(words_fileptr);
+        char * _name = strtok(attribute_pair, ",");
+        char * _type = strtok(NULL, ",");
 
-
-    for (; created < count_arg; created++) {
-        char * word = read_line(words_fileptr);
-
-        if (sgx_backend_abac_attribute_add(word, "user", mounted_volume)) {
-            log_error("sgx_backend_abac_attribute_add() `%s` FAILED\n", word);
-            nexus_free(word);
+        if (sgx_backend_abac_attribute_add(_name, _type, mounted_volume)) {
+            log_error("sgx_backend_abac_attribute_add() `%s` (%s) FAILED\n", _name, _type);
+            nexus_free(attribute_pair);
             goto out_err;
         }
 
-        nexus_free(word);
+        nexus_free(attribute_pair);
+
+        created += 1;
     }
 
-    nexus_printf("SUCCESS\n");
+    nexus_printf("CREATED ATTRIBUTES: %zu\n", created);
+
+    fclose(file_ptr);
+    nexus_free(filepath);
 
     return 0;
-
 out_err:
-    log_error("Created %d attributes\n", created);
+    nexus_printf("CREATED ATTRIBUTES: %zu\n", created);
+
+    fclose(file_ptr);
+    nexus_free(filepath);
 
     return -1;
 }
+
+
+static int
+__policies_filler(int argc, char ** argv)
+{
+    size_t added = 0;
+
+    if (argc < 1) {
+        usage("policies");
+        return -1;
+    }
+
+    char * filepath = strndup(argv[0], PATH_MAX);
+
+    FILE * file_ptr = fopen(filepath, "r");
+
+    if (file_ptr == NULL) {
+        log_error("could not open file %s\n", filepath);
+        goto out_err;
+    }
+
+    while (feof(file_ptr) == false) {
+        struct nexus_uuid uuid;
+
+        char * policy_str = read_line(file_ptr);
+        if (policy_str == NULL) {
+            break;
+        }
+
+        if (sgx_backend_abac_policy_add(policy_str, &uuid, mounted_volume)) {
+            nexus_free(policy_str);
+            log_error("sgx_backend_abac_policy_add() FAILED\n");
+            goto out_err;
+        }
+
+        nexus_free(policy_str);
+
+        added += 1;
+    }
+
+    nexus_printf("ADDED POLICIES: %zu\n", added);
+
+    fclose(file_ptr);
+    nexus_free(filepath);
+
+    return 0;
+out_err:
+    nexus_printf("ADDED POLICIES: %zu\n", added);
+
+    fclose(file_ptr);
+    nexus_free(filepath);
+
+    return -1;
+}
+
 
 static struct _cmd {
     char * name;
@@ -100,9 +160,11 @@ static struct _cmd {
     char * usage;
 } cmds[];
 
-static struct _cmd cmds[] = { { "attributes", __attributes_filler, "fills in attributes", "<count>" },
-                              { "help", help, "Help menu", "" },
-                              { NULL, NULL, NULL, NULL } };
+static struct _cmd cmds[]
+    = { { "attributes", __attributes_filler, "fills in attributes", "<count>" },
+        { "policies", __policies_filler, "fills in policies", "<policy file>" },
+        { "help", help, "Help menu", "" },
+        { NULL, NULL, NULL, NULL } };
 
 static void
 usage(char * handle_cmd)
@@ -155,16 +217,7 @@ filler_volume_main(int argc, char ** argv)
 
     while (cmds[i].name) {
         if (strncmp(cmds[i].name, sub_command, 1024) == 0) {
-            words_fileptr = fopen(WORDS_FILE, "r");
-
-            if (words_fileptr == NULL) {
-                log_error("could not open file (%s)\n", WORDS_FILE);
-                goto out_err;
-            }
-
             int ret = cmds[i].handler(argc - 2, &argv[3]);
-
-            fclose(words_fileptr);
 
             if (ret) {
                 printf("command failed\n");
