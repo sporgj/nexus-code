@@ -191,6 +191,8 @@ attribute_space_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
 
     nexus_mac_copy(&mac, &attribute_space->mac);
 
+    attribute_space->last_serialized_size = buflen;
+
     return attribute_space;
 }
 
@@ -262,6 +264,8 @@ attribute_space_store(struct attribute_space * attribute_space,
     }
 
     nexus_crypto_buf_free(crypto_buffer);
+
+    attribute_space->last_serialized_size = serialized_buflen;
 
     return 0;
 out_err:

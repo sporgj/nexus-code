@@ -163,6 +163,8 @@ __policy_store_parse(uint8_t * buffer, size_t buflen)
         buffer = next_ptr;
     }
 
+    policy_store->last_serialized_size = buflen;
+
     return policy_store;
 out_err:
     policy_store_free(policy_store);
@@ -289,6 +291,8 @@ policy_store_store(struct policy_store * policy_store, uint32_t version, struct 
     }
 
     nexus_crypto_buf_free(crypto_buffer);
+
+    policy_store->last_serialized_size = serialized_buflen;
 
     return 0;
 

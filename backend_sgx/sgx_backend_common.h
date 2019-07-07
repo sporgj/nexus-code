@@ -92,6 +92,15 @@ struct nxs_telemetry {
 
     size_t     total_allocated_bytes;
 
+    size_t     user_table_count;
+    size_t     user_table_bytes;
+
+    size_t     attribute_space_bytes;
+    size_t     attribute_space_count;
+
+    size_t     policy_store_bytes;
+    size_t     policy_store_count;
+
     size_t     asserted_facts_count;
     size_t     asserted_rules_count;
 };

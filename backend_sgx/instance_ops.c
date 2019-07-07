@@ -371,7 +371,7 @@ err:
 
 // https://gist.github.com/dgoguerra/7194777
 static const char *
-humanSize(uint64_t bytes)
+human_size(uint64_t bytes)
 {
     char * suffix[] = { "B", "KB", "MB", "GB", "TB" };
     char   length   = sizeof(suffix) / sizeof(suffix[0]);
@@ -408,8 +408,18 @@ sgx_backend_print_telemetry(struct nexus_volume * volume)
     {
         printf("TELEMETRY INFO\n---\n");
 
-        printf("Allocated memory: %s\n", humanSize(telemetry.total_allocated_bytes));
+        printf("Allocated memory: %s\n", human_size(telemetry.total_allocated_bytes));
         printf("Lua memory: %zu KB\n", telemetry.lua_memory_kilobytes);
+        printf("User Table: %zu users [%s]\n",
+               telemetry.user_table_count,
+               human_size(telemetry.user_table_bytes));
+        printf("Attribute Space: %zu attributes [%s]\n",
+               telemetry.attribute_space_count,
+               human_size(telemetry.attribute_space_bytes));
+        printf("Policy Store: %zu policies [%s]\n",
+               telemetry.policy_store_count,
+               human_size(telemetry.policy_store_bytes));
+        printf("Rules count: %zu\n", telemetry.asserted_rules_count);
         printf("Facts count: %zu\n", telemetry.asserted_facts_count);
         printf("Rules count: %zu\n", telemetry.asserted_rules_count);
     }

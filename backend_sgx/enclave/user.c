@@ -309,6 +309,8 @@ nexus_usertable_store(struct nexus_usertable * usertable, uint32_t version, stru
         nexus_mac_copy(mac, &usertable->mac);
     }
 
+    usertable->total_size = buffer_size;
+
     nexus_crypto_buf_free(crypto_buffer);
 
     return 0;

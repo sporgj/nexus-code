@@ -15,6 +15,7 @@ struct policy_store {
 
     struct nexus_list       rules_list;
 
+    size_t                  last_serialized_size;
 
     struct nexus_metadata * metadata;
 };

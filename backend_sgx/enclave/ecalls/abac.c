@@ -435,6 +435,7 @@ ecall_abac_policy_add(char * policy_string_IN, struct nexus_uuid * uuid_out)
 
     if (policy_rule == NULL) {
         log_error("could not parse policy rule\n");
+        log_error("%s\n", policy_string_IN);
         return -1;
     }
 

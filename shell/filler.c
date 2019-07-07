@@ -24,9 +24,9 @@ help(int argc, char ** argv);
 static char *
 read_line(FILE * fp)
 {
-    char * tmp_charptr = nexus_malloc(64);
+    char * tmp_charptr = nexus_malloc(1024);
 
-    char * rv = fgets(tmp_charptr, 64, fp);
+    char * rv = fgets(tmp_charptr, 1024, fp);
 
     if (rv == NULL) {
         perror("fgets");
@@ -59,6 +59,11 @@ __attributes_filler(int argc, char ** argv)
 
     if (file_ptr == NULL) {
         log_error("could not open file %s\n", filepath);
+        return -1;
+    }
+
+    if (sgx_backend_batch_mode_start(mounted_volume)) {
+        log_error("sgx_backend_batch_mode_start() FAILED\n");
         goto out_err;
     }
 
@@ -83,6 +88,11 @@ __attributes_filler(int argc, char ** argv)
         created += 1;
     }
 
+    if (sgx_backend_batch_mode_finish(mounted_volume)) {
+        log_error("sgx_backend_batch_mode_finish() FAILED\n");
+        goto out_err;
+    }
+
     nexus_printf("CREATED ATTRIBUTES: %zu\n", created);
 
     fclose(file_ptr);
@@ -90,7 +100,6 @@ __attributes_filler(int argc, char ** argv)
 
     return 0;
 out_err:
-    nexus_printf("CREATED ATTRIBUTES: %zu\n", created);
 
     fclose(file_ptr);
     nexus_free(filepath);
@@ -115,6 +124,11 @@ __policies_filler(int argc, char ** argv)
 
     if (file_ptr == NULL) {
         log_error("could not open file %s\n", filepath);
+        return -1;
+    }
+
+    if (sgx_backend_batch_mode_start(mounted_volume)) {
+        log_error("sgx_backend_batch_mode_start() FAILED\n");
         goto out_err;
     }
 
@@ -127,14 +141,20 @@ __policies_filler(int argc, char ** argv)
         }
 
         if (sgx_backend_abac_policy_add(policy_str, &uuid, mounted_volume)) {
-            nexus_free(policy_str);
             log_error("sgx_backend_abac_policy_add() FAILED\n");
+            nexus_printf("POLICY-> %s\n", policy_str);
+            nexus_free(policy_str);
             goto out_err;
         }
 
         nexus_free(policy_str);
 
         added += 1;
+    }
+
+    if (sgx_backend_batch_mode_finish(mounted_volume)) {
+        log_error("sgx_backend_batch_mode_finish() FAILED\n");
+        goto out_err;
     }
 
     nexus_printf("ADDED POLICIES: %zu\n", added);
@@ -144,8 +164,6 @@ __policies_filler(int argc, char ** argv)
 
     return 0;
 out_err:
-    nexus_printf("ADDED POLICIES: %zu\n", added);
-
     fclose(file_ptr);
     nexus_free(filepath);
 

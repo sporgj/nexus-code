@@ -395,5 +395,42 @@ abac_release_current_user_profile()
 void
 abac_export_telemetry(struct nxs_telemetry * telemetry)
 {
+    struct attribute_space * attribute_space = NULL;
+    struct policy_store    * policy_store    = NULL;
+    struct nexus_usertable * global_usertable = NULL;
+
     db_export_telemetry(telemetry);
+
+    telemetry->attribute_space_bytes = 0;
+    telemetry->policy_store_bytes = 0;
+
+    attribute_space = abac_acquire_attribute_space(NEXUS_FREAD);
+
+    if (attribute_space) {
+        telemetry->attribute_space_bytes = attribute_space->last_serialized_size;
+        telemetry->attribute_space_count = attribute_space->count;
+        abac_release_attribute_space();
+    } else {
+        log_error("could not acquire attribute_space for telemetry\n");
+    }
+
+    policy_store = abac_acquire_policy_store(NEXUS_FREAD);
+
+    if (policy_store) {
+        telemetry->policy_store_bytes = policy_store->last_serialized_size;
+        telemetry->policy_store_count = policy_store->rules_count;
+        abac_release_policy_store();
+    } else {
+        log_error("could not acquire policy_store for telemetry\n");
+    }
+
+    global_usertable = nexus_vfs_acquire_user_table(NEXUS_FREAD);
+
+    if (global_usertable) {
+        telemetry->user_table_bytes = nexus_usertable_buflen(global_usertable);
+        telemetry->user_table_count = global_usertable->user_count;
+        nexus_vfs_release_user_table();
+    } else {
+        log_error("could not acquire glocal user table\n");
+    }
 }

@@ -14,6 +14,8 @@ struct attribute_space {
 
     size_t                   count;
 
+    size_t                   last_serialized_size;
+
     struct nexus_mac         mac;
 
     struct hashmap           map_attribute_schemas; // lookup by uuid

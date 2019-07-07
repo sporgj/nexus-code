@@ -68,6 +68,7 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
         }
 
         offset += result_size;
+        break;
     } while (offset < total_size);
 
     return 0;
