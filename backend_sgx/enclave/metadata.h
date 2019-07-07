@@ -134,6 +134,9 @@ nexus_metadata_revalidate(struct nexus_metadata * metadata,
 int
 nexus_metadata_reload(struct nexus_metadata * metadata, nexus_io_flags_t flags);
 
+void
+nexus_metadata_reset(struct nexus_metadata * metadata);
+
 /**
  * Loads the metadata from the specified UUID
  * @param uuid

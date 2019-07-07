@@ -7,6 +7,7 @@
 #include <libnexus/nexus_log.h>
 #include <libnexus/nexus_volume.h>
 #include <libnexus/nexus_util.h>
+#include <libnexus/nexus_raw_file.h>
 
 #include <backend_sgx/exports.h>
 
@@ -21,41 +22,43 @@ static int
 help(int argc, char ** argv);
 
 
-static char *
-read_line(FILE * fp)
+static size_t
+count_lines (FILE * fp, size_t * p_file_size)
 {
-    char * tmp_charptr = nexus_malloc(1024);
+    size_t line_count = 0;
+    size_t file_size  = 0;
 
-    char * rv = fgets(tmp_charptr, 1024, fp);
+    rewind(fp);
 
-    if (rv == NULL) {
-        perror("fgets");
-        nexus_free(tmp_charptr);
-        return NULL;
+    for (char c = getc(fp); c != EOF; c = getc(fp)) {
+        if (c == '\n') {
+            line_count += 1;
+        }
+
+        file_size += 1;
     }
 
-    char * p_newline = strchr(rv, '\n');
+    rewind(fp);
 
-    if (p_newline) {
-        *p_newline = '\0';
-    }
+    *p_file_size = file_size;
 
-    return rv;
+    return line_count;
 }
 
 static int
 __attributes_filler(int argc, char ** argv)
 {
-    size_t created = 0;
+    size_t    buflen = 0;
+    uint8_t * buffer = NULL;
 
     if (argc < 1) {
         usage("attributes");
         return -1;
     }
 
-    char * filepath = strndup(argv[0], PATH_MAX);
-
-    FILE * file_ptr = fopen(filepath, "r");
+    char * filepath  = strndup(argv[0], PATH_MAX);
+    size_t file_size = 0;
+    FILE * file_ptr  = fopen(filepath, "r");
 
     if (file_ptr == NULL) {
         log_error("could not open file %s\n", filepath);
@@ -67,25 +70,18 @@ __attributes_filler(int argc, char ** argv)
         goto out_err;
     }
 
-    while (feof(file_ptr) == false) {
-        // <attr_name, attr_type>
-        char * attribute_pair = read_line(file_ptr);
-        if (attribute_pair == NULL) {
-            break;
-        }
+    size_t line_count = count_lines(file_ptr, &file_size);
 
-        char * _name = strtok(attribute_pair, ",");
-        char * _type = strtok(NULL, ",");
+    if (__nexus_read_raw_file(file_ptr, file_size, &buffer, &buflen)) {
+        log_error("__nexus_read_raw_file() FAILED\n");
+        goto out_err;
+    }
 
-        if (sgx_backend_abac_attribute_add(_name, _type, mounted_volume)) {
-            log_error("sgx_backend_abac_attribute_add() `%s` (%s) FAILED\n", _name, _type);
-            nexus_free(attribute_pair);
-            goto out_err;
-        }
+    nexus_printf("Adding %zu attributes\n", line_count);
 
-        nexus_free(attribute_pair);
-
-        created += 1;
+    if (sgx_backend_abac_attribute_add_bulk((char *)buffer, line_count, mounted_volume)) {
+        log_error("sgx_backend_abac_attribute_add_bulk() FAILED\n");
+        goto out_err;
     }
 
     if (sgx_backend_batch_mode_finish(mounted_volume)) {
@@ -93,14 +89,14 @@ __attributes_filler(int argc, char ** argv)
         goto out_err;
     }
 
-    nexus_printf("CREATED ATTRIBUTES: %zu\n", created);
-
+    nexus_free(buffer);
     fclose(file_ptr);
     nexus_free(filepath);
 
     return 0;
 out_err:
 
+    nexus_free(buffer);
     fclose(file_ptr);
     nexus_free(filepath);
 
@@ -111,7 +107,8 @@ out_err:
 static int
 __policies_filler(int argc, char ** argv)
 {
-    size_t added = 0;
+    size_t    buflen = 0;
+    uint8_t * buffer = NULL;
 
     if (argc < 1) {
         usage("policies");
@@ -119,7 +116,7 @@ __policies_filler(int argc, char ** argv)
     }
 
     char * filepath = strndup(argv[0], PATH_MAX);
-
+    size_t file_size = 0;
     FILE * file_ptr = fopen(filepath, "r");
 
     if (file_ptr == NULL) {
@@ -132,24 +129,18 @@ __policies_filler(int argc, char ** argv)
         goto out_err;
     }
 
-    while (feof(file_ptr) == false) {
-        struct nexus_uuid uuid;
+    size_t line_count = count_lines(file_ptr, &file_size);
 
-        char * policy_str = read_line(file_ptr);
-        if (policy_str == NULL) {
-            break;
-        }
+    if (__nexus_read_raw_file(file_ptr, file_size, &buffer, &buflen)) {
+        log_error("__nexus_read_raw_file() FAILED\n");
+        goto out_err;
+    }
 
-        if (sgx_backend_abac_policy_add(policy_str, &uuid, mounted_volume)) {
-            log_error("sgx_backend_abac_policy_add() FAILED\n");
-            nexus_printf("POLICY-> %s\n", policy_str);
-            nexus_free(policy_str);
-            goto out_err;
-        }
+    nexus_printf("Adding %zu policies\n", line_count);
 
-        nexus_free(policy_str);
-
-        added += 1;
+    if (sgx_backend_abac_policy_add_bulk((char *)buffer, line_count, mounted_volume)) {
+        log_error("sgx_backend_abac_policy_add() FAILED\n");
+        goto out_err;
     }
 
     if (sgx_backend_batch_mode_finish(mounted_volume)) {
@@ -157,13 +148,13 @@ __policies_filler(int argc, char ** argv)
         goto out_err;
     }
 
-    nexus_printf("ADDED POLICIES: %zu\n", added);
-
+    nexus_free(buffer);
     fclose(file_ptr);
     nexus_free(filepath);
 
     return 0;
 out_err:
+    nexus_free(buffer);
     fclose(file_ptr);
     nexus_free(filepath);
 

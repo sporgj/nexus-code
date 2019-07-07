@@ -1,6 +1,25 @@
 #include "internal.h"
 
 int
+sgx_backend_abac_attribute_add_bulk(char                * list_of_strings_by_newline,
+                                    size_t                number_of_lines,
+                                    struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_attribute_add_bulk(
+        backend->enclave_id, &ret, list_of_strings_by_newline, number_of_lines);
+
+    if (err || ret) {
+        log_error("ecall_abac_attribute_add_bulk() FAILED. err=%x, ret=%d\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
 sgx_backend_abac_attribute_add(char                * attribute_name,
                                char                * attribute_type,
                                struct nexus_volume * volume)
@@ -236,6 +255,25 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
 
         offset += result_size;
     } while (offset < total_size);
+
+    return 0;
+}
+
+int
+sgx_backend_abac_policy_add_bulk(char                * list_of_strings_by_newline,
+                                 size_t                number_of_lines,
+                                 struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_policy_add_bulk(
+        backend->enclave_id, &ret, list_of_strings_by_newline, number_of_lines);
+
+    if (err || ret) {
+        log_error("ecall_abac_policy_add_bulk() FAILED. err=%x, ret=%d\n", err, ret);
+        return -1;
+    }
 
     return 0;
 }

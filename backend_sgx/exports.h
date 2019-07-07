@@ -27,6 +27,11 @@ sgx_backend_import_rootkey(char * rk_exchange_path);
 // abac management stuff
 
 int
+sgx_backend_abac_attribute_add_bulk(char                * list_of_strings_by_newline,
+                                    size_t                number_of_lines,
+                                    struct nexus_volume * volume);
+
+int
 sgx_backend_abac_attribute_add(char                * attribute_name,
                                char                * attribute_type,
                                struct nexus_volume * volume);
@@ -67,6 +72,12 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume);
 
 
 /// policy management
+
+int
+sgx_backend_abac_policy_add_bulk(char                * list_of_strings_by_newline,
+                                 size_t                number_of_lines,
+                                 struct nexus_volume * volume);
+
 int
 sgx_backend_abac_policy_add(char                * policy_string,
                             struct nexus_uuid   * uuid,

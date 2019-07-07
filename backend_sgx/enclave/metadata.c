@@ -504,6 +504,13 @@ nexus_metadata_unlock(struct nexus_metadata * metadata)
     }
 }
 
+void
+nexus_metadata_reset(struct nexus_metadata * metadata)
+{
+    nexus_metadata_unlock(metadata);
+    nexus_metadata_reload(metadata, NEXUS_FREAD);
+}
+
 int
 nexus_metadata_verify_uuids(struct nexus_dentry * dentry)
 {

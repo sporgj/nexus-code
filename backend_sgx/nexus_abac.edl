@@ -11,6 +11,12 @@ enclave {
             [in, string] char * attriubte_type_IN
         );
 
+        public int ecall_abac_attribute_add_bulk
+        (
+            [in, string] char * list_of_strings_by_newline,
+                         size_t max_number
+        );
+
         /** Deletes an attribute from the volume */
         public int ecall_abac_attribute_del
         (
@@ -78,6 +84,13 @@ enclave {
 
 
         // policy management
+
+        public int ecall_abac_policy_add_bulk
+        (
+            [in, string] char * list_of_strings_by_newline,
+                         size_t max_number
+        );
+
         public int ecall_abac_policy_add
         (
             [in, string] char              * policy_string_IN,

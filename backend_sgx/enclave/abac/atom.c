@@ -12,7 +12,6 @@ struct __policy_atom_buf {
     atom_type_t             atom_type;
     pred_type_t             pred_type;
 
-    struct nexus_uuid       attr_uuid; // 0s when not an attribute
     char                    predicate[SYSTEM_FUNC_MAX_LENGTH];
 
     uint16_t                arity;
@@ -285,7 +284,6 @@ policy_atom_to_buf(struct policy_atom * atom, uint8_t * buffer, size_t buflen)
         atom_buffer->arity        = atom->arity;
         atom_buffer->args_bufsize = atom->args_bufsize;
 
-        nexus_uuid_copy(&atom->attr_uuid, &atom_buffer->attr_uuid);
         memcpy(atom_buffer->predicate, atom->predicate, SYSTEM_FUNC_MAX_LENGTH);
     }
 
@@ -351,7 +349,6 @@ policy_atom_from_buf(uint8_t * buffer, size_t buflen, uint8_t ** output_ptr)
         new_policy_atom->arity        = tmp_atom_buf->arity;
         new_policy_atom->args_bufsize = tmp_atom_buf->args_bufsize;
 
-        nexus_uuid_copy(&tmp_atom_buf->attr_uuid, &new_policy_atom->attr_uuid);
         memcpy(new_policy_atom->predicate, tmp_atom_buf->predicate, SYSTEM_FUNC_MAX_LENGTH);
     }
 
@@ -484,7 +481,7 @@ out_err:
 static bool
 __validate_abac_attribute_atom(struct policy_atom * atom)
 {
-    return __check_attribute(atom->predicate, atom->atom_type, &atom->attr_uuid);
+    return true;
 }
 
 static bool
