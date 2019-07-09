@@ -109,6 +109,7 @@ nexus_abac_objs := \
 	user_profile.o \
 	policy_store.o \
 	attribute_table.o \
+	audit_log.o \
 	attribute_space.o
 
 abac_objs := $(foreach o,$(nexus_abac_objs),abac/$(o))

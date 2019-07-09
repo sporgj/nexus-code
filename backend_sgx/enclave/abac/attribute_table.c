@@ -7,6 +7,8 @@ struct __attr_table_hdr {
     size_t                  count;
     size_t                  generation;
 
+    struct nexus_uuid       audit_log_uuid;
+
     __mac_and_version_bytes_t attribute_space_macversion_bytes;
 } __attribute__((packed));
 
@@ -177,6 +179,8 @@ __parse_attribute_table_hdr(struct attribute_table * attribute_table, uint8_t * 
     attribute_table->count = header->count;
     attribute_table->generation = header->generation;
 
+    nexus_uuid_copy(&header->audit_log_uuid, &attribute_table->audit_log_uuid);
+
     __mac_and_version_from_buf(&attribute_table->attribute_space_macversion,
                                (uint8_t *)&header->attribute_space_macversion_bytes);
 
@@ -251,6 +255,8 @@ __serialize_attribute_header(struct attribute_table * attribute_table, uint8_t *
 
     dest_header->count = attribute_table->count;
     dest_header->generation = attribute_table->generation;
+
+    nexus_uuid_copy(&attribute_table->audit_log_uuid, &dest_header->audit_log_uuid);
 
     __mac_and_version_to_buf(&attribute_table->attribute_space_macversion,
                              (uint8_t *)&dest_header->attribute_space_macversion_bytes);
@@ -400,4 +406,29 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
     *total_count = attribute_table->count;
 
     return 0;
+}
+
+
+
+bool
+attribute_table_has_audit_log(struct attribute_table * attribute_table)
+{
+    return nexus_uuid_is_zeros(&attribute_table->audit_log_uuid);
+}
+
+void
+attribute_table_set_audit_log(struct attribute_table * attribute_table, struct nexus_uuid * uuid)
+{
+    nexus_uuid_copy(uuid, &attribute_table->audit_log_uuid);
+}
+
+int
+attribute_table_get_audit_log(struct attribute_table * attribute_table, struct nexus_uuid * uuid)
+{
+    if (attribute_table_has_audit_log(attribute_table)) {
+        nexus_uuid_copy(&attribute_table->audit_log_uuid, uuid);
+        return 0;
+    }
+
+    return -1;
 }

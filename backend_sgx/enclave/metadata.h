@@ -25,6 +25,7 @@ typedef enum {
     NEXUS_ATTRIBUTE_STORE,
     NEXUS_POLICY_STORE,
     NEXUS_USER_PROFILE,
+    NEXUS_AUDIT_LOG,
 } nexus_metadata_type_t;
 
 
@@ -57,6 +58,7 @@ struct nexus_metadata {
         struct attribute_space   * attribute_space;
         struct policy_store      * policy_store;
         struct user_profile      * user_profile;
+        struct audit_log         * audit_log;
 
         void                     * object;
     };
@@ -145,7 +147,7 @@ nexus_metadata_reset(struct nexus_metadata * metadata);
  * @return metadata
  */
 struct nexus_metadata *
-nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t mode);
+nexus_metadata_load(struct nexus_uuid * uuid, nexus_metadata_type_t type, nexus_io_flags_t flags);
 
 /**
  * Flushes the contents of the metadata to the datastore
@@ -170,3 +172,6 @@ nexus_metadata_verify_uuids(struct nexus_dentry * dentry);
 
 bool
 nexus_metadata_has_changed(struct nexus_metadata * metadata);
+
+int
+metadata_create_audit_log(struct nexus_metadata * metadata);

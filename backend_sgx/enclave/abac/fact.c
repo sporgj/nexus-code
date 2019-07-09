@@ -96,6 +96,7 @@ kb_entity_new(struct nexus_uuid * uuid, attribute_type_t attribute_type)
     hashmap_init(&entity->name_facts, (hashmap_cmp_fn)__name_facts_cmp, NULL, 7);
 
     nexus_list_init(&entity->uuid_facts_lru);
+    nexus_list_init(&entity->name_facts_lru);
 
     return entity;
 }

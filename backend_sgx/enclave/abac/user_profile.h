@@ -13,8 +13,6 @@ struct user_profile {
     struct nexus_uuid               my_uuid;
     struct nexus_uuid               root_uuid;
 
-    size_t                          attribute_count;
-
     struct nexus_mac                mac;
 
     struct attribute_table        * attribute_table;
@@ -35,6 +33,9 @@ user_profile_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer);
 
 int
 user_profile_store(struct user_profile * user_profile, uint32_t version, struct nexus_mac * mac);
+
+size_t
+user_profile_get_size(struct user_profile * user_profile);
 
 
 int

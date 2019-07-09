@@ -31,6 +31,7 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
     struct attribute_space * attribute_space = NULL;
     struct policy_store    * policy_store    = NULL;
     struct user_profile    * user_profile    = NULL;
+    struct audit_log       * audit_log       = NULL;
 
     switch (metadata->type) {
     case NEXUS_SUPERNODE:
@@ -96,6 +97,14 @@ __set_metadata_object(struct nexus_metadata * metadata, void * object)
 
         user_profile = object;
         user_profile->metadata = metadata;
+        break;
+    case NEXUS_AUDIT_LOG:
+        if (metadata->audit_log) {
+            audit_log_free(metadata->audit_log);
+        }
+
+        audit_log = object;
+        audit_log->metadata = metadata;
         break;
     }
 
@@ -183,6 +192,9 @@ nexus_metadata_create(struct nexus_uuid * uuid, nexus_metadata_type_t metadata_t
     case NEXUS_USER_PROFILE:
         object = user_profile_create(&global_supernode->root_uuid, uuid);
         break;
+    case NEXUS_AUDIT_LOG:
+        object = audit_log_create(&global_supernode->root_uuid, uuid);
+        break;
     default:
         log_error("cannot create object from nexus_metadata_create()\n");
         return NULL;
@@ -218,6 +230,9 @@ nexus_metadata_free(struct nexus_metadata * metadata)
         break;
     case NEXUS_USER_PROFILE:
         user_profile_free(metadata->user_profile);
+        break;
+    case NEXUS_AUDIT_LOG:
+        audit_log_free(metadata->audit_log);
         break;
     }
 
@@ -282,6 +297,9 @@ __read_object(struct nexus_uuid     * uuid,
         case NEXUS_USER_PROFILE:
             object = user_profile_create(&global_supernode->root_uuid, uuid);
             break;
+        case NEXUS_AUDIT_LOG:
+            object = audit_log_create(&global_supernode->root_uuid, uuid);
+            break;
         default:
             log_error("metadata cannot be version 0\n");
             break;
@@ -311,6 +329,9 @@ __read_object(struct nexus_uuid     * uuid,
             break;
         case NEXUS_USER_TABLE:
             object = nexus_usertable_from_crypto_buf(crypto_buf);
+            break;
+        case NEXUS_AUDIT_LOG:
+            object = audit_log_from_crypto_buf(crypto_buf);
             break;
         }
     }
@@ -434,6 +455,9 @@ nexus_metadata_store(struct nexus_metadata * metadata)
     case NEXUS_USER_TABLE:
         ret = nexus_usertable_store(metadata->user_table, metadata->version, NULL);
         break;
+    case NEXUS_AUDIT_LOG:
+        ret = audit_log_store(metadata->audit_log, metadata->version, NULL);
+        break;
     default:
         log_error("metadata->type UNKNOWN\n");
         return -1;
@@ -535,4 +559,72 @@ metadata_get_attribute_table(struct nexus_metadata * metadata)
         log_error("incorrect metadata type\n");
         return NULL;
     }
+}
+
+int
+metadata_create_audit_log(struct nexus_metadata * metadata)
+{
+    struct nexus_uuid audit_log_uuid;
+
+    struct attribute_table * attribute_table = metadata_get_attribute_table(metadata);
+
+    if (attribute_table == NULL) {
+        log_error("could not get attribute table\n");
+        return -1;
+    }
+
+    if (attribute_table_has_audit_log(attribute_table)) {
+        log_error("attribute table already has audit log\n");
+        return 0;
+    }
+
+    // create the audit log and write to disk
+    {
+        struct nexus_metadata * audit_log_metadata = NULL;
+
+        nexus_uuid_gen(&audit_log_uuid);
+
+        audit_log_metadata = nexus_metadata_create(&audit_log_uuid, NEXUS_AUDIT_LOG);
+
+        if (nexus_metadata_store(audit_log_metadata)) {
+            nexus_metadata_free(audit_log_metadata);
+            goto out_err;
+        }
+
+        nexus_metadata_free(audit_log_metadata);
+    }
+
+    attribute_table_set_audit_log(attribute_table, &audit_log_uuid);
+    __metadata_set_dirty(metadata);
+
+    if (nexus_metadata_store(metadata)) {
+        log_error("nexus_metadata_store() FAILED\n");
+        goto out_err;
+    }
+
+    return 0;
+
+out_err:
+    return -1;
+}
+
+
+struct nexus_metadata *
+metadata_get_audit_log(struct nexus_metadata * metadata, nexus_io_flags_t flags)
+{
+    struct attribute_table * attribute_table = metadata_get_attribute_table(metadata);
+
+    struct nexus_uuid audit_log_uuid;
+
+    if (attribute_table == NULL) {
+        log_error("could not get attribute table\n");
+        return -1;
+    }
+
+    if (attribute_table_get_audit_log(attribute_table, &audit_log_uuid)) {
+        log_error("attribute table does not have audit log\n");
+        return NULL;
+    }
+
+    return nexus_metadata_load(&audit_log_uuid, NEXUS_AUDIT_LOG, flags);
 }

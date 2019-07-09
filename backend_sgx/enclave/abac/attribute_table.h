@@ -20,6 +20,8 @@ struct attribute_table {
     struct nexus_uuid       uuid;
     size_t                  count;
 
+    struct nexus_uuid       audit_log_uuid;
+
     size_t                  generation;
 
     struct mac_and_version  attribute_space_macversion;
@@ -44,6 +46,15 @@ attribute_table_create();
 
 void
 attribute_table_free(struct attribute_table * attribute_table);
+
+bool
+attribute_table_has_audit_log(struct attribute_table * attribute_table);
+
+void
+attribute_table_set_audit_log(struct attribute_table * attribute_table, struct nexus_uuid * uuid);
+
+int
+attribute_table_get_audit_log(struct attribute_table * attribute_table, struct nexus_uuid * uuid);
 
 
 size_t

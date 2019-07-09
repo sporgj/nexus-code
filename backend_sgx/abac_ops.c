@@ -62,14 +62,13 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
 
     struct nxs_attribute_schema schema_array[_ARRAY_LEN];
 
-    size_t offset      = 0;
     size_t total_size  = 0;
     size_t result_size = 0;
 
     int ret = -1;
     int err = -1;
 
-    do {
+    {
         err = ecall_abac_attribute_ls(
             backend->enclave_id, &ret, schema_array, _ARRAY_LEN, offset, &total_size, &result_size);
 
@@ -85,10 +84,7 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
         for (size_t i = 0; i < result_size; i++) {
             printf("\t %s [%s]\n", schema_array[i].schema_str, schema_array[i].type_str);
         }
-
-        offset += result_size;
-        break;
-    } while (offset < total_size);
+    }
 
     return 0;
 }
@@ -140,14 +136,13 @@ sgx_backend_abac_user_ls(char * username, struct nexus_volume * volume)
 
     struct nxs_attribute_pair pair_array[_ARRAY_LEN];
 
-    size_t offset      = 0;
     size_t total_size  = 0;
     size_t result_size = 0;
 
     int ret = -1;
     int err = -1;
 
-    do {
+    {
         err = ecall_abac_user_attribute_ls(backend->enclave_id,
                                            &ret,
                                            username,
@@ -169,9 +164,7 @@ sgx_backend_abac_user_ls(char * username, struct nexus_volume * volume)
         for (size_t i = 0; i < result_size; i++) {
             printf("\t %s [%s]\n", pair_array[i].schema_str, pair_array[i].val_str);
         }
-
-        offset += result_size;
-    } while (offset < total_size);
+    }
 
     return 0;
 }
@@ -223,14 +216,13 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
 
     struct nxs_attribute_pair pair_array[_ARRAY_LEN];
 
-    size_t offset      = 0;
     size_t total_size  = 0;
     size_t result_size = 0;
 
     int ret = -1;
     int err = -1;
 
-    do {
+    {
         err = ecall_abac_object_attribute_ls(backend->enclave_id,
                                              &ret,
                                              path,
@@ -252,9 +244,7 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
         for (size_t i = 0; i < result_size; i++) {
             printf("\t %s [%s]\n", pair_array[i].schema_str, pair_array[i].val_str);
         }
-
-        offset += result_size;
-    } while (offset < total_size);
+    }
 
     return 0;
 }
@@ -339,14 +329,13 @@ sgx_backend_abac_policy_ls(struct nexus_volume * volume)
     struct sgx_backend     * backend      = __sgx_backend_from_volume(volume);
     struct nxs_policy_rule * rules_buffer = NULL;
 
-    size_t offset       = 0;
     size_t total_count  = 0;
     size_t result_count = 0;
 
 
     rules_buffer = nexus_malloc(buf_capacity);
 
-    do {
+    {
         int ret = -1;
         int err = ecall_abac_policy_ls(backend->enclave_id,
                                        &ret,
@@ -362,9 +351,7 @@ sgx_backend_abac_policy_ls(struct nexus_volume * volume)
         }
 
         __print_policy_buffer(rules_buffer, result_count);
-
-        offset += result_count;
-    } while (offset < total_count);
+    }
 
     nexus_free(rules_buffer);
 

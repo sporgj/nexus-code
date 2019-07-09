@@ -5,6 +5,7 @@
 #include "policy_store.h"
 #include "rule.h"
 #include "user_profile.h"
+#include "audit_log.h"
 
 
 /// exports

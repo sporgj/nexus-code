@@ -96,8 +96,8 @@ user_profile_from_crypto_buf(struct nexus_crypto_buf * crypto_buffer)
     return user_profile_from_buffer(buffer, buflen);
 }
 
-static size_t
-__get_user_profile_size(struct user_profile * user_profile)
+size_t
+user_profile_get_size(struct user_profile * user_profile)
 {
     return sizeof(struct __user_profile_hdr)
            + attribute_table_get_size(user_profile->attribute_table);
@@ -145,7 +145,7 @@ user_profile_store(struct user_profile * user_profile, uint32_t version, struct 
 {
     struct nexus_crypto_buf * crypto_buffer = NULL;
 
-    size_t serialized_buflen = __get_user_profile_size(user_profile);
+    size_t serialized_buflen = user_profile_get_size(user_profile);
 
 
     crypto_buffer = nexus_crypto_buf_new(serialized_buflen, version, &user_profile->my_uuid);
