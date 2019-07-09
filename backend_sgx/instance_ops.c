@@ -412,7 +412,7 @@ sgx_backend_print_telemetry(struct nexus_volume * volume)
         printf("Lua memory: %zu KB\n", telemetry.lua_memory_kilobytes);
         printf("User Table: %zu user%c [%s]\n",
                telemetry.user_table_count,
-               (telemetry.user_table_count == 1 ? '' : 's'),
+               (telemetry.user_table_count == 1 ? ' ' : 's'),
                human_size(telemetry.user_table_bytes));
         printf("Attribute Space: %zu attributes [%s]\n",
                telemetry.attribute_space_count,
@@ -420,6 +420,9 @@ sgx_backend_print_telemetry(struct nexus_volume * volume)
         printf("Policy Store: %zu policies [%s]\n",
                telemetry.policy_store_count,
                human_size(telemetry.policy_store_bytes));
+        printf("User Profile: %zu attributes [%s]\n",
+               telemetry.user_profile_count,
+               human_size(telemetry.user_profile_bytes));
         printf("Rules count: %zu\n", telemetry.asserted_rules_count);
         printf("Facts count: %zu\n", telemetry.asserted_facts_count);
     }

@@ -95,6 +95,9 @@ struct nxs_telemetry {
     size_t     user_table_count;
     size_t     user_table_bytes;
 
+    size_t     user_profile_count;
+    size_t     user_profile_bytes;
+
     size_t     attribute_space_bytes;
     size_t     attribute_space_count;
 

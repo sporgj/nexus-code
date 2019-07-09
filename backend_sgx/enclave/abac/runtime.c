@@ -398,6 +398,7 @@ abac_export_telemetry(struct nxs_telemetry * telemetry)
     struct attribute_space * attribute_space = NULL;
     struct policy_store    * policy_store    = NULL;
     struct nexus_usertable * global_usertable = NULL;
+    struct user_profile    * user_profile = NULL;
 
     db_export_telemetry(telemetry);
 
@@ -432,5 +433,14 @@ abac_export_telemetry(struct nxs_telemetry * telemetry)
         nexus_vfs_release_user_table();
     } else {
         log_error("could not acquire glocal user table\n");
+    }
+
+    user_profile = abac_acquire_current_user_profile(NEXUS_FREAD);
+
+    if (user_profile) {
+        telemetry->user_profile_bytes = user_profile_get_size(user_profile);
+        telemetry->user_profile_count = user_profile->attribute_table->count;
+
+        abac_release_current_user_profile();
     }
 }
