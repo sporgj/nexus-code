@@ -9,6 +9,7 @@ static struct {
     { PERM_WRITE,       "write" },
     { PERM_CREATE,      "create" },
     { PERM_DELETE,      "delete" },
+    { PERM_AUDIT,       "audit" },
     { PERM_UNK,         NULL },
 };
 

@@ -63,6 +63,7 @@ struct nexus_metadata {
         void                     * object;
     };
 
+    struct nexus_metadata        * audit_log_metadata; // set by the abac runtime
 
     sgx_spinlock_t                 dentry_lock;
     struct list_head               dentry_list;
@@ -175,3 +176,6 @@ nexus_metadata_has_changed(struct nexus_metadata * metadata);
 
 int
 metadata_create_audit_log(struct nexus_metadata * metadata);
+
+struct nexus_metadata *
+metadata_get_audit_log(struct nexus_metadata * metadata, nexus_io_flags_t flags);

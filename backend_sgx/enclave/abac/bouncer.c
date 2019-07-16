@@ -476,11 +476,21 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
         goto out_err;
     }
 
-    nexus_printf(":) YAY!!!\n");
+    // 4 - check if there's an audit
+    if (db_ask_permission(perm_type, user_profile_entity, abac_req->obj_entity) == 0) {
+        struct nexus_metadata * audit_log_metadata = NULL;
+
+        audit_log_metadata = metadata_get_audit_log(abac_req->obj_metadata, NEXUS_FRDWR);
+
+        if (audit_log_metadata == NULL) {
+            log_error("could not get audit log metadata\n");
+            goto out_err;
+        }
+    }
 
     __destroy_abac_request(abac_req);
 
-    return false; // TODO change this when done
+    return true;
 out_err:
     __destroy_abac_request(abac_req);
 

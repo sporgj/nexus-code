@@ -22,6 +22,7 @@ typedef enum {
     PERM_WRITE              = 0x02,
     PERM_CREATE             = 0x03,
     PERM_DELETE             = 0x04,
+    PERM_AUDIT              = 0x05,
 } perm_type_t;
 
 typedef enum {
