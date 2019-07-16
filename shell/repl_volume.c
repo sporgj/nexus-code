@@ -983,6 +983,8 @@ repl_volume_main(int argc, char ** argv)
     do {
         int i = 0;
 
+        bool found = false;
+
         line = readline("> ");
 
         if (line == NULL) {
@@ -1005,6 +1007,12 @@ repl_volume_main(int argc, char ** argv)
                 if (ret) {
                     printf("command failed\n");
                 }
+
+                found = true;
+            }
+
+            if (found == false) {
+                log_error("command '%s' not found\n", my_argv[0]);
             }
 
             i++;
@@ -1012,6 +1020,48 @@ repl_volume_main(int argc, char ** argv)
 
         free(line);
     } while (true);
+}
+
+int
+cmd_volume_main(int argc, char ** argv)
+{
+    char * volume_path = NULL;
+
+    if (argc < 2) {
+        log_error("repl> must pass volume path\n");
+        return -1;
+    }
+
+    volume_path = strndup(argv[1], PATH_MAX);
+
+    mounted_volume = nexus_mount_volume(volume_path);
+
+    if (mounted_volume == NULL) {
+        printf("Error: could not mount nexus volume (%s)\n", volume_path);
+        nexus_free(volume_path);
+        return -1;
+    }
+
+    nexus_free(volume_path);
+
+    for (int i = 0; cmds[i].name; i++) {
+        if (strncmp(cmds[i].name, argv[2], 1024) == 0) {
+            int ret = cmds[i].handler(argc - 1, &my_argv[3]);
+
+            if (ret) {
+                printf("command failed\n");
+                return -1;
+            }
+
+            return 0;
+        }
+
+        i++;
+    }
+
+    log_error("command '%s' not found\n", argv[2]);
+
+    return -1;
 }
 
 static void
