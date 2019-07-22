@@ -4,7 +4,7 @@ import random
 import argparse
 
 
-PERMISSIONS = ['read', 'write', 'create', 'delete']
+PERMISSIONS = ['read', 'write', 'create', 'delete', 'audit']
 
 MAX_ATTRIBUTE_COUNT = 5
 

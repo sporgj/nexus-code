@@ -7,7 +7,7 @@ Creates attribute pairs from a list of words. Automatically skips keywords
 
 import argparse
 
-forbidden_words = ['read', 'write', 'create', 'delete']
+forbidden_words = ['read', 'write', 'create', 'delete', 'audit']
 
 
 def __get_parser():

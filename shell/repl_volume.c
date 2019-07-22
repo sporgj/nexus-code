@@ -783,6 +783,28 @@ handle_abac_print_facts(int argc, char ** argv)
 }
 
 static int
+handle_abac_clear_rules(int argc, char ** argv)
+{
+    if (sgx_backend_abac_clear_rules(mounted_volume)) {
+        log_error("sgx_backend_abac_clear_rules() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+handle_abac_clear_facts(int argc, char ** argv)
+{
+    if (sgx_backend_abac_clear_facts(mounted_volume)) {
+        log_error("sgx_backend_abac_clear_facts() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
 handle_abac_print_rules(int argc, char ** argv)
 {
     if (sgx_backend_abac_print_rules(mounted_volume)) {
@@ -949,6 +971,9 @@ static struct _cmd cmds[]
         { "abac_print_facts", handle_abac_print_facts, "List current facts", "" },
         { "abac_print_rules", handle_abac_print_rules, "List current rules", "" },
 
+        { "abac_clear_facts", handle_abac_clear_facts, "Clear current facts", "" },
+        { "abac_clear_rules", handle_abac_clear_rules, "Clear current rules", "" },
+
         { "telemetry", handle_telemetry, "Prints Telemetry", "" },
 
         { "help", help, "Prints usage", "" },
@@ -1011,11 +1036,11 @@ repl_volume_main(int argc, char ** argv)
                 found = true;
             }
 
-            if (found == false) {
-                log_error("command '%s' not found\n", my_argv[0]);
-            }
-
             i++;
+        }
+
+        if (found == false) {
+            log_error("command '%s' not found\n", my_argv[0]);
         }
 
         free(line);
@@ -1046,7 +1071,7 @@ cmd_volume_main(int argc, char ** argv)
 
     for (int i = 0; cmds[i].name; i++) {
         if (strncmp(cmds[i].name, argv[2], 1024) == 0) {
-            int ret = cmds[i].handler(argc - 1, &my_argv[3]);
+            int ret = cmds[i].handler(argc - 2, &argv[3]);
 
             if (ret) {
                 printf("command failed\n");
@@ -1055,8 +1080,6 @@ cmd_volume_main(int argc, char ** argv)
 
             return 0;
         }
-
-        i++;
     }
 
     log_error("command '%s' not found\n", argv[2]);
