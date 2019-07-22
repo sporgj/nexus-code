@@ -429,7 +429,7 @@ ecall_fs_readdir(char                * dirpath_IN,
 
     if (!bouncer_access_check(metadata, PERM_READ)) {
         log_error("ACCESS DENIED\n");
-        return -1;
+        goto out;
     }
 
     ret = UNSAFE_dirnode_readdir(metadata->dirnode,

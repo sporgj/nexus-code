@@ -668,3 +668,17 @@ ecall_abac_print_rules()
 {
     return UNSAFE_bouncer_print_rules();
 }
+
+int
+ecall_abac_clear_facts()
+{
+    db_clear_facts();
+    return 0;
+}
+
+int
+ecall_abac_clear_rules()
+{
+    db_clear_rules();
+    return 0;
+}

@@ -115,5 +115,9 @@ enclave {
         public int ecall_abac_print_facts();
 
         public int ecall_abac_print_rules();
+
+        public int ecall_abac_clear_facts();
+
+        public int ecall_abac_clear_rules();
     };
 };

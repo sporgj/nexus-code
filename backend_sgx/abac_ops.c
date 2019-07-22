@@ -64,6 +64,7 @@ sgx_backend_abac_attribute_ls(struct nexus_volume * volume)
 
     size_t total_size  = 0;
     size_t result_size = 0;
+    size_t offset      = 0; // TODO change to argument
 
     int ret = -1;
     int err = -1;
@@ -138,6 +139,7 @@ sgx_backend_abac_user_ls(char * username, struct nexus_volume * volume)
 
     size_t total_size  = 0;
     size_t result_size = 0;
+    size_t offset      = 0; // TODO change to argument
 
     int ret = -1;
     int err = -1;
@@ -218,6 +220,7 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
 
     size_t total_size  = 0;
     size_t result_size = 0;
+    size_t offset      = 0;  // TODO change to argument
 
     int ret = -1;
     int err = -1;
@@ -237,9 +240,7 @@ sgx_backend_abac_object_ls(char * path, struct nexus_volume * volume)
             return -1;
         }
 
-        if (offset == 0) {
-            printf("ATTRIBUTE COUNT = %zu\n===\n", total_size);
-        }
+        printf("ATTRIBUTE COUNT = %zu\n===\n", total_size);
 
         for (size_t i = 0; i < result_size; i++) {
             printf("\t %s [%s]\n", pair_array[i].schema_str, pair_array[i].val_str);
@@ -331,6 +332,7 @@ sgx_backend_abac_policy_ls(struct nexus_volume * volume)
 
     size_t total_count  = 0;
     size_t result_count = 0;
+    size_t offset       = 0;
 
 
     rules_buffer = nexus_malloc(buf_capacity);
@@ -387,6 +389,38 @@ sgx_backend_abac_print_rules(struct nexus_volume * volume)
 
     if (ret || err) {
         log_error("ecall_abac_print_rules() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+sgx_backend_abac_clear_facts(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_clear_facts(backend->enclave_id, &ret);
+
+    if (ret || err) {
+        log_error("ecall_abac_clear_facts() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+sgx_backend_abac_clear_rules(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_clear_rules(backend->enclave_id, &ret);
+
+    if (ret || err) {
+        log_error("ecall_abac_clear_rules() FAILED\n");
         return -1;
     }
 
