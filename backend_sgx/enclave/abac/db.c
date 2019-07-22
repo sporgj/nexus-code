@@ -3,6 +3,8 @@
 #include "abac_internal.h"
 #include "db.h"
 
+#include "./datalog-engine/engine.h"
+
 #include <libnexus_trusted/rapidstring.h>
 
 
@@ -11,10 +13,28 @@
 
 static dl_db_t my_database;
 
-static struct list_head cached_facts_list;
 static size_t           cached_facts_count;
-
 static size_t           cached_rules_count;
+
+struct kb_entity *
+kb_entity_new(struct nexus_uuid * uuid, attribute_type_t attribute_type)
+{
+    struct kb_entity * entity = nexus_malloc(sizeof(struct kb_entity));
+
+    nexus_uuid_copy(uuid, &entity->uuid);
+    entity->uuid_str = nexus_uuid_to_hex(uuid);
+
+    entity->attr_type = attribute_type;
+
+    return entity;
+}
+
+void
+kb_entity_free(struct kb_entity * entity)
+{
+    nexus_free(entity->uuid_str);
+    nexus_free(entity);
+}
 
 int
 db_init()
@@ -26,17 +46,12 @@ db_init()
         return -1;
     }
 
-    INIT_LIST_HEAD(&cached_facts_list);
-
     return 0;
 }
 
 void
 db_exit()
 {
-    // TODO remove the cached facts
-    //
-
     if (my_database) {
         datalog_engine_destroy(my_database);
     }
@@ -65,42 +80,19 @@ db_ask_permission(perm_type_t        perm_type,
 int
 db_assert_kb_entity_type(struct kb_entity * entity)
 {
-    if (entity->type_fact && entity->type_fact->is_inserted) {
-        return 0;
-    }
+    char * entity_type_str = NULL;
 
-    if (entity->type_fact == NULL) {
-        char * entity_type_str = NULL;
-
-        if (entity->attr_type == USER_ATTRIBUTE_TYPE) {
-            entity_type_str = "_isUser";
-        } else if (entity->attr_type == OBJECT_ATTRIBUTE_TYPE) {
-            entity_type_str = "_isObject";
-        } else {
-            log_error("unsupported attribute type\n");
-            return -1;
-        }
-
-        entity->type_fact = kb_entity_put_name_fact(entity, entity_type_str, NULL);
-    }
-
-    if (db_assert_fact(entity->type_fact)) {
-        log_error("could not assert `%s` entity type\n", entity->uuid_str);
+    if (entity->attr_type == USER_ATTRIBUTE_TYPE) {
+        entity_type_str = "_isUser";
+    } else if (entity->attr_type == OBJECT_ATTRIBUTE_TYPE) {
+        entity_type_str = "_isObject";
+    } else {
+        log_error("unsupported attribute type\n");
         return -1;
     }
 
-    return 0;
-}
-
-int
-db_retract_kb_entity_type(struct kb_entity * entity)
-{
-    if (entity->type_fact == NULL || !entity->type_fact->is_inserted) {
-        return 0;
-    }
-
-    if (db_retract_fact(entity->type_fact)) {
-        log_error("could not retract `%s` entity type\n", entity->uuid_str);
+    if (db_assert_fact(entity, entity_type_str, NULL)) {
+        log_error("could not assert `%s` entity type\n", entity->uuid_str);
         return -1;
     }
 
@@ -143,14 +135,11 @@ out_err:
 }
 
 int
-db_retract_fact(struct kb_fact * cached_fact)
+db_retract_fact(struct kb_entity * entity, const char * predicate, const char * value)
 {
     int mark = dl_mark(my_database);
 
-    if (__insert_db_fact(my_database,
-                         cached_fact->name,
-                         cached_fact->entity->uuid_str,
-                         cached_fact->value)) {
+    if (__insert_db_fact(my_database, predicate, entity->uuid_str, value)) {
         log_error("__insert_db_fact() FAILED\n");
         goto out_err;
     }
@@ -160,13 +149,6 @@ db_retract_fact(struct kb_fact * cached_fact)
         goto out_err;
     }
 
-    cached_fact->is_inserted = false;
-
-    kb_fact_cool_down(cached_fact);
-
-    list_del_init(&cached_fact->db_list);
-    cached_facts_count -= 1;
-
     return 0;
 
 out_err:
@@ -174,62 +156,20 @@ out_err:
     return -1;
 }
 
-
-static int
-__make_space(struct kb_fact * fact)
-{
-    if (cached_facts_count < MAX_CACHED_FACTS) {
-        return 0;
-    }
-
-    struct list_head * curr = NULL;
-    struct list_head * next = NULL;
-
-    list_for_each_prev_safe(curr, next, &cached_facts_list) {
-        struct kb_fact * asserted_fact = list_last_entry(curr, struct kb_fact, db_list);
-
-        if (asserted_fact->entity == fact->entity) {
-            continue;
-        }
-
-        if (db_retract_fact(asserted_fact)) {
-            log_error("could not retract fact\n");
-            return -1;
-        } else {
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
-
 int
-db_assert_fact(struct kb_fact * cached_fact)
+db_assert_fact(struct kb_entity * entity, const char * predicate, const char * value)
 {
     int mark = -1;
-
-    if (cached_fact->is_inserted) {
-        nexus_printf("WARNING: tring to add indeserted fact\n");
-        return 0;
-    }
-
-    if (__make_space(cached_fact)) {
-        log_error("could not make space for the new fact\n");
-        return -1;
-    }
+    int ret  = -1;
 
     mark = dl_mark(my_database);
 
-    if (__insert_db_fact(my_database,
-                         cached_fact->name,
-                         cached_fact->entity->uuid_str,
-                         cached_fact->value)) {
+    if (__insert_db_fact(my_database, predicate, entity->uuid_str, value)) {
         log_error("__insert_db_fact() FAILED\n");
         goto out_err;
     }
 
-    int ret = dl_assert(my_database);
+    ret = dl_assert(my_database);
 
     if (ret) {
         if (ret == -1) {
@@ -241,29 +181,12 @@ db_assert_fact(struct kb_fact * cached_fact)
         goto out_err;
     }
 
-    cached_fact->is_inserted = true;
-
-    kb_fact_warm_up(cached_fact);
-
-    list_add(&cached_fact->db_list, &cached_facts_list);
-
     cached_facts_count += 1;
 
     return 0;
 out_err:
     dl_reset(my_database, mark);
     return -1;
-}
-
-void
-db_reaffirm_fact(struct kb_fact * cached_fact)
-{
-    if (!cached_fact->is_inserted) {
-        return;
-    }
-
-    kb_fact_warm_up(cached_fact);
-    list_move(&cached_fact->db_list, &cached_facts_list);
 }
 
 int
@@ -419,10 +342,11 @@ db_export_telemetry(struct nxs_telemetry * telemetry)
 
     telemetry->lua_memory_kilobytes = datalog_engine_lua_kilobytes(my_database);
 
-    telemetry->asserted_facts_count = cached_facts_count;
-    telemetry->asserted_rules_count = cached_rules_count;
+    telemetry->asserted_facts_count = dl_count_facts(my_database);
+    telemetry->asserted_rules_count = dl_count_rules(my_database);
 }
 
+// TODO
 int
 UNSAFE_db_print_facts()
 {
@@ -433,36 +357,56 @@ UNSAFE_db_print_facts()
         return 0;
     }
 
-    rs_init(&string_builder);
+    return -1;
+}
 
-    {
-        char tmp_buffer[32] = { 0 };
-
-        snprintf(tmp_buffer, sizeof(tmp_buffer), "%zu Facts", cached_facts_count);
-        rs_cat(&string_builder, tmp_buffer);
-
-        rs_cat(&string_builder, "\n-----------\n");
+void
+db_clear_facts()
+{
+    if (nexus_enclave_is_current_user_owner()) {
+        return;
     }
 
-    list_for_each(curr, &cached_facts_list) {
-        struct kb_fact * cached_fact = __kb_fact_from_db_list(curr);
+    dl_clear_facts(my_database);
 
-        rs_cat(&string_builder, cached_fact->name);
-        rs_cat_n(&string_builder, "(", 1);
-        rs_cat(&string_builder, cached_fact->entity->uuid_str);
+    lua_gc(my_database, LUA_GCCOLLECT, 0);
 
-        if (cached_fact->value && strnlen(cached_fact->value, ATTRIBUTE_VALUE_SIZE)) {
-            rs_cat_n(&string_builder, ", \"", 3);
-            rs_cat(&string_builder, cached_fact->value);
-            rs_cat_n(&string_builder, "\"", 1);
-        }
+    cached_facts_count = 0;
+}
 
-        rs_cat_n(&string_builder, ")\n", 2);
+void
+db_clear_rules()
+{
+    if (nexus_enclave_is_current_user_owner()) {
+        return;
     }
 
-    ocall_print(rs_data_c(&string_builder));
+    dl_clear_rules(my_database);
 
-    rs_free(&string_builder);
+    lua_gc(my_database, LUA_GCCOLLECT, 0);
+
+    cached_rules_count = 0;
+}
+
+int
+db_evict_entity(struct kb_entity * entity)
+{
+    if (nexus_enclave_is_current_user_owner()) {
+        return 0;
+    }
+
+    int evict_count = dl_evict_entity(my_database, entity->uuid_str);
+
+    if (evict_count == -1) {
+        log_error("could not evict '%s' from knowledgebase\n", entity->uuid_str);
+        return -1;
+    }
+
+    if (evict_count > 0) {
+        nexus_printf("evicted %d facts for `%s`\n", evict_count, entity->uuid_str);
+    }
+
+    cached_facts_count -= evict_count;
 
     return 0;
 }

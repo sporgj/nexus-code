@@ -404,12 +404,6 @@ policy_atom_get_arg(struct policy_atom * atom, size_t index)
 }
 
 void
-policy_atom_set_uuid(struct policy_atom * atom, struct nexus_uuid * uuid)
-{
-    nexus_uuid_copy(uuid, &atom->attr_uuid);
-}
-
-void
 policy_atom_set_predicate(struct policy_atom * atom, char * predicate_str)
 {
     memset(&atom->predicate, 0, SYSTEM_FUNC_MAX_LENGTH);

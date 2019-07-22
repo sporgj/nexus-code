@@ -59,7 +59,6 @@ struct policy_atom {
     atom_type_t             atom_type;
     pred_type_t             pred_type;
 
-    struct nexus_uuid       attr_uuid; // 0s when not an attribute
     char                    predicate[SYSTEM_FUNC_MAX_LENGTH];
 
     size_t                  arity;

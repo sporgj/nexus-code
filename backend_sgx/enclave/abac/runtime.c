@@ -400,6 +400,8 @@ abac_export_telemetry(struct nxs_telemetry * telemetry)
     struct nexus_usertable * global_usertable = NULL;
     struct user_profile    * user_profile = NULL;
 
+    memset(telemetry, 0, sizeof(struct nxs_telemetry));
+
     db_export_telemetry(telemetry);
 
     telemetry->attribute_space_bytes = 0;
