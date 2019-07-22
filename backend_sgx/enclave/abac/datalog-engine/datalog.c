@@ -262,6 +262,61 @@ dl_retract(dl_db_t L)
     return dl_pcall(L, 1, 0);
 }
 
+DATALOG_API int
+dl_count_facts(dl_db_t L)
+{
+    lua_getglobal(L, "dl_count_facts");
+    if (dl_pcall(L, 0, 1)) {
+        return 0;
+    }
+
+    int fact_count = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return fact_count;
+}
+
+DATALOG_API int
+dl_count_rules(dl_db_t L)
+{
+    lua_getglobal(L, "dl_count_rules");
+    if (dl_pcall(L, 0, 1)) {
+        return 0;
+    }
+
+    int rule_count = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return rule_count;
+}
+
+DATALOG_API void
+dl_clear_facts(dl_db_t L)
+{
+    lua_getglobal(L, "dl_clear_facts");
+    dl_pcall(L, 0, 0);
+}
+
+DATALOG_API void
+dl_clear_rules(dl_db_t L)
+{
+    lua_getglobal(L, "dl_clear_rules");
+    dl_pcall(L, 0, 0);
+}
+
+DATALOG_API int
+dl_evict_entity(dl_db_t L, char * entity_name)
+{
+    lua_getglobal(L, "dl_evict_entity");
+    lua_pushstring(L, entity_name);
+
+    if (dl_pcall(L, 1, 1)) {
+        return -1;
+    }
+
+    int count = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return count;
+}
+
 /* The dl_ask function returns the list of facts it derives from a
    literal provided as the function's query.  A pointer to the
    dl_answers structure represents the list. */

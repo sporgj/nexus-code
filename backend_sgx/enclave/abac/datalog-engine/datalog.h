@@ -157,6 +157,22 @@ dl_assert(dl_db_t db);
 DATALOG_API int
 dl_retract(dl_db_t db);
 
+DATALOG_API int
+dl_count_facts(dl_db_t L);
+
+DATALOG_API int
+dl_count_rules(dl_db_t L);
+
+DATALOG_API void
+dl_clear_facts(dl_db_t L);
+
+DATALOG_API void
+dl_clear_rules(dl_db_t L);
+
+// return -1 on error
+DATALOG_API int
+dl_evict_entity(dl_db_t L, char * entity_name);
+
 /* Computes a list that contains all ground instances of a literal
    that are a logical consequence of the clauses stored in the
    database.  Pops the literal from the stack and returns a freshly

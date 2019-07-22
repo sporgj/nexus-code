@@ -504,6 +504,98 @@ local function retract(clause)
    return clause
 end
 
+local function is_rule(clause)
+  if not clause then
+    return false
+  end
+
+  local start1, stop1 = string.find(clause, '/')
+  if start1 and string.find(clause, '/', stop1 + 1) then
+    return true
+  end
+
+  return false
+end
+
+local function get_table_size(t)
+  local count = 0
+  for _, __ in pairs(t) do
+    count = count + 1
+  end
+  return count
+end
+
+local function evict_entity(uuid_str)
+  local evicted_count = 0
+
+  for _, clauses in next, db do
+    for clause_id, clause_obj in next, clauses.db do
+      if clause_id and not is_rule(clause_id) and string.find(clause_id, uuid_str) then
+	evicted_count = evicted_count + 1
+	retract(clause_obj)
+      end
+    end
+  end
+
+  return evicted_count
+end
+
+dl_evict_entity = evict_entity
+
+local function clear_facts()
+  for _, clauses in next, db do
+    clause = next(clauses.db)
+    if not is_rule(clause) then
+      remove(clauses)
+    end
+  end
+end
+
+dl_clear_facts = clear_facts
+
+local function clear_rules()
+  for _, clauses in next, db do
+    clause = next(clauses.db)
+    if is_rule(clause) then
+      remove(clauses)
+    end
+  end
+end
+
+dl_clear_rules = clear_rules
+
+-- Count the number of facts
+local function count_facts()
+  local number_of_facts = 0
+
+  for i, clauses in next, db do
+    clause = next(clauses.db)
+    if not is_rule(clause) then
+      number_of_facts = number_of_facts + get_table_size(clauses.db)
+    end
+  end
+
+  return number_of_facts
+end
+
+dl_count_facts = count_facts
+
+-- Count the number of rules
+local function count_rules()
+  local number_of_rules = 0
+
+  for _, clauses in next, db do
+    clause = next(clauses.db)
+    if is_rule(clause) then
+      number_of_rules = number_of_rules + get_table_size(clauses.db)
+    end
+  end
+
+  return number_of_rules
+end
+
+dl_count_rules = count_rules
+
 -- DATABASE CLONING
 
 -- A database can be saved and then later restored.  With copy and
@@ -922,55 +1014,6 @@ add_iter_prim("_ne", 2, function(literal)
     end
   end
 end)
-
---[[
-
--- Example of a very simple primitive defined by an iterator.
--- It defines the fact three(3).
-
-add_iter_prim("three", 1,
-	      function(literal)
-		 return function(s, v)
-			   if v then
-			      return nil
-			   else
-			      return {3}
-			   end
-			end
-	      end)
-
--- Example of the successor primitive.
-
-local function succ(literal)
-   return function(s, v)
-	     if v then
-		return nil
-	     else
-		local x = literal[1]
-		local y = literal[2]
-		if y:is_const() then
-		   local j = tonumber(y.id)
-		   if j and j >= 0 then
-		      return {j + 1, j}
-		   else
-		      return nil
-		   end
-		elseif x:is_const() then
-		   local i = tonumber(x.id)
-		   if i and i > 0 then
-		      return {i, i - 1}
-		   else
-		      return nil
-		   end
-		else
-		   return nil
-		end
-	     end
-	  end
-end
-datalog.add_iter_prim("succ", 2, succ)
-
---]]
 
 -- EXPORTED FUNCTIONS
 
