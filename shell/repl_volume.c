@@ -815,6 +815,27 @@ handle_abac_print_rules(int argc, char ** argv)
     return 0;
 }
 
+static int
+handle_abac_audit_log(int argc, char ** argv)
+{
+    char * path = NULL;
+
+    int ret = -1;
+
+    if (argc < 1) {
+        usage("abac_audit_log");
+        return -1;
+    }
+
+    path = strndup(argv[0], 1024);
+
+    ret = sgx_backend_abac_object_auditor(path, mounted_volume);
+
+    nexus_free(path);
+
+    return ret;
+}
+
 
 /////////
 
@@ -973,6 +994,8 @@ static struct _cmd cmds[]
 
         { "abac_clear_facts", handle_abac_clear_facts, "Clear current facts", "" },
         { "abac_clear_rules", handle_abac_clear_rules, "Clear current rules", "" },
+
+        { "abac_audit_log", handle_abac_audit_log, "Prints file/dir audit log", "" },
 
         { "telemetry", handle_telemetry, "Prints Telemetry", "" },
 

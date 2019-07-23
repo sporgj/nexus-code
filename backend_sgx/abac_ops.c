@@ -426,3 +426,19 @@ sgx_backend_abac_clear_rules(struct nexus_volume * volume)
 
     return 0;
 }
+
+int
+sgx_backend_abac_object_auditor(char * path, struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_print_audit_log(backend->enclave_id, &ret, path);
+
+    if (err || ret) {
+        log_error("ecall_abac_print_audit_log() FAILED. err=%x, ret=%d\n", err, ret);
+        return -1;
+    }
+
+    return 0;
+}

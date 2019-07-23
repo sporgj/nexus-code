@@ -338,6 +338,45 @@ bouncer_destroy()
     }
 }
 
+static int
+__audit_abac_request(struct abac_request * abac_req)
+{
+    struct nexus_metadata * audit_log_metadata = NULL;
+
+    if (db_ask_permission(PERM_AUDIT, user_profile_entity, abac_req->obj_entity)) {
+        return 0;
+    }
+
+    if (metadata_create_audit_log(abac_req->obj_metadata)) {
+        log_error("could not create audit log\n");
+        goto out_err;
+    }
+
+    audit_log_metadata = metadata_get_audit_log(abac_req->obj_metadata, NEXUS_FRDWR);
+
+    if (audit_log_metadata == NULL) {
+        log_error("could not get audit log metadata\n");
+        goto out_err;
+    }
+
+    if (audit_log_add_event(audit_log_metadata->audit_log,
+                            abac_req->perm_type,
+                            &global_user_struct->user_uuid,
+                            abac_req->obj_metadata->version)) {
+        log_error("audit_log_add_event() FAILED\n");
+        goto out_err;
+    }
+
+    if (nexus_metadata_store(audit_log_metadata)) {
+        log_error("nexus_metadata_store() FAILED\n");
+        goto out_err;
+    }
+
+    return 0;
+out_err:
+    return -1;
+}
+
 bool
 bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
 {
@@ -376,18 +415,10 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
     }
 
     // 4 - check if there's an audit
-#if 0
-    if (db_ask_permission(perm_type, user_profile_entity, abac_req->obj_entity) == 0) {
-        struct nexus_metadata * audit_log_metadata = NULL;
-
-        audit_log_metadata = metadata_get_audit_log(abac_req->obj_metadata, NEXUS_FRDWR);
-
-        if (audit_log_metadata == NULL) {
-            log_error("could not get audit log metadata\n");
-            goto out_err;
-        }
+    if (__audit_abac_request(abac_req)) {
+        log_error("__audit_abac_request() FAAILED\n");
+        goto out_err;
     }
-#endif
 
     __destroy_abac_request(abac_req);
 

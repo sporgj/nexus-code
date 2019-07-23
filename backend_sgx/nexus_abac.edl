@@ -119,5 +119,10 @@ enclave {
         public int ecall_abac_clear_facts();
 
         public int ecall_abac_clear_rules();
+
+        public int ecall_abac_print_audit_log
+        (
+            [in, string] char * path_IN
+        );
     };
 };

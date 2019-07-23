@@ -12,8 +12,9 @@ struct __audit_log_hdr {
 
 
 struct __audit_log_event {
+    uint64_t version;
     perm_type_t  perm;
-    nexus_uid_t  uid;
+    struct nexus_uuid  uuid;
 } __attribute__((packed));
 
 
@@ -236,14 +237,60 @@ out_err:
 }
 
 int
-audit_log_add_event(struct audit_log * audit_log, perm_type_t perm, nexus_uid_t uid)
+audit_log_add_event(struct audit_log  * audit_log,
+                    perm_type_t         perm,
+                    struct nexus_uuid * uuid,
+                    size_t              version)
 {
     struct audit_event * audit_event = nexus_malloc(sizeof(struct audit_event));
 
     struct __audit_log_event _evt = { 0 };
 
     _evt.perm = perm;
-    _evt.uid = uid;
+    _evt.version = version;
+    nexus_uuid_copy(uuid, &_evt.uuid);
 
-    return __audit_log_put(audit_log, &_evt);
+    if (__audit_log_put(audit_log, &_evt)) {
+        log_error("__audit_log_put() FAILED\n");
+        return -1;
+    }
+
+    __audit_log_set_dirty(audit_log);
+
+    return 0;
+}
+
+
+int
+audit_log_print(struct audit_log * audit_log, struct nexus_usertable * usertable)
+{
+    struct list_head * curr = NULL;
+
+    size_t count = 0;
+
+    nexus_printf("EVENT COUNT = %zu\n", audit_log->event_count);
+
+    list_for_each(curr, &audit_log->events_list) {
+        struct audit_event * event = container_of(curr, struct audit_event, node);
+
+        struct nexus_user * user = nexus_usertable_find_uuid(usertable, &event->_evt.uuid);
+
+        if (user == NULL) {
+            log_error("could not find user entry\n");
+            continue;
+        }
+
+        char * permission_string = perm_type_to_string(event->_evt.perm);
+
+        nexus_printf("[%s] %s\n", user->name, permission_string);
+
+        nexus_free(permission_string);
+
+        count++;
+        if (count == 10) {
+            break;
+        }
+    }
+
+    return 0;
 }

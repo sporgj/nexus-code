@@ -413,7 +413,7 @@ UNSAFE_attribute_table_ls(struct attribute_table    * attribute_table,
 bool
 attribute_table_has_audit_log(struct attribute_table * attribute_table)
 {
-    return nexus_uuid_is_zeros(&attribute_table->audit_log_uuid);
+    return !nexus_uuid_is_zeros(&attribute_table->audit_log_uuid);
 }
 
 void

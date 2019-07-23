@@ -179,3 +179,6 @@ metadata_create_audit_log(struct nexus_metadata * metadata);
 
 struct nexus_metadata *
 metadata_get_audit_log(struct nexus_metadata * metadata, nexus_io_flags_t flags);
+
+bool
+metadata_has_audit_log(struct nexus_metadata * metadata);

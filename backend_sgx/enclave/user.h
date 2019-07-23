@@ -96,6 +96,9 @@ struct nexus_user *
 nexus_usertable_find_name(struct nexus_usertable * usertable, char * name);
 
 struct nexus_user *
+nexus_usertable_find_uuid(struct nexus_usertable * usertable, struct nexus_uuid * uuid);
+
+struct nexus_user *
 nexus_usertable_find_pubkey_hash(struct nexus_usertable * usertable, pubkey_hash_t * pubkey_hash);
 
 /**

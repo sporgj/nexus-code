@@ -682,3 +682,73 @@ ecall_abac_clear_rules()
     db_clear_rules();
     return 0;
 }
+
+
+static int
+__nxs_abac_print_audit_log(struct nexus_metadata * audit_log_metadata)
+{
+    struct nexus_usertable * usertable   = nexus_vfs_acquire_user_table(NEXUS_FREAD);
+
+    if (usertable == NULL) {
+        log_error("nexus_global_get_usertable() FAILED\n");
+        return NULL;
+    }
+
+    if (audit_log_print(audit_log_metadata->audit_log, usertable)) {
+        log_error("audit_log_print() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_vfs_release_user_table();
+
+    return 0;
+out_err:
+    nexus_vfs_release_user_table();
+
+    return -1;
+}
+
+
+int
+ecall_abac_print_audit_log(char * filepath_IN)
+{
+    struct nexus_metadata * metadata = NULL;
+    struct nexus_metadata * audit_log_metadata = NULL;
+
+    sgx_spin_lock(&vfs_ops_lock);
+
+    metadata = nexus_vfs_get(filepath_IN, NEXUS_FRDWR);
+
+    if (metadata == NULL) {
+        log_error("could not get metadata\n");
+        sgx_spin_unlock(&vfs_ops_lock);
+        return -1;
+    }
+
+    audit_log_metadata = metadata_get_audit_log(metadata, NEXUS_FREAD);
+
+    if (audit_log_metadata == NULL) {
+        nexus_printf("could not acquire audit log\n");
+        goto out_err;
+    }
+
+    if (__nxs_abac_print_audit_log(audit_log_metadata)) {
+        log_error("__nxs_abac_print_audit_log() FAILED\n");
+        goto out_err;
+    }
+
+    nexus_vfs_put(audit_log_metadata);
+    nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
+
+    return 0;
+out_err:
+    if (audit_log_metadata) {
+        nexus_vfs_put(audit_log_metadata);
+    }
+
+    nexus_vfs_put(metadata);
+    sgx_spin_unlock(&vfs_ops_lock);
+
+    return -1;
+}

@@ -561,6 +561,19 @@ metadata_get_attribute_table(struct nexus_metadata * metadata)
     }
 }
 
+bool
+metadata_has_audit_log(struct nexus_metadata * metadata)
+{
+    struct attribute_table * attribute_table = metadata_get_attribute_table(metadata);
+
+    if (attribute_table == NULL) {
+        log_error("could not get attribute table\n");
+        return -1;
+    }
+
+    return attribute_table_has_audit_log(attribute_table);
+}
+
 int
 metadata_create_audit_log(struct nexus_metadata * metadata)
 {
@@ -574,7 +587,6 @@ metadata_create_audit_log(struct nexus_metadata * metadata)
     }
 
     if (attribute_table_has_audit_log(attribute_table)) {
-        log_error("attribute table already has audit log\n");
         return 0;
     }
 
@@ -595,11 +607,32 @@ metadata_create_audit_log(struct nexus_metadata * metadata)
     }
 
     attribute_table_set_audit_log(attribute_table, &audit_log_uuid);
-    __metadata_set_dirty(metadata);
 
-    if (nexus_metadata_store(metadata)) {
-        log_error("nexus_metadata_store() FAILED\n");
-        goto out_err;
+    // check the file is in write-mode, flush it, and re-open
+    {
+        nexus_io_flags_t old_flags = metadata->flags;
+
+        if (!nexus_io_in_lock_mode(old_flags)) {
+            if (nexus_metadata_lock(metadata, NEXUS_FWRITE)) {
+                log_error("nexus_metadata_lock() FAILED\n");
+                goto out_err;
+            }
+        }
+
+        __metadata_set_dirty(metadata);
+
+        if (nexus_metadata_store(metadata)) {
+            log_error("nexus_metadata_store() FAILED\n");
+            goto out_err;
+        }
+
+        // reopen in old mode
+        if (nexus_io_in_lock_mode(old_flags)) {
+            if (nexus_metadata_lock(metadata, old_flags)) {
+                log_error("nexus_metadata_lock() FAILED\n");
+                goto out_err;
+            }
+        }
     }
 
     return 0;
@@ -626,5 +659,5 @@ metadata_get_audit_log(struct nexus_metadata * metadata, nexus_io_flags_t flags)
         return NULL;
     }
 
-    return nexus_metadata_load(&audit_log_uuid, NEXUS_AUDIT_LOG, flags);
+    return nexus_vfs_load(&audit_log_uuid, NEXUS_AUDIT_LOG, flags);
 }

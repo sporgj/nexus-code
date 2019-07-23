@@ -33,4 +33,13 @@ int
 audit_log_store(struct audit_log * audit_log, size_t version, struct nexus_mac * mac);
 
 int
-audit_log_add_event(struct audit_log * audit_log, perm_type_t perm, nexus_uid_t uid);
+audit_log_add_event(struct audit_log  * audit_log,
+                    perm_type_t         perm,
+                    struct nexus_uuid * uuid,
+                    size_t              version);
+
+int
+audit_log_add_event(struct audit_log  * audit_log,
+                    perm_type_t         perm,
+                    struct nexus_uuid * uuid,
+                    size_t              version);
