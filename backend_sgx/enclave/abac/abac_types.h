@@ -110,3 +110,6 @@ perm_type_from_string(char * str);
 
 char *
 perm_type_to_string(perm_type_t perm_type);
+
+bool
+perm_type_modifies_object(perm_type_t perm_type);

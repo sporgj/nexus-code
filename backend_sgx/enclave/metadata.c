@@ -478,7 +478,57 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         }
     }
 
+    if (metadata->audit_log_metadata) {
+        struct audit_log * audit_log = metadata->audit_log_metadata->audit_log;
+
+        if (audit_log_complete_write(audit_log, metadata->version)) {
+            log_error("audit_log_complete_write() FAILED\n");
+            goto out_err;
+        }
+
+        if (__nexus_metadata_sync(metadata->audit_log_metadata)) {
+            log_error("could not sync audit_log\n");
+            goto out_err;
+        }
+
+        metadata->audit_log_metadata = NULL;
+    }
+
     return ret;
+out_err:
+    metadata->audit_log_metadata = NULL;
+
+    return -1;
+}
+
+int
+__nexus_metadata_sync(struct nexus_metadata * metadata)
+{
+    nexus_io_flags_t old_flags = metadata->flags;
+
+    if (!metadata->is_locked) {
+        if (nexus_metadata_lock(metadata, NEXUS_FWRITE)) {
+            log_error("nexus_metadata_lock() FAILED\n");
+            goto out_err;
+        }
+    }
+
+    if (nexus_metadata_store(metadata)) {
+        log_error("nexus_metadata_store() FAILED\n");
+        goto out_err;
+    }
+
+    // reopen in old mode
+    if (nexus_io_in_lock_mode(old_flags)) {
+        if (nexus_metadata_lock(metadata, old_flags)) {
+            log_error("nexus_metadata_lock() FAILED\n");
+            goto out_err;
+        }
+    }
+
+    return 0;
+out_err:
+    return -1;
 }
 
 struct nexus_metadata *
@@ -608,35 +658,15 @@ metadata_create_audit_log(struct nexus_metadata * metadata)
 
     attribute_table_set_audit_log(attribute_table, &audit_log_uuid);
 
+    __metadata_set_dirty(metadata);
+
     // check the file is in write-mode, flush it, and re-open
-    {
-        nexus_io_flags_t old_flags = metadata->flags;
-
-        if (!nexus_io_in_lock_mode(old_flags)) {
-            if (nexus_metadata_lock(metadata, NEXUS_FWRITE)) {
-                log_error("nexus_metadata_lock() FAILED\n");
-                goto out_err;
-            }
-        }
-
-        __metadata_set_dirty(metadata);
-
-        if (nexus_metadata_store(metadata)) {
-            log_error("nexus_metadata_store() FAILED\n");
-            goto out_err;
-        }
-
-        // reopen in old mode
-        if (nexus_io_in_lock_mode(old_flags)) {
-            if (nexus_metadata_lock(metadata, old_flags)) {
-                log_error("nexus_metadata_lock() FAILED\n");
-                goto out_err;
-            }
-        }
+    if (__nexus_metadata_sync(metadata)) {
+        log_error("__nexus_metadata_sync() FAILED\n");
+        goto out_err;
     }
 
     return 0;
-
 out_err:
     return -1;
 }

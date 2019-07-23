@@ -260,6 +260,35 @@ audit_log_add_event(struct audit_log  * audit_log,
     return 0;
 }
 
+int
+audit_log_complete_write(struct audit_log * audit_log, size_t new_version)
+{
+    // get the last element and check if there's need for version change
+    struct audit_event * event = NULL;
+
+    event = list_last_entry(&audit_log->events_list, struct audit_event, node);
+
+    if (!perm_type_modifies_object(event->_evt.perm)) {
+        char * perm_string = perm_type_to_string(event->_evt.perm);
+        log_error("Permission type ('%s') is not a write-permission\n", perm_string);
+        nexus_free(perm_string);
+        return -1;
+    }
+
+    if (event->_evt.version >= new_version) {
+        log_error("new version has to be greater. old_version=%zu, new_version=%zu\n",
+                  event->_evt.version,
+                  new_version);
+        return -1;
+    }
+
+    event->_evt.version = new_version;
+
+    __audit_log_set_dirty(audit_log);
+
+    return 0;
+}
+
 
 int
 audit_log_print(struct audit_log * audit_log, struct nexus_usertable * usertable)

@@ -135,7 +135,7 @@ __abac_request_insert_facts(struct abac_request   * abac_req,
                             struct nexus_metadata * metadata,
                             struct nexus_list     * sys_functions)
 {
-    if (metadata->version == entity->metadata_version) {
+    if (metadata->version && metadata->version == entity->metadata_version) {
         return 0;
     }
 
@@ -370,6 +370,10 @@ __audit_abac_request(struct abac_request * abac_req)
     if (nexus_metadata_store(audit_log_metadata)) {
         log_error("nexus_metadata_store() FAILED\n");
         goto out_err;
+    }
+
+    if (perm_type_modifies_object(abac_req->perm_type)) {
+        abac_req->obj_metadata->audit_log_metadata = audit_log_metadata;
     }
 
     return 0;

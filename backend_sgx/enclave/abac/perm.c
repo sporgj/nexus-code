@@ -36,3 +36,19 @@ perm_type_to_string(perm_type_t perm_type)
 
     return NULL;
 }
+
+bool
+perm_type_modifies_object(perm_type_t perm_type)
+{
+    switch (perm_type) {
+        case PERM_READ:
+        case PERM_AUDIT:
+            return false;
+        case PERM_DELETE:
+        case PERM_WRITE:
+        case PERM_CREATE:
+            return true;
+    }
+
+    return false;
+}

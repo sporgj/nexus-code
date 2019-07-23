@@ -38,8 +38,7 @@ audit_log_add_event(struct audit_log  * audit_log,
                     struct nexus_uuid * uuid,
                     size_t              version);
 
+// for create/write operations.. a 2nd metadata commit is necessary for storing that metadata
+// object
 int
-audit_log_add_event(struct audit_log  * audit_log,
-                    perm_type_t         perm,
-                    struct nexus_uuid * uuid,
-                    size_t              version);
+audit_log_complete_write(struct audit_log * audit_log, size_t new_version);
