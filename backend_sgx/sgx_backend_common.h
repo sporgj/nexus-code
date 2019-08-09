@@ -103,7 +103,13 @@ struct nxs_telemetry {
 
     size_t     policy_store_bytes;
     size_t     policy_store_count;
+    uint64_t   policy_store_load_time_ns;
 
     size_t     asserted_facts_count;
     size_t     asserted_rules_count;
+};
+
+
+struct nxs_tick_tok {
+    uint64_t volatile nsec;
 };

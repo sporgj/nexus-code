@@ -33,6 +33,10 @@
 // For every run of NeXUS, there will be a unique instance
 extern struct nxs_instance * global_nxs_instance;
 
+struct __tick_tok {
+    uint64_t volatile nsec;
+};
+
 
 struct sgx_backend {
     sgx_enclave_id_t              enclave_id;
@@ -60,6 +64,8 @@ struct sgx_backend {
     time_t                        batch_finish_time;
     struct nexus_datastore      * batch_datastore;
     char                        * batch_dirpath;
+
+    struct nxs_tick_tok         * tick_tok;
 
     struct nexus_list             batch_deleted_uuids;
 };
@@ -92,6 +98,15 @@ sgx_backend_create_volume(struct nexus_volume * volume, void * priv_data);
 
 int
 sgx_backend_open_volume(struct nexus_volume * volume, void * priv_data);
+
+
+// timer.c
+
+struct nxs_tick_tok *
+time_ticker_create();
+
+int
+time_ticker_destroy(struct nxs_tick_tok * tick_tok);
 
 
 // --------------------

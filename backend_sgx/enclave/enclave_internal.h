@@ -70,6 +70,8 @@ extern struct nexus_metadata       * global_supernode_metadata;
 
 extern struct nexus_heap           * global_heap;
 
+extern struct nxs_tick_tok         * global_tick_tok;
+
 
 extern nexus_uid_t                   global_user_id;
 
@@ -93,3 +95,6 @@ nexus_verfiy_pubkey(struct nexus_hash * user_pubkey_hash);
 
 bool
 nexus_enclave_is_current_user_owner();
+
+void
+enclave_get_ticktock(uint64_t * const nsec);

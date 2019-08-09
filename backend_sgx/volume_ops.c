@@ -46,7 +46,8 @@ init_enclave(struct sgx_backend * backend)
     err = ecall_init_enclave(backend->enclave_id,
                              &ret,
                              backend->volume,
-                             &backend->heap_manager);
+                             &backend->heap_manager,
+                             backend->tick_tok);
 
     if (err || ret) {
         log_error("ecall_init_enclave() FAILED\n");

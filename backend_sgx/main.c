@@ -59,15 +59,8 @@ sgx_backend_exit(struct sgx_backend * sgx_backend)
 static int
 initialize_batch_datastore(struct sgx_backend * backend)
 {
-    char template[] = "/tmp/batch.XXXXXX";
-
-    backend->batch_dirpath = mkdtemp(template);
-    if (backend->batch_dirpath == NULL) {
-        log_error("mkdtemp() FAILED\n");
-        return -1;
-    }
-
-    backend->batch_dirpath = strndup(backend->batch_dirpath, PATH_MAX);
+    // TODO find better way of generating batching path
+    backend->batch_dirpath = strndup("/tmp/batch-nexus", PATH_MAX);
 
     nexus_printf("batch_datastore init:: %s\n", backend->batch_dirpath);
 
@@ -179,6 +172,8 @@ sgx_backend_init(nexus_json_obj_t backend_cfg)
 
         nexus_heap_init(&sgx_backend->heap_manager, sgx_backend->mmap_ptr, sgx_backend->mmap_len);
     }
+
+    sgx_backend->tick_tok = time_ticker_create();
 
     sgx_backend->volume_chunk_size = NEXUS_CHUNK_SIZE;
 
