@@ -87,6 +87,9 @@ int
 sgx_backend_abac_policy_del(struct nexus_uuid * uuid, struct nexus_volume * volume);
 
 int
+sgx_backend_abac_policy_del_first(struct nexus_volume * volume);
+
+int
 sgx_backend_abac_policy_ls(struct nexus_volume * volume);
 
 int

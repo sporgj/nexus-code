@@ -10,6 +10,7 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
     nexus_uuid_gen(entry_uuid);
 
     // perform the access check
+#if 0
     {
         struct nexus_dentry * parent_dentry = metadata_get_dentry(parent_dirnode->metadata);
         struct nexus_dentry * tmp_dentry    = NULL;
@@ -34,6 +35,7 @@ __nxs_fs_create(struct nexus_dirnode  * parent_dirnode,
 
         dentry_delete_tmp(tmp_dentry);
     }
+#endif
 
     if (buffer_layer_new(entry_uuid)) {
         log_error("buffer_layer_new() FAILED\n");
@@ -70,6 +72,11 @@ ecall_fs_create(char                * dirpath_IN,
         log_error("could not get metadata\n");
         sgx_spin_unlock(&vfs_ops_lock);
         return -1;
+    }
+
+    if (!bouncer_access_check(metadata, PERM_CREATE)) {
+        log_error("ACCESS DENIED\n");
+        goto out;
     }
 
     // perform the create operation
@@ -155,6 +162,7 @@ __nxs_fs_remove(struct nexus_metadata  * metadata,
     tmp_type = direntry->dir_rec.type;
 
     // access control
+#if 0
     {
         struct nexus_dentry * parent_dentry = metadata_get_dentry(metadata);
         struct nexus_dentry * child_dentry  = NULL;
@@ -194,6 +202,7 @@ __nxs_fs_remove(struct nexus_metadata  * metadata,
             dentry_delete_tmp(tmp_dentry);
         }
     }
+#endif
 
 perform_removal:
     *should_remove = true;
@@ -237,6 +246,10 @@ ecall_fs_remove(char                   * dirpath_IN,
         return -1;
     }
 
+    if (!bouncer_access_check(metadata, PERM_DELETE)) {
+        log_error("ACCESS DENIED\n");
+        goto out;
+    }
 
     dentry_delete_child(metadata_get_dentry(metadata), filename_IN);
 

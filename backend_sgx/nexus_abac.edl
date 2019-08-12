@@ -102,6 +102,8 @@ enclave {
             [in] struct nexus_uuid         * rule_uuid_IN
         );
 
+        public int ecall_abac_policy_del_first();
+
         public int ecall_abac_policy_ls
         (
             [user_check] struct nxs_policy_rule    * rules_buffer_out,

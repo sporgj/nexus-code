@@ -736,6 +736,17 @@ handle_abac_policy_del(int argc, char ** argv)
 }
 
 static int
+handle_abac_policy_pop(int argc, char ** argv)
+{
+    if (sgx_backend_abac_policy_del_first(mounted_volume)) {
+        log_error("sgx_backend_abac_policy_del_first() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
 handle_abac_policy_add(int argc, char ** argv)
 {
     struct nexus_uuid uuid;
@@ -987,6 +998,7 @@ static struct _cmd cmds[]
 
         { "abac_policy_add", handle_abac_policy_add, "Add a policy", "'<policy_string>'" },
         { "abac_policy_del", handle_abac_policy_del, "Delete a policy", "<policy_uuid>" },
+        { "abac_policy_pop", handle_abac_policy_pop, "Delete the first policy", "" },
         { "abac_policy_ls", handle_abac_policy_ls, "List volume policies", "" },
 
         { "abac_print_facts", handle_abac_print_facts, "List current facts", "" },

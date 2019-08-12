@@ -626,6 +626,33 @@ out_err:
 }
 
 int
+ecall_abac_policy_del_first()
+{
+    struct policy_store * policy_store = abac_acquire_policy_store(NEXUS_FRDWR);
+
+    if (policy_store == NULL) {
+        log_error("could not acquire policy store\n");
+        return -1;
+    }
+
+    if (policy_store_del_first(policy_store)) {
+        log_error("policy_store_del_first() FAILED\n");
+        goto out_err;
+    }
+
+    if (abac_flush_policy_store()) {
+        log_error("abac_flush_policy_store() FAILED\n");
+        goto out_err;
+    }
+
+    return 0;
+out_err:
+    abac_release_policy_store();
+
+    return -1;
+}
+
+int
 ecall_abac_policy_ls(struct nxs_policy_rule * rules_buffer_out,
                      size_t                   rules_buffer_capacity,
                      size_t                   offset,

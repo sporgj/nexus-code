@@ -328,6 +328,19 @@ policy_store_del(struct policy_store * policy_store, struct nexus_uuid * rule_uu
     return 0;
 }
 
+int
+policy_store_del_first(struct policy_store * policy_store)
+{
+    if (policy_store->rules_count < 1) {
+        log_error("zero policies\n");
+        return -1;
+    }
+
+    struct policy_rule * rule = nexus_list_get(&policy_store->rules_list, 0);
+
+    return policy_store_del(policy_store, &rule->rule_uuid);
+}
+
 
 static uint8_t *
 __export_policy_rule(struct policy_rule * policy_rule, uint8_t * buffer, size_t buflen)

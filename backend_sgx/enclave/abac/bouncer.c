@@ -372,10 +372,6 @@ __audit_abac_request(struct abac_request * abac_req)
         goto out_err;
     }
 
-    if (perm_type_modifies_object(abac_req->perm_type)) {
-        abac_req->obj_metadata->audit_log_metadata = audit_log_metadata;
-    }
-
     return 0;
 out_err:
     return -1;
@@ -414,9 +410,22 @@ bouncer_access_check(struct nexus_metadata * metadata, perm_type_t perm_type)
     }
 
     // 3 - query the database
+#if 0
+    uint64_t start = 0;
+    uint64_t stop  = 0;
+
+    enclave_get_ticktock(&start);
+#endif
+
     if (db_ask_permission(perm_type, user_profile_entity, abac_req->obj_entity)) {
         goto out_err;
     }
+
+#if 0
+    enclave_get_ticktock(&stop);
+
+    nexus_printf("EVALUATION TIME = %llu\n", (stop - start));
+#endif
 
     // 4 - check if there's an audit
     if (__audit_abac_request(abac_req)) {
@@ -452,6 +461,12 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
     {
         struct nexus_list_iterator * iter = list_iterator_new(&new_policystore->rules_list);
 
+        size_t counter = 0;
+        uint64_t start = 0;
+        uint64_t stop  = 0;
+
+        enclave_get_ticktock(&start);
+
         while (list_iterator_is_valid(iter)) {
             struct policy_rule * rule = list_iterator_get(iter);
 
@@ -461,11 +476,19 @@ bouncer_update_policy_store(struct policy_store * old_policystore,
                 return -1;
             }
 
+            counter += 1;
+
             list_iterator_next(iter);
         }
 
+        enclave_get_ticktock(&stop);
+
         list_iterator_free(iter);
+
+        nexus_printf("POLICY STORE: COUNT = %zu, TIME = %llu\n", counter, (stop - start));
     }
+
+    policy_store_cached_version = new_policystore->metadata->version;
 
     return 0;
 }

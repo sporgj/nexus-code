@@ -1,4 +1,5 @@
 #include "nexus_fuse.h"
+#include <wordexp.h>
 
 
 
@@ -974,17 +975,58 @@ static struct fuse_lowlevel_ops nxs_fuse_ops = {
     .init                   = nxs_fuse_init,
 };
 
+////
+
+static struct options {
+    const char * user_key;
+} options;
+
+#define OPTION(t, p)                                                                               \
+    {                                                                                              \
+        t, offsetof(struct options, p), 1                                                          \
+    }
+static const struct fuse_opt option_spec[] = { OPTION("--user_key=%s", user_key), FUSE_OPT_END };
+
+////
+
 int
-start_fuse(int argc, char * argv[], bool foreground, char * mount_path)
+start_fuse(int argc, char * argv[], bool foreground, char * volume_path, char * mount_path)
 {
     struct fuse_args         args = FUSE_ARGS_INIT(argc, argv);
     struct fuse_session *    se   = NULL;
     struct fuse_cmdline_opts opts;
 
+    options.user_key = NULL;
+
+    if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1) {
+        return 1;
+    }
+
     int ret = -1;
 
     if (fuse_parse_cmdline(&args, &opts) != 0) {
         return 1;
+    }
+
+    // mount the nexus volume after parsing arguments
+    {
+        if (options.user_key) {
+            wordexp_t userkey_fpath_exp;
+
+            wordexp(options.user_key, &userkey_fpath_exp, 0);
+
+            nexus_config.user_key_path = strndup(userkey_fpath_exp.we_wordv[0], PATH_MAX);
+            nexus_printf("User key: %s\n", nexus_config.user_key_path);
+
+            wordfree(&userkey_fpath_exp);
+        }
+
+        nexus_fuse_volume = nexus_mount_volume(volume_path);
+
+        if (nexus_fuse_volume == NULL) {
+            log_error("failed to mount '%s'\n", volume_path);
+            return -1;
+        }
     }
 
     // github.com/libfuse/libfuse/blob/master/example/hello_ll.c

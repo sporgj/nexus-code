@@ -402,9 +402,11 @@ db_evict_entity(struct kb_entity * entity)
         return -1;
     }
 
+#if 0
     if (evict_count > 0) {
         nexus_printf("evicted %d facts for `%s`\n", evict_count, entity->uuid_str);
     }
+#endif
 
     cached_facts_count -= evict_count;
 

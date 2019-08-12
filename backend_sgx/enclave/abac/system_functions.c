@@ -23,32 +23,52 @@ sys_func_get_name(struct __sys_func * sys_func)
     return sys_func->name;
 }
 
-struct abac_value *
+static struct abac_value *
 __handle_uname(struct nexus_metadata * metadata)
 {
     return abac_value_from_str(global_user_struct->name);
 }
 
-struct abac_value *
+static struct abac_value *
 __handle_upkey(struct nexus_metadata * metadata)
 {
     // TODO
     return NULL;
 }
 
-struct abac_value *
-__handle_opath(struct nexus_metadata * metadata)
+static struct abac_value *
+__handle_odirname(struct nexus_metadata * metadata)
 {
     struct nexus_dentry * dentry = metadata_get_dentry(metadata);
 
     if (dentry) {
-        return abac_value_from_str(dentry_get_fullpath(dentry));
+        // if we are in the root
+        if (dentry->parent == NULL || dentry->parent->parent == NULL) {
+            return abac_value_from_str("/");
+        }
+
+        return abac_value_from_str(dentry->parent->name);
     }
 
     return NULL;
 }
 
-struct abac_value *
+static struct abac_value *
+__handle_opath(struct nexus_metadata * metadata)
+{
+    struct nexus_dentry * dentry = metadata_get_dentry(metadata);
+
+    if (dentry) {
+        char * path = dentry_get_fullpath(dentry);
+        struct abac_value * value = abac_value_from_str(path);
+        nexus_free(path);
+        return value;
+    }
+
+    return NULL;
+}
+
+static struct abac_value *
 __handle_oname(struct nexus_metadata * metadata)
 {
     struct nexus_dentry * dentry = metadata_get_dentry(metadata);
@@ -60,7 +80,7 @@ __handle_oname(struct nexus_metadata * metadata)
     return NULL;
 }
 
-struct abac_value *
+static struct abac_value *
 __handle_osize(struct nexus_metadata * metadata)
 {
     if (metadata->type == NEXUS_DIRNODE) {
@@ -72,7 +92,7 @@ __handle_osize(struct nexus_metadata * metadata)
     return NULL;
 }
 
-struct abac_value *
+static struct abac_value *
 __handle_otype(struct nexus_metadata * metadata)
 {
     if (metadata->type == NEXUS_DIRNODE) {
@@ -93,6 +113,7 @@ static struct __sys_func system_functions[] = {
     { "@oname", __handle_oname, OBJECT_FUNCTION },
     { "@osize", __handle_osize, OBJECT_FUNCTION },
     { "@otype", __handle_otype, OBJECT_FUNCTION },
+    { "@odirname", __handle_odirname, OBJECT_FUNCTION },
     { NULL, NULL, 0 }
 };
 

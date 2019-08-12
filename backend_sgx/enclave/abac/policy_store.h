@@ -44,6 +44,9 @@ policy_store_add(struct policy_store * policy_store, struct policy_rule * policy
 int
 policy_store_del(struct policy_store * policy_store, struct nexus_uuid * rule_uuid);
 
+int
+policy_store_del_first(struct policy_store * policy_store);
+
 
 /**
  * Returns a list of policies matching the given action

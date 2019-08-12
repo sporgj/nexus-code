@@ -251,6 +251,8 @@ dirnode_from_buffer(uint8_t * buffer, size_t buflen, nexus_io_flags_t flags)
         goto out_err;
     }
 
+    input_ptr += attribute_table_get_size(dirnode->attribute_table);
+
     /* load the dirnode buckets */
     if (__load_bucket0(dirnode, input_ptr)) {
         log_error("could not load dirnode buckets\n");

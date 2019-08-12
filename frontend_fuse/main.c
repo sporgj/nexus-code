@@ -41,13 +41,6 @@ main(int argc, char * argv[])
 
     nexus_init();
 
-    nexus_fuse_volume = nexus_mount_volume(volume_path);
-
-    if (nexus_fuse_volume == NULL) {
-        log_error("failed to mount '%s'\n", volume_path);
-        goto out;
-    }
-
 
     if (vfs_init()) {
         log_error("could not initialize the internal VFS system\n");
@@ -62,7 +55,7 @@ main(int argc, char * argv[])
     printf("Starting nexus-fuse at [%s] (pid=%d)...\n", mount_path, (int) getpid());
 
     argv[1] = argv[0];
-    ret = start_fuse(argc - 1, &argv[1], true, mount_path);
+    ret = start_fuse(argc - 1, &argv[1], true, volume_path, mount_path);
 
 
 out:

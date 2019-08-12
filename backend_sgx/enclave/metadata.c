@@ -478,6 +478,7 @@ nexus_metadata_store(struct nexus_metadata * metadata)
         }
     }
 
+#if 0
     if (metadata->audit_log_metadata) {
         struct audit_log * audit_log = metadata->audit_log_metadata->audit_log;
 
@@ -493,6 +494,7 @@ nexus_metadata_store(struct nexus_metadata * metadata)
 
         metadata->audit_log_metadata = NULL;
     }
+#endif
 
     return ret;
 out_err:

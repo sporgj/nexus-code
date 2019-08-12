@@ -58,7 +58,7 @@ dentry_create_tmp(struct nexus_dentry * parent_dentry,
 
     nexus_metadata_type_t tmp_metadata_type = (type == NEXUS_DIR ? NEXUS_DIRNODE : NEXUS_FILENODE);
 
-    dentry->metadata = nexus_metadata_create(uuid, tmp_metadata_type);
+    dentry_instantiate(dentry, nexus_metadata_create(uuid, tmp_metadata_type));
 
     dentry->parent = dentry_get(parent_dentry);
 
@@ -454,10 +454,44 @@ dentry_lookup(struct path_walker * walker)
     return walk_path(walker);
 }
 
-
-// TODO implement function
 char *
 dentry_get_fullpath(struct nexus_dentry * dentry)
 {
-    return strndup(dentry->name, NEXUS_NAME_MAX);
+    char * result = NULL;
+    char * end    = NULL;
+
+    struct nexus_dentry * current = NULL;
+
+    size_t total_len = 0;
+
+
+    if (dentry->parent == NULL) {
+        return strndup("/", NEXUS_NAME_MAX);
+    }
+
+    current = dentry;
+
+    while (current->parent) {
+        total_len += (current->name_len + 1);
+
+        current = current->parent;
+    }
+
+    // allocate and start writing the dentry names from the end
+    result = nexus_malloc(total_len + 1);
+    end    = result + total_len;
+
+    current = dentry;
+
+    while (current->parent) {
+        char * ptr = end - (current->name_len + 1);
+
+        *ptr = '/';
+        memcpy(ptr + 1, current->name, current->name_len);
+        end = ptr;
+
+        current = current->parent;
+    }
+
+    return result;
 }

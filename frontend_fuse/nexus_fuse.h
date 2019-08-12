@@ -14,7 +14,7 @@ extern struct nexus_volume      * nexus_fuse_volume;
  * Starts the FUSE filesystem, at specified mount point
  */
 int
-start_fuse(int argc, char * argv[], bool foreground, char * mount_path);
+start_fuse(int argc, char * argv[], bool foreground, char * volume_path, char * mount_path);
 
 
 int

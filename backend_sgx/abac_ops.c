@@ -306,6 +306,23 @@ sgx_backend_abac_policy_del(struct nexus_uuid * uuid, struct nexus_volume * volu
 }
 
 
+int
+sgx_backend_abac_policy_del_first(struct nexus_volume * volume)
+{
+    struct sgx_backend * backend = __sgx_backend_from_volume(volume);
+
+    int ret = -1;
+    int err = ecall_abac_policy_del_first(backend->enclave_id, &ret);
+
+    if (err || ret) {
+        log_error("ecall_abac_policy_del_first() FAILED\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
 static void
 __print_policy_buffer(struct nxs_policy_rule * rules_buffer, size_t result_count)
 {
