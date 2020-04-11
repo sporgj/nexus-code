@@ -51,9 +51,7 @@ ecall_init_enclave(struct nexus_volume  * volume,
                    struct nxs_tick_tok  * tick_tok)
 {
     global_volume      = volume;
-
     global_heap        = heap;
-
     global_tick_tok    = tick_tok;
 
     if (buffer_layer_init() != 0) {
