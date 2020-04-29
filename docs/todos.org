@@ -1,4 +1,0 @@
-#+TITLE: TODOS
-
-* TODO Add link to VM box
-  DEADLINE: <2017-10-25 Wed>
