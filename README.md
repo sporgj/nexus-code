@@ -6,7 +6,10 @@ such as Dropbox and Google Drive. The protection offered by NeXUS is rooted in
 trusted hardware, which enables the secure processing of sensitive information
 without any leakage. NeXUS is built on top of Intel SGX and the current
 prototype uses FUSE. Furthermore, the trusted portion is also equipped with a
-datalog logic engine for Attribute-Based Access Control (ABAC) enforcement.
+datalog logic engine for Attribute-Based Access Control (ABAC) enforcement over
+files and directories.
+The entire prototype runs without requiring any server-side modifications, and
+results show good performance on typical user workloads.
 
 Please consult the `INSTALL.md` for instructions on how to build NeXUS on your
 platform.
