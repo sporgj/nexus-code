@@ -911,7 +911,7 @@ split_string_to_my_argv(char * parm_chars)
         }
     }
 
-    if (pos == 0 && my_argv[0] != '\0') {
+    if (pos == 0 && *my_argv[0] != '\0') {
         pos = 1;
     }
 

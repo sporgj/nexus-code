@@ -21,7 +21,6 @@
 #include <nexus_json.h>
 #include <nexus_log.h>
 #include <nexus_raw_file.h>
-#include <nexus_file_handle.h>
 #include <nexus_util.h>
 #include <nexus_types.h>
 
@@ -473,10 +472,10 @@ flat_fwrite(struct nexus_file_handle * file_handle, uint8_t * buf, size_t size, 
     return nexus_file_handle_write(file_handle, buf, size);
 }
 
-void
+int
 flat_fclose(struct nexus_file_handle * file_handle, void * priv_data)
 {
-    nexus_file_handle_close(file_handle);
+    return nexus_file_handle_close(file_handle);
 }
 
 
